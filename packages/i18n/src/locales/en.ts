@@ -809,6 +809,7 @@ export const en: Translation = {
         more: 'Show more',
         moreError: 'The rest could not load.',
         listLoadError: 'The feedback could not load.',
+        settling: 'Saving…',
       },
       settledField: {
         title: 'Fixed feedback',

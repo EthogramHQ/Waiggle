@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ListGroup } from '../ui/ListGroup'
 import { type ActionMenuItem, MessageBubble } from '../ui/MessageBubble'
+import { Notice } from '../ui/Notice'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
@@ -248,6 +249,34 @@ function Bubbles({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] })
             outcome={outcome('partly')}
             device={device('phone')}
             settled={t(($) => $.project.testers.thread.settled)}
+            menu={own}
+          />
+        </Example>
+        {/* R7b, K13 : « Marquer comme réglé » en route, puis refusé, sous la bulle touchée. */}
+        <Example caption={at(`${l.feedback} · réglage en cours (K13)`)}>
+          <MessageBubble
+            from="tester"
+            kind="feedback"
+            mine={false}
+            name={l.ines}
+            text={l.partly}
+            at={LATER}
+            outcome={outcome('partly')}
+            settled={t(($) => $.project.testers.thread.settled)}
+            pending={t(($) => $.project.testers.thread.settling)}
+            menu={own}
+          />
+        </Example>
+        <Example caption={at(`${l.feedback} · réglage refusé (K13)`)}>
+          <MessageBubble
+            from="tester"
+            kind="feedback"
+            mine={false}
+            name={l.ines}
+            text={l.partly}
+            at={LATER}
+            outcome={outcome('partly')}
+            notice={<Notice message={t(($) => $.project.testers.thread.settleError)} />}
             menu={own}
           />
         </Example>

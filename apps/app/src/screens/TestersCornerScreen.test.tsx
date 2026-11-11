@@ -15,7 +15,9 @@
 // - les onglets sont des `tab` (`ui/Tabs`), les filtres « À traiter » / « Réglés » des `radio`
 //   (`ui/Segmented`, nom lu « À traiter, 3 fils ») ;
 // - le reste est dans `TestersCorner.testkit.tsx` (faux serveur, routeur, textes).
+import { palettes } from '@ruche/brand'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { clearAllDrafts } from '../testers/drafts'
 import { passTapGuard } from '../testing/dialog'
 import { reportsOpened } from '../testing/navigation'
@@ -673,7 +675,49 @@ describe('the tab « Retours » of a tester', () => {
 
     expect(await screen.findByLabelText(containing(kit().replyTo(lea.name)))).toBeTruthy()
   })
+
+  // R7b, K12 (correction 14) : sur téléphone, le compositeur collé au pied de l'écran, hors de la
+  // zone qui défile, comme dans le fil de l'auteur ; « Envoyer un retour » reste dans le fil.
+  it('pins the composer to the foot of the screen on a phone, « Envoyer un retour » in the thread', async () => {
+    await openAsInes()
+
+    const field = await screen.findByLabelText(containing(kit().replyTo(lea.name)))
+    expect(insideScroller(field)).toBe(false)
+    expect(insideScroller(getControl(T.sendFeedback))).toBe(true)
+  })
+
+  it('shows one honey action at a time to a tester who has written', async () => {
+    await openAsInes()
+    await screen.findByLabelText(containing(kit().replyTo(lea.name)))
+
+    // La règle (une seule action miel), pas la couleur choisie : au plus un fond miel, actif ou non.
+    const honey = (element: ReturnType<typeof screen.getByRole>) => {
+      const background = StyleSheet.flatten(element.props.style)?.backgroundColor
+      return background === palettes.day.honey || background === palettes.day.honeyDisabled
+    }
+    expect(screen.getAllByRole('button').filter(honey)).toHaveLength(1)
+  })
+
+  it('keeps « Envoyer un retour » in honey for a tester who has not written yet', async () => {
+    seenByInes()
+    mockServer.setThread(ines.id, [])
+    mockNav.params = { id, tab: 'feedback' }
+    await openCorner()
+
+    const send = await screen.findByRole('button', { name: T.sendFeedback })
+    expect(StyleSheet.flatten(send.props.style)?.backgroundColor).toBe(palettes.day.honey)
+  })
 })
+
+/** Vrai si l'élément est dans la zone qui défile de l'écran (un ScrollView le contient). */
+const insideScroller = (element: unknown) => {
+  let node = element as { type: unknown; parent: unknown } | null
+  while (node) {
+    if (node.type === 'RCTScrollView') return true
+    node = node.parent as typeof node
+  }
+  return false
+}
 
 // --- L'ancien testeur ---
 

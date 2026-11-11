@@ -954,6 +954,8 @@ export const fr = {
         more: 'Afficher la suite',
         moreError: 'La suite n’a pas pu se charger.',
         listLoadError: 'Les retours n’ont pas pu se charger.',
+        // Sous un retour, pendant « Marquer comme réglé » ou « Remettre à traiter » (ui-A1).
+        settling: 'Enregistrement…',
       },
       // La partie « Retours réglés » de la feuille « Nouvelle mise à jour ».
       settledField: {

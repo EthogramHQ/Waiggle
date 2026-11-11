@@ -160,6 +160,8 @@ function ThreadPage({ project, corner, tester, memberId }: PageProps) {
       corner={corner}
       tester={tester}
       memberId={memberId}
+      // Sur téléphone, la page s'ouvre sur le dernier message, au-dessus du compositeur (K11).
+      openAtLatest
       layout={({ head, messages, footer }) => (
         <Screen
           width="page"
@@ -193,7 +195,10 @@ export function AuthorThreadPane({
   memberId,
   headingRef,
   layout,
+  openAtLatest = false,
 }: PageProps & {
+  /** Le fil s'ouvre sur son dernier message (`TesterThreadView`) : la page du fil seulement. */
+  openAtLatest?: boolean
   headingRef?: Ref<Focusable>
   /** Range les trois morceaux ; par défaut, l'un sous l'autre. */
   layout?: (parts: TesterThreadParts & { head: ReactNode }) => ReactNode
@@ -232,6 +237,7 @@ export function AuthorThreadPane({
       testerName={tester.name}
       readOnly={readOnly}
       closed={corner.closed}
+      openAtLatest={openAtLatest}
       layout={({ messages, footer }) => (
         <>
           {layout ? (

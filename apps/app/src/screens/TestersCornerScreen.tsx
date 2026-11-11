@@ -70,6 +70,7 @@ import { ListGroup } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
+import { ScreenFooterSlot } from '../ui/ScreenFooterSlot'
 import { Segmented } from '../ui/Segmented'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
@@ -334,14 +335,19 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
         <Stack gap="lg">
           {messages}
           {former ? null : (
-            // La seule action miel de l'onglet (planche validée 9).
+            // L'action miel de l'onglet (planche validée 9), tant que le compositeur n'en montre pas
+            // une : sur téléphone, sa flèche est miel, et une seule action miel se voit à la fois
+            // (K12, correction 14). Sur ordinateur, son « Envoyer » est blanc.
             <Button
               label={t(($) => $.project.testers.feedback.send)}
               icon="plus"
+              {...(footer !== null && !columns ? { variant: 'secondary' as const } : null)}
               onPress={() => router.push(`${cornerPath}/new-feedback`)}
             />
           )}
-          {footer}
+          {/* Sur téléphone, le compositeur collé au pied de l'écran, comme dans le fil de l'auteur
+              (K12) ; sur ordinateur, sous le fil. */}
+          {footer !== null ? <ScreenFooterSlot>{footer}</ScreenFooterSlot> : null}
         </Stack>
       )}
     />
