@@ -32,7 +32,18 @@ export type ColumnsRow = { main: ReactNode; side: ReactNode; continues?: boolean
 export type SideWidth = 'regular' | 'wide'
 
 type Props = { gap?: Space; sideWidth?: SideWidth } & (
-  | { main: ReactNode; side: ReactNode; rows?: never; divided?: never }
+  | {
+      main: ReactNode
+      side: ReactNode
+      /**
+       * La latérale à gauche, lue d'abord (R7b, le coin des testeurs : la liste des fils à gauche,
+       * le fil ouvert à droite, qui prend la place gagnée). Quand la place manque, elle passe
+       * au-dessus.
+       */
+      sideFirst?: boolean
+      rows?: never
+      divided?: never
+    }
   | {
       /** Les rangées, dans l'ordre de lecture. */
       rows: readonly ColumnsRow[]
@@ -40,6 +51,7 @@ type Props = { gap?: Space; sideWidth?: SideWidth } & (
       divided?: boolean
       main?: never
       side?: never
+      sideFirst?: never
     }
 )
 
@@ -47,7 +59,15 @@ export function Columns(props: Props) {
   const gap = props.gap ?? 'xxl'
   const sideWidth = props.sideWidth ?? 'regular'
   if (props.rows === undefined) {
-    return <ColumnPair main={props.main} side={props.side} gap={gap} sideWidth={sideWidth} />
+    return (
+      <ColumnPair
+        main={props.main}
+        side={props.side}
+        gap={gap}
+        sideWidth={sideWidth}
+        sideFirst={props.sideFirst ?? false}
+      />
+    )
   }
   return (
     // Les rangées l'une sous l'autre, avec le même écart que les colonnes (et autour du trait).
@@ -70,17 +90,34 @@ function ColumnPair({
   side,
   gap,
   sideWidth,
+  sideFirst = false,
 }: {
   main: ReactNode
   side: ReactNode
   gap: Space
   sideWidth: SideWidth
+  sideFirst?: boolean
 }) {
   const wide = sideWidth === 'wide'
+  const sideColumn = (
+    <View
+      style={{
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: layout.sideColumn,
+        ...(wide ? { maxWidth: layout.sideColumnWide } : null),
+        minWidth: 0,
+        gap: space[gap],
+      }}
+    >
+      {side}
+    </View>
+  )
   return (
     <View
       style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[gap], alignItems: 'flex-start' }}
     >
+      {sideFirst ? sideColumn : null}
       {/* flexGrow 999 : la colonne principale prend presque toute la place gagnée. En `wide`, les
           deux colonnes grandissent autant l'une que l'autre, et la latérale s'arrête à sa largeur
           maximale (maxWidth) : le reste revient à la principale. */}
@@ -95,18 +132,7 @@ function ColumnPair({
       >
         {main}
       </View>
-      <View
-        style={{
-          flexGrow: 1,
-          flexShrink: 1,
-          flexBasis: layout.sideColumn,
-          ...(wide ? { maxWidth: layout.sideColumnWide } : null),
-          minWidth: 0,
-          gap: space[gap],
-        }}
-      >
-        {side}
-      </View>
+      {sideFirst ? null : sideColumn}
     </View>
   )
 }
