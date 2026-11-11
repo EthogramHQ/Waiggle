@@ -41,6 +41,11 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   'PUT /v1/suggestions/members/:id/dismissed',
   // R7a : supprimer sa mise à jour reste permis (ce qui défait ne punit pas, comme « Retirer »).
   'DELETE /v1/projects/:id/updates/:updateId',
+  // R7b : marquer un fil lu ne touche qu'à sa propre date de lecture, comme « vu ». « Marquer comme
+  // réglé » est permis pour que la route réponde elle-même 409 `corner_closed` à un auteur
+  // suspendu (le coin est fermé), comme « Remettre à traiter » (un DELETE) : sécurité A7.
+  'POST /v1/projects/:id/threads/:testerId/read',
+  'POST /v1/projects/:id/messages/:messageId/settled',
   'PATCH /v1/me/email-preferences',
   'PATCH /v1/me',
   'POST /v1/email/unsubscribe',

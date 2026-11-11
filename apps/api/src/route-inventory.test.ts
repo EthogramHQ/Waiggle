@@ -90,6 +90,18 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /v1/projects/:id/calls': ['hidesBlocked', 'allowed'],
   'POST /v1/projects/:id/calls': ['own', 'refused'],
   'DELETE /v1/projects/:id/calls/:callId': ['own', 'allowed'],
+  // R7b : les fils de retours. Lire la liste ou un fil montre les messages d'un autre : un blocage
+  // fait du testeur un ancien testeur, et son pseudo et sa photo disparaissent de la liste. Écrire un
+  // message est refusé à un suspendu ; marquer lu et « Marquer comme réglé » restent permis (la
+  // seconde répond elle-même 409 `corner_closed` : sécurité A7) ; les DELETE passent toujours.
+  'GET /v1/projects/:id/threads': ['hidesBlocked', 'allowed'],
+  'GET /v1/projects/:id/threads/:testerId/messages': ['hidesBlocked', 'allowed'],
+  'POST /v1/projects/:id/threads/:testerId/messages': ['hidesBlocked', 'refused'],
+  'POST /v1/projects/:id/threads/:testerId/read': ['own', 'allowed'],
+  'DELETE /v1/projects/:id/messages/:messageId': ['own', 'allowed'],
+  'POST /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed'],
+  'DELETE /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed'],
+  'GET /v1/projects/:id/feedback/open': ['own', 'allowed'],
   'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused'],
   'DELETE /v1/projects/:id/reactions/:kind': ['own', 'allowed'],
   'GET /v1/projects/:id/comments': ['hidesBlocked', 'allowed'],
@@ -190,6 +202,18 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'GET /v1/projects/:id/calls': {
     file: 'tester-calls.test.ts',
     test: 'refuses a former tester the calls',
+  },
+  'GET /v1/projects/:id/threads': {
+    file: 'tester-threads.test.ts',
+    test: 'hides the handle and photo of a blocked former tester in the thread list',
+  },
+  'GET /v1/projects/:id/threads/:testerId/messages': {
+    file: 'tester-threads.test.ts',
+    test: 'treats a block like a departure, in both directions',
+  },
+  'POST /v1/projects/:id/threads/:testerId/messages': {
+    file: 'tester-threads.test.ts',
+    test: 'treats a block like a departure, in both directions',
   },
   'PUT /v1/projects/:id/reactions/:kind': {
     file: 'blocks.test.ts',

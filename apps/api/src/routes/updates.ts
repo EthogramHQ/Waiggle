@@ -15,7 +15,7 @@ import {
   UpdatesQuery,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { after, encodeCursor, readCursor } from '../cursor'
@@ -99,6 +99,9 @@ type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicAp
 /** Levée dans la transaction de publication pour l'annuler : une photo n'est pas rattachable. */
 class InvalidPhotos extends Error {}
 
+/** Levée dans la même transaction : un retour cité n'est pas réglable par cette mise à jour (R7b). */
+class InvalidFeedback extends Error {}
+
 export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
 
@@ -180,6 +183,32 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         if (!locked) return { kind: 'gone' as const }
         if (locked.removedAt !== null) return { kind: 'removed' as const }
         await tx.insert(schema.projectUpdate).values(update)
+
+        // Les retours que cette mise à jour règle (R7b, « Réglé dans la v1.3 »), dans la MÊME
+        // transaction : une seule écriture conditionnelle, comme les photos ci-dessous. « De ce
+        // projet, un retour, ni réglé ni retiré » est dans l'UPDATE lui-même : un retour d'un autre
+        // projet, déjà réglé, retiré, une réponse ou un identifiant inconnu ne sont pas écrits, et
+        // `returning` rend les lignes réellement écrites. Un nombre différent de celui cité, et
+        // toute la publication est annulée (400 `invalid_feedback`, la même réponse dans tous ces
+        // cas). Le règlement porte la date de la mise à jour : « Réglé dans la mise à jour du … ».
+        // L'index partiel tester_message_open_feedback_idx (project_id) donne les retours ouverts.
+        if (body.settledFeedbackIds.length > 0) {
+          const k = schema.testerMessage
+          const settled = await tx
+            .update(k)
+            .set({ settledAt: update.createdAt, settledUpdateId: update.id })
+            .where(
+              and(
+                inArray(k.id, body.settledFeedbackIds),
+                eq(k.projectId, id),
+                eq(k.kind, 'feedback'),
+                isNull(k.settledAt),
+                isNull(k.removedAt),
+              ),
+            )
+            .returning({ id: k.id })
+          if (settled.length !== body.settledFeedbackIds.length) throw new InvalidFeedback()
+        }
         if (body.photos.length === 0) return { kind: 'ok' as const, photos: [] }
 
         // Le rattachement des photos : UNE seule écriture conditionnelle (relecture A1). La
@@ -222,6 +251,9 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         return { kind: 'ok' as const, photos: attached.sort((a, b) => a.position - b.position) }
       })
     } catch (error) {
+      if (error instanceof InvalidFeedback) {
+        return c.json(errorBody(languageOf(c), 'invalid_feedback'), 400)
+      }
       if (!(error instanceof InvalidPhotos)) throw error
       outcome = { kind: 'invalid_photos' }
     }

@@ -418,7 +418,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (written === 'removed') return removed(ctx)
     if (written === 'blocked_mention') return blockedMention(ctx)
 
-    const authors = await authorsOf(db, [user.id], publicApiUrl)
+    const authors = await authorsOf(db, [user.id], publicApiUrl, id)
     const shown = presentComment(row, viewer, authors, false, written)
     if (!shown) return notFound(ctx)
     return ctx.json(Comment.parse({ ...shown, replies: [] }), 201)
@@ -485,7 +485,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (edited === 'blocked_mention') return blockedMention(ctx)
     const { row, mentions } = edited
     const [authors, blocks] = await Promise.all([
-      authorsOf(db, [user.id], publicApiUrl),
+      authorsOf(db, [user.id], publicApiUrl, id),
       blocksOf(db, user.id),
     ])
     // Son auteur voit toujours son commentaire, masqué ou non, sur un projet public ou privé :

@@ -164,6 +164,12 @@ export const memberCounterKeys = (userId: string) => ({
   // ensemble, comptées avant tout examen. Le plafond de 5 appels par jour d'un projet est une autre
   // clé (`projectCallKey`), comptée après le droit d'auteur.
   testerCall: `tester-call:${userId}`,
+  // Les messages du coin (retours et réponses), tous projets ensemble : 30 par 24 heures, comptés
+  // avant tout examen (R7b, sécurité B1).
+  testerMessage: `tester-message:${userId}`,
+  // « Marquer comme réglé » et « Remettre à traiter » : un seul compteur, 120 par heure, mal formées
+  // comprises (R7b, sécurité A8).
+  testerSettle: `tester-settle:${userId}`,
 })
 
 /**
