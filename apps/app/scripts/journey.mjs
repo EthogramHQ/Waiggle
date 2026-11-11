@@ -659,12 +659,66 @@ try {
   )
   console.log('  ok : Sam est testeur du projet de Léa')
 
+  // R7b : le coin des testeurs. Sam envoie un retour ; Léa lance un appel et répond ; sa mise à jour
+  // (plus bas) règle le retour.
+  const samId = (await (await sam.request.get(`${apiUrl}/v1/me`)).json()).id
+  const cornerApi = `${apiUrl}/v1/projects/${projectId}`
+  step('Sam ouvre « Le coin des testeurs » et envoie un retour')
+  await byRole(sam.page, 'button', 'Le coin des testeurs').click()
+  await sam.page.waitForURL(`**/projects/${projectId}/testers`)
+  await byRole(sam.page, 'tab', 'Retours').click()
+  await byRole(sam.page, 'button', 'Envoyer un retour').click()
+  await sam.page.getByRole('heading', { name: 'Ton retour', exact: true }).waitFor()
+  await sam.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+  await byRole(sam.page, 'radio', 'En partie').click()
+  await byRole(sam.page, 'radio', 'Téléphone').click()
+  await sam.page.getByLabel('Raconte, facultatif').fill('le score repart à zéro au niveau 3')
+  await byRole(sam.page, 'button', 'Envoyer', { exact: true }).last().click()
+  // La feuille se ferme sur le coin, où le retour paraît dans le fil de Sam.
+  await sam.page.getByText('le score repart à zéro au niveau 3', { exact: true }).waitFor()
+  await waitFor('retour enregistré', async () => {
+    const res = await sam.request.get(`${cornerApi}/threads/${samId}/messages`)
+    const { items } = await res.json()
+    return (
+      items.length === 1 &&
+      items[0].kind === 'feedback' &&
+      items[0].outcome === 'partly' &&
+      items[0].device === 'phone' &&
+      items[0].text === 'le score repart à zéro au niveau 3'
+    )
+  })
+  console.log('  ok : le retour de Sam est dans son fil (« En partie », Téléphone)')
+
+  step('Léa lance un appel, puis répond au retour de Sam')
+  await open(lea.page, `${appUrl}/projects/${projectId}/testers`)
+  await byRole(lea.page, 'button', 'Lancer un appel').click()
+  await lea.page.getByRole('heading', { name: 'Nouvel appel', exact: true }).waitFor()
+  await lea.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+  await lea.page.getByLabel('Ton appel').fill('Essayez le niveau 3 ce week-end')
+  await byRole(lea.page, 'button', 'Envoyer', { exact: true }).last().click()
+  await lea.page.getByText('Essayez le niveau 3 ce week-end', { exact: true }).waitFor()
+  await waitFor('appel enregistré', async () => {
+    const { items } = await (await lea.request.get(`${cornerApi}/calls`)).json()
+    return items.length === 1 && items[0].text === 'Essayez le niveau 3 ce week-end'
+  })
+  console.log('  ok : l’appel de Léa est publié')
+  await byRole(lea.page, 'tab', 'Retours').click()
+  await lea.page.getByRole('link', { name: /^Sam/ }).first().click()
+  await lea.page.waitForURL(`**/projects/${projectId}/testers/threads/${samId}`)
+  await lea.page.getByLabel(/^Répondre à /).fill('Merci Sam, je regarde ça')
+  await byRole(lea.page, 'button', 'Envoyer la réponse').click()
+  await waitFor('réponse enregistrée', async () => {
+    const { items } = await (await lea.request.get(`${cornerApi}/threads/${samId}/messages`)).json()
+    return items.length === 2 && items.some((one) => one.text === 'Merci Sam, je regarde ça')
+  })
+  console.log('  ok : Léa a répondu au retour de Sam')
+
   step('Léa publie une mise à jour : deux lignes, deux photos en avant / après')
   await open(lea.page, `${appUrl}/projects/${projectId}`)
   await byRole(lea.page, 'button', 'Publier une mise à jour').first().click()
   await lea.page.waitForURL(/\/update$/)
   await lea.page.getByLabel('Titre, facultatif').fill('Le dessert')
-  await lea.page.getByLabel('Numéro de version, facultatif').fill('v1.2')
+  await lea.page.getByLabel('Numéro de version, facultatif').fill('v1.3')
   await lea.page.getByLabel(/^Changement 1 sur /).fill('Il propose aussi un dessert')
   await byRole(lea.page, 'button', 'Ajouter une ligne').click()
   await lea.page.getByLabel(/^Changement 2 sur /).fill('Les quantités se calculent par personne')
@@ -690,12 +744,20 @@ try {
     return (await sending.count()) === 0
   })
   await byRole(lea.page, 'switch', 'Avant / après').click()
+  // R7b : la partie « Retours réglés » propose le retour de Sam ; Léa le coche.
+  await lea.page.getByText('Retours réglés', { exact: true }).waitFor()
+  await lea.page.getByRole('checkbox', { name: /· En partie/ }).click()
   await byRole(lea.page, 'button', 'Publier', { exact: true }).last().click()
   await lea.page.getByText('Mise à jour publiée.').waitFor()
   await waitFor('mise à jour enregistrée', async () => {
     const res = await lea.request.get(`${apiUrl}/v1/projects/${projectId}/updates`)
     const { items } = await res.json()
     return items.length === 1 && items[0].beforeAfter === true && items[0].photos.length === 2
+  })
+  await waitFor('retour de Sam réglé par la mise à jour', async () => {
+    const res = await lea.request.get(`${cornerApi}/threads/${samId}/messages`)
+    const { items } = await res.json()
+    return items.some((one) => one.kind === 'feedback' && one.settled?.update?.version === 'v1.3')
   })
   console.log('  ok : la mise à jour de Léa est publiée, avec son avant / après')
 
@@ -707,7 +769,7 @@ try {
   await byRole(
     sam.page,
     'link',
-    /a publié une mise à jour de « Mon agent de recettes » · v1\.2/,
+    /a publié une mise à jour de « Mon agent de recettes » · v1\.3/,
   ).click()
   await sam.page.waitForURL(`**/projects/${projectId}/updates`)
   // Le curseur « Avant / après » : 50 au départ ; la flèche droite ajoute 10, Fin va au bout.
@@ -727,12 +789,24 @@ try {
   )
   console.log('  ok : Sam a comparé l’avant et l’après au clavier')
 
-  step('Sam quitte les testeurs')
+  // R7b : le retour de Sam est réglé par la mise à jour de Léa ; Sam le lit sous son retour.
+  step('Sam lit « Réglé dans la v1.3 » sous son retour, dans le coin des testeurs')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await byRole(sam.page, 'button', 'Tu testes ce projet').click()
-  await sam.page.getByRole('heading', { name: 'Tu testes ce projet', exact: true }).waitFor()
-  await sam.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
-  await byRole(sam.page.getByRole('dialog'), 'button', 'Quitter les testeurs').click()
+  await byRole(sam.page, 'button', 'Le coin des testeurs').click()
+  await sam.page.waitForURL(`**/projects/${projectId}/testers`)
+  await byRole(sam.page, 'tab', 'Retours').click()
+  await sam.page.getByText('Réglé dans la v1.3', { exact: true }).waitFor()
+  console.log('  ok : Sam lit « Réglé dans la v1.3 » sous son retour')
+
+  // R7b : « Quitter les testeurs » est dans le menu « … » de la page du projet (la feuille « membre »
+  // n'existe plus), avec une confirmation ; après quoi la page revient, « Rejoindre » reprend le focus.
+  step('Sam quitte les testeurs, par le menu « … » de la page du projet')
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await byRole(sam.page, 'button', 'Plus d’actions').click()
+  await byRole(sam.page, 'menuitem', 'Quitter les testeurs').click()
+  await sam.page.getByRole('dialog').waitFor()
+  await sam.page.waitForTimeout(800) // la fenêtre ignore les tapes de ses 600 premières ms
+  await byRole(sam.page.getByRole('dialog'), 'button', 'Quitter', { exact: true }).click()
   await byRole(sam.page, 'button', 'Rejoindre les testeurs').waitFor()
   await waitFor(
     'départ des testeurs enregistré',
