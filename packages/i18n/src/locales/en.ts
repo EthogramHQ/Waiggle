@@ -809,6 +809,7 @@ export const en: Translation = {
         more: 'Show more',
         moreError: 'The rest could not load.',
         listLoadError: 'The feedback could not load.',
+        choose: 'Pick a thread from the list to read it here.',
       },
       settledField: {
         title: 'Fixed feedback',

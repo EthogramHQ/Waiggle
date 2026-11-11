@@ -119,23 +119,61 @@ function FormerTester({
   member: string
   render: (tester: ThreadTester) => ReactNode
 }) {
+  const search = useFormerTester(projectId, member)
+  if (search.found) return render(search.found)
+  return search.exhausted ? <ThreadNotFound /> : <LoadingScreen width="page" />
+}
+
+/** Ce que la recherche d'un ancien testeur a donné jusqu'ici. */
+export type FormerTesterSearch = {
+  /** Le testeur, une fois son fil trouvé ; null tant qu'il ne l'est pas. */
+  found: ThreadTester | null
+  /** Toutes les pages lues (ou en échec) sans le trouver. */
+  exhausted: boolean
+  /** Une lecture a échoué en route : « Réessayer » la relance. */
+  failed: boolean
+  retry: () => void
+}
+
+/**
+ * Hook : cherche le fil d'un ancien testeur dans les fils de l'auteur, page après page, « À traiter »
+ * et « Réglés » ensemble. Sert à la page du fil (téléphone) et à la colonne de droite du coin
+ * (ordinateur, R7b, K8 : elle ne lisait que la première page). `skip` : le testeur est déjà connu
+ * (un testeur actuel, dans la liste du coin) : aucune page de plus.
+ */
+export function useFormerTester(
+  projectId: string,
+  member: string,
+  skip = false,
+): FormerTesterSearch {
   const lists = [useThreads(projectId, 'open'), useThreads(projectId, 'settled')]
-  const found = lists
+  const thread = lists
     .flatMap((list) => list.data?.pages.flatMap((one) => one.items) ?? [])
-    .find((thread) => thread.tester.id === member)
+    .find((one) => one.tester.id === member)
   // Pas encore trouvé : la page suivante de chaque liste qui en a une. Sans liste de dépendances :
   // après chaque affichage, tant qu'il le faut (une page à la fois, `isFetchingNextPage`).
   useEffect(() => {
-    if (found) return
+    if (skip || thread) return
     for (const list of lists)
       if (list.hasNextPage && !list.isFetchingNextPage && !list.isFetchNextPageError)
         void list.fetchNextPage()
   })
-  if (found) return render({ ...found.tester })
   const exhausted = lists.every(
     (list) => list.isError || list.isFetchNextPageError || (list.data && !list.hasNextPage),
   )
-  return exhausted ? <ThreadNotFound /> : <LoadingScreen width="page" />
+  const failed = lists.some((list) => list.isError || list.isFetchNextPageError)
+  return {
+    found: thread ? { ...thread.tester } : null,
+    exhausted,
+    failed,
+    retry: () => {
+      for (const list of lists) {
+        // Une première page en échec se relit ; une page suivante en échec se redemande.
+        if (list.isError && !list.data) void list.refetch()
+        else if (list.isFetchNextPageError) void list.fetchNextPage()
+      }
+    },
+  }
 }
 
 type PageProps = {

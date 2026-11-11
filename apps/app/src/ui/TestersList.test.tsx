@@ -269,4 +269,23 @@ describe('TestersList', () => {
     expect(screen.getByText(NAMES[0])).toBeTruthy() // témoin
     expect(shownTesters()).toEqual([])
   })
+
+  it('gives the focus to « 0 testeur » when the screen asks, the list now empty (R7b, K5)', async () => {
+    // Sur téléphone, le lecteur d'écran est amené sur le bouton qui déplie la liste.
+    const reader = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent')
+    reader.mockClear()
+    const handle = createRef<import('./TestersList').TestersListHandle>()
+    await renderWithProviders(
+      <TestersList count={0} testers={[]} onRemove={() => {}} initiallyOpen handle={handle} />,
+    )
+
+    let given = false
+    await act(async () => {
+      given = handle.current?.focusToggle() ?? false
+    })
+
+    expect(given).toBe(true)
+    const [node] = reader.mock.calls.at(-1) ?? []
+    expect(contentOf(node)).toContain(text.count(0))
+  })
 })

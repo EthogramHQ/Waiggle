@@ -5,7 +5,7 @@
 // traduit aussi en `accessibilityState.expanded` pour VoiceOver et TalkBack (Disclosure.test.tsx
 // le vérifie : les deux disent toujours la même chose).
 import { layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, type Ref, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { Icon, type IconName } from './Icon'
@@ -31,6 +31,11 @@ type Props = {
    * servent qu'à la carte.
    */
   variant?: 'card' | 'inline'
+  /**
+   * Le bouton qui déplie et replie (R7b, K5) : pour y rendre le focus quand le contenu perd son
+   * dernier élément (le seul testeur retiré de « 1 testeur »), au lieu de le laisser se perdre.
+   */
+  toggleRef?: Ref<View>
   children: ReactNode
 }
 
@@ -40,6 +45,7 @@ export function Disclosure({
   icon = 'plus',
   initiallyOpen = false,
   variant = 'card',
+  toggleRef,
   children,
 }: Props) {
   const { colors, shadows } = useTheme()
@@ -48,6 +54,7 @@ export function Disclosure({
     return (
       <View style={{ gap: space.xs }}>
         <Pressable
+          ref={toggleRef}
           accessibilityRole="button"
           accessibilityLabel={title}
           aria-expanded={open}
@@ -94,6 +101,7 @@ export function Disclosure({
       }}
     >
       <Pressable
+        ref={toggleRef}
         accessibilityRole="button"
         accessibilityLabel={title}
         aria-expanded={open}
