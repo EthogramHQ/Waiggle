@@ -301,7 +301,8 @@ const recipesShown = {
   latestUpdate: recipesUpdates[0],
   updateCount: 3,
   version: 'v1.2',
-  testerCount: 4,
+  // Le même nombre que le coin de ce projet (`testerCornersAtStart`) : 12 testeurs.
+  testerCount: 12,
 }
 // Une note de 1 000 caractères, et une adresse sans espace : rien ne doit déborder.
 const longNote = Array.from({ length: 20 }, () => 'Une note très longue, pour voir la coupure. ')
@@ -1581,6 +1582,8 @@ const testedProject = {
   status: 'testable',
   demoUrl: 'https://decollage.example.org',
   isTester: true,
+  // Comme son coin (`testerCornersAtStart`) : 9 testeurs.
+  testerCount: 9,
   latestUpdate: { ...recipesUpdates[0], title: 'Le décompte de la fusée' },
   updateCount: 1,
   version: 'v1.2',
@@ -1734,6 +1737,29 @@ const testerCornersAtStart = () => ({
           text: 'Merci Sam, c’est corrigé dans la v1.3 !',
           createdAt: cornerAgo(1, 3),
           mine: true,
+        }),
+      ],
+      // Chloé ne teste plus : son retour sans texte reste à traiter (« Ne teste plus » dans la
+      // feuille de mise à jour), et Hugo a déjà un retour réglé.
+      [cornerChloe.id]: [
+        cornerMessage(9, {
+          kind: 'feedback',
+          outcome: 'yes',
+          device: 'tablet',
+          createdAt: cornerAgo(4),
+        }),
+      ],
+      [cornerHugo.id]: [
+        cornerMessage(10, {
+          kind: 'feedback',
+          outcome: 'no',
+          device: 'tablet',
+          text: 'Le bouton « Imprimer » ne fait rien sur tablette.',
+          createdAt: cornerAgo(9),
+          settled: {
+            at: cornerAgo(8),
+            update: { id: recipesUpdates[1].id, version: 'v1.1', createdAt: cornerAgo(8) },
+          },
         }),
       ],
     },
@@ -2042,7 +2068,12 @@ const fakeApi = (
               id: message.id,
               tester: { name: one.tester.name, current: one.tester.current },
               outcome: message.outcome,
-              excerpt: message.text ? message.text.slice(0, 80) : null,
+              // Comme l'API (`excerptOf`) : 80 caractères au plus, puis « … ».
+              excerpt: message.text
+                ? message.text.length > 80
+                  ? `${message.text.slice(0, 80)}…`
+                  : message.text
+                : null,
               createdAt: message.createdAt,
             })),
         )
@@ -2414,6 +2445,16 @@ const fakeApi = (
 
 // 4. Ce qu'on photographie.
 const project = `/projects/${recipesProject.id}`
+// R7b : le projet que Léa teste (« Décollage ! »), et la feuille « Ton retour » remplie : « En
+// partie », « Téléphone » et un texte.
+const tested = `/projects/${testedProject.id}/testers`
+const fillFeedback = async (page) => {
+  await page.getByRole('radio', { name: fr.project.testers.feedback.outcomes.partly }).click()
+  await page.getByRole('radio', { name: fr.project.testers.feedback.devices.phone }).click()
+  await page
+    .getByLabel(fr.project.testers.feedback.text)
+    .fill('Le score repart à zéro au niveau 3.')
+}
 // La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
 // servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
 // simulée du contexte), puis la page est relue.
@@ -2797,6 +2838,121 @@ const pages = [
     signedIn: true,
     prepare: async (page) => {
       await page.getByRole('link', { name: fr.project.testers.leavingLink }).waitFor()
+    },
+  },
+  // R7b : le coin des testeurs. L'autrice (Léa, 12 testeurs : la liste, les appels, puis les fils à
+  // traiter), la testeuse (Léa chez Max : les appels, puis son fil), un fil ouvert (sur ordinateur, le
+  // coin à gauche et le fil à droite), et le coin fermé par la modération (relecture seule).
+  { name: 'coin-testeurs-auteur', path: `${project}/testers`, signedIn: true, fullPage: true },
+  {
+    name: 'coin-testeurs-auteur-retours',
+    path: `${project}/testers?tab=feedback`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByText(fr.project.testers.thread.privacyList).first().waitFor()
+    },
+  },
+  {
+    name: 'coin-testeurs-testeur',
+    path: `/projects/${testedProject.id}/testers`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'coin-testeurs-testeur-retours',
+    path: `/projects/${testedProject.id}/testers?tab=feedback`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.feedback.send }).waitFor()
+    },
+  },
+  {
+    name: 'coin-testeurs-fil',
+    path: `${project}/testers/threads/${cornerInes.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByText('Pareil sur ordinateur, au fait.').last().waitFor()
+    },
+  },
+  {
+    name: 'coin-ferme',
+    path: `/projects/${removedProject.id}/testers`,
+    signedIn: true,
+    fullPage: true,
+  },
+  // R7b : la feuille « Nouvel appel » (vide, puis remplie) de l'autrice. La feuille ignore les tapes
+  // de ses 600 premières ms (`guardTaps`) : on attend plus que d'habitude.
+  { name: 'feuille-appel', path: `${project}/testers/new-call`, signedIn: true, wait: 1500 },
+  {
+    name: 'feuille-appel-remplie',
+    path: `${project}/testers/new-call`,
+    signedIn: true,
+    wait: 1500,
+    prepare: async (page) => {
+      await page
+        .getByLabel(fr.project.testers.calls.field)
+        .fill('Essayez le niveau 3 ce week-end, surtout sur téléphone.')
+    },
+  },
+  // R7b : la feuille « Ton retour » du testeur (Léa chez Max) : vide, remplie, l'erreur sans issue
+  // (« Choisis Oui, En partie ou Non. »), et un brouillon rouvert. Le brouillon vit en mémoire : la
+  // feuille est rouverte par un clic dans l'appli, jamais par `page.goto`, qui le viderait.
+  { name: 'feuille-retour', path: `${tested}/new-feedback`, signedIn: true, wait: 1500 },
+  {
+    name: 'feuille-retour-remplie',
+    path: `${tested}/new-feedback`,
+    signedIn: true,
+    wait: 1500,
+    prepare: fillFeedback,
+  },
+  {
+    name: 'feuille-retour-erreur',
+    path: `${tested}/new-feedback`,
+    signedIn: true,
+    wait: 1500,
+    prepare: async (page) => {
+      await page.getByLabel(fr.project.testers.feedback.text).fill('Le score repart à zéro.')
+      await page
+        .getByRole('button', { name: fr.project.testers.feedback.submit, exact: true })
+        .last()
+        .click()
+      await page.getByText(fr.project.testers.feedback.outcomeRequired).first().waitFor()
+    },
+  },
+  {
+    name: 'feuille-retour-brouillon',
+    path: `${tested}?tab=feedback`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.feedback.send }).click()
+      await page.getByRole('heading', { name: fr.project.testers.feedback.sheetTitle }).waitFor()
+      await page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+      await fillFeedback(page)
+      await page
+        .getByRole('button', { name: fr.project.testers.feedback.cancel, exact: true })
+        .first()
+        .click()
+      await page
+        .getByRole('heading', { name: fr.project.testers.feedback.sheetTitle })
+        .waitFor({ state: 'detached' })
+      await page.getByRole('button', { name: fr.project.testers.feedback.send }).click()
+      await page.getByRole('button', { name: fr.project.testers.feedback.clearDraft }).waitFor()
+    },
+  },
+  // R7b : la feuille « Nouvelle mise à jour » de l'autrice avec la partie « Retours réglés » : les
+  // retours à traiter (dont celui d'un ancien testeur), et un coché.
+  {
+    name: 'maj-retours-regles',
+    path: `${project}/update`,
+    signedIn: true,
+    fullPage: true,
+    wait: 1500,
+    prepare: async (page) => {
+      await page.getByText(fr.project.testers.settledField.title).first().waitFor()
+      await page.getByRole('checkbox').first().click()
     },
   },
   // Les commentaires d'un projet (R5b) : l'aperçu sous le projet, puis la feuille (sur téléphone) ou
