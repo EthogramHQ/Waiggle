@@ -183,6 +183,13 @@ export function DeleteAccountScreen() {
             label={t(($) => $.account.delete.reactionsItem)}
             detail={t(($) => $.account.delete.reactionsDetail)}
           />
+          {/* R7b : ses retours de testeur partent avec leurs captures, fil entier (réponses des
+            auteurs comprises) : le membre le lit avant de confirmer. */}
+          <ListRow
+            icon="chat-circle-dots"
+            label={t(($) => $.account.delete.testerFeedbackItem)}
+            detail={t(($) => $.account.delete.testerFeedbackDetail)}
+          />
           {/* Tranche 6b : ses notifications et ses mentions partent aussi ; ses gestes sortent des
             notifications des autres, qui sont calculées et non recopiées. */}
           <ListRow

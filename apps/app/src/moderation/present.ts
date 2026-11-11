@@ -26,6 +26,15 @@ export const viewHref = (target: StoredReportTarget, projectId: string | null): 
   if (target.kind === 'member') return { pathname: '/members/[id]', params: { id: target.id } }
   // Pour un projet, son propre identifiant ; pour une note ou un commentaire, celui de son projet.
   const id = projectId ?? target.id
+  // R7b : un appel ou un message du coin des testeurs se lit dans le coin, jamais sur la page du
+  // projet (le fil est privé). L'appel : l'onglet « Appels » ; le message : l'onglet « Retours »
+  // (la cible ne donne pas le testeur, donc pas le fil lui-même).
+  if (target.kind === 'call' || target.kind === 'message') {
+    return {
+      pathname: '/projects/[id]/testers',
+      params: { id, tab: target.kind === 'call' ? 'calls' : 'feedback' },
+    }
+  }
   return { pathname: '/projects/[id]', params: { id } }
 }
 
