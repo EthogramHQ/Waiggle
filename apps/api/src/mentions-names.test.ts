@@ -217,7 +217,13 @@ describe('the handle of the author of a comment', () => {
     const root = await comment(meteo.id, malik, 'Super idée.')
     const reply = await comment(meteo.id, zoe, 'Bien vu.', root.id)
 
-    expect(root.author).toEqual({ id: malikId, name: 'Malik', handle: 'malik', avatarUrl: null })
+    expect(root.author).toEqual({
+      id: malikId,
+      name: 'Malik',
+      handle: 'malik',
+      avatarUrl: null,
+      isTester: false,
+    })
     expect(reply.author?.handle).toBe('zoe')
 
     // Le pseudo actuel, pas celui du jour de l'écriture.
@@ -229,12 +235,14 @@ describe('the handle of the author of a comment', () => {
       name: 'Malik',
       handle: 'malik_b',
       avatarUrl: null,
+      isTester: false,
     })
     expect(thread?.replies[0]?.author).toEqual({
       id: zoeId,
       name: 'Zoé',
       handle: 'zoe',
       avatarUrl: null,
+      isTester: false,
     })
   })
 
@@ -275,7 +283,13 @@ describe('the handle of the author of a comment', () => {
     later()
     await act.block(inesId, malik) // Malik bloque Inès
 
-    const blockedAuthor = { id: malikId, name: 'Malik', handle: null, avatarUrl: null }
+    const blockedAuthor = {
+      id: malikId,
+      name: 'Malik',
+      handle: null,
+      avatarUrl: null,
+      isTester: false,
+    }
     for (const [projectId, commentId] of [
       [meteo.id, atInes.id],
       [recettes.id, mention.id],
@@ -306,6 +320,7 @@ describe('the handle of the author of a comment', () => {
       name: 'Malik',
       handle: 'malik_b',
       avatarUrl: photo,
+      isTester: false,
     })
   })
 
@@ -324,8 +339,8 @@ describe('the handle of the author of a comment', () => {
       ...items.flatMap((item) => item.replies.map((reply) => reply.author)),
     ].filter((author) => author?.id === malikId)
     expect(authors).toEqual([
-      { id: malikId, name: 'Malik', handle: null, avatarUrl: null },
-      { id: malikId, name: 'Malik', handle: null, avatarUrl: null },
+      { id: malikId, name: 'Malik', handle: null, avatarUrl: null, isTester: false },
+      { id: malikId, name: 'Malik', handle: null, avatarUrl: null, isTester: false },
     ])
 
     // Témoin : Zoé lit le pseudo de Malik, racine comme réponse.
