@@ -9,7 +9,7 @@
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli. Les
 // dates sont fixes (le 3 et le 10 novembre 2026) : le catalogue pré-rendu ne lit pas l'heure.
-import { space } from '@ruche/brand'
+import { palettes, space } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -101,8 +101,9 @@ const LATER = '2026-11-10T18:05:00.000Z'
  * Une capture d'écran d'exemple : un dessin SVG en adresse `data:` (expo-image le dessine aussi sur
  * le web), sans photo à télécharger.
  */
-const CAPTURE_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 104"><rect width="150" height="104" fill="#1F2A44"/><circle cx="112" cy="30" r="14" fill="#FFC21A"/><rect x="16" y="64" width="80" height="10" rx="5" fill="#F7F3EA"/><rect x="16" y="82" width="52" height="8" rx="4" fill="#A39B89"/></svg>'
+// Les couleurs viennent de @ruche/brand (palette de jour : une image ne change pas avec le thème).
+const day = palettes.day
+const CAPTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 104"><rect width="150" height="104" fill="${day.text}"/><circle cx="112" cy="30" r="14" fill="${day.honey}"/><rect x="16" y="64" width="80" height="10" rx="5" fill="${day.background}"/><rect x="16" y="82" width="52" height="8" rx="4" fill="${day.textMuted}"/></svg>`
 const capture = { uri: `data:image/svg+xml;utf8,${encodeURIComponent(CAPTURE_SVG)}` }
 
 /** Un exemple légendé (« Retour réglé — nuit »). */
