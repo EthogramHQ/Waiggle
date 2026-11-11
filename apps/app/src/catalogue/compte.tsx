@@ -186,7 +186,7 @@ export function AccountCatalogue() {
     {
       key: 'calls' as const,
       label: l.calls,
-      icon: 'megaphone' as const,
+      icon: 'megaphone-simple' as const,
       content: <Text>{l.callsBody}</Text>,
     },
     {

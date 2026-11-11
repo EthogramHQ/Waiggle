@@ -9,8 +9,9 @@
 //   (aria-invalid) et décrite par l'erreur (aria-describedby) ; sur téléphone, l'erreur est lue
 //   dans l'indice. Le nom donné au Pressable cache le texte qu'il contient, d'où ces liens à part.
 // - Un détail facultatif (R7b : l'extrait d'un retour et sa date, sous « Inès · En partie ») s'écrit
-//   sous le libellé, plus petit. Le nom reste le libellé seul ; le détail est sa description, lue
-//   après lui, par le même chemin que l'erreur (aria-describedby sur le web, indice ailleurs).
+//   sous le libellé, plus petit, dans la zone à toucher (il coche la case lui aussi). Le nom reste
+//   le libellé seul ; le détail est sa description, lue après lui (et après l'erreur, s'il y en a
+//   une), par le même chemin (aria-describedby sur le web, indice ailleurs).
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type Ref, useId } from 'react'
 import { Platform, Pressable, View } from 'react-native'
@@ -56,11 +57,11 @@ export function Checkbox({
   const errorId = useId()
   const detailId = useId()
   const toggle = () => onValueChange(!value)
-  // Ce qui décrit la case, dans l'ordre où on le voit : le détail, puis l'erreur. Sur le web,
-  // aria-describedby prend plusieurs identifiants séparés par une espace ; ailleurs, l'indice
-  // reprend les deux textes à la suite.
-  const descriptions = [detail ? detailId : null, error ? errorId : null].filter(Boolean)
-  const hint = [detail, error].filter(Boolean).join('. ')
+  // Ce qui décrit la case : l'erreur d'abord, l'urgent avant le rappel (R7b), puis le détail. Sur
+  // le web, aria-describedby prend plusieurs identifiants séparés par une espace, lus dans cet
+  // ordre ; ailleurs, l'indice reprend les deux textes à la suite (l'erreur finit par un point).
+  const descriptions = [error ? errorId : null, detail ? detailId : null].filter(Boolean)
+  const hint = [error, detail].filter(Boolean).join(' ')
 
   return (
     <View style={{ gap: space.xxs }}>

@@ -72,7 +72,6 @@ const icons = [
   'chat-circle',
   'chat-circle-dots',
   'megaphone-simple', // une note dans le fil : l'auteur annonce du nouveau
-  'megaphone', // R7b : l'onglet « Appels » du coin des testeurs
   'note-pencil', // écrire une note dans le journal
   // Messages et sécurité
   'check-circle',
