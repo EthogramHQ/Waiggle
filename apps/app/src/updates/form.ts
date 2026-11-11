@@ -22,6 +22,12 @@ export type UpdateFormValues = {
   version: string
   lines: UpdateLineValue[]
   beforeAfter: boolean
+  /**
+   * R7b : les retours de testeurs cochés dans « Retours réglés », que la mise à jour règle (leurs
+   * identifiants, dans l'ordre où l'auteur les a cochés). Absent : aucun (une feuille sans la
+   * partie, ou un formulaire écrit avant R7b).
+   */
+  settledIds?: string[]
 }
 
 /**
@@ -81,12 +87,20 @@ export const setFamily = (
 export const setText = (values: UpdateFormValues, id: string, text: string): UpdateFormValues =>
   patchLine(values, id, { text })
 
+/** Les retours cochés, tels quels ; absents : aucun. */
+const settledOf = (values: UpdateFormValues): string[] => values.settledIds ?? []
+
+/** Deux listes de retours cochés sont-elles les mêmes, dans n'importe quel ordre ? */
+const sameSettled = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((id) => b.includes(id))
+
 /**
  * Vrai si fermer la feuille perdrait quelque chose : un champ, une ligne ou une famille différents
- * des valeurs d'ouverture, ou une photo ajoutée (même en cours d'envoi : elle est déjà, ou bientôt,
- * sur le serveur). On compare aux valeurs d'ouverture, pas à une feuille vide : une feuille
- * préremplie par le changement de statut se ferme sans question. Les lignes se comparent par leur
- * contenu, pas par leur identifiant : une ligne ajoutée puis retirée ne compte pas.
+ * des valeurs d'ouverture, une photo ajoutée (même en cours d'envoi : elle est déjà, ou bientôt,
+ * sur le serveur), ou un retour coché dans « Retours réglés » (R7b). On compare aux valeurs
+ * d'ouverture, pas à une feuille vide : une feuille préremplie par le changement de statut se ferme
+ * sans question. Les lignes se comparent par leur contenu, pas par leur identifiant : une ligne
+ * ajoutée puis retirée ne compte pas ; une case cochée puis décochée non plus.
  */
 export const isDirty = (
   initial: UpdateFormValues,
@@ -94,6 +108,7 @@ export const isDirty = (
   photos: UpdateFormPhoto[],
 ): boolean =>
   photos.length > 0 ||
+  !sameSettled(settledOf(initial), settledOf(current)) ||
   initial.title !== current.title ||
   initial.version !== current.version ||
   initial.beforeAfter !== current.beforeAfter ||
@@ -116,7 +131,9 @@ const optional = (text: string): string | null => {
  *   collage se voit en entier ; l'API refuserait avec un 400 que la feuille ne saurait pas expliquer) ;
  * - `uploading` : une photo s'envoie encore (son identifiant n'est pas connu).
  * Le titre et la version vides valent null ; « Avant / après » est coupé sous deux photos (le
- * contrat le refuserait, et l'API répondrait 400).
+ * contrat le refuserait, et l'API répondrait 400). Les retours cochés partent en
+ * `settledFeedbackIds` (R7b), chacun une fois ; sans case cochée, le champ n'est pas envoyé (le
+ * contrat dit alors « aucun »).
  */
 export const toPayload = (
   values: UpdateFormValues,
@@ -137,6 +154,9 @@ export const toPayload = (
   const sent = photos
     .slice(0, UPDATE_PHOTOS_MAX)
     .map((photo) => ({ id: photo.id as string, description: photo.description }))
+  // Un Set retire un doublon (une double tape qui aurait coché deux fois) : le contrat refuse un
+  // retour envoyé deux fois.
+  const settled = [...new Set(settledOf(values))]
   return {
     ok: true,
     payload: {
@@ -146,6 +166,7 @@ export const toPayload = (
       lines: lines.map(({ family, text }) => ({ family, text })),
       photos: sent,
       beforeAfter: values.beforeAfter && sent.length >= 2,
+      ...(settled.length > 0 ? { settledFeedbackIds: settled } : null),
     },
   }
 }

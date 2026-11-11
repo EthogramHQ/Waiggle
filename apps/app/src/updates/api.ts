@@ -34,10 +34,12 @@ type UpdatesCache = InfiniteData<ProjectUpdatePage, string | undefined>
  * Pourquoi la dernière demande a échoué, quand réessayer ne servirait à rien :
  * - limited : la limite du jour est atteinte (10 mises à jour par jour, 429) ;
  * - expired : la session a expiré (401) ;
- * - invalidPhotos : une photo n'est plus en attente (400 `invalid_photos`).
+ * - invalidPhotos : une photo n'est plus en attente (400 `invalid_photos`) ;
+ * - invalidFeedback : un retour coché dans « Retours réglés » n'est plus à traiter (400
+ *   `invalid_feedback`, R7b : un autre onglet l'a réglé, ou son testeur l'a supprimé).
  * Absent : une autre erreur (réseau, serveur), qu'un nouvel essai peut régler.
  */
-export type UpdateFailure = 'limited' | 'expired' | 'invalidPhotos'
+export type UpdateFailure = 'limited' | 'expired' | 'invalidPhotos' | 'invalidFeedback'
 
 const reasonOf = (error: unknown): UpdateFailure | undefined => {
   if (!error) return undefined
@@ -48,6 +50,8 @@ const reasonOf = (error: unknown): UpdateFailure | undefined => {
       return 'expired'
     case 'invalidPhotos':
       return 'invalidPhotos'
+    case 'invalidFeedback':
+      return 'invalidFeedback'
     default:
       return undefined
   }
