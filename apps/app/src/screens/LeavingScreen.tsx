@@ -152,10 +152,14 @@ function OpenableTarget({
   // bouton « Rejoindre les testeurs » de sa page), d'un autre membre, dont on n'est pas déjà
   // testeur. Un compte suspendu n'a pas de quoi rejoindre : la page se tait. Rien ne s'inscrit
   // d'ici : le lien mène à la page du projet, où se trouve le bouton.
+  // `testerJoinable` vient de l'API : faux pour l'auteur et pour un membre que l'auteur a retiré.
+  // Sans lui, on inviterait à rejoindre une liste dont le membre est écarté, et le bouton de la
+  // page du projet n'y serait pas : la page se tait, sans rien dire du retrait.
   const testers: LeavingTesters | null =
     shown &&
     sameDemo &&
     shown.status === 'testable' &&
+    shown.testerJoinable &&
     !shown.isMine &&
     !shown.isTester &&
     !suspended
