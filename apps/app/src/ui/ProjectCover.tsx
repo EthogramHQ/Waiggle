@@ -28,6 +28,13 @@ export type CoverImage = {
   thumbhash?: string | null
   /** Ce que les lecteurs d'écran annoncent (« Photo 1 sur 3 »). */
   label: string
+  /**
+   * R7b (relecture de sécurité du plan, sec-A4) : `memory` pour une image privée au coin des
+   * testeurs (la photo d'un appel). expo-image la garde en mémoire le temps de la visite, sans
+   * jamais l'écrire sur le disque de l'appareil : un testeur retiré ne la retrouve pas dans le cache.
+   * Absent : le cache par défaut d'expo-image (mémoire et disque), pour les photos publiques.
+   */
+  cachePolicy?: 'memory'
 }
 
 /** hero : grande (ordinateur) ; band : bande basse (sans photo, téléphone) ; portrait : haute. */
@@ -99,6 +106,7 @@ export function ProjectCover({
           contentFit="cover"
           transition={200}
           accessibilityLabel={image.label}
+          {...(image.cachePolicy ? { cachePolicy: image.cachePolicy } : null)}
           style={{ position: 'absolute', inset: 0, backgroundColor: colors.honeySoft }}
         />
       ) : (
