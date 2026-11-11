@@ -372,7 +372,7 @@ export const createApp = ({
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
-  app.route('/', moderationRoutes({ db, limiter, auth, mailer }))
+  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter }))
   app.route('/', mediaRoutes({ db, storage }))
