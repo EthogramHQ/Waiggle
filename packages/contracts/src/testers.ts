@@ -362,12 +362,14 @@ export const TesterMessageExport = z.object({
 export type TesterMessageExport = z.infer<typeof TesterMessageExport>
 
 /**
- * Dans l'export de l'auteur : un membre qu'il a retiré de ses testeurs, par son pseudo (null s'il
- * n'en a pas), comme les blocages (relecture juridique J11).
+ * Dans l'export de l'auteur : un membre qu'il a retiré de ses testeurs, par son identifiant et son
+ * pseudo, comme les blocages (relecture juridique J11). `handle` vaut null s'il n'en a pas, ou si un
+ * blocage les sépare (règle de R4, relecture de sécurité de R7b).
  */
 export const TesterRemovalExport = z.object({
   projectId: z.uuid(),
   title: z.string().nullable(),
+  memberId: z.string(),
   handle: z.string().nullable(),
   at: z.iso.datetime(),
 })
