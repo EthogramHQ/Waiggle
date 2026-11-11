@@ -12,9 +12,9 @@
 // Seul l'auteur entre ici : un testeur lit son fil dans l'onglet « Retours » du coin ; tout autre
 // membre, comme un fil inconnu, a la page introuvable (le même écran que pour un projet privé).
 //
-// Sur ordinateur, la page du fil doit montrer le coin, la liste des fils à gauche et ce fil à
-// droite (relecture du plan, ui-B1) : c'est la page du coin qui le fera (`TestersCornerScreen`, à
-// venir), en reprenant `AuthorThreadPane` ci-dessous pour la colonne de droite.
+// Sur ordinateur, la page du fil montre le coin, la liste des fils à gauche et ce fil à droite
+// (relecture du plan, ui-B1) : c'est la page du coin qui le fait (`TestersCornerScreen`, avec
+// `member`), en reprenant `AuthorThreadPane` ci-dessous pour la colonne de droite.
 //
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import type { Project, TesterCorner } from '@ruche/contracts'
@@ -32,6 +32,7 @@ import { HiddenHeading } from '../ui/HiddenHeading'
 import { shortDate } from '../ui/relativeDate'
 import { Screen } from '../ui/Screen'
 import { ThreadHeader } from '../ui/ThreadHeader'
+import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useNameOf } from '../useNameOf'
 import {
@@ -41,6 +42,9 @@ import {
   SessionErrorScreen,
   SignedOutScreen,
 } from './states'
+// Les deux pages se rendent l'une l'autre (le coin pose ce fil à droite, ce fil rend le coin sur
+// ordinateur) : chacune n'est lue qu'à l'affichage, jamais au chargement du module.
+import { TestersCornerScreen } from './TestersCornerScreen'
 import { type TesterThreadParts, TesterThreadView } from './TesterThreadView'
 
 /** Le testeur du fil, tel que l'écran le montre : actuel (dans le coin) ou ancien. */
@@ -55,6 +59,11 @@ export type ThreadTester = {
 
 export function TesterThreadScreen({ id, member }: { id: string; member: string }) {
   const { state, session, retry } = useMemberSession()
+  const hydrated = useHydrated()
+  const { columns } = useLayout()
+  // Sur ordinateur, une fois la page hydratée : le coin, la liste des fils à gauche et ce fil à
+  // droite (ui-B1). Avant l'hydratation, la page pré-rendue ne connaît pas la largeur : le fil seul.
+  if (hydrated && columns) return <TestersCornerScreen id={id} member={member} />
   if (state === 'pending') return <LoadingScreen width="page" />
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />

@@ -17,11 +17,12 @@
 // La carte n'a pas de rôle à elle : l'écran la pose dans sa liste. Elle ne parle pas à l'API : les
 // actions du menu et l'adresse de la photo arrivent toutes prêtes.
 import { space } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { excerpt } from './CommentAction'
+import type { Focusable } from './focus'
 import { Icon } from './Icon'
 import type { ImageSource } from './image'
 import { ProjectCover } from './ProjectCover'
@@ -40,22 +41,29 @@ type Props = {
   removal?: ReactNode
   /** Les actions du menu « … » ; vide ou absent : pas de bouton du tout. */
   menu?: ActionMenuItem[]
+  /**
+   * La vue où poser le focus sur cet appel : son texte (le coin des testeurs y mène la lecture après
+   * « Afficher les appels précédents », ou après la suppression d'un appel voisin).
+   */
+  focusRef?: Ref<Focusable>
 }
 
 /** La hauteur de la photo, celle de la planche : assez grande pour être lue, sans manger l'écran. */
 const PHOTO_HEIGHT = 168
 /**
  * Le début de l'appel qui nomme le menu : assez pour distinguer deux appels, assez court pour que
- * le nom du bouton se lise d'une traite.
+ * le nom du bouton se lise d'une traite. 80 caractères, comme le menu d'un message du fil
+ * (`MessageBubble`) : à 40, deux appels qui commencent de la même façon (« Essayez le niveau 3… »)
+ * avaient deux menus du même nom.
  */
-const MENU_EXCERPT = 40
+const MENU_EXCERPT = 80
 /**
  * De combien le bouton « … » (44 points) déborde dans la marge de la carte, en haut et à droite,
  * comme sur la planche : son disque reste aligné sur le texte, sa zone à toucher garde 44 points.
  */
 const MENU_HANG = space.sm
 
-export function CallCard({ text, at, photo = null, removal, menu = [] }: Props) {
+export function CallCard({ text, at, photo = null, removal, menu = [], focusRef }: Props) {
   const { t } = useTranslation()
   // Le nom du menu reprend le début de l'appel, sur une ligne : les sauts de ligne et les blancs
   // répétés deviennent une espace (un nom lu ne passe pas à la ligne).
@@ -101,7 +109,9 @@ export function CallCard({ text, at, photo = null, removal, menu = [] }: Props) 
       </View>
       {removal ?? null}
       {/* Texte brut, affiché tel quel avec ses sauts de ligne ; sélectionnable pour le recopier. */}
-      <Text selectable>{text}</Text>
+      <Text selectable {...(focusRef ? { focusRef } : null)}>
+        {text}
+      </Text>
       {photo ? (
         // Une image nommée : sa description, ou « Photo jointe à l'appel ». L'image elle-même n'a
         // pas de nom à elle (nom vide), sinon le navigateur lirait deux images l'une dans l'autre.
