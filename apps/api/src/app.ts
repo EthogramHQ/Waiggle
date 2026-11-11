@@ -36,6 +36,8 @@ import { reportRoutes } from './routes/reports'
 import { searchRoutes } from './routes/search'
 import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
+import { testerCallRoutes } from './routes/tester-calls'
+import { testerMediaRoutes } from './routes/tester-media'
 import { testerRoutes } from './routes/testers'
 import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
@@ -240,9 +242,18 @@ export const createApp = ({
   app.use('/v1/*', (c, next) => {
     if (c.req.path === '/v1/me/avatar') return next()
     if (/^\/v1\/projects\/[^/]+\/visuals$/.test(c.req.path)) return next()
+    // L'envoi d'une image du coin des testeurs (R7b) a sa propre limite, comme les visuels : la
+    // route la pose juste après avoir vérifié les droits (routes/tester-media.ts).
+    if (/^\/v1\/projects\/[^/]+\/testers\/media$/.test(c.req.path)) return next()
     // Une mise à jour (16 Ko : cinq lignes, un titre, quatre photos citées) ou un commentaire pèse
     // peu, une réaction ou une inscription de testeur n'a pas de corps : la petite limite suffit.
-    if (/^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions)(\/|$)/.test(c.req.path)) {
+    // R7b : les appels (500 caractères), les fils, les messages (1 000 caractères), les retours
+    // réglés, la lecture d'un fil et la liste des retours ouverts n'ont pas plus de corps.
+    if (
+      /^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions|calls|threads|messages|feedback)(\/|$)/.test(
+        c.req.path,
+      )
+    ) {
       return small(c, next)
     }
     // La description d'une photo (R6a, sec-A3) : 250 caractères, la petite limite suffit.
@@ -343,7 +354,10 @@ export const createApp = ({
   app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
   app.route('/', updateRoutes({ db, storage, limiter, publicApiUrl }))
   // Rejoindre et quitter les testeurs d'un projet (tranche R7a).
-  app.route('/', testerRoutes({ db, limiter }))
+  app.route('/', testerRoutes({ db, limiter, publicApiUrl }))
+  // Le coin des testeurs (tranche R7b) : les appels à tester et l'envoi de leurs images.
+  app.route('/', testerCallRoutes({ db, storage, limiter, publicApiUrl }))
+  app.route('/', testerMediaRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))

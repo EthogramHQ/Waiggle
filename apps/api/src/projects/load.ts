@@ -24,7 +24,7 @@ import { mediaUrl } from '../profile/me'
 import { reactionStatesOf, reactionTotalsOf } from '../reactions/load'
 import { removalsOf } from '../removals/load'
 import { latestUpdatesOf, updateCountsOf, updateSummariesOf } from '../updates/load'
-import { testerStatesOf } from './testers'
+import { testerRemovalsOf, testerStatesOf } from './testers'
 import { projectVisibleTo } from './visibility'
 import { type MediaRow, toVisual } from './visual'
 
@@ -119,6 +119,7 @@ type ProjectBase = Omit<
   | 'version'
   | 'isTester'
   | 'testerCount'
+  | 'testerJoinable'
   | 'reactions'
   | 'commentCount'
   | 'removal'
@@ -145,9 +146,6 @@ const toProjectBase = (
     name: authorName,
     avatarUrl: authorAvatarKey ? mediaUrl(publicApiUrl, authorAvatarKey) : null,
   },
-  // R7b, provisoire au commit du contrat : faux pour l'auteur seul ; le retrait d'un testeur par
-  // l'auteur s'y ajoute avec les routes du coin.
-  testerJoinable: project.authorId !== viewerId,
   title: project.title,
   pitch: project.pitch,
   description: project.description,
@@ -212,9 +210,11 @@ const toProjects = async (
       reactionStatesOf(db, ids, viewerId),
       commentCountsOf(db, ids),
     ])
-  const [removals, tools] = await Promise.all([
+  const [removals, tools, removedFrom] = await Promise.all([
     removalsOf(db, rows.map(removalIdOf)),
     toolsOfProjects(db, ids),
+    // Les projets dont l'auteur a retiré ce membre des testeurs (une requête pour toute la liste).
+    testerRemovalsOf(db, ids, viewerId),
   ])
   return rows.map((row) => {
     const removalId = removalIdOf(row)
@@ -225,6 +225,8 @@ const toProjects = async (
       updateCount: updateCounts.get(row.project.id) ?? 0,
       version: versions.get(row.project.id)?.version ?? null,
       ...(testers.get(row.project.id) ?? { isTester: false, testerCount: null }),
+      // R7b : on ne propose plus de rejoindre les testeurs à l'auteur, ni à un membre qu'il a retiré.
+      testerJoinable: row.project.authorId !== viewerId && !removedFrom.has(row.project.id),
       reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
       commentCount: commentCounts.get(row.project.id) ?? 0,
       removal: (removalId && removals.get(removalId)) || null,

@@ -2,9 +2,31 @@
 // « combien sont-ils ? » pour l'auteur seul (un autre membre n'apprend jamais ce nombre : sécurité
 // A3). L'inscription et le départ sont dans routes/testers.ts ; ici, la lecture seule.
 import { type Database, schema } from '@ruche/db'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 
 type Reader = Pick<Database, 'select'>
+
+/**
+ * Parmi ces projets, ceux dont l'auteur a retiré ce membre des testeurs (R7b), en une seule requête
+ * quel que soit leur nombre : l'appli ne lui propose plus d'y revenir (`Project.testerJoinable`).
+ *
+ * En SQL : select project_id from project_tester_removal where member_id = $viewer and project_id
+ * in (…). La clé primaire (project_id, member_id) donne chaque couple directement. Une liste vide
+ * ne lit rien.
+ */
+export const testerRemovalsOf = async (
+  db: Reader,
+  projectIds: string[],
+  viewerId: string,
+): Promise<Set<string>> => {
+  if (projectIds.length === 0) return new Set()
+  const r = schema.projectTesterRemoval
+  const rows = await db
+    .select({ projectId: r.projectId })
+    .from(r)
+    .where(and(eq(r.memberId, viewerId), inArray(r.projectId, projectIds)))
+  return new Set(rows.map((row) => row.projectId))
+}
 
 export type TesterState = { isTester: boolean; testerCount: number | null }
 
