@@ -82,6 +82,9 @@ const recapData = (overrides: Partial<RecapData> = {}): RecapData => ({
   // R7a : la partie « Les projets que tu suis ou que tu testes », vide par défaut.
   updates: [],
   updatesMore: 0,
+  // R7b : la partie « Le coin des testeurs », vide par défaut.
+  testers: [],
+  testersMore: 0,
   links,
   ...overrides,
 })
@@ -327,6 +330,141 @@ describe('the followed or tested projects of the recap (R7a)', () => {
         href?.startsWith('https://waiggle.com/') || href?.startsWith('https://api.waiggle.com/'),
         href,
       ).toBe(true)
+    }
+  })
+})
+
+// ─── Tranche R7b : « Le coin des testeurs » ──────────────────────────────────────────────────────
+// Le récap gagne une seconde partie : chaque projet dont le coin des testeurs a du nouveau pour le
+// membre (appels, messages de l'autre personne d'un fil, retours réglés), son nombre de nouveautés
+// et un lien vers le coin. Les données du modèle : `testers`, 5 projets au plus, de la forme
+// { title, count, url }, et `testersMore`, le nombre des autres (« Et 2 autres projets »). Le lien
+// est fabriqué par la tâche du récap (l'adresse de l'appli + /projects/<id>/testers) ; le modèle ne
+// reçoit jamais le texte d'un appel ni d'un message (relecture juridique J12, sécurité du plan).
+describe('the testers corner part of the recap (R7b)', () => {
+  const cornerUrl = (id: string) => `https://waiggle.com/projects/${id}/testers`
+  const METEO = '0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10'
+  const JARDIN = '7d1c9e04-3b2a-4f68-8e15-a2c4d6b8f901'
+  const hrefsOf = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1])
+
+  it('lists each project of the corner with its number of news and a link to its corner', () => {
+    const email = recapEmail(
+      'fr',
+      recapData({
+        testers: [
+          { title: 'Météo', count: 3, url: cornerUrl(METEO) },
+          { title: 'Jardin', count: 1, url: cornerUrl(JARDIN) },
+        ],
+      }),
+    )
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(fr.recap.testersTitle))
+      expect(part).toContain(fill(fr.recap.testers_other, { title: 'Météo', count: '3' }))
+      expect(part).toContain(fill(fr.recap.testers_one, { title: 'Jardin', count: '1' }))
+    }
+    // Chaque projet mène à son coin, dans le texte comme dans le HTML.
+    expect(hrefsOf(email.html)).toEqual(
+      expect.arrayContaining([cornerUrl(METEO), cornerUrl(JARDIN)]),
+    )
+    expect(email.text).toContain(cornerUrl(METEO))
+    expect(email.text).toContain(cornerUrl(JARDIN))
+  })
+
+  it('writes « and N more projects » after five projects of the corner, in the singular for one', () => {
+    const five = ['A', 'B', 'C', 'D', 'E'].map((title, i) => ({
+      title: `Projet ${title}`,
+      count: 1,
+      url: cornerUrl(`${METEO.slice(0, -1)}${i}`),
+    }))
+
+    const many = recapEmail('fr', recapData({ testers: five, testersMore: 2 }))
+    const one = recapEmail('fr', recapData({ testers: five, testersMore: 1 }))
+
+    expect(many.text).toContain(fill(fr.recap.testersMore_other, { count: '2' }))
+    expect(one.text).toContain(fill(fr.recap.testersMore_one, { count: '1' }))
+    // Rien de plus quand tout tient dans les cinq.
+    const none = recapEmail('fr', recapData({ testers: five, testersMore: 0 })).text
+    expect(none).toContain(fill(fr.recap.testersTitle)) // témoin : la partie est là
+    expect(none).not.toMatch(/autres? projets?/)
+  })
+
+  it('writes no testers part when no corner has news', () => {
+    const email = recapEmail('fr', recapData())
+    // Témoin : avec un projet qui a du nouveau, la partie est bien écrite.
+    const witness = recapEmail(
+      'fr',
+      recapData({ testers: [{ title: 'Météo', count: 1, url: cornerUrl(METEO) }] }),
+    )
+
+    expect(witness.text).toContain(fill(fr.recap.testersTitle))
+    for (const part of [email.text, email.html]) {
+      expect(part).not.toContain(fill(fr.recap.testersTitle))
+    }
+  })
+
+  it('writes both parts when a followed project and a corner have news', () => {
+    const email = recapEmail(
+      'fr',
+      recapData({
+        updates: [
+          { title: 'Jardin', count: 2, url: `https://waiggle.com/projects/${JARDIN}/updates` },
+        ],
+        testers: [{ title: 'Météo', count: 1, url: cornerUrl(METEO) }],
+      }),
+    )
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(fr.recap.updatesTitle))
+      expect(part).toContain(fill(fr.recap.updates_other, { title: 'Jardin', count: '2' }))
+      expect(part).toContain(fill(fr.recap.testersTitle))
+      expect(part).toContain(fill(fr.recap.testers_one, { title: 'Météo', count: '1' }))
+    }
+  })
+
+  it('writes the testers part in the language of the member', () => {
+    const email = recapEmail(
+      'en',
+      recapData({ testers: [{ title: 'Weather', count: 3, url: cornerUrl(METEO) }] }),
+    )
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(en.recap.testersTitle))
+      expect(part).toContain(fill(en.recap.testers_other, { title: 'Weather', count: '3' }))
+      expect(part).not.toContain(fill(fr.recap.testersTitle))
+    }
+    const more = recapEmail(
+      'en',
+      recapData({
+        testers: [{ title: 'Weather', count: 1, url: cornerUrl(METEO) }],
+        testersMore: 2,
+      }),
+    )
+    expect(more.text).toContain(fill(en.recap.testersMore_other, { count: '2' }))
+  })
+
+  // Relecture de sécurité du plan (mot pour mot) : le titre d'un projet est écrit par un membre.
+  it('defangs a domain in a project title of the testers part of the recap', () => {
+    const title = '<a href="https://evil.example">x</a> evil.example'
+
+    for (const language of ['fr', 'en'] as const) {
+      const email = recapEmail(
+        language,
+        recapData({ testers: [{ title, count: 1, url: cornerUrl(METEO) }] }),
+      )
+
+      for (const part of [email.subject, email.text, email.html]) {
+        expect(part, language).not.toContain('evil.example')
+        expect(part, language).not.toContain('<a href="https://evil')
+      }
+      // Le titre garde sa place, l'adresse remplacée par « [lien] » dans la langue de l'e-mail.
+      const placeholder = resources[language].translation.email.link
+      expect(email.text, language).toContain(placeholder)
+      // Aucune balise venue du titre : chaque lien du HTML est l'un des nôtres (appli ou API).
+      for (const tag of email.html.match(/<a\b[^>]*>/g) ?? []) {
+        expect(tag).toMatch(/^<a\b[^>]*href="https:\/\/(api\.)?waiggle\.com\//)
+      }
+      expect(hrefsOf(email.html)).toContain(cornerUrl(METEO)) // témoin : la partie est bien là
     }
   })
 })
