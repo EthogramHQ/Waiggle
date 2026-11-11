@@ -455,6 +455,15 @@ describe('« Le coin des testeurs » for a tester (R7b)', () => {
     expect(screen.queryByRole('button', { name: JOIN })).toBeNull()
   })
 
+  // Interface A10 (R7b, correction 7) : le bouton des testeurs mène au coin, il se lit « lien » ;
+  // « Rejoindre les testeurs », qui ouvre une feuille, reste un bouton (témoin).
+  it('reads « Le coin des testeurs » as a link, « Rejoindre les testeurs » as a button', async () => {
+    await renderPage(tester)
+
+    expect(await screen.findByRole('link', { name: CORNER })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: CORNER })).toBeNull()
+  })
+
   it('leads to the testers corner of the project, without a sheet and without a request', async () => {
     await renderPage(tester)
 
@@ -548,6 +557,16 @@ describe('« Le coin des testeurs » for the author (R7b, planche validée 2)', 
     await fireEvent.press(await findCorner())
 
     expect(visitedPaths()).toEqual([cornerPath])
+  })
+
+  // Interface A10 (R7b, correction 7) : il mène à une autre page, il se lit « lien ».
+  it('reads « Le coin des testeurs » as a link, for the author as for a tester', async () => {
+    await renderPage(mine)
+
+    expect(await screen.findByRole('link', { name: CORNER })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: CORNER })).toBeNull()
+    // Témoin : « Modifier », qui ouvre une feuille sur la page, reste un bouton.
+    expect(screen.getByRole('button', { name: fr.t(($) => $.project.page.edit) })).toBeTruthy()
   })
 
   it('offers the corner on a testable project that has no tester yet, beside « 0 testeur »', async () => {

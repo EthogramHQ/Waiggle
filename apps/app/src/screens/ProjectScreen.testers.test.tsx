@@ -6,8 +6,10 @@
 // - pour l'auteur, « Le coin des testeurs », qui mène à la page du coin.
 // Les vrais hooks des testeurs (`testers/api.ts`) tournent sur un faux réseau (`requestWithoutBody`) ;
 // le projet est relu par `getProject`, qui rend ce que le faux serveur sait.
+import { palettes } from '@ruche/brand'
 import type { Project } from '@ruche/contracts'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { requestWithoutBody } from '../api/client'
 import { getMe } from '../profile/api'
 import { getProject } from '../projects/api'
@@ -157,6 +159,21 @@ describe('« Quitter les testeurs » in the « … » menu of the page (R7b, jur
     // Témoin : « Signaler ce projet » est là, comme pour tout autre membre.
     expect(screen.getByRole('menuitem', { name: fr.t(($) => $.report.project) })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: QUIT })).toBeTruthy()
+  })
+
+  // Interface A6 (R7b) : le même geste que « Quitter les testeurs » du coin, le même dessin (rouge).
+  it('draws « Quitter les testeurs » of the menu in red, as in the corner', async () => {
+    await renderPage(testedByInes)
+
+    await openMenu()
+
+    const quit = within(screen.getByRole('menuitem', { name: QUIT })).getByText(QUIT)
+    // Le ton « danger » du texte : la couleur des textes d'erreur (`dangerText`).
+    expect(StyleSheet.flatten(quit.props.style)?.color).toBe(palettes.day.dangerText)
+    // Témoin : « Signaler ce projet » reste dans le ton ordinaire.
+    const reportText = fr.t(($) => $.report.project)
+    const report = within(screen.getByRole('menuitem', { name: reportText })).getByText(reportText)
+    expect(StyleSheet.flatten(report.props.style)?.color).not.toBe(palettes.day.dangerText)
   })
 
   it('offers no « Quitter les testeurs » to a member who does not test the project', async () => {

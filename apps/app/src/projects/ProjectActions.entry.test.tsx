@@ -135,7 +135,8 @@ describe('« Le coin des testeurs » against a double tap (R7b)', () => {
   it('opens the corner once on a double tap', async () => {
     await renderPage({ ...seenByInes, isTester: true })
 
-    const corner = screen.getByRole('button', { name: CORNER })
+    // Un lien depuis la correction 7 de R7b (interface A10) : il mène à une autre page.
+    const corner = screen.getByRole('link', { name: CORNER })
     await fireEvent.press(corner)
     await fireEvent.press(corner)
 
