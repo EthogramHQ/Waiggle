@@ -490,6 +490,11 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         categoryChanges,
         updates,
         testerOf,
+        // R7b, provisoire au commit du contrat : remplis avec les routes du coin des testeurs.
+        testerCalls: [],
+        testerMessages: [],
+        testerRemovals: [],
+        testerThreadReads: [],
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
         comments: comments.map((comment) => ({

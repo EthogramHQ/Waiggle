@@ -116,6 +116,23 @@ export const presentNotification = (
         quote: notification.comment.excerpt,
         target: projectRoute(notification.project.id),
       }
+    // R7b, provisoire au commit du contrat : le texte, et la page du projet en attendant le coin.
+    case 'tester_call':
+    case 'tester_message':
+    case 'feedback_settled':
+      return {
+        icon: 'users-three',
+        text: t(($) => $.notifications.testerCall, {
+          name:
+            notification.kind === 'tester_message'
+              ? notification.from.name
+              : notification.author.name,
+          title: notification.project.title,
+        }),
+        detail: null,
+        quote: null,
+        target: projectRoute(notification.project.id),
+      }
     case 'handle':
       return {
         icon: 'sparkle',

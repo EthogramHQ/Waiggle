@@ -268,6 +268,10 @@ const loadVisible = async (
         snapshot: [{ field: 'body', value: row.body }],
       }
     }
+    // R7b, provisoire au commit du contrat : un appel et un message arrivent avec la modération du coin.
+    case 'call':
+    case 'message':
+      return null
     case 'member': {
       // Un profil se voit comme sa page (routes/members.ts) : un compte vérifié, avec son pseudo
       // actuel. Seules les colonnes publiques sont lues (ni l'e-mail, ni la langue).
@@ -384,6 +388,10 @@ export const loadDecidable = async (
         .where(and(eq(c.id, target.id), isNull(c.deletedAt)))
       return row ? { authorId: row.authorId, removed: row.removedAt !== null } : null
     }
+    // R7b, provisoire au commit du contrat : un appel et un message arrivent avec la modération du coin.
+    case 'call':
+    case 'message':
+      return null
     case 'member': {
       const [row] = await db
         .select({ id: schema.user.id })

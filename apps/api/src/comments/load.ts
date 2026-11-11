@@ -325,6 +325,8 @@ export const authorsOf = async (
         name: row.name,
         handle: row.handle,
         avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+        // R7b, provisoire au commit du contrat : le badge « Testeur » vient avec les fils du coin.
+        isTester: false,
       },
     ]),
   )

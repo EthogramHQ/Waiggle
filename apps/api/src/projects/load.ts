@@ -145,6 +145,9 @@ const toProjectBase = (
     name: authorName,
     avatarUrl: authorAvatarKey ? mediaUrl(publicApiUrl, authorAvatarKey) : null,
   },
+  // R7b, provisoire au commit du contrat : faux pour l'auteur seul ; le retrait d'un testeur par
+  // l'auteur s'y ajoute avec les routes du coin.
+  testerJoinable: project.authorId !== viewerId,
   title: project.title,
   pitch: project.pitch,
   description: project.description,
