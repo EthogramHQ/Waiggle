@@ -2453,7 +2453,8 @@ export const fr = {
     cornerClosed: 'Ce coin des testeurs est fermé : rien ne peut y être écrit pour l’instant.',
     threadClosed: 'Tu ne peux pas répondre dans ce fil.',
     invalidPhoto: 'L’image n’est plus disponible. Ajoute-la de nouveau.',
-    invalidFeedback: 'Un des retours n’est plus à traiter. Recharge la liste, puis réessaie.',
+    invalidFeedback:
+      'Un des retours cochés n’est plus à traiter : la liste est à jour, vérifie-la puis publie.',
     testerMediaFull: 'Ce fil ou ce coin a atteint 100 images. Supprimes-en une pour en ajouter.',
   },
 } as const

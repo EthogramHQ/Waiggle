@@ -2047,7 +2047,7 @@ export const en: Translation = {
     threadClosed: 'You can’t reply in this thread.',
     invalidPhoto: 'The image is no longer available. Add it again.',
     invalidFeedback:
-      'One of the feedback items is no longer to do. Reload the list, then try again.',
+      'One of the checked feedback items is no longer to do: the list is up to date, check it, then publish.',
     testerMediaFull: 'This thread or corner has reached 100 images. Delete one to add another.',
   },
 }
