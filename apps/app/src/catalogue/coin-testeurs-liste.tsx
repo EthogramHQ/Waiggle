@@ -8,11 +8,10 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes du composant viennent de l'appli.
-import { type ColorName, palettes, radii, space } from '@ruche/brand'
+import { radii, space } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import type { ImageSource } from '../ui/image'
 import { Stack } from '../ui/Stack'
 import { TestersList, type TestersListItem } from '../ui/TestersList'
 import { Text } from '../ui/Text'
@@ -56,19 +55,6 @@ type Labels = typeof fr
 const noop = () => {}
 const schemes = ['day', 'night'] as const
 
-/**
- * Une photo d'exemple (le dépôt n'en contient aucune) : un dégradé SVG entre deux couleurs de la
- * marque (comme coin-entetes.tsx), jamais écrites à la main.
- */
-const sample = (from: ColorName, to: ColorName): ImageSource => {
-  const day = palettes.day
-  return {
-    uri: `data:image/svg+xml;utf8,${encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${day[from]}"/><stop offset="1" stop-color="${day[to]}"/></linearGradient></defs><rect width="80" height="80" fill="url(#g)"/></svg>`,
-    )}`,
-  }
-}
-
 const NAMES = [
   'Inès Haddad',
   'Léa Moreau',
@@ -83,13 +69,16 @@ const NAMES = [
   'Emma Lopez',
   'Paul Vidal',
 ]
-const photos = [sample('honey', 'amber'), sample('honeyLight', 'amberText'), null]
-
-/** Douze testeurs, du plus récent inscrit au plus ancien (l'ordre de l'API), une photo sur trois. */
+/**
+ * Douze testeurs, du plus récent inscrit au plus ancien (l'ordre de l'API). Sans photo : les
+ * initiales. `Avatar` dessine une photo avec l'`Image` de React Native, qui ne dessine pas sur le web
+ * une image SVG écrite dans l'adresse (`data:`), la seule que le catalogue puisse fabriquer : on n'y
+ * verrait qu'un rond vide.
+ */
 const twelve: TestersListItem[] = NAMES.map((name, index) => ({
   id: `t${index + 1}`,
   name,
-  avatar: photos[index % photos.length] ?? null,
+  avatar: null,
   since: new Date(Date.UTC(2026, 10, 3 - index * 3, 9)).toISOString(),
 }))
 
