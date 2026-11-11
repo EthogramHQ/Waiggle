@@ -39,6 +39,14 @@ type GroupProps = {
   children: ReactNode
   /** Annoncé comme un groupe de boutons radio (une liste de choix). */
   radio?: boolean
+  /**
+   * R7b : annoncé comme une liste (« liste, 4 éléments »), pour une liste de personnes plutôt que
+   * de réglages (les testeurs d'un projet). Le groupe pose lui-même chaque ligne dans un élément de
+   * liste, son trait de séparation compris : sur le web, une liste (`<ul>`) ne contient que des
+   * éléments (`<li>`), jamais un trait posé entre deux. Les lignes ne portent donc pas ce rôle
+   * (`<li>` dans `<li>`). Sans effet avec `radio`.
+   */
+  list?: boolean
 }
 
 /**
@@ -68,7 +76,7 @@ type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
 /** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
 export type PressEvent = { preventDefault?: () => void }
 
-export function ListGroup({ title, footer, children, radio = false }: GroupProps) {
+export function ListGroup({ title, footer, children, radio = false, list = false }: GroupProps) {
   const { colors, shadows } = useTheme()
   const rows = Children.toArray(children)
   // Les éléments des choix, par rang de ligne, pour y poser le focus quand une flèche passe au
@@ -107,6 +115,7 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
     },
   })
   const notes = footer === undefined ? [] : typeof footer === 'string' ? [footer] : footer
+  const asList = list && !radio
   return (
     <View style={{ gap: space.sm }}>
       {title ? (
@@ -120,6 +129,7 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
       <View
         {...(radio ? { accessibilityRole: 'radiogroup' as const } : null)}
         {...(radio && title ? { accessibilityLabel: title } : null)}
+        {...(asList ? { role: 'list' as const } : null)}
         style={{
           backgroundColor: colors.surface,
           borderRadius: radii.group,
@@ -129,9 +139,9 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
           overflow: 'hidden',
         }}
       >
-        {rows.map((row, i) => (
-          <Fragment key={(row as { key?: string }).key ?? i}>
-            {i > 0 ? (
+        {rows.map((row, i) => {
+          const separator =
+            i > 0 ? (
               <View
                 style={{
                   height: borders.hairline,
@@ -139,14 +149,28 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
                   marginLeft: space.lg,
                 }}
               />
-            ) : null}
-            {choices[i] ? (
-              <RadioSlotContext.Provider value={slot(i)}>{row}</RadioSlotContext.Provider>
-            ) : (
-              row
-            )}
-          </Fragment>
-        ))}
+            ) : null
+          const key = (row as { key?: string }).key ?? i
+          // Une liste (R7b) : la ligne et son trait dans un même élément de liste.
+          if (asList) {
+            return (
+              <View key={key} role="listitem">
+                {separator}
+                {row}
+              </View>
+            )
+          }
+          return (
+            <Fragment key={key}>
+              {separator}
+              {choices[i] ? (
+                <RadioSlotContext.Provider value={slot(i)}>{row}</RadioSlotContext.Provider>
+              ) : (
+                row
+              )}
+            </Fragment>
+          )
+        })}
       </View>
       {notes.length > 0 ? (
         <View style={{ paddingHorizontal: space.lg, gap: space.xs }}>

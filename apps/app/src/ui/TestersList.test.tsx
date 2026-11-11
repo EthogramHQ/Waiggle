@@ -91,10 +91,10 @@ const testerIn = (node: unknown): string | null => {
 /** L'état replié ou déplié, tel que le lit le web (`aria-expanded`) et le téléphone. */
 const expandedOf = (node: unknown) => {
   const { props } = node as Host
-  return {
-    web: props['aria-expanded'],
-    phone: (props.accessibilityState as { expanded?: boolean } | undefined)?.expanded,
-  }
+  const phone = (props.accessibilityState as { expanded?: boolean } | undefined)?.expanded
+  // Sous Jest, le Pressable reste celui de React Native même avec Platform.OS = 'web' : il range
+  // aria-expanded dans accessibilityState sans le poser sur la vue (comme Disclosure.test.tsx).
+  return { web: props['aria-expanded'] ?? phone, phone }
 }
 
 const countButton = (count = 12) => screen.getByRole('button', { name: text.count(count) })
