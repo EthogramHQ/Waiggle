@@ -19,6 +19,12 @@ export type Presented = {
 
 const projectRoute = (id: string): Href => ({ pathname: '/projects/[id]', params: { id } })
 
+/** Un onglet du coin des testeurs d'un projet (R7b). */
+const cornerRoute = (id: string, tab: 'calls' | 'feedback'): Href => ({
+  pathname: '/projects/[id]/testers',
+  params: { id, tab },
+})
+
 /**
  * Les textes et la destination d'une notification. Les réactions et les abonnés ne nomment
  * personne ; un commentaire nomme son auteur, déjà visible sous le commentaire. Celles de la
@@ -116,23 +122,70 @@ export const presentNotification = (
         quote: notification.comment.excerpt,
         target: projectRoute(notification.project.id),
       }
-    // R7b, provisoire au commit du contrat : le texte, et la page du projet en attendant le coin.
-    case 'tester_call':
-    case 'tester_message':
-    case 'feedback_settled':
+    case 'tester_call': {
+      // R7b : un appel à tester ; le début de l'appel dessous, en citation ; au toucher, l'onglet
+      // « Appels » du coin des testeurs.
+      const { author, project, call } = notification
       return {
-        icon: 'users-three',
-        text: t(($) => $.notifications.testerCall, {
-          name:
-            notification.kind === 'tester_message'
-              ? notification.from.name
-              : notification.author.name,
-          title: notification.project.title,
-        }),
+        icon: 'megaphone-simple',
+        text: t(($) => $.notifications.testerCall, { name: author.name, title: project.title }),
+        detail: null,
+        quote: call.excerpt,
+        target: cornerRoute(project.id, 'calls'),
+      }
+    }
+    case 'tester_message': {
+      // R7b : un message d'un fil de testeur. Le fil est privé : jamais d'extrait, seulement qui a
+      // écrit. L'auteur ouvre le fil de ce testeur ; le testeur, l'onglet « Retours » où il lit la
+      // réponse sous son retour.
+      const { from, project, role, message } = notification
+      const params = { name: from.name, title: project.title }
+      if (role === 'author') {
+        return {
+          icon: 'chat-circle-dots',
+          text: t(($) => $.notifications.testerReplyToTester, params),
+          detail: null,
+          quote: null,
+          target: cornerRoute(project.id, 'feedback'),
+        }
+      }
+      return {
+        icon: 'chat-circle-dots',
+        text:
+          message.kind === 'feedback'
+            ? t(($) => $.notifications.testerFeedback, params)
+            : t(($) => $.notifications.testerReplyToAuthor, params),
         detail: null,
         quote: null,
-        target: projectRoute(notification.project.id),
+        target: {
+          pathname: '/projects/[id]/testers/threads/[testerId]',
+          params: { id: project.id, testerId: message.testerId },
+        },
       }
+    }
+    case 'feedback_settled': {
+      // R7b : un de ses retours est réglé, à la main, ou par une mise à jour (sa version, sinon sa
+      // date, écrite à l'heure de Paris comme les autres dates de l'Activité).
+      const { author, project, update } = notification
+      const params = { name: author.name, title: project.title }
+      return {
+        icon: 'check-circle',
+        text: !update
+          ? t(($) => $.notifications.feedbackSettled, params)
+          : update.version
+            ? t(($) => $.notifications.feedbackSettledVersion, {
+                ...params,
+                version: update.version,
+              })
+            : t(($) => $.notifications.feedbackSettledUpdate, {
+                ...params,
+                date: parisDateTime(update.createdAt, language).date,
+              }),
+        detail: null,
+        quote: null,
+        target: cornerRoute(project.id, 'feedback'),
+      }
+    }
     case 'handle':
       return {
         icon: 'sparkle',

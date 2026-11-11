@@ -45,6 +45,7 @@ import { ProjectHeader } from '../projects/ProjectHeader'
 import { ProjectUpdatesSection, useUpdateSheet } from '../projects/ProjectUpdatesSection'
 import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
+import { QuitTestersDialog } from '../testers/QuitTestersDialog'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Columns } from '../ui/Columns'
 import { copyText } from '../ui/clipboard'
@@ -200,6 +201,24 @@ function ProjectView({ project }: { project: Project }) {
     router.dismissTo('/me')
   }
 
+  // R7b : le coin des testeurs de l'auteur ; la fenêtre « Quitter les testeurs » du testeur, ouverte
+  // depuis le menu « … » (dont `menuRef` reprend le focus après « Annuler »).
+  const openCorner = () =>
+    router.push({ pathname: '/projects/[id]/testers', params: { id: project.id } })
+  const [quitting, setQuitting] = useState(false)
+  // Parti : la fenêtre se ferme, la bulle le dit, et la page se remet sur elle-même avec
+  // `?focus=join` : `ProjectActions` y lit où poser le focus (« Rejoindre les testeurs », ui-B6).
+  const onQuit = () => {
+    setQuitting(false)
+    toast.show(
+      t(($) => $.project.testers.quitToast, { title: project.title }),
+      {
+        icon: 'check-circle',
+      },
+    )
+    router.replace({ pathname: '/projects/[id]', params: { id: project.id, focus: 'join' } })
+  }
+
   const edit = () => router.push({ pathname: '/projects/[id]/edit', params: { id: project.id } })
   const report = () =>
     router.push({ pathname: '/report', params: { kind: 'project', id: project.id } })
@@ -260,6 +279,17 @@ function ProjectView({ project }: { project: Project }) {
                   onPress: () => updateSheet.open(menuRef),
                 },
               ]),
+          // R7b : « Le coin des testeurs », sous la même condition que son bouton sur la page
+          // (le projet cherche des testeurs, ou en a). Même retiré ou suspendu : le coin se lit.
+          ...(project.status === 'testable' || (project.testerCount ?? 0) > 0
+            ? [
+                {
+                  label: t(($) => $.project.testers.corner),
+                  icon: 'users-three' as const,
+                  onPress: openCorner,
+                },
+              ]
+            : []),
           {
             label: t(($) => $.project.page.delete),
             icon: 'trash' as const,
@@ -267,7 +297,20 @@ function ProjectView({ project }: { project: Project }) {
             onPress: () => setConfirming(true),
           },
         ]
-      : [{ label: t(($) => $.report.project), icon: 'flag' as const, onPress: report }]),
+      : [
+          // R7b (juridique J1) : partir reste possible depuis la page, qui reste visible quand le
+          // coin se ferme (auteur suspendu) ; aussi pour un testeur suspendu, projet en pause ou fini.
+          ...(project.isTester
+            ? [
+                {
+                  label: t(($) => $.project.testers.quit),
+                  icon: 'sign-out' as const,
+                  onPress: () => setQuitting(true),
+                },
+              ]
+            : []),
+          { label: t(($) => $.report.project), icon: 'flag' as const, onPress: report },
+        ]),
   ]
   // Partager et « … » : posés sur la photo (téléphone) ou en haut de la page (tablette, ordinateur).
   // Le menu a toujours au moins une action (signaler, ou supprimer pour l'auteur). `menuRef` : le
@@ -478,12 +521,27 @@ function ProjectView({ project }: { project: Project }) {
     />
   ) : null
 
+  // R7b : la fenêtre « Quitter les testeurs » (un autre membre), montée dès l'arrivée : `isTester`
+  // bascule dans le cache au toucher de « Quitter », la fenêtre doit rester pour finir son geste.
+  const quitDialog = project.isMine ? null : (
+    <QuitTestersDialog
+      project={{ id: project.id, title: project.title }}
+      authorName={project.author.name}
+      visible={quitting}
+      onCancel={() => setQuitting(false)}
+      onQuit={onQuit}
+      opener={menuRef}
+    />
+  )
+
   // Les couches de la page, montées dès l'arrivée, fermées : l'éventail lit au montage s'il doit
   // montrer son aide (rien ne pousse ses lignes à l'ouverture), la feuille rend le focus à
-  // « Partager » quand elle se ferme ; la fenêtre de suppression (l'auteur), qui couvre l'écran.
+  // « Partager » quand elle se ferme ; les fenêtres de suppression (l'auteur) et de départ des
+  // testeurs, qui couvrent l'écran.
   const layers = (
     <>
       {deletion}
+      {quitDialog}
       {capsule && !suspended ? (
         <ReactionFan
           open={fanOpen}
