@@ -21,6 +21,7 @@ import {
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { memberCounterKeys } from './rate-limit'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { jpegImage } from './testing/images'
@@ -623,6 +624,34 @@ describe('limits against abuse', () => {
 
     await expectError(await postCall(project.id, jean), 429, 'rate_limited')
     expect((await calls(project.id, jean)).items).toEqual([])
+  })
+
+  it('counts the calls of a project once, whatever the case of its identifier', async () => {
+    const project = await publishProject()
+    // z.uuid() et PostgreSQL ignorent la casse : la même adresse en majuscules désigne le même projet,
+    // et son plafond de 5 appels par jour ne se contourne pas en alternant les graphies.
+    for (let i = 0; i < 5; i++) {
+      const written = i % 2 === 0 ? project.id : project.id.toUpperCase()
+      expect((await postCall(written, jean, simple(`Appel ${i + 1}.`))).status).toBe(201)
+    }
+
+    await expectError(await postCall(project.id.toUpperCase(), jean), 429, 'rate_limited')
+    await expectError(await postCall(project.id, jean), 429, 'rate_limited')
+    expect((await calls(project.id, jean)).items).toHaveLength(5)
+  })
+
+  it('counts even requests on an unknown call in the change quota', async () => {
+    const project = await publishProject()
+    const call = await launch(project.id)
+    // 60 modifications par heure : il en a déjà fait 59 ; un appel inconnu fait la 60e.
+    await ctx.db
+      .insert(schema.apiRateLimit)
+      .values({ key: memberCounterKeys(jeanId).projectChange, count: 59, windowStart: Date.now() })
+    await expectError(await deleteCall(project.id, UNKNOWN), 404, 'not_found')
+
+    const res = await deleteCall(project.id, call.id)
+    await expectError(res, 429, 'rate_limited')
+    expect((await calls(project.id, jean)).items).toHaveLength(1)
   })
 
   it('does not spend the author’s daily calls when another member posts calls', async () => {

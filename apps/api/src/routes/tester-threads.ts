@@ -53,6 +53,7 @@ const HOUR = 60 * 60 * 1000
 const messageRule: RateRule = { windowMs: 24 * HOUR, max: TESTER_MESSAGES_PER_DAY }
 const settleRule: RateRule = { windowMs: HOUR, max: TESTER_SETTLES_PER_HOUR }
 const changeRule: RateRule = { windowMs: HOUR, max: 60 }
+const readRule: RateRule = { windowMs: HOUR, max: 300 }
 
 const projectParams = z.object({ id: z.string() })
 const threadParams = z.object({ id: z.string(), testerId: z.string() })
@@ -137,12 +138,13 @@ const readThreadRoute = createRoute({
   summary: 'Mark a thread as read',
   description:
     'The author or this tester: writes only the reader’s own read date, which the other one never ' +
-    'sees. Allowed during a suspension. No quota: one row, by its primary key.',
+    'sees. Allowed during a suspension. 300 per hour per member, malformed requests included.',
   request: { params: threadParams },
   responses: {
     204: { description: 'Marked.' },
     401: errorResponse('Not signed in.'),
     404: errorResponse('No such thread for this member.'),
+    429: errorResponse('Too many reads.'),
   },
 })
 
@@ -286,6 +288,16 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
       await next()
     })
   }
+  // Marquer lu est une écriture : un compteur à lui, 300 par heure, compté avant tout examen (mal
+  // formées comprises). Sans lui, on pourrait appeler la route sans fin, à une écriture par appel
+  // (relecture de sécurité R7b, A2).
+  app.on('POST', '/v1/projects/:id/threads/:testerId/read', async (c, next) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    const decision = await limiter.hit(memberCounterKeys(user.id).testerRead, readRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    await next()
+  })
   app.on('DELETE', '/v1/projects/:id/messages/:messageId', async (c, next) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)

@@ -1478,6 +1478,25 @@ describe('the testers corner of an account (R7b)', () => {
       expect((await exportOf(max)).data.testerRemovals).toEqual([])
     })
 
+    it('exports a removed tester who blocked the author without his handle, in both directions', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      await join(meteo.id, zoe)
+      const maxAt = await removeTester(meteo.id, maxId)
+      const zoeAt = await removeTester(meteo.id, zoeId)
+      // Max bloque l'autrice depuis son retrait ; l'autrice bloque Zoé. Dans les deux sens, la page
+      // de l'autre répond 404 : l'export ne donne plus leur pseudo, mais garde l'identifiant et la
+      // date (le retrait est un geste de l'autrice).
+      await act.block(leaId, max)
+      await act.block(zoeId, leaCookie)
+
+      const removals = (await exportOf(leaCookie)).data.testerRemovals
+      expect(removals).toEqual([
+        { projectId: meteo.id, title: 'Météo', memberId: maxId, handle: null, at: maxAt },
+        { projectId: meteo.id, title: 'Météo', memberId: zoeId, handle: null, at: zoeAt },
+      ])
+    })
+
     it('exports how far I have read each of my threads, never how far the other has read', async () => {
       const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
       await join(meteo.id, max)
