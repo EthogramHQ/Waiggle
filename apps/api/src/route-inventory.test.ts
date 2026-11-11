@@ -80,6 +80,16 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'DELETE /v1/projects/:id/updates/:updateId': ['own', 'allowed'],
   'POST /v1/projects/:id/testers': ['hidesBlocked', 'refused'],
   'DELETE /v1/projects/:id/testers': ['own', 'allowed'],
+  // R7b : le coin des testeurs. Entrer dans le coin montre l'inscription d'autres membres (l'auteur)
+  // et un blocage défait l'accès du testeur (il n'a plus que son fil) ; retirer un testeur est un
+  // geste de l'auteur sur son projet, permis pendant une suspension comme tout DELETE (le coin est
+  // alors fermé : 409). Lancer un appel et envoyer une image écrivent : refusés à un suspendu.
+  'GET /v1/projects/:id/testers': ['hidesBlocked', 'allowed'],
+  'DELETE /v1/projects/:id/testers/:memberId': ['own', 'allowed'],
+  'POST /v1/projects/:id/testers/media': ['own', 'refused'],
+  'GET /v1/projects/:id/calls': ['hidesBlocked', 'allowed'],
+  'POST /v1/projects/:id/calls': ['own', 'refused'],
+  'DELETE /v1/projects/:id/calls/:callId': ['own', 'allowed'],
   'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused'],
   'DELETE /v1/projects/:id/reactions/:kind': ['own', 'allowed'],
   'GET /v1/projects/:id/comments': ['hidesBlocked', 'allowed'],
@@ -171,6 +181,15 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'POST /v1/projects/:id/testers': {
     file: 'testers.test.ts',
     test: 'answers 404 to a blocked member who tries to become a tester, in both directions',
+  },
+  // R7b : un blocage fait de l'ancien testeur un lecteur de son seul fil (404 sur le reste).
+  'GET /v1/projects/:id/testers': {
+    file: 'tester-corner.test.ts',
+    test: 'keeps a read-only corner after a block, in both directions',
+  },
+  'GET /v1/projects/:id/calls': {
+    file: 'tester-calls.test.ts',
+    test: 'refuses a former tester the calls',
   },
   'PUT /v1/projects/:id/reactions/:kind': {
     file: 'blocks.test.ts',

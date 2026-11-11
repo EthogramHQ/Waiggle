@@ -160,7 +160,18 @@ export const memberCounterKeys = (userId: string) => ({
   // mal formées comprises.
   suggestionDismissHour: `suggestion-dismiss-hour:${userId}`,
   suggestionDismissDay: `suggestion-dismiss-day:${userId}`,
+  // Les demandes d'appel à tester (R7b, sécurité B1) : 20 par jour et par membre, tous projets
+  // ensemble, comptées avant tout examen. Le plafond de 5 appels par jour d'un projet est une autre
+  // clé (`projectCallKey`), comptée après le droit d'auteur.
+  testerCall: `tester-call:${userId}`,
 })
+
+/**
+ * Le compteur des appels à tester d'un projet (R7b) : 5 par jour, pour l'auteur seul (la route ne le
+ * compte qu'après avoir vérifié qu'il l'est). La clé porte le projet, pas un membre : elle ne part
+ * donc pas avec un compte (`deleteMemberCounters`), mais avec la purge de nuit, à la fin de sa fenêtre.
+ */
+export const projectCallKey = (projectId: string) => `call:${projectId}`
 
 /**
  * Une adresse e-mail sous la forme qu'on compare : sans blancs autour, en minuscules. Better Auth

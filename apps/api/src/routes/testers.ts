@@ -1,17 +1,22 @@
-// Rejoindre et quitter les testeurs d'un projet (R7a) : POST et DELETE /v1/projects/{id}/testers.
-// Un testeur est un membre inscrit à un projet « Testable » avec une démo ; il est prévenu de chaque
-// mise à jour publiée après son inscription (notifications). Seul l'auteur voit le nombre de
-// testeurs (projects/testers.ts) ; la liste des testeurs n'est lue nulle part.
+// Les testeurs d'un projet : rejoindre et quitter (R7a : POST et DELETE /v1/projects/{id}/testers),
+// et, depuis R7b, entrer dans le coin des testeurs (GET, avec le nombre pour l'auteur et ses
+// testeurs, la liste pour l'auteur seul) et retirer un testeur (DELETE …/testers/{memberId}). Un
+// testeur est un membre inscrit à un projet « Testable » avec une démo ; il est prévenu de chaque
+// mise à jour publiée après son inscription (notifications). Un membre retiré par l'auteur ne peut
+// plus s'inscrire (table project_tester_removal), sans que le refus le dise.
 import { createRoute, z } from '@hono/zod-openapi'
-import { ProjectId, TESTERS_MAX } from '@ruche/contracts'
+import { ProjectId, TESTERS_MAX, TesterCorner } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
+import { currentHandleOf } from '../handles/load'
+import { mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { cornerAccess, isMissingMember } from '../testers/access'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -59,15 +64,62 @@ const quitRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter }
+const cornerRoute = createRoute({
+  method: 'get',
+  path: '/v1/projects/{id}/testers',
+  summary: 'Open the testers corner of a project',
+  description:
+    'The author (and the testers) read the number of testers; the author alone reads the list, the ' +
+    'most recent first. A former tester (left, removed, or blocked) opens the corner without the ' +
+    'count. `closed` is true for the author of a removed, private or suspended project, who then ' +
+    'only reads. Everyone else, and every tester of a closed corner, gets 404. No quota: a read ' +
+    'served by the primary keys and by `project_tester_project_idx`.',
+  request: { params },
+  responses: {
+    200: {
+      description: 'The corner.',
+      content: { 'application/json': { schema: TesterCorner } },
+    },
+    401: errorResponse('Not signed in.'),
+    404: errorResponse('No such corner for this member (unknown, private, closed, not a tester).'),
+  },
+})
 
-export const testerRoutes = ({ db, limiter }: Deps) => {
+const removeTesterRoute = createRoute({
+  method: 'delete',
+  path: '/v1/projects/{id}/testers/{memberId}',
+  summary: 'Remove a tester from my project',
+  description:
+    'The author removes a member from the testers: the inscription is erased and the member cannot ' +
+    'join again (the refusal of a new inscription is the one of any closed project). The member is ' +
+    'not told. Idempotent: 204 without writing for a member who does not test the project, or for ' +
+    'oneself.',
+  request: { params: z.object({ id: z.string(), memberId: z.string() }) },
+  responses: {
+    204: done,
+    401: errorResponse('Not signed in.'),
+    403: errorResponse('A tester: removing is the author’s gesture.'),
+    404: errorResponse('No such corner for this member, or a malformed project identifier.'),
+    409: errorResponse(
+      'The corner is closed (`corner_closed`): removed or private project, suspended author.',
+    ),
+    429: errorResponse('Too many tester changes.'),
+  },
+})
+
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+
+export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
-  // Connecté obligatoire, avant tout le reste.
+  // Connecté obligatoire, avant tout le reste (aussi pour …/testers/{memberId}).
   app.use('/v1/projects/:id/testers', requireUser)
+  app.use('/v1/projects/:id/testers/:memberId', requireUser)
 
   const unauthorized = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'unauthorized'), 401)
+  const forbidden = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'forbidden'), 403)
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
+  const cornerClosed = (c: Context<AppEnv>) =>
+    c.json(errorBody(languageOf(c), 'corner_closed'), 409)
   const tooMany = (c: Context<AppEnv>, retryAfterSeconds: number) => {
     c.header('Retry-After', String(retryAfterSeconds))
     return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
@@ -129,6 +181,19 @@ export const testerRoutes = ({ db, limiter }: Deps) => {
         .from(t)
         .where(and(eq(t.memberId, viewer.id), eq(t.projectId, id)))
       if (mine) return 'done' as const
+      // R7b : un membre que l'auteur a retiré ne revient pas. La ligne de retrait est relue ici,
+      // sous le verrou du projet (le retrait la pose sous le même verrou : l'un des deux passe
+      // avant l'autre). Le même refus qu'un projet fermé : rien ne dit qu'il a été retiré.
+      const [barred] = await tx
+        .select({ memberId: schema.projectTesterRemoval.memberId })
+        .from(schema.projectTesterRemoval)
+        .where(
+          and(
+            eq(schema.projectTesterRemoval.projectId, id),
+            eq(schema.projectTesterRemoval.memberId, viewer.id),
+          ),
+        )
+      if (barred) return 'not_testable' as const
       if (locked.status !== 'testable' || locked.demoUrl === null) return 'not_testable' as const
       // L'index project_tester_project_idx (project_id) compte les inscrits (200 au plus).
       const [counted] = await tx
@@ -166,6 +231,127 @@ export const testerRoutes = ({ db, limiter }: Deps) => {
         and(eq(schema.projectTester.memberId, viewer.id), eq(schema.projectTester.projectId, id)),
       )
     return ok(c)
+  })
+
+  // Entrer dans le coin : l'accès décide de tout (testers/access.ts), la réponse ne dit jamais plus
+  // que ce que ce membre a le droit de savoir.
+  app.openapi(cornerRoute, async (c) => {
+    const viewer = c.get('user')
+    if (!viewer) return unauthorized(c)
+    const { id } = c.req.valid('param')
+    const access = await cornerAccess(db, id, viewer.id)
+    if (access === 'not_found') return notFound(c)
+    // Un ancien testeur ne voit ni le nombre ni la liste : seulement son fil, lu ailleurs.
+    if (access === 'former_tester') {
+      return c.json(
+        { role: 'former_tester' as const, closed: false, testerCount: null, testers: null },
+        200,
+      )
+    }
+
+    const t = schema.projectTester
+    if (access === 'tester') {
+      // Les testeurs ne se voient pas entre eux : seulement le nombre. L'index
+      // project_tester_project_idx (project_id) donne les inscrits (200 au plus).
+      const [counted] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(t)
+        .where(eq(t.projectId, id))
+      return c.json(
+        { role: 'tester' as const, closed: false, testerCount: counted?.n ?? 0, testers: null },
+        200,
+      )
+    }
+
+    // L'auteur (coin ouvert ou fermé : il relit toujours) : la liste, du plus récent inscrit au plus
+    // ancien. En SQL : select … from project_tester join "user" left join profile left join
+    // member_handle (pseudo actuel) where project_id = $id order by created_at desc, member_id
+    // desc. L'index project_tester_project_idx donne les inscrits du projet (200 au plus, un tri
+    // en mémoire de cette taille suffit) ; chaque jointure suit une clé primaire. Une seule
+    // requête pour toute la liste.
+    const rows = await db
+      .select({
+        id: schema.user.id,
+        name: schema.user.name,
+        handle: schema.memberHandle.handle,
+        avatarKey: schema.profile.avatarKey,
+        since: t.createdAt,
+      })
+      .from(t)
+      .innerJoin(schema.user, eq(schema.user.id, t.memberId))
+      .leftJoin(schema.profile, eq(schema.profile.userId, t.memberId))
+      .leftJoin(schema.memberHandle, currentHandleOf(t.memberId))
+      .where(eq(t.projectId, id))
+      .orderBy(desc(t.createdAt), desc(t.memberId))
+    return c.json(
+      {
+        role: 'author' as const,
+        closed: access === 'author_closed',
+        testerCount: rows.length,
+        testers: rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          handle: row.handle,
+          avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+          since: row.since.toISOString(),
+        })),
+      },
+      200,
+    )
+  })
+
+  // Retirer un testeur. Le quota passe avant tout (chaque demande compte, projet inconnu compris),
+  // puis le droit, puis une transaction : sous le verrou du projet (`for update`, comme
+  // l'inscription), on relit l'accès et l'inscription, qu'une première lecture a pu manquer (le
+  // membre vient de rejoindre) ; une inscription et un retrait simultanés passent l'un après l'autre.
+  app.openapi(removeTesterRoute, async (c) => {
+    const viewer = c.get('user')
+    if (!viewer) return unauthorized(c)
+    const wait = await overLimit(viewer.id)
+    if (wait !== null) return tooMany(c, wait)
+
+    const { id, memberId } = c.req.valid('param')
+    const access = await cornerAccess(db, id, viewer.id)
+    if (access === 'not_found' || access === 'former_tester') return notFound(c)
+    // Un testeur entre dans le coin, mais n'y retire personne : aucune écriture.
+    if (access === 'tester') return forbidden(c)
+    if (access === 'author_closed') return cornerClosed(c)
+    // On ne se retire pas soi-même (l'auteur n'est pas testeur de son projet) : 204 sans écrire.
+    if (memberId === viewer.id) return ok(c)
+
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        await tx
+          .select({ id: schema.project.id })
+          .from(schema.project)
+          .where(eq(schema.project.id, id))
+          .for('update')
+        // Sous le verrou, l'état a pu changer (projet passé en privé, auteur suspendu) : relu.
+        if ((await cornerAccess(tx, id, viewer.id)) !== 'author') return 'closed' as const
+        const t = schema.projectTester
+        // `returning` : les lignes réellement effacées. Aucune, et le membre ne teste pas ce projet :
+        // rien n'est écrit, pas même une ligne de retrait (l'auteur ne peut pas « bannir à
+        // l'avance » un membre qui n'est pas testeur). Clé primaire (member_id, project_id).
+        const erased = await tx
+          .delete(t)
+          .where(and(eq(t.projectId, id), eq(t.memberId, memberId)))
+          .returning({ memberId: t.memberId })
+        if (erased.length === 0) return 'done' as const
+        // `on conflict do nothing` : la clé primaire écarte un doublon sans erreur (idempotent).
+        await tx
+          .insert(schema.projectTesterRemoval)
+          .values({ projectId: id, memberId, createdAt: new Date() })
+          .onConflictDoNothing()
+        return 'done' as const
+      })
+      if (outcome === 'closed') return cornerClosed(c)
+      return ok(c)
+    } catch (error) {
+      // 23503 : le compte retiré a été supprimé pendant l'écriture. Rien n'est écrit (la
+      // transaction est annulée) et l'état a changé : un refus propre plutôt qu'un 500.
+      if (isMissingMember(error)) return cornerClosed(c)
+      throw error
+    }
   })
 
   return app

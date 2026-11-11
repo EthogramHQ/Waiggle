@@ -179,12 +179,19 @@ export const testerMedia = pgTable(
     width: integer('width').notNull(),
     height: integer('height').notNull(),
     thumbhash: text('thumbhash').notNull(),
+    // La description lue à voix haute d'une photo d'appel (écrite par l'auteur quand il lance
+    // l'appel, relecture juridique J8) ; null pour une capture et pour une photo sans description.
+    description: text('description'),
     createdAt: timestamp('created_at').notNull(),
   },
   (t) => [
     // Les images d'un appel, et celles d'un message (les lire avec eux, les compter).
     index('tester_media_call_idx').on(t.callId),
     index('tester_media_message_idx').on(t.messageId),
+    // Les plafonds de stockage (100 photos d'appel par projet, 100 captures par fil) comptent les
+    // images d'un projet, d'un membre et d'une sorte, rattachées ou en attente : sans cet index, la
+    // table entière serait lue à chaque envoi.
+    index('tester_media_project_owner_idx').on(t.projectId, t.ownerId, t.kind),
     // Index partiel : seulement les images en attente. Il sert au plafond par membre et par projet
     // et à la purge de nuit, et reste minuscule.
     index('tester_media_pending_idx')
