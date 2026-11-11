@@ -2797,7 +2797,8 @@ const pages = [
     path: `/projects/${testedProject.id}`,
     signedIn: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: fr.project.testers.corner }).waitFor()
+      // Il mène au coin : il se lit « lien » (R7b, correction 7).
+      await page.getByRole('link', { name: fr.project.testers.corner }).waitFor()
     },
   },
   {
