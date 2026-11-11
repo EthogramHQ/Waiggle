@@ -4,6 +4,7 @@
 // de ses images. Un fichier à part, avec ses propres textes : la section de la modération
 // (`moderation.tsx`) vit à côté, sans que deux personnes écrivent dans le même fichier.
 // Outil de développement : les exemples sont écrits ici, pas dans les traductions des membres.
+import { palettes } from '@ruche/brand'
 import type { CommentReply } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { CommentCard } from '../ui/CommentCard'
@@ -90,8 +91,7 @@ const fr = {
 }
 
 /** Une capture d'exemple : un dessin SVG en adresse data: (expo-image le dessine aussi sur le web). */
-const CAPTURE_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 104"><rect width="150" height="104" fill="#1F2A44"/><circle cx="112" cy="30" r="14" fill="#FFC21A"/><rect x="16" y="64" width="80" height="10" rx="5" fill="#F7F3EA"/></svg>'
+const CAPTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 104"><rect width="150" height="104" fill="${palettes.day.text}"/><circle cx="112" cy="30" r="14" fill="${palettes.day.honey}"/><rect x="16" y="64" width="80" height="10" rx="5" fill="${palettes.day.background}"/></svg>`
 const capture = { uri: `data:image/svg+xml;utf8,${encodeURIComponent(CAPTURE_SVG)}` }
 
 const en: typeof fr = {
