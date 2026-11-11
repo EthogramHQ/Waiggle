@@ -45,7 +45,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /api/auth/*': ['public', 'allowed'],
   'POST /api/auth/*': ['public', 'allowed'],
   // Les fichiers : une clé tirée au hasard, neuve à chaque photo (règle 11).
-  'GET /media/:folder{(?:avatars|visuals)}/:file': ['public', 'allowed'],
+  'GET /media/:folder/:file': ['public', 'allowed'],
   // Mon compte.
   'GET /v1/me': ['own', 'allowed'],
   'PATCH /v1/me': ['own', 'allowed'],
