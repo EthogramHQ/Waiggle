@@ -1,5 +1,5 @@
-// Retrouver la cible d'un signalement (tranche 7a) : un projet, une mise à jour, un commentaire
-// ou un profil. Deux lectures :
+// Retrouver la cible d'un signalement (tranche 7a) : un projet, une mise à jour, un commentaire,
+// un profil, et depuis R7b un appel à tester ou un message d'un fil de testeur. Deux lectures :
 // - pour un membre qui signale (POST /v1/reports, GET /v1/reports/target) : seulement ce qu'il voit,
 //   avec les règles de visibilité des autres lectures (projects/visibility.ts, comments/load.ts) ;
 //   tout le reste, inconnu, privé, retiré, masqué, supprimé ou caché par un blocage, donne « rien »,
@@ -28,12 +28,17 @@ import { currentHandleOf } from '../handles/load'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
 import { projectVisibleTo } from '../projects/visibility'
+import { cornerAccess } from '../testers/access'
 import { photosOfUpdates, readLines, updateShownTo } from '../updates/load'
 
 const p = schema.project
 const u = schema.projectUpdate
 const c = schema.projectComment
 const m = schema.projectMedia
+// Le coin des testeurs (R7b) : les appels, les messages d'un fil et leurs images.
+const tc = schema.testerCall
+const tmsg = schema.testerMessage
+const tm = schema.testerMedia
 
 /** Ce qu'on sait d'une cible que le membre voit. */
 export type Reportable = {
@@ -268,10 +273,88 @@ const loadVisible = async (
         snapshot: [{ field: 'body', value: row.body }],
       }
     }
-    // R7b, provisoire au commit du contrat : un appel et un message arrivent avec la modération du coin.
-    case 'call':
-    case 'message':
-      return null
+    case 'call': {
+      // R7b : un appel à tester ne se voit que de ses testeurs actuels (et de son auteur) : la règle
+      // d'entrée du coin (cornerAccess) l'écarte pour un ancien testeur, un testeur retiré ou séparé
+      // de l'auteur par un blocage, un coin fermé (projet privé, retiré, auteur suspendu) et tout
+      // autre membre. Un appel retiré par la modération ne se voit plus que de son auteur (comme une
+      // mise à jour). Clé primaire de tester_call, puis de project.
+      const [row] = await db
+        .select({
+          authorId: p.authorId,
+          projectId: tc.projectId,
+          text: tc.text,
+          removedAt: tc.removedAt,
+        })
+        .from(tc)
+        .innerJoin(p, eq(p.id, tc.projectId))
+        .where(eq(tc.id, target.id))
+      if (!row) return null
+      const access = await cornerAccess(db, row.projectId, viewerId)
+      const isAuthor = row.authorId === viewerId && access !== 'not_found'
+      if (!isAuthor && access !== 'tester') return null
+      if (row.removedAt !== null && !isAuthor) return null
+      // Sa photo (index tester_media_call_idx) : la clé, puis sa description. Jamais le fichier.
+      const [photo] = await db
+        .select({ key: tm.storageKey, description: tm.description })
+        .from(tm)
+        .where(eq(tm.callId, target.id))
+        .orderBy(asc(tm.createdAt), asc(tm.id))
+      return {
+        authorId: row.authorId,
+        projectId: row.projectId,
+        text: row.text,
+        snapshot: [
+          ...filled('body', row.text),
+          ...(photo
+            ? [
+                { field: 'photo' as const, value: photo.key },
+                ...filled('photoDescription', photo.description),
+              ]
+            : []),
+        ],
+      }
+    }
+    case 'message': {
+      // R7b : un message d'un fil ne se voit que des deux personnes du fil : l'auteur du projet, et
+      // ce testeur (actuel ou ancien : « Ne teste plus », il relit son fil ; un blocage ne l'en
+      // prive pas). Un coin fermé le cache au testeur, pas à l'auteur. Un message retiré par la
+      // modération ne se voit plus que de son expéditeur. Clé primaire de tester_message, puis de
+      // project.
+      const [row] = await db
+        .select({
+          projectAuthorId: p.authorId,
+          projectId: tmsg.projectId,
+          testerId: tmsg.testerId,
+          senderId: tmsg.senderId,
+          text: tmsg.text,
+          removedAt: tmsg.removedAt,
+        })
+        .from(tmsg)
+        .innerJoin(p, eq(p.id, tmsg.projectId))
+        .where(eq(tmsg.id, target.id))
+      if (!row) return null
+      const access = await cornerAccess(db, row.projectId, viewerId)
+      const inThread =
+        row.projectAuthorId === viewerId
+          ? access === 'author' || access === 'author_closed'
+          : row.testerId === viewerId && (access === 'tester' || access === 'former_tester')
+      if (!inThread) return null
+      if (row.removedAt !== null && row.senderId !== viewerId) return null
+      const [capture] = await db
+        .select({ key: tm.storageKey })
+        .from(tm)
+        .where(eq(tm.messageId, target.id))
+      return {
+        authorId: row.senderId,
+        projectId: row.projectId,
+        text: row.text ?? '',
+        snapshot: [
+          ...filled('body', row.text),
+          ...(capture ? [{ field: 'photo' as const, value: capture.key }] : []),
+        ],
+      }
+    }
     case 'member': {
       // Un profil se voit comme sa page (routes/members.ts) : un compte vérifié, avec son pseudo
       // actuel. Seules les colonnes publiques sont lues (ni l'e-mail, ni la langue).
@@ -388,10 +471,23 @@ export const loadDecidable = async (
         .where(and(eq(c.id, target.id), isNull(c.deletedAt)))
       return row ? { authorId: row.authorId, removed: row.removedAt !== null } : null
     }
-    // R7b, provisoire au commit du contrat : un appel et un message arrivent avec la modération du coin.
-    case 'call':
-    case 'message':
-      return null
+    case 'call': {
+      // L'auteur d'un appel est celui de son projet.
+      const [row] = await db
+        .select({ authorId: p.authorId, removedAt: tc.removedAt })
+        .from(tc)
+        .innerJoin(p, eq(p.id, tc.projectId))
+        .where(eq(tc.id, target.id))
+      return row ? { authorId: row.authorId, removed: row.removedAt !== null } : null
+    }
+    case 'message': {
+      // L'auteur d'un message est son expéditeur (l'auteur du projet ou le testeur).
+      const [row] = await db
+        .select({ authorId: tmsg.senderId, removedAt: tmsg.removedAt })
+        .from(tmsg)
+        .where(eq(tmsg.id, target.id))
+      return row ? { authorId: row.authorId, removed: row.removedAt !== null } : null
+    }
     case 'member': {
       const [row] = await db
         .select({ id: schema.user.id })

@@ -6,7 +6,15 @@
 import type { MemberInputField } from '@ruche/contracts'
 
 /** L'objet qui porte le champ : ce qu'on signale et ce qu'un blocage cache. */
-export type InputObject = 'member' | 'project' | 'update' | 'comment' | 'report'
+export type InputObject =
+  | 'member'
+  | 'project'
+  | 'update'
+  | 'comment'
+  | 'report'
+  // R7b : un appel à tester et un message d'un fil de testeur (le coin des testeurs).
+  | 'call'
+  | 'message'
 
 /** La sorte de champ : un texte, une liste de textes, un lien, ou une image (une clé de stockage). */
 export type InputKind = 'text' | 'list' | 'link' | 'image'
@@ -239,6 +247,57 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     snapshot: true,
     export: true,
   },
+  // Le coin des testeurs (R7b). Un appel : son texte (copié sous `body`, comme un commentaire), sa
+  // photo (la clé seulement) et la description de cette photo, écrite par l'auteur au lancement.
+  // La photo et la description sont dans `tester_media`, une table commune aux appels et aux
+  // messages ; l'objet dit à laquelle des deux sortes de cible la ligne se rattache.
+  {
+    field: 'body',
+    object: 'call',
+    table: 'tester_call',
+    column: 'text',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  {
+    field: 'photo',
+    object: 'call',
+    table: 'tester_media',
+    column: 'storage_key',
+    kind: 'image',
+    snapshot: true,
+    export: false,
+  },
+  {
+    field: 'photoDescription',
+    object: 'call',
+    table: 'tester_media',
+    column: 'description',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  // Un message d'un fil : un retour (texte facultatif) ou une réponse. Sa capture n'a pas de
+  // description (son nom lu est fixe, relecture A15).
+  {
+    field: 'body',
+    object: 'message',
+    table: 'tester_message',
+    column: 'text',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  {
+    field: 'photo',
+    object: 'message',
+    table: 'tester_media',
+    column: 'storage_key',
+    kind: 'image',
+    snapshot: true,
+    export: false,
+  },
   // La précision d'un signalement : saisie par un membre, montrée à la modération seule.
   {
     field: null,
@@ -330,6 +389,45 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
   },
   // L'inscription d'un membre aux testeurs d'un projet : deux identifiants et une date.
   project_tester: '*',
+  // R7b : le coin des testeurs. Les textes saisis (appel, message, description de photo) et la clé
+  // des images sont au registre (MEMBER_INPUTS) ; le reste est écrit par l'API ou choisi dans une
+  // liste fermée par Zod.
+  project_tester_removal: '*', // deux identifiants et une date
+  tester_thread: '*', // deux identifiants et trois dates (création, lectures)
+  tester_call: {
+    id: 'identifiant',
+    project_id: 'identifiant',
+    created_at: 'date',
+    removed_at: 'date',
+    removal_id: 'identifiant',
+  },
+  tester_message: {
+    id: 'identifiant',
+    project_id: 'identifiant',
+    tester_id: 'identifiant',
+    sender_id: 'identifiant',
+    kind: 'retour ou réponse, une liste fermée par Zod (TesterMessageKind)',
+    outcome: "l'issue du test (oui, en partie, non), une liste fermée par Zod (FeedbackOutcome)",
+    device: "l'appareil du test (téléphone, ordinateur, tablette), une liste fermée par Zod",
+    created_at: 'date',
+    settled_at: 'date',
+    settled_update_id: 'identifiant',
+    removed_at: 'date',
+    removal_id: 'identifiant',
+  },
+  tester_media: {
+    id: 'identifiant',
+    project_id: 'identifiant',
+    owner_id: 'identifiant',
+    kind: "la sorte d'image (photo d'appel ou capture), écrite par l'API",
+    call_id: 'identifiant',
+    message_id: 'identifiant',
+    width: 'nombre',
+    height: 'nombre',
+    thumbhash:
+      "l'aperçu flou calculé par l'API à partir de l'image, déjà au registre par sa clé (storage_key)",
+    created_at: 'date',
+  },
   project_comment: {
     id: 'identifiant',
     project_id: 'identifiant',
