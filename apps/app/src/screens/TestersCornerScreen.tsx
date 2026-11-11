@@ -283,7 +283,7 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
   }))
 
   const head = (
-    <Stack gap="md">
+    <Stack gap="xs">
       {/* Le projet : un lien qui y ramène (la planche le pose sous « Retour »). */}
       <TextLink
         label={project.title}
