@@ -1605,3 +1605,30 @@ describe('the date of a placeholder', () => {
     expect(second.nextCursor).toBeNull()
   })
 })
+
+// R7b : le badge « Testeur » (`author.isTester`), testé pour la page des commentaires par
+// tester-badge.test.ts. Ici, ce qui n'y est pas : le commentaire rendu à sa publication, les
+// réponses, et le testeur retiré par l'auteur, qui perd le badge comme celui qui part.
+describe('the tester badge on a reply and on a published comment (R7b)', () => {
+  it('marks a tester on his reply and on the comment he publishes, until the author removes him', async () => {
+    const project = await publish(lea, { status: 'testable', demoUrl: 'https://example.com/demo' })
+    later()
+    expect((await send('POST', `/v1/projects/${project.id}/testers`, max)).status).toBe(204)
+    const root = await comment(project.id, lea, 'Qui a essayé le mode hors ligne ?')
+    const reply = await comment(project.id, max, 'Moi, ça marche dans le métro.', root.id)
+
+    // Le commentaire rendu à la publication porte déjà le badge.
+    expect(reply.author?.isTester).toBe(true)
+    const [thread] = (await readComments(project.id, zoe)).items
+    expect(thread?.author?.isTester).toBe(false)
+    expect(thread?.replies.map((r) => r.author?.isTester)).toEqual([true])
+
+    // L'autrice le retire de ses testeurs : le badge disparaît de sa réponse.
+    later()
+    expect((await send('DELETE', `/v1/projects/${project.id}/testers/${maxId}`, lea)).status).toBe(
+      204,
+    )
+    const [after] = (await readComments(project.id, zoe)).items
+    expect(after?.replies.map((r) => r.author?.isTester)).toEqual([false])
+  })
+})

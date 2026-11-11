@@ -5,7 +5,8 @@
 // - les compteurs anti-abus périmés : ceux de Better Auth (rate_limit, plus d'une heure) et les
 //   nôtres (api_rate_limit, plus de 25 heures : la plus longue fenêtre, 24 h, plus une marge) ;
 // - les pseudos dont la réservation est finie (purgeExpiredHandles) ;
-// - les inscriptions jamais vérifiées, au bout de 30 jours (décision de Louis du 20/10/2026).
+// - les inscriptions jamais vérifiées, au bout de 30 jours (décision de Louis du 20/10/2026) ;
+// - R7b : les images du coin des testeurs restées en attente plus de 24 heures, ligne et fichier.
 // Elle rend le nombre de lignes effacées de chaque sorte.
 //
 // L'heure vient du paramètre `now`, jamais de now() en SQL (relecture de sécurité S-A5) : la fausse
@@ -703,5 +704,107 @@ describe('the pending photos of an update (R7a)', () => {
     expect(await photoIds()).toEqual([])
     expect(erase).toHaveBeenCalledTimes(2)
     expect([first, second].filter(({ storageKey }) => hasFile(storageKey))).toHaveLength(1)
+  })
+})
+
+// R7b : une image du coin des testeurs (photo d'appel, capture d'un retour) est envoyée avant
+// l'appel ou le message qui la cite ; tant qu'aucun ne la cite, elle est « en attente » (call_id et
+// message_id nuls). La purge efface celles qui attendent depuis plus de 24 heures, la ligne puis le
+// fichier, et jamais une image rattachée.
+describe('the pending images of the testers corner (R7b)', () => {
+  /** Un projet d'Inès, posé directement en base (la purge seule est regardée ici). */
+  const insertProject = async () => {
+    const id = randomUUID()
+    await ctx.db.insert(schema.project).values({
+      id,
+      authorId: inesId,
+      title: 'Décollage !',
+      pitch: 'Un quiz de l’espace pour les petits.',
+      primaryCategory: 'other',
+      createdAt: START,
+      updatedAt: START,
+      publishedAt: START,
+    })
+    return id
+  }
+  /**
+   * Une image du coin, posée en base avec son fichier, à la date voulue. `attach` : l'appel ou le
+   * message qui la cite ; absent, elle est en attente.
+   */
+  const insertImage = async (
+    projectId: string,
+    createdAt: Date,
+    attach: { callId: string } | { messageId: string } | null = null,
+  ) => {
+    const id = randomUUID()
+    const storageKey = `testers/${randomUUID()}.webp`
+    await ctx.storage.put(storageKey, new Uint8Array([1, 2, 3]))
+    await ctx.db.insert(schema.testerMedia).values({
+      id,
+      projectId,
+      ownerId: inesId,
+      kind: attach !== null && 'messageId' in attach ? 'capture' : 'call',
+      callId: attach !== null && 'callId' in attach ? attach.callId : null,
+      messageId: attach !== null && 'messageId' in attach ? attach.messageId : null,
+      storageKey,
+      width: 800,
+      height: 600,
+      thumbhash: 'AAAA',
+      description: null,
+      createdAt,
+    })
+    return { id, storageKey }
+  }
+  const imageIds = async () =>
+    (await ctx.db.select({ id: schema.testerMedia.id }).from(schema.testerMedia))
+      .map(({ id }) => id)
+      .sort()
+  const hasFile = (key: string) => ctx.storage.files.has(key)
+
+  it('erases a pending tester image after 24 hours, row and file', async () => {
+    const projectId = await insertProject()
+    const pending = await insertImage(projectId, START)
+
+    await nightlyPurge(ctx.db, at(START, DAY - MINUTE), ctx.storage)
+    expect(await imageIds()).toEqual([pending.id])
+    expect(hasFile(pending.storageKey)).toBe(true)
+
+    await nightlyPurge(ctx.db, at(START, DAY + MINUTE), ctx.storage)
+    expect(await imageIds()).toEqual([])
+    expect(hasFile(pending.storageKey)).toBe(false)
+  })
+
+  it('never erases a tester image attached to a call or a message', async () => {
+    const projectId = await insertProject()
+    // Un appel et un fil (un message d'Inès, testeuse de son propre projet pour la scène : la purge
+    // ne regarde que le rattachement de l'image).
+    const callId = randomUUID()
+    await ctx.db
+      .insert(schema.testerCall)
+      .values({ id: callId, projectId, text: 'Essayez le niveau 3.', createdAt: START })
+    await ctx.db
+      .insert(schema.testerThread)
+      .values({ projectId, testerId: inesId, createdAt: START })
+    const messageId = randomUUID()
+    await ctx.db.insert(schema.testerMessage).values({
+      id: messageId,
+      projectId,
+      testerId: inesId,
+      senderId: inesId,
+      kind: 'feedback',
+      outcome: 'yes',
+      createdAt: START,
+    })
+    const ofCall = await insertImage(projectId, START, { callId })
+    const ofMessage = await insertImage(projectId, START, { messageId })
+    // Témoin : une image en attente, aussi vieille, part la même nuit.
+    const pending = await insertImage(projectId, START)
+
+    await nightlyPurge(ctx.db, at(START, 30 * DAY), ctx.storage)
+
+    expect(await imageIds()).toEqual([ofCall.id, ofMessage.id].sort())
+    expect(hasFile(ofCall.storageKey)).toBe(true)
+    expect(hasFile(ofMessage.storageKey)).toBe(true)
+    expect(hasFile(pending.storageKey)).toBe(false)
   })
 })
