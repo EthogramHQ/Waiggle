@@ -1468,11 +1468,11 @@ describe('the testers corner of an account (R7b)', () => {
 
       const forLea = await exportOf(leaCookie)
       expect(forLea.data.testerRemovals).toEqual([
-        { projectId: meteo.id, title: 'Météo', handle: maxHandle, at: maxAt },
-        { projectId: meteo.id, title: 'Météo', handle: zoeHandle, at: zoeAt },
+        { projectId: meteo.id, title: 'Météo', memberId: maxId, handle: maxHandle, at: maxAt },
+        { projectId: meteo.id, title: 'Météo', memberId: zoeId, handle: zoeHandle, at: zoeAt },
       ])
-      // Par pseudo, comme les blocages : jamais l'identifiant interne du membre retiré.
-      expect(JSON.stringify(forLea.data.testerRemovals)).not.toContain(maxId)
+      // Par identifiant et pseudo, comme les blocages (relecture de sécurité de R7b : sous un blocage,
+      // le pseudo part et l'identifiant reste).
       // Le retrait est une donnée de l'autrice : le membre retiré ne la reçoit pas (comme un
       // blocage : jamais qui l'a bloqué).
       expect((await exportOf(max)).data.testerRemovals).toEqual([])
