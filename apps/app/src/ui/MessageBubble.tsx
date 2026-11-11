@@ -26,7 +26,7 @@ import type {
 import { Image } from 'expo-image'
 import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Platform, View } from 'react-native'
+import { ActivityIndicator, Platform, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { useNameOf } from '../useNameOf'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
@@ -78,6 +78,17 @@ type Props = {
    * « … » ; sur téléphone, le texte caché qui dit le nom du message, où va le lecteur d'écran.
    */
   focusRef?: Ref<View>
+  /**
+   * Un geste en cours sur ce message, déjà écrit par l'écran (« Enregistrement… », pendant « Marquer
+   * comme réglé ») : sous la bulle, de son côté, avec une roue ; le message est annoncé occupé
+   * (R7b, ui-A1). null : rien en cours.
+   */
+  pending?: string | null
+  /**
+   * Le message d'un geste raté sur ce message (l'erreur de « Marquer comme réglé », un `Notice`) :
+   * sous la bulle, près du « … » touché, plutôt qu'au bas d'un long fil (R7b, ui-A1).
+   */
+  notice?: ReactNode
 }
 
 /** L'icône de chaque appareil (pas d'icône de tablette dans le jeu : celle du téléphone). */
@@ -111,6 +122,8 @@ export function MessageBubble({
   removal,
   menu = [],
   focusRef,
+  pending = null,
+  notice,
 }: Props) {
   const { t } = useTranslation()
   const { colors, shadows } = useTheme()
@@ -284,9 +297,14 @@ export function MessageBubble({
   // Le nom du message : sur le web, celui de l'élément de liste (le navigateur le lit en y entrant) ;
   // sur téléphone, un texte caché à l'œil, lu en premier (une vue `accessible` cacherait au lecteur
   // d'écran le menu « … » qu'elle contient).
+  // `aria-busy` : un geste en cours sur ce message (le web lit l'état ; sur téléphone, la phrase dite).
   const named =
     Platform.OS === 'web'
-      ? ({ role: 'listitem', 'aria-label': spokenName } as object)
+      ? ({
+          role: 'listitem',
+          'aria-label': spokenName,
+          ...(pending ? { 'aria-busy': true } : null),
+        } as object)
       : ({ role: 'listitem' } as object)
 
   return (
@@ -333,6 +351,28 @@ export function MessageBubble({
       <View style={{ paddingHorizontal: space.sm, maxWidth: '100%' }}>
         <RelativeTime date={at} />
       </View>
+      {/* Le geste en cours, puis son erreur : sous la bulle, du côté de qui parle, au plus large de
+          la bulle (80 %), pour rester près du « … » touché. */}
+      {pending ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space.xs,
+            paddingHorizontal: space.sm,
+            maxWidth: BUBBLE_MAX,
+          }}
+        >
+          {/* La roue est un décor : la phrase dit l'état. */}
+          <ActivityIndicator size="small" color={colors.textMuted} aria-hidden />
+          <View style={{ flexShrink: 1, minWidth: 0 }}>
+            <Text variant="caption" tone="muted">
+              {pending}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      {notice ? <View style={{ width: '100%', maxWidth: BUBBLE_MAX }}>{notice}</View> : null}
     </View>
   )
 }

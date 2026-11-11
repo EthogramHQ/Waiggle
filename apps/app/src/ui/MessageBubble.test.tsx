@@ -324,3 +324,31 @@ describe('MessageBubble', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
+
+// R7b, K13 (ui-A1) : un geste en cours et son erreur, sous la bulle qu'ils concernent.
+describe('a gesture on a message', () => {
+  it('shows the pending gesture under the bubble, inside its list item', async () => {
+    await renderWithProviders(bubble({ pending: 'Enregistrement…' }))
+
+    const text = screen.getByText('Enregistrement…') as unknown as {
+      props: Record<string, unknown>
+      parent: unknown
+    }
+    let node: typeof text | null = text
+    while (node && node.props.role !== 'listitem') node = node.parent as typeof node
+    expect(node).not.toBeNull()
+  })
+
+  it('shows nothing pending by default', async () => {
+    await renderWithProviders(bubble())
+
+    expect(screen.getByText(FEEDBACK_TEXT)).toBeTruthy() // témoin
+    expect(screen.queryByText('Enregistrement…')).toBeNull()
+  })
+
+  it('shows the notice of a failed gesture with the message', async () => {
+    await renderWithProviders(bubble({ notice: <Text>Le changement a échoué.</Text> }))
+
+    expect(screen.getByText('Le changement a échoué.')).toBeTruthy()
+  })
+})

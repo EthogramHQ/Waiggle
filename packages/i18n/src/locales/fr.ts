@@ -956,6 +956,8 @@ export const fr = {
         listLoadError: 'Les retours n’ont pas pu se charger.',
         // Sur ordinateur, la colonne de droite tant qu'aucun fil n'est ouvert (planche R7b-Desktop).
         choose: 'Choisis un fil dans la liste pour le lire ici.',
+        // Sous un retour, pendant « Marquer comme réglé » ou « Remettre à traiter » (ui-A1).
+        settling: 'Enregistrement…',
       },
       // La partie « Retours réglés » de la feuille « Nouvelle mise à jour ».
       settledField: {

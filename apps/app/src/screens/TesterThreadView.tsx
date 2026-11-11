@@ -20,7 +20,8 @@
 //
 // Le focus ne se perd jamais (relecture du plan, ui-B8) :
 // - « Afficher les précédents » disparaît avec la dernière page : il va au plus ancien message ;
-// - un message supprimé : au message d'avant, sinon à celui d'après, sinon au champ. La liste reste
+// - un message supprimé : au message d'avant, sinon à celui d'après, sinon au champ, sinon (lecture
+//   seule, plus rien à quoi répondre) à la phrase du fil vide (K10). La liste reste
 //   figée pendant la confirmation, et ne perd le message qu'une fois la fenêtre partie (sinon la
 //   fenêtre rendrait le focus au « … » d'un message qui n'existe plus) ;
 // - une réponse envoyée : le focus reste dans le champ, vidé, pour écrire la suite.
@@ -36,7 +37,7 @@ import {
   type TesterRole,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactElement, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
 import { useMediaSources } from '../api/media'
@@ -64,6 +65,7 @@ import { shortDate } from '../ui/relativeDate'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
+import { ScreenScrollContext } from '../ui/scrollLight'
 import type { TextFieldInput } from '../ui/TextField'
 import { useLayout } from '../ui/theme/layout'
 import { useNameOf } from '../useNameOf'
@@ -97,6 +99,13 @@ type Props = {
   closed: boolean
   /** Range les deux morceaux ; par défaut, l'un sous l'autre. */
   layout?: (parts: TesterThreadParts) => ReactElement
+  /**
+   * Le fil s'ouvre sur son dernier message : l'écran défile jusqu'en bas dès la première page
+   * chargée, une fois par fil (R7b, K11 : sur 24 messages, le plus récent était à 2 985 px). La page
+   * du fil sur téléphone le demande ; ailleurs, le focus posé à l'arrivée (un onglet, l'en-tête du
+   * fil) sortirait de l'écran.
+   */
+  openAtLatest?: boolean
 }
 
 /** Pose le focus sur un message : au clavier sur le web (son « … »), le lecteur d'écran ailleurs. */
@@ -122,6 +131,7 @@ export function TesterThreadView({
       {footer}
     </>
   ),
+  openAtLatest = false,
 }: Props) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
@@ -154,6 +164,11 @@ export function TesterThreadView({
     markedFor.current = testerId
     void markRead()
   }, [loaded, testerId, markRead])
+
+  // --- Ouvert sur le dernier message (K11) ---------------------------------------------------------
+
+  // Le saut se décide dans les messages (`OpenAtLatest`, plus bas) : c'est le morceau que l'écran pose
+  // dans son Screen, là où se lit le canal de la zone qui défile ; ce composant-ci peut être au-dessus.
 
   // --- Le focus sur les messages -----------------------------------------------------------------
 
@@ -190,14 +205,37 @@ export function TesterThreadView({
     }
     setFrozen(null)
   }
+  // La phrase du fil vide : où va le focus quand il ne reste ni message ni champ (K10).
+  const emptyRef = useRef<Focusable>(null)
   // La liste vient de perdre le message : le focus va à celui d'avant, sinon à celui d'après,
-  // sinon au champ (il n'y a plus de message du tout).
+  // sinon au champ (il n'y a plus de message du tout), sinon à la phrase du fil vide (lecture
+  // seule, ou un testeur qui n'a plus rien à quoi répondre : pas de champ).
   useEffect(() => {
     if (focusAfter === null || frozen) return
     setFocusAfter(null)
     const next = shown[focusAfter - 1] ?? shown[focusAfter]
-    if (!focusMessage(next ? nodes.current.get(next.id) : null)) inputRef.current?.focus()
+    if (focusMessage(next ? nodes.current.get(next.id) : null)) return
+    if (inputRef.current) inputRef.current.focus()
+    else focusMessage(emptyRef.current)
   }, [focusAfter, frozen, shown])
+
+  // --- Régler un retour (K13) ----------------------------------------------------------------------
+
+  // Les retours dont le réglage est en route : « Enregistrement… » sous leur bulle.
+  const [settling, setSettling] = useState<ReadonlySet<string>>(() => new Set())
+  // Le retour du dernier geste refusé : son erreur sous sa bulle, près du « … » touché, jusqu'à la
+  // réponse du geste suivant (sinon le fil sauterait deux fois).
+  const [settleFailed, setSettleFailed] = useState<string | null>(null)
+  const changeSettled = async (messageId: string, settled: boolean) => {
+    setSettling((before) => new Set(before).add(messageId))
+    const ok = await (settled ? settle.settle(messageId) : settle.unsettle(messageId))
+    setSettling((before) => {
+      const after = new Set(before)
+      after.delete(messageId)
+      return after
+    })
+    setSettleFailed(ok ? null : messageId)
+  }
 
   // --- Les menus ---------------------------------------------------------------------------------
 
@@ -211,12 +249,12 @@ export function TesterThreadView({
           ? {
               label: t(($) => $.project.testers.thread.unsettle),
               icon: 'arrows-clockwise',
-              onPress: () => void settle.unsettle(message.id),
+              onPress: () => void changeSettled(message.id, false),
             }
           : {
               label: t(($) => $.project.testers.thread.settle),
               icon: 'check-circle',
-              onPress: () => void settle.settle(message.id),
+              onPress: () => void changeSettled(message.id, true),
             },
       )
     }
@@ -294,6 +332,10 @@ export function TesterThreadView({
           ) : undefined
         }
         menu={menuOf(message)}
+        pending={settling.has(message.id) ? t(($) => $.project.testers.thread.settling) : null}
+        notice={
+          settleFailed === message.id && settleError ? <Notice message={settleError} /> : undefined
+        }
       />
     )
   }
@@ -399,6 +441,8 @@ export function TesterThreadView({
     )
   ) : (
     <Stack gap="lg">
+      {/* Une clé par fil : un autre fil ouvert dans la même page saute de nouveau à sa fin. */}
+      {openAtLatest ? <OpenAtLatest key={testerId} /> : null}
       <FeedEnd
         state={earlier}
         moreLabel={t(($) => $.project.testers.thread.showEarlier)}
@@ -410,6 +454,7 @@ export function TesterThreadView({
       {shown.length === 0 ? (
         <StateMessage
           kind="empty"
+          focusRef={emptyRef}
           message={
             reader === 'tester'
               ? t(($) => $.project.testers.thread.emptyTester, { name: authorName })
@@ -422,7 +467,6 @@ export function TesterThreadView({
           {shown.map(bubble)}
         </Stack>
       )}
-      {settleError ? <Notice message={settleError} /> : null}
       <DeleteMessageDialog
         projectId={projectId}
         testerId={testerId}
@@ -469,6 +513,24 @@ export function TesterThreadView({
   ) : null
 
   return layout({ messages, footer })
+}
+
+/**
+ * Fait défiler l'écran jusqu'à sa fin, une fois, quand la première page du fil est affichée (K11) :
+ * le dernier message est alors juste au-dessus du compositeur. Monté avec les messages, il ne revient
+ * pas à chaque relecture (une réponse envoyée, « Afficher les précédents ») : la page ne saute plus
+ * sous le doigt. Il ne dessine rien.
+ */
+function OpenAtLatest() {
+  // Le canal de la zone qui défile (Screen) ; hors d'un Screen (catalogue), rien.
+  const scroll = useContext(ScreenScrollContext)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: une fois, à l'arrivée des messages.
+  useEffect(() => {
+    // À l'image suivante : les bulles ont leur place, la fin de la page est la bonne. Jamais
+    // annulé : un écran déjà parti n'a plus de zone qui défile, le saut ne fait alors rien.
+    requestAnimationFrame(() => scroll?.toEnd?.())
+  }, [])
+  return null
 }
 
 type DeleteProps = {

@@ -16,7 +16,8 @@
 //   « Envoyer la réponse » ; son brouillon passe par `testers/drafts.ts` ;
 // - le reste est dans `TestersCorner.testkit.tsx` (faux serveur, routeur, textes).
 import { nameOf } from '@ruche/i18n'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { ScrollView } from 'react-native'
 import { clearAllDrafts } from '../testers/drafts'
 import { passTapGuard } from '../testing/dialog'
 import { reportsOpened } from '../testing/navigation'
@@ -454,6 +455,85 @@ describe('a thread in read only', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: messageMenu(feedback.text ?? '') }))
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: T.settle })).toBeNull())
+  })
+})
+
+// --- Corrections après relectures (R7b, K10, K11, K13) ---
+
+/** L'élément de liste (la bulle) qui contient ce texte : on remonte l'arbre jusqu'à lui. */
+type TreeNode = { props: Record<string, unknown>; parent: TreeNode | null }
+const itemOf = (text: string) => {
+  let node = screen.getByText(containing(text)) as unknown as TreeNode | null
+  while (node && node.props.role !== 'listitem') node = node.parent
+  if (!node) throw new Error(`no list item around « ${text} »`)
+  return node as unknown as Parameters<typeof within>[0]
+}
+
+const settling = fr.t(($) => $.project.testers.thread.settling)
+const settleError = fr.t(($) => $.project.testers.thread.settleError)
+const emptyAuthor = fr.t(($) => $.project.testers.thread.emptyAuthor)
+
+describe('the corrections after the reviews', () => {
+  it('moves the focus to the empty thread after deleting the only message of a read-only thread', async () => {
+    inesHasLeft()
+    mockServer.setThread(ines.id, [authorReply])
+    await renderWithProviders(
+      <ToastProvider>
+        <TesterThreadScreen id={id} member={ines.id} />
+      </ToastProvider>,
+    )
+    await screen.findByText(containing(authorReply.text ?? ''))
+    await chooseInMenu(messageMenu(authorReply.text ?? ''), T.messageDelete)
+    await screen.findByRole('header', { name: T.messageDeleteTitle })
+    await passTapGuard()
+    await fireEvent.press(screen.getByRole('button', { name: T.messageDeleteConfirm }))
+
+    await waitFor(() => expect(screen.queryByText(containing(authorReply.text ?? ''))).toBeNull())
+    // Ni message ni champ : le focus va à la phrase qui dit que le fil est vide.
+    await waitFor(() => expect(focused().at(-1)).toBe(emptyAuthor))
+  })
+
+  it('opens the thread on its latest message', async () => {
+    const scrollToEnd = jest.spyOn(ScrollView.prototype, 'scrollToEnd')
+    scrollToEnd.mockClear()
+    await openThread()
+
+    await waitFor(() => expect(scrollToEnd).toHaveBeenCalledWith({ animated: false }))
+    const calls = scrollToEnd.mock.calls.length
+    // Une fois : une relecture du fil (une réponse envoyée) ne fait pas sauter la page.
+    const field = composer()
+    if (!field) throw new Error('a composer expected')
+    await fireEvent.changeText(field, 'Corrigé.')
+    await fireEvent.press(screen.getByRole('button', { name: T.replyLabel }))
+    await screen.findByText(containing('Corrigé.'))
+    expect(scrollToEnd.mock.calls.length).toBe(calls)
+  })
+
+  it('shows « Enregistrement… » under the feedback while « Marquer comme réglé » is sent', async () => {
+    const answer = deferred<{ ok: true; data: null }>()
+    mockServer.answer('POST', /\/settled$/, () => answer.promise)
+    await openThread()
+
+    await chooseInMenu(messageMenu(feedback.text ?? ''), T.settle)
+
+    await waitFor(() =>
+      expect(within(itemOf(feedback.text ?? '')).getByText(settling)).toBeTruthy(),
+    )
+    await act(async () => answer.resolve({ ok: true, data: null }))
+    await waitFor(() => expect(shown(settling)).toBe(false))
+  })
+
+  it('shows a failed « Marquer comme réglé » next to the feedback it concerns', async () => {
+    mockServer.answer('POST', /\/settled$/, () => ({ ok: false, error: 'internal' }))
+    await openThread()
+
+    await chooseInMenu(messageMenu(feedback.text ?? ''), T.settle)
+
+    await waitFor(() =>
+      expect(within(itemOf(feedback.text ?? '')).getByText(settleError)).toBeTruthy(),
+    )
+    // Une seule fois dans la page : plus sous tout le fil.
+    expect(screen.getAllByText(settleError)).toHaveLength(1)
   })
 })
 
