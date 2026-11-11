@@ -38,6 +38,7 @@ import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
 import { testerCallRoutes } from './routes/tester-calls'
 import { testerMediaRoutes } from './routes/tester-media'
+import { testerThreadRoutes } from './routes/tester-threads'
 import { testerRoutes } from './routes/testers'
 import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
@@ -358,6 +359,8 @@ export const createApp = ({
   // Le coin des testeurs (tranche R7b) : les appels à tester et l'envoi de leurs images.
   app.route('/', testerCallRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', testerMediaRoutes({ db, storage, limiter, publicApiUrl }))
+  // Les fils de retours entre l'auteur et chaque testeur, « réglé » et les retours à traiter.
+  app.route('/', testerThreadRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
