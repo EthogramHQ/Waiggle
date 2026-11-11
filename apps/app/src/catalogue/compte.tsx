@@ -33,12 +33,6 @@ const fr = {
   signUp: 'Créer un compte',
   signInBody: 'Te revoilà. Connecte-toi pour retrouver les projets de tes proches.',
   signUpBody: 'Bienvenue. Quelques questions, et ton compte est prêt.',
-  iconTabs: 'Onglets avec icône (coin des testeurs, R7b) : sur le verre, puis sur une surface',
-  cornerLabel: 'Le coin des testeurs',
-  calls: 'Appels',
-  feedback: 'Retours',
-  callsBody: 'Les appels que l’auteur lance à ses testeurs.',
-  feedbackBody: 'Les retours des testeurs, un fil par testeur.',
   nav: 'Rubriques des réglages : colonne sur ordinateur, liste sur téléphone (« Sécurité » ouverte)',
   navLabel: 'Rubriques des réglages',
   profile: 'Mon profil',
@@ -89,12 +83,6 @@ const en: typeof fr = {
   signUp: 'Create an account',
   signInBody: 'Welcome back. Sign in to find your friends’ projects.',
   signUpBody: 'Welcome. A few questions, and your account is ready.',
-  iconTabs: 'Tabs with an icon (testers corner, R7b): on glass, then on a surface',
-  cornerLabel: 'The testers corner',
-  calls: 'Calls',
-  feedback: 'Feedback',
-  callsBody: 'The calls the author sends to their testers.',
-  feedbackBody: 'The testers’ feedback, one thread per tester.',
   nav: 'Settings sections: a column on desktop, a list on phone (“Security” open)',
   navLabel: 'Settings sections',
   profile: 'My profile',
@@ -152,7 +140,6 @@ const blockedAt = () => {
 const PHONE_SHEET_HEIGHT = 560
 
 type TabKey = 'sign-in' | 'sign-up'
-type CornerKey = 'calls' | 'feedback'
 type SectionKey =
   | 'profile'
   | 'notifications'
@@ -169,8 +156,6 @@ export function AccountCatalogue() {
   const { colors } = useTheme()
   const [tab, setTab] = useState<TabKey>('sign-in')
   const [groupedTab, setGroupedTab] = useState<TabKey>('sign-up')
-  const [cornerTab, setCornerTab] = useState<CornerKey>('calls')
-  const [groupedCornerTab, setGroupedCornerTab] = useState<CornerKey>('feedback')
   const [sheetOpen, setSheetOpen] = useState(false)
   // Le refus simulé : null tant qu'on n'a pas appuyé ; le hook libère tout seul au bout du délai.
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
@@ -180,21 +165,6 @@ export function AccountCatalogue() {
   const tabs = [
     { key: 'sign-in' as const, label: l.signIn, content: <Text>{l.signInBody}</Text> },
     { key: 'sign-up' as const, label: l.signUp, content: <Text>{l.signUpBody}</Text> },
-  ]
-  // Les onglets du coin des testeurs (R7b) : une icône décorative avant chaque libellé.
-  const cornerTabs = [
-    {
-      key: 'calls' as const,
-      label: l.calls,
-      icon: 'megaphone-simple' as const,
-      content: <Text>{l.callsBody}</Text>,
-    },
-    {
-      key: 'feedback' as const,
-      label: l.feedback,
-      icon: 'chat-circle-dots' as const,
-      content: <Text>{l.feedbackBody}</Text>,
-    },
   ]
 
   const sections: { key: SectionKey; label: string; href: string }[] = [
@@ -233,16 +203,6 @@ export function AccountCatalogue() {
         tabs={tabs}
         selected={groupedTab}
         onSelect={setGroupedTab}
-        variant="grouped"
-      />
-
-      <Text tone="secondary">{l.iconTabs}</Text>
-      <Tabs label={l.cornerLabel} tabs={cornerTabs} selected={cornerTab} onSelect={setCornerTab} />
-      <Tabs
-        label={l.cornerLabel}
-        tabs={cornerTabs}
-        selected={groupedCornerTab}
-        onSelect={setGroupedCornerTab}
         variant="grouped"
       />
 
