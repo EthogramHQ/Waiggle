@@ -2112,7 +2112,9 @@ que l'auteur.
 ## R7b — Le coin des testeurs
 
 Statut : **validé par Louis** le 10/11/2026 (« tout me va », « ok pour le découpage »), à
-reprendre au début de R7b. R7b suit R7a, qui crée les mises à jour et l'inscription des testeurs.
+reprendre au début de R7b. Amendé le 11/11/2026 après la relecture du plan (décisions de Louis :
+ancien testeur en lecture seule, badge pour tous, la modération voit une capture signalée ; le nom
+à la place de « Elle » ; le signalement dans un fil à deux). R7b suit R7a, qui crée les mises à jour et l'inscription des testeurs.
 
 R7b donne aux testeurs inscrits en R7a **le coin des testeurs** du projet, un espace tenu par
 l'auteur : les appels à tester, et un fil privé de retours entre chaque testeur et l'auteur, relié
@@ -2188,17 +2190,26 @@ Hors de R7b, et où ça va :
 
 - Dans les commentaires de Décollage !, un testeur porte le badge « Testeur », à côté du nom, comme
   le badge « Auteur »
+- Et tous les testeurs le portent, inscrits avant R7b compris, sans notification (Louis, 11/11/2026) ;
+  la feuille d'inscription le dit désormais
 
 ### Retirer et quitter
 
-- Quand Papi Jean retire Inès des testeurs (confirmation « Retirer Inès des testeurs ? Elle ne
-  verra plus le coin des testeurs ; ses retours te restent lisibles. »)
+- Quand Papi Jean retire Inès des testeurs (confirmation « Retirer Inès des testeurs ? Inès ne
+  verra plus le coin des testeurs et ne pourra plus les rejoindre ; aucune notification ne part. Ses
+  retours te restent lisibles. Impossible de revenir en arrière. »)
 - Alors Inès n'est plus testeuse, sans en être prévenue, et « Rejoindre les testeurs » ne lui est plus
   proposé sur ce projet
-- Quand Inès quitte les testeurs
+- Quand Inès quitte les testeurs (depuis le menu « … » du coin, ou de la page du projet), après une
+  confirmation qui dit que ses retours restent lisibles par Papi Jean
 - Alors son fil de retours reste lisible par Papi Jean, et redevient le sien si elle se réinscrit
+- Et une ancienne testeuse (partie, retirée, ou bloquée dans un sens ou dans l'autre) garde son fil
+  en lecture seule : elle le relit, supprime ses messages et signale ceux de l'auteur ; ni appels, ni
+  compositeur, ni « Envoyer un retour » (Louis, 11/11/2026)
 - Et un projet supprimé emporte son coin des testeurs ; un projet retiré, privé, ou dont l'auteur
-  est suspendu le ferme à tous, sauf à l'auteur pour la lecture
+  est suspendu le ferme à tous, testeurs et anciens testeurs compris, sauf à l'auteur pour la
+  lecture ; un testeur peut toujours en supprimer ses messages et quitter les testeurs depuis la
+  page du projet
 
 ### Ce que reçoit un testeur, en plus des mises à jour
 
@@ -2208,7 +2219,10 @@ Hors de R7b, et où ça va :
 ### La modération
 
 - Un appel, un retour ou une réponse se signalent comme un commentaire (menu « … » du message) et
-  se retirent comme lui ; le testeur ou l'auteur qui signale le fait sans que l'autre le sache
+  se retirent comme lui ; le nom de la personne qui signale n'est pas transmis, mais dans un fil à
+  deux l'autre peut le deviner, et le texte du signalement le dit
+- Et la modération voit le message signalé et sa capture tant que le signalement est ouvert,
+  jamais le reste du fil (Louis, 11/11/2026)
 
 ### Mes données
 
