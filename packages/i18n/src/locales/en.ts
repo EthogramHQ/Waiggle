@@ -641,17 +641,13 @@ export const en: Translation = {
     },
     testers: {
       join: 'Join the testers',
-      joined: 'You test this project',
       joinTitle: 'Join the testers',
       joinBody:
         'You help {{name}} improve “{{title}}”: you will receive their updates and calls for testing, and you can send them feedback that no other member reads. {{name}} will see your name, your photo and the date you joined. In this project’s comments, a “Tester” badge will show next to your name.',
       confirm: 'Join the testers',
       cancel: 'Cancel',
       joinedToast: 'You are one of the testers of “{{title}}”.',
-      memberTitle: 'You test this project',
-      memberBody: 'You are one of the testers of “{{title}}”. You receive its updates.',
       quit: 'Leave the testers',
-      close: 'Close',
       quitToast: 'You are no longer one of the testers of “{{title}}”.',
       full: 'This project is not taking new testers.',
       notTestable: 'You can’t join the testers of this project.',

@@ -763,17 +763,13 @@ export const fr = {
     // (décision de Louis du 10/11/2026, juridique T2) ; jamais le nombre pour un autre que l'auteur.
     testers: {
       join: 'Rejoindre les testeurs',
-      joined: 'Tu testes ce projet',
       joinTitle: 'Rejoindre les testeurs',
       joinBody:
         'Tu aides {{name}} à améliorer « {{title}} » : tu recevras ses mises à jour et ses appels à tester, et tu pourras lui envoyer des retours qu’aucun autre membre ne lit. {{name}} verra ton nom, ta photo et ta date d’inscription. Dans les commentaires de ce projet, un badge « Testeur » s’affichera à côté de ton nom.',
       confirm: 'Rejoindre les testeurs',
       cancel: 'Annuler',
       joinedToast: 'Tu fais partie des testeurs de « {{title}} ».',
-      memberTitle: 'Tu testes ce projet',
-      memberBody: 'Tu fais partie des testeurs de « {{title}} ». Tu reçois ses mises à jour.',
       quit: 'Quitter les testeurs',
-      close: 'Fermer',
       quitToast: 'Tu ne fais plus partie des testeurs de « {{title}} ».',
       // juridique (T3) : jamais le nombre de testeurs d'un autre.
       full: 'Ce projet ne prend plus de nouveaux testeurs.',
