@@ -58,6 +58,9 @@ export type TextTone =
   | 'outcomeYes'
   | 'outcomePartly'
   | 'outcomeNo'
+  // R7b : « Réglé dans la v1.3 », sous un retour (rôle `settledText`, lisible sur les deux bulles
+  // d'un fil et sur une carte, ui/MessageBubble).
+  | 'settled'
 
 // Sur le web, un mot sans espace plus large que l'écran déborde ; « overflow-wrap: anywhere » le
 // coupe. Les téléphones le font déjà d'eux-mêmes. Cette propriété CSS manque aux types de React
@@ -103,6 +106,7 @@ const toneColor = {
   outcomeYes: 'outcomeYesText',
   outcomePartly: 'outcomePartlyText',
   outcomeNo: 'outcomeNoText',
+  settled: 'settledText',
 } as const satisfies Record<TextTone, string>
 
 /**
