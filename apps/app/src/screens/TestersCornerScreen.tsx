@@ -18,15 +18,18 @@
 // qui le dit. Tout autre membre, un visiteur, ou un testeur quand le coin est fermé : la page
 // introuvable, la même que pour un projet privé (rien ne dit que le coin existe).
 //
-// Sur ordinateur (relecture du plan, ui-B1) : la page d'un fil (`threads/<testeur>`) rend ce coin,
-// la liste des fils à gauche et le fil choisi à droite (`AuthorThreadPane`), sa ligne marquée
-// « en cours ». Une seule colonne tant que la page n'est pas hydratée : le pré-rendu ne connaît pas
-// la largeur de la fenêtre.
+// Sur ordinateur (relecture du plan, ui-B1 ; planche R7b-Desktop, corrections K6 à K8) : tout le
+// coin tient dans une colonne de lecture à gauche, et la page d'un fil (`threads/<testeur>`) rend ce
+// coin avec le fil choisi à droite (`AuthorThreadPane`), sa ligne marquée « en cours » ; sans fil
+// ouvert, l'auteur y lit une invitation à en choisir un. Le bouton du haut porte le titre du projet.
+// Une seule colonne tant que la page n'est pas hydratée : le pré-rendu ne connaît pas la largeur.
 //
-// Le focus ne se perd jamais (ui-B8) : après « Retirer », il va au testeur suivant ; après
-// « Afficher les appels précédents », au premier appel arrivé ; après la suppression d'un appel, à
-// l'appel suivant. La liste reste figée sous la fenêtre de confirmation, et ne perd l'élément qu'une
-// fois la fenêtre partie (sinon la fenêtre rendrait le focus à un « … » qui n'existe plus).
+// Le focus ne se perd jamais (ui-B8, K5, K7) : après « Retirer », il va au testeur suivant (le seul
+// retiré : au bouton « 0 testeur ») ; après « Afficher les appels précédents », au premier appel
+// arrivé ; après la suppression d'un appel, à l'appel suivant (le seul : à « Lancer un appel ») ;
+// après un fil ouvert depuis sa ligne, sur ordinateur, au nom du testeur. La liste reste figée sous
+// la fenêtre de confirmation, et ne perd l'élément qu'une fois la fenêtre partie (sinon la fenêtre
+// rendrait le focus à un « … » qui n'existe plus).
 //
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import type {
@@ -89,11 +92,18 @@ import {
   SessionErrorScreen,
   SignedOutScreen,
 } from './states'
-import { AuthorThreadPane, type ThreadTester } from './TesterThreadScreen'
+import { AuthorThreadPane, type ThreadTester, useFormerTester } from './TesterThreadScreen'
 import { TesterThreadView } from './TesterThreadView'
 
 /** Les deux onglets du coin, tels qu'ils s'écrivent dans l'adresse (`?tab=`). */
 type TabKey = 'calls' | 'feedback'
+
+/**
+ * Le repli du focus quand le dernier élément d'une liste part (R7b, K5) : ni suivant ni précédent à
+ * qui le rendre, il va à ce qui reste (le bouton « 0 testeur », « Lancer un appel »). Aucun
+ * identifiant de l'API ne commence par un deux-points.
+ */
+const FALLBACK = ':fallback'
 
 export function TestersCornerScreen({ id, member }: { id: string; member?: string }) {
   const { state, session, retry } = useMemberSession()
@@ -121,11 +131,28 @@ function CornerNotFound() {
   )
 }
 
-/** Le coin n'a pas pu se charger (panne, réseau) : on le dit, avec « Réessayer ». */
-function CornerLoadError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
+/**
+ * Le coin n'a pas pu se charger (panne, réseau) : on le dit, avec « Réessayer », et « Retour » vers
+ * la page du projet (R7b, K9 : sur téléphone, sans la barre du haut, il n'y avait pas d'autre issue).
+ */
+function CornerLoadError({
+  id,
+  onRetry,
+  retrying,
+}: {
+  id: string
+  onRetry: () => void
+  retrying: boolean
+}) {
   const { t } = useTranslation()
+  const back = useGoBack(`/projects/${id}`)
   return (
-    <Screen header={<TopNav />} width="page" pageTitle={t(($) => $.states.errorTitle)}>
+    <Screen
+      header={<TopNav />}
+      width="page"
+      onBack={back}
+      pageTitle={t(($) => $.states.errorTitle)}
+    >
       <StateMessage
         kind="error"
         level={1}
@@ -152,7 +179,9 @@ function Corner({ id, member, memberId, memberName }: CornerProps) {
     // L'API répond 404 à qui n'a rien à faire ici (un autre membre, un testeur d'un coin fermé).
     if (key === 'notFound') return <CornerNotFound />
     if (key === 'unauthorized') return <SignedOutScreen width="page" expired />
-    return <CornerLoadError onRetry={() => void corner.refetch()} retrying={corner.isFetching} />
+    return (
+      <CornerLoadError id={id} onRetry={() => void corner.refetch()} retrying={corner.isFetching} />
+    )
   }
   if (project.error) {
     if (errorKey(project.error) === 'notFound') return <CornerNotFound />
@@ -186,9 +215,9 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
   const toSource = useMediaSources()
   const toast = useToast()
   const hydrated = useHydrated()
-  const { columns } = useLayout()
+  const { columns, sizeClass } = useLayout()
   const back = useGoBack(`/projects/${project.id}`)
-  const params = useLocalSearchParams<{ tab?: string | string[] }>()
+  const params = useLocalSearchParams<{ tab?: string | string[]; focus?: string | string[] }>()
   const cornerPath = `/projects/${project.id}/testers`
   const isAuthor = corner.role === 'author'
   const former = corner.role === 'former_tester'
@@ -213,8 +242,16 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
     else router.setParams({ tab: key })
   }
 
-  // Deux colonnes : sur ordinateur, une fois la page hydratée, quand un fil est choisi (l'auteur).
-  const twoColumns = hydrated && columns && isAuthor && member !== undefined
+  // Sur ordinateur, une fois la page hydratée, la mise en page de la planche R7b-Desktop (R7b, K6) :
+  // une colonne de lecture à gauche (la tête, les onglets et leur contenu, pour tous), et à droite le
+  // fil ouvert, ou l'invitation à en choisir un (l'auteur, onglet « Retours »). Avant, le coin
+  // s'étirait sur 1 280 points dès 1 024 (appels à 154 caractères par ligne, boutons miel de toute
+  // la largeur). La colonne de gauche ne change pas d'un onglet à l'autre ni à l'ouverture d'un fil :
+  // rien ne bouge sous le doigt.
+  const desktop = hydrated && columns
+  const threadOpen = desktop && isAuthor && member !== undefined
+  // Arrivé par une ligne de la liste (`?focus=thread`) : le focus ira au nom du testeur (K7).
+  const focusThread = hydrated && firstParam(params.focus) === 'thread'
 
   // --- Retirer un testeur ---------------------------------------------------------------------
 
@@ -247,9 +284,10 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
     const ok = await removal.remove(tester.id)
     removeSending.current = false
     if (!ok) return
+    // Le seul testeur retiré : ni suivant ni précédent, le focus ira au bouton « 0 testeur » (K5).
     removed.current = {
       id: tester.id,
-      next: list[index + 1]?.id ?? list[index - 1]?.id ?? null,
+      next: list[index + 1]?.id ?? list[index - 1]?.id ?? FALLBACK,
     }
     toast.show(t(($) => $.project.testers.removedToast, { name: tester.name }))
     setRemoving(null)
@@ -266,7 +304,8 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
   useEffect(() => {
     if (focusTester === null || frozen) return
     setFocusTester(null)
-    listHandle.current?.focusTester(focusTester)
+    if (focusTester === FALLBACK) listHandle.current?.focusToggle()
+    else listHandle.current?.focusTester(focusTester)
   }, [focusTester, frozen])
 
   // --- Quitter les testeurs ---------------------------------------------------------------------
@@ -282,15 +321,19 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
     since: one.since,
   }))
 
+  // Le projet : sur téléphone, un lien sous « Retour » (planches R7b-Coin) ; dès la tablette, le
+  // bouton du haut porte son titre, « ‹ Décollage ! » (planche R7b-Desktop, K6), sans second lien.
+  const backNamed = sizeClass !== 'compact'
   const head = (
     <Stack gap="xs">
-      {/* Le projet : un lien qui y ramène (la planche le pose sous « Retour »). */}
-      <TextLink
-        label={project.title}
-        tone="muted"
-        breakAnywhere
-        onPress={() => router.push(`/projects/${project.id}`)}
-      />
+      {backNamed ? null : (
+        <TextLink
+          label={project.title}
+          tone="muted"
+          breakAnywhere
+          onPress={() => router.push(`/projects/${project.id}`)}
+        />
+      )}
       {isAuthor && corner.closed ? (
         <Notice tone="info" message={t(($) => $.project.testers.closedAuthor)} />
       ) : null}
@@ -308,12 +351,17 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
   const authorThreads = (
     <AuthorThreads
       project={project}
-      current={twoColumns ? member : undefined}
+      current={threadOpen ? member : undefined}
       onOpen={(testerId) => {
         const path = `${cornerPath}/threads/${testerId}`
-        // Sur ordinateur, d'un fil à l'autre sans empiler l'historique ; sinon, une page de plus.
-        if (twoColumns) router.replace(path)
-        else router.push(path)
+        // Sur téléphone, une page de plus.
+        if (!desktop) return router.push(path)
+        // Sur ordinateur, la page du fil remonte tout le coin : `?focus=thread` lui dit de poser le
+        // focus sur le nom du testeur, sinon il tombait sur toute la page (K7). D'un fil à l'autre,
+        // sans empiler l'historique.
+        const arrival = `${path}?focus=thread`
+        if (member !== undefined) router.replace(arrival)
+        else router.push(arrival)
       }}
     />
   )
@@ -383,6 +431,7 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
       width="page"
       header={<TopNav />}
       onBack={back}
+      {...(backNamed ? { backLabel: project.title } : null)}
       title={t(($) => $.project.testers.corner)}
       // Avant l'hydratation, l'onglet du navigateur ne dit rien de plus que l'appli.
       pageTitle={
@@ -409,7 +458,7 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
           }
         : null)}
     >
-      {twoColumns ? (
+      {desktop ? (
         <Columns
           sideFirst
           sideWidth="wide"
@@ -421,13 +470,19 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
             </>
           }
           main={
-            <ThreadPane
-              project={project}
-              corner={corner}
-              tester={testerOfPane()}
-              member={member}
-              memberId={memberId}
-            />
+            threadOpen && member !== undefined ? (
+              <ThreadPane
+                project={project}
+                corner={corner}
+                tester={testerOfPane()}
+                member={member}
+                memberId={memberId}
+                focusOnArrival={focusThread}
+                onFocused={() => router.setParams({ focus: undefined })}
+              />
+            ) : isAuthor && tab === 'feedback' ? (
+              <ThreadPlaceholder projectId={project.id} />
+            ) : null
           }
         />
       ) : (
@@ -491,33 +546,44 @@ type PaneProps = {
   corner: TesterCorner
   /** Le testeur du fil, s'il est dans la liste du coin ; sinon, on le cherche dans les fils. */
   tester: ThreadTester | null
-  member: string | undefined
+  member: string
   memberId: string
+  /** Arrivé par une ligne de la liste (`?focus=thread`) : le focus va au nom du testeur. */
+  focusOnArrival: boolean
+  /** Le focus est posé : l'écran retire `?focus=thread` de l'adresse. */
+  onFocused: () => void
 }
 
 /**
  * Le fil choisi, dans une carte à droite de la liste. Un ancien testeur n'est plus dans la liste du
- * coin : on le trouve dans les fils déjà chargés (« À traiter », puis « Réglés »).
+ * coin : on le cherche dans les fils de l'auteur, page après page, comme la page du fil sur
+ * téléphone (K8 : seule la première page était lue, et le fil d'un ancien testeur plus loin
+ * paraissait « n'a pas pu se charger », sans issue).
  */
-function ThreadPane({ project, corner, tester, member, memberId }: PaneProps) {
+function ThreadPane({
+  project,
+  corner,
+  tester,
+  member,
+  memberId,
+  focusOnArrival,
+  onFocused,
+}: PaneProps) {
   const { t } = useTranslation()
-  const open = useThreads(project.id, 'open')
-  const settled = useThreads(project.id, 'settled')
+  const search = useFormerTester(project.id, member, tester !== null)
+  const found = tester ?? search.found
   const headingRef = useRef<Focusable>(null)
-  // D'un fil à l'autre (une ligne touchée à gauche) : le focus va au nom du nouveau testeur, en
-  // tête du fil (ui-B1). Pas à l'arrivée sur la page : seulement après un geste.
-  const seen = useRef(member)
+  // Arrivé par une ligne touchée à gauche (K7) : le coin entier vient d'être remonté par la
+  // navigation, le focus du clavier est tombé sur la page ; il va au nom du testeur, en tête du fil
+  // (ui-B1), sans faire défiler, une fois le fil trouvé. Une seule fois, puis le paramètre quitte
+  // l'adresse : recharger la page, ou l'ouvrir par un lien, ne déplace pas le focus.
+  const arrived = useRef(false)
   useEffect(() => {
-    if (seen.current === member) return
-    seen.current = member
+    if (!focusOnArrival || !found || arrived.current) return
+    arrived.current = true
+    onFocused()
     if (!focusWithoutScroll(headingRef.current)) moveReaderTo(headingRef.current)
-  }, [member])
-  const found =
-    tester ??
-    [open, settled]
-      .flatMap((list) => list.data?.pages.flatMap((page) => page.items) ?? [])
-      .find((thread) => thread.tester.id === member)?.tester ??
-    null
+  }, [focusOnArrival, found, onFocused])
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
       {found ? (
@@ -529,11 +595,34 @@ function ThreadPane({ project, corner, tester, member, memberId }: PaneProps) {
           memberId={memberId}
           headingRef={headingRef}
         />
-      ) : open.isFetching || settled.isFetching ? (
+      ) : !search.exhausted ? (
         <SkeletonList count={2} />
       ) : (
-        <StateMessage kind="error" message={t(($) => $.project.testers.thread.loadError)} />
+        <StateMessage
+          kind="error"
+          message={t(($) => $.project.testers.thread.loadError)}
+          {...(search.failed
+            ? { actions: [{ label: t(($) => $.common.retry), onPress: search.retry }] }
+            : null)}
+        />
       )}
+    </Surface>
+  )
+}
+
+/**
+ * La colonne de droite tant qu'aucun fil n'est ouvert (ordinateur, l'auteur, onglet « Retours ») :
+ * une invitation calme à en choisir un, dans la carte où le fil s'ouvrira. Sans aucun fil, rien :
+ * la liste dit déjà qu'il n'y a pas encore de retour. Les nombres viennent de la même lecture que
+ * la liste (« À traiter »), sans requête de plus.
+ */
+function ThreadPlaceholder({ projectId }: { projectId: string }) {
+  const { t } = useTranslation()
+  const counts = useThreads(projectId, 'open').data?.pages[0]?.counts
+  if (!counts || counts.open + counts.settled === 0) return null
+  return (
+    <Surface variant="grouped" padding="xl" gap="lg">
+      <StateMessage kind="empty" message={t(($) => $.project.testers.thread.choose)} />
     </Surface>
   )
 }
@@ -572,6 +661,8 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
   const deleteSending = useRef(false)
   const confirmed = useRef<{ id: string; next: string | null } | null>(null)
   const [focusCall, setFocusCall] = useState<string | null>(null)
+  // « Lancer un appel » : il reçoit le focus quand le dernier appel montré est supprimé.
+  const launchRef = useRef<Focusable>(null)
 
   const openDelete = (call: TesterCall) => {
     setFrozen(shown)
@@ -596,9 +687,10 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
     const ok = await deletion.remove(call.id)
     deleteSending.current = false
     if (!ok) return
+    // Le seul appel supprimé : ni suivant ni précédent, le focus ira à « Lancer un appel » (K5).
     confirmed.current = {
       id: call.id,
-      next: shown[index + 1]?.id ?? shown[index - 1]?.id ?? null,
+      next: shown[index + 1]?.id ?? shown[index - 1]?.id ?? FALLBACK,
     }
     setDeleting(null)
     if (Platform.OS !== 'web') release()
@@ -606,7 +698,7 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
   useEffect(() => {
     if (focusCall === null || frozen) return
     setFocusCall(null)
-    const node = nodes.current.get(focusCall)
+    const node = focusCall === FALLBACK ? launchRef.current : nodes.current.get(focusCall)
     if (!focusWithoutScroll(node)) moveReaderTo(node)
   }, [focusCall, frozen])
 
@@ -701,6 +793,7 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
       {isAuthor && !corner.closed ? (
         // La seule action miel de l'onglet (planche validée 9).
         <Button
+          ref={launchRef}
           label={t(($) => $.project.testers.calls.launch)}
           icon="megaphone-simple"
           onPress={() => router.push(`/projects/${project.id}/testers/new-call`)}
@@ -839,9 +932,12 @@ function AuthorThreads({ project, current, onOpen }: ThreadsProps) {
     <StateMessage
       kind="empty"
       message={
-        filter === 'open'
-          ? t(($) => $.project.testers.thread.emptyOpen)
-          : t(($) => $.project.testers.thread.emptySettled)
+        // Aucun fil du tout : l'invitation à attendre les retours, pas « rien à traiter » (K9).
+        counts.current.open + counts.current.settled === 0
+          ? t(($) => $.project.testers.thread.emptyAuthor)
+          : filter === 'open'
+            ? t(($) => $.project.testers.thread.emptyOpen)
+            : t(($) => $.project.testers.thread.emptySettled)
       }
     />
   ) : (
@@ -875,7 +971,8 @@ function AuthorThreads({ project, current, onOpen }: ThreadsProps) {
   return (
     <Stack gap="lg">
       <Segmented<TesterThreadState>
-        label={t(($) => $.project.testers.tabs.feedback)}
+        // Un nom à lui : « Retours » est déjà celui de l'onglet qui le contient (K9, ui-A5).
+        label={t(($) => $.project.testers.thread.filterLabel)}
         fill={false}
         value={filter}
         onChange={setFilter}

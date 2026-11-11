@@ -954,6 +954,8 @@ export const fr = {
         more: 'Afficher la suite',
         moreError: 'La suite n’a pas pu se charger.',
         listLoadError: 'Les retours n’ont pas pu se charger.',
+        // Sur ordinateur, la colonne de droite tant qu'aucun fil n'est ouvert (planche R7b-Desktop).
+        choose: 'Choisis un fil dans la liste pour le lire ici.',
       },
       // La partie « Retours réglés » de la feuille « Nouvelle mise à jour ».
       settledField: {

@@ -50,8 +50,15 @@ type Props = {
   handle?: Ref<TestersListHandle>
 }
 
-/** Ce que l'écran peut demander à la liste : `focusTester` rend faux si la ligne n'est pas montrée. */
-export type TestersListHandle = { focusTester: (id: string) => boolean }
+/**
+ * Ce que l'écran peut demander à la liste : `focusTester` rend faux si la ligne n'est pas montrée ;
+ * `focusToggle` donne le focus au bouton « 0 testeur » (R7b, K5 : le seul testeur retiré, il n'y a
+ * plus de voisin à qui le rendre), faux pour un testeur, qui n'a pas de bouton.
+ */
+export type TestersListHandle = {
+  focusTester: (id: string) => boolean
+  focusToggle: () => boolean
+}
 
 /** Le nombre de testeurs montrés avant « Afficher les N autres » (planche validée 1). */
 export const TESTERS_PREVIEW = 4
@@ -70,6 +77,8 @@ export function TestersList({ count, testers, onRemove, initiallyOpen = false, h
   const focusPending = useRef(false)
   // La vue de chaque ligne montrée, par testeur : où poser le focus qu'on demande à la liste.
   const rows = useRef(new Map<string, View>())
+  // Le bouton « 12 testeurs » de l'auteur, qui déplie la liste.
+  const toggle = useRef<View>(null)
   // Posé après la mémoire qu'il lit (`rows`) : la fonction rendue la trouve toujours remplie.
   useImperativeHandle(
     handle,
@@ -80,6 +89,12 @@ export function TestersList({ count, testers, onRemove, initiallyOpen = false, h
         // Web : le premier contrôle de la ligne (son « … »), sans défilement ; téléphone : le
         // lecteur d'écran, sur la ligne.
         if (!focusWithoutScroll(focusTarget(node))) moveReaderTo(node)
+        return true
+      },
+      focusToggle: () => {
+        const node = toggle.current
+        if (!node) return false
+        if (!focusWithoutScroll(node)) moveReaderTo(node)
         return true
       },
     }),
@@ -112,7 +127,13 @@ export function TestersList({ count, testers, onRemove, initiallyOpen = false, h
   const shown = showAll ? testers : testers.slice(0, TESTERS_PREVIEW)
   const hidden = testers.length - shown.length
   return (
-    <Disclosure title={label} icon={null} variant="inline" initiallyOpen={initiallyOpen}>
+    <Disclosure
+      title={label}
+      icon={null}
+      variant="inline"
+      initiallyOpen={initiallyOpen}
+      toggleRef={toggle}
+    >
       {testers.length === 0 ? (
         <Text variant="callout" tone="muted">
           {t(($) => $.project.testers.list.empty)}

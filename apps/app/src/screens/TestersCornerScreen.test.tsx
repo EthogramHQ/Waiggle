@@ -798,3 +798,145 @@ describe('on a wide window', () => {
     await waitFor(() => expect(control(new RegExp(`^${ines.name}`))).toBeNull())
   })
 })
+
+// --- Corrections après les relectures (R7b, K5 à K9) ---
+
+describe('the focus when the last item of a list goes (R7b, K5)', () => {
+  it('moves the focus to « Lancer un appel » after deleting the only call', async () => {
+    const call = calls[0]
+    if (!call) throw new Error('a call expected')
+    mockServer.callPages.set('', { items: [call], nextCursor: null })
+    await openCorner()
+    await screen.findByText(call.text)
+    await chooseInMenu(callMenu(call.text), T.callDelete)
+    await screen.findByRole('header', { name: T.callDeleteTitle })
+    await passTapGuard()
+    await fireEvent.press(screen.getByRole('button', { name: T.callDeleteConfirm }))
+
+    await waitFor(() => expect(screen.queryByText(call.text)).toBeNull())
+    // Plus d'appel après lui ni avant lui : le focus va à l'action qui reste, jamais nulle part.
+    await waitFor(() => expect(focused().at(-1)).toBe(T.launch))
+  })
+
+  it('moves the focus to « 0 testeur » after removing the only tester', async () => {
+    // Inès, seule testeuse.
+    mockServer.corner = { ...authorCorner, testers: testers.slice(0, 1), testerCount: 1 }
+    await openCorner()
+    await fireEvent.press(screen.getByRole('button', { name: new RegExp(`^${testerCount(1)}`) }))
+    await screen.findByText(ines.name)
+    await chooseInMenu(testerMenu(ines.name), T.remove)
+    await screen.findByRole('header', { name: removeTitle(ines.name) })
+    await passTapGuard()
+    await fireEvent.press(screen.getByRole('button', { name: T.removeConfirm }))
+
+    await waitFor(() => expect(shown(testerCount(0))).toBe(true))
+    // Le bouton qui replie la liste, désormais vide, reçoit le focus.
+    await waitFor(() => expect(focused().at(-1)).toBe(testerCount(0)))
+  })
+})
+
+describe('the corner on a wide window, as on the board R7b-Desktop (R7b, K6 to K8)', () => {
+  beforeEach(() => {
+    restoreWindow = setDesktopWindow()
+  })
+
+  it('names the back button after the project on a wide window, without a second link to it', async () => {
+    await openCorner()
+
+    // « ‹ Décollage ! » : le titre du projet est le bouton du haut (planche R7b-Desktop).
+    expect(getControl(project.title)).toBeTruthy()
+    expect(control(/^Retour$/)).toBeNull()
+    expect(screen.getAllByText(project.title)).toHaveLength(1)
+  })
+
+  it('invites to pick a thread beside the list of the threads, until one is opened', async () => {
+    mockNav.params = { id, tab: 'feedback' }
+    await openCorner()
+    await screen.findByText(ines.name)
+
+    expect(await screen.findByText(fr.t(($) => $.project.testers.thread.choose))).toBeTruthy()
+    // Témoin : aucun fil n'est ouvert.
+    expect(screen.queryByText(containing('Le score repart à zéro au niveau 3.'))).toBeNull()
+  })
+
+  it('opens another thread from its row, asking for the focus on its heading', async () => {
+    mockNav.params = { id, tab: 'feedback' }
+    await openCorner(ines.id)
+    await screen.findByText(containing('Le score repart à zéro au niveau 3.'))
+
+    await fireEvent.press(getControl(new RegExp(`^${sam.name}`)))
+
+    expect(replaced()).toContain(`${cornerPath}/threads/${sam.id}?focus=thread`)
+  })
+
+  it('moves the focus to the heading of a thread opened from a row', async () => {
+    mockNav.params = { id, member: ines.id, focus: 'thread' }
+    await openCorner(ines.id)
+    await screen.findByText(containing('Le score repart à zéro au niveau 3.'))
+
+    await waitFor(() => expect(focused().at(-1)).toBe(ines.name))
+    // Le paramètre quitte l'adresse : recharger la page ne redéplace pas le focus.
+    expect(mockNav.router.setParams).toHaveBeenCalledWith({ focus: undefined })
+  })
+
+  it('leaves the focus alone when a thread is opened by its address', async () => {
+    mockNav.params = { id, member: ines.id }
+    await openCorner(ines.id)
+    await screen.findByText(containing('Le score repart à zéro au niveau 3.'))
+
+    expect(focused()).not.toContain(ines.name)
+  })
+
+  it('finds a former tester beyond the first page of threads on a wide window', async () => {
+    // Un identifiant qui n'est pas dans la liste du coin (t2 à t12 y sont).
+    const gone = { id: 'gone-1', name: 'Nina Roux' }
+    mockServer.threadPages.open.set('', { items: openThreads, nextCursor: 'p2' })
+    mockServer.threadPages.open.set('p2', {
+      items: [threadOf(gone, { unread: false }, false)],
+      nextCursor: null,
+    })
+    mockServer.setThread(gone.id, kit().inesThread('author'))
+    mockNav.params = { id, tab: 'feedback' }
+    await openCorner(gone.id)
+
+    expect(await screen.findByRole('header', { name: gone.name })).toBeTruthy()
+    expect(shown(T.listLoadError)).toBe(false)
+  })
+})
+
+describe('the states of the corner (R7b, K9)', () => {
+  it('offers « Retour » when the corner could not load', async () => {
+    mockServer.answer('GET', /\/testers$/, () => ({ ok: false, error: 'internal' }))
+    await renderWithProviders(<TestersCornerScreen id={id} />)
+
+    await waitFor(() => expect(shown(T.cornerLoadError)).toBe(true))
+    expect(getControl(/^Retour$/)).toBeTruthy()
+  })
+
+  it('names the thread filter apart from the « Retours » tab', async () => {
+    mockNav.params = { id, tab: 'feedback' }
+    await openCorner()
+    await screen.findByText(ines.name)
+
+    // Le groupe n'est pas `accessible` (ses choix le sont) : on le trouve par son nom.
+    const group = screen.getByLabelText(fr.t(($) => $.project.testers.thread.filterLabel))
+    expect(group.props.accessibilityRole).toBe('radiogroup')
+    // Témoin : « Retours » ne nomme plus que l'onglet.
+    expect(
+      screen
+        .queryAllByLabelText(T.feedback)
+        .filter((one) => one.props.accessibilityRole === 'radiogroup'),
+    ).toHaveLength(0)
+  })
+
+  it('invites the author to wait for feedback when no thread exists yet', async () => {
+    mockServer.threadPages.open.set('', { items: [], nextCursor: null })
+    mockServer.threadPages.settled.set('', { items: [], nextCursor: null })
+    mockServer.counts = { open: 0, settled: 0 }
+    mockNav.params = { id, tab: 'feedback' }
+    await openCorner()
+
+    await waitFor(() => expect(shown(fr.t(($) => $.project.testers.thread.emptyAuthor))).toBe(true))
+    expect(shown(T.emptyOpen)).toBe(false)
+  })
+})
