@@ -262,6 +262,7 @@ export function CommentThreads({
         kind={kind}
         isMine={comment.isMine}
         isProjectAuthor={author?.id === project.author.id}
+        isProjectTester={author?.isTester}
         highlighted={draft.highlightedId === comment.id}
         // Un emplacement masqué que personne n'a masqué : le projet est retiré (le retrait l'emporte,
         // il est aussi public) ou privé.
