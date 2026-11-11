@@ -330,9 +330,11 @@ describe('sharing a project removed by the moderation', () => {
     expect(screen.queryByRole('button', { name: share })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
     // Le menu « … » ne garde que « Supprimer » (jur-J1, R6a : l'auteur peut toujours supprimer un
-    // projet retiré ; « Modifier » y est refusé). Avant R6a : aucun menu.
+    // projet retiré ; « Modifier » y est refusé). Avant R6a : aucun menu. R7b : et « Le coin des
+    // testeurs », que l'auteur relit, fermé, pendant le retrait.
     await fireEvent.press(screen.getByRole('button', { name: menu }))
     expect(screen.getAllByRole('menuitem').map((item) => item.props.accessibilityLabel)).toEqual([
+      'Le coin des testeurs',
       'Supprimer',
     ])
   })
@@ -349,6 +351,7 @@ describe('sharing a project removed by the moderation', () => {
       // jur-J1 (R6a) : le menu ne garde que « Supprimer ».
       await fireEvent.press(screen.getByRole('button', { name: menu }))
       expect(screen.getAllByRole('menuitem').map((item) => item.props.accessibilityLabel)).toEqual([
+        'Le coin des testeurs',
         'Supprimer',
       ])
     } finally {
