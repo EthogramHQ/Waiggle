@@ -1,6 +1,6 @@
 // Tests de la case à cocher avec un détail et une erreur à la fois (R7b) : l'erreur se lit avant le
 // détail, sur le web (ordre des identifiants d'`aria-describedby`) comme sur téléphone (l'indice).
-// Fichier à part de Checkbox.test.tsx, écrit avant le composant par la tranche.
+// Fichier à part de Checkbox.test.tsx : la règle a été décidée à l'assemblage, après ses tests.
 import { screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
