@@ -375,7 +375,8 @@ describe('quitting the testers from the corner', () => {
     await waitFor(() => expect(mockServer.received('DELETE', /\/testers$/)).toHaveLength(1))
     // La page du coin lui devient introuvable : on la remplace par celle du projet (pas d'entrée
     // d'historique qui y ramènerait), où « Rejoindre les testeurs » reçoit le focus.
-    await waitFor(() => expect(replaced()).toContain(`/projects/${id}`))
+    // ?focus=join : la page du projet pose le focus sur « Rejoindre les testeurs » (décision du 11/11).
+    await waitFor(() => expect(replaced()).toContain(`/projects/${id}?focus=join`))
     expect(pushed().filter((path) => path.startsWith(cornerPath))).toEqual([])
   })
 })
