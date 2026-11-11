@@ -24,7 +24,7 @@ import type {
   TesterRole,
 } from '@ruche/contracts'
 import { Image } from 'expo-image'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
@@ -72,6 +72,12 @@ type Props = {
   removal?: ReactNode
   /** Les actions du menu « … » ; vide ou absent : pas de « … ». */
   menu?: ActionMenuItem[]
+  /**
+   * Où l'écran pose le focus sur ce message (après « Afficher les précédents », après la
+   * suppression d'un voisin). Sur le web, l'élément de liste, nommé : `focusTarget` y trouve le
+   * « … » ; sur téléphone, le texte caché qui dit le nom du message, où va le lecteur d'écran.
+   */
+  focusRef?: Ref<View>
 }
 
 /** L'icône de chaque appareil (pas d'icône de tablette dans le jeu : celle du téléphone). */
@@ -104,6 +110,7 @@ export function MessageBubble({
   settled = null,
   removal,
   menu = [],
+  focusRef,
 }: Props) {
   const { t } = useTranslation()
   const { colors, shadows } = useTheme()
@@ -285,6 +292,7 @@ export function MessageBubble({
   return (
     <View
       {...named}
+      ref={Platform.OS === 'web' ? focusRef : undefined}
       style={{
         alignSelf: 'stretch',
         gap: space.xs,
@@ -293,7 +301,9 @@ export function MessageBubble({
     >
       {Platform.OS === 'web' ? null : (
         <View style={hiddenFrame} pointerEvents="none">
-          <Text accessibilityLabel={spokenName}>{spokenName}</Text>
+          <Text accessibilityLabel={spokenName} focusRef={focusRef}>
+            {spokenName}
+          </Text>
         </View>
       )}
       {/* La bulle et son « … » : la rangée a la largeur de la colonne, la bulle la sienne (80 % au
