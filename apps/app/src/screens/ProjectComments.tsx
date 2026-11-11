@@ -443,6 +443,7 @@ export function Comments({ project }: { project: Project }) {
       kind={kind}
       isMine={comment.isMine}
       isProjectAuthor={comment.author?.id === project.author.id}
+      isProjectTester={comment.author?.isTester}
       menu={[]}
       hiddenNote={null}
       avatar={comment.author ? toSource(comment.author.avatarUrl) : null}

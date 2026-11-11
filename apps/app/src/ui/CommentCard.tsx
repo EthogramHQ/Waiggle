@@ -4,7 +4,8 @@
 // quelles actions offrir (`menu`, `onReply`, `onUnhide`).
 //
 // - En tête : la photo de l'auteur dans sa colonne ; à sa droite, dans une rangée qui passe à la
-//   ligne, son nom (un lien vers sa page), le badge « Auteur » si c'est l'auteur du projet, la date
+//   ligne, son nom (un lien vers sa page), le badge « Auteur » si c'est l'auteur du projet (ou
+//   « Testeur » s'il teste le projet : jamais les deux, R7b), la date
 //   relative (« il y a 3 h ») et « modifié » s'il l'a été ; au bout, le menu « … » (ActionMenu :
 //   Modifier, Supprimer, Masquer, Signaler, selon le membre).
 // - Puis le texte, ses mentions en pastilles (MentionText), et « Répondre » dessous. Le texte
@@ -82,6 +83,11 @@ type Props = {
   isMine: boolean
   /** L'auteur du commentaire est celui du projet : le badge « Auteur ». */
   isProjectAuthor: boolean
+  /**
+   * L'auteur du commentaire teste ce projet (`comment.author.isTester`) : le badge « Testeur »,
+   * dessiné comme « Auteur ». Exclusif : l'auteur du projet n'a que « Auteur ».
+   */
+  isProjectTester?: boolean
   /** Le commentaire visé par une réponse ou une modification en cours : le miel pâle. */
   highlighted?: boolean
   /**
@@ -202,6 +208,7 @@ export function CommentCard({
   kind,
   isMine,
   isProjectAuthor,
+  isProjectTester = false,
   highlighted = false,
   keptBecause,
   compact = false,
@@ -329,9 +336,13 @@ export function CommentCard({
       {editedWord}
     </View>
   ) : null
+  // Un seul badge : « Auteur » l'emporte sur « Testeur » (l'auteur n'est pas testeur de son projet).
+  const showTester = isProjectTester && !isProjectAuthor
   const badge = isProjectAuthor ? (
     // Dans le lien, dont le nom le dit déjà (« Léa Moreau, Auteur ») : lu une seule fois.
     <StatusPill label={t(($) => $.project.comments.author)} />
+  ) : showTester ? (
+    <StatusPill label={t(($) => $.project.comments.tester)} />
   ) : null
   // Le nom et le badge : le contenu du lien vers sa page.
   const nameAndBadge = (
@@ -535,7 +546,9 @@ export function CommentCard({
                   label={
                     isProjectAuthor
                       ? t(($) => $.project.comments.authorLink, { name: author.name })
-                      : author.name
+                      : showTester
+                        ? t(($) => $.project.comments.testerLink, { name: author.name })
+                        : author.name
                   }
                   role="link"
                   onPress={onAuthorPress}
