@@ -108,6 +108,10 @@ function ThemedChrome() {
       <Stack.Screen name="projects/[id]/edit" options={sheetRoute} />
       {/* R7a : la feuille « Nouvelle mise à jour », posée de même sur la page du projet. */}
       <Stack.Screen name="projects/[id]/update" options={sheetRoute} />
+      {/* R7b : les feuilles « Nouvel appel » et « Ton retour », posées de même sur le coin des
+          testeurs : leur adresse à elles, et donc le Retour du navigateur pour les fermer. */}
+      <Stack.Screen name="projects/[id]/testers/new-call" options={sheetRoute} />
+      <Stack.Screen name="projects/[id]/testers/new-feedback" options={sheetRoute} />
     </Stack>
   )
   return (
