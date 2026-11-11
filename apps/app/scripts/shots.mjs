@@ -2737,9 +2737,10 @@ const pages = [
     },
   },
   // R7a : les testeurs. La feuille d'inscription (page de Décollage !, d'Inès, « Testable » avec sa
-  // démo), la feuille « Tu testes ce projet » (page de Max), la page une fois les testeurs quittés
-  // (le bouton redevient « Rejoindre les testeurs »), le refus « plus de nouveaux testeurs », et la
-  // page de sortie de la démo (la ligne « Tu veux aider Inès ? »).
+  // démo), le refus « plus de nouveaux testeurs », et la page de sortie de la démo (la ligne « Tu
+  // veux aider Inès ? »). R7b : une fois inscrit, « Le coin des testeurs » à la place du bouton (page
+  // de Max ; la feuille « Tu testes ce projet » a disparu), et l'arrivée du coin après « Quitter les
+  // testeurs » (?focus=join : le focus sur « Rejoindre les testeurs », l'adresse nettoyée).
   {
     name: 'testeur',
     path: `/projects/${launchProject.id}`,
@@ -2754,19 +2755,19 @@ const pages = [
     path: `/projects/${testedProject.id}`,
     signedIn: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: fr.project.testers.joined }).click()
-      await page.getByRole('heading', { name: fr.project.testers.memberTitle }).waitFor()
+      await page.getByRole('button', { name: fr.project.testers.corner }).waitFor()
     },
   },
   {
-    name: 'testeur-quitte',
-    path: `/projects/${testedProject.id}`,
+    name: 'testeur-retour',
+    path: `/projects/${launchProject.id}?focus=join`,
     signedIn: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: fr.project.testers.joined }).click()
-      await page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
-      await page.getByRole('button', { name: fr.project.testers.quit }).click()
-      await page.getByRole('button', { name: fr.project.testers.join }).waitFor()
+      await page.waitForFunction(
+        (name) => document.activeElement?.textContent?.includes(name) ?? false,
+        fr.project.testers.join,
+      )
+      await page.waitForFunction(() => !window.location.search.includes('focus='))
     },
   },
   {
