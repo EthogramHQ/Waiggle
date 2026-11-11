@@ -94,7 +94,17 @@ export type ReportSnapshot = z.infer<typeof ReportSnapshot>
  * remplacée).
  */
 export const SnapshotImage = z
-  .object({ field: z.enum(IMAGE_INPUT_FIELDS), state: z.enum(['present', 'gone']) })
+  .object({
+    field: z.enum(IMAGE_INPUT_FIELDS),
+    state: z.enum(['present', 'gone']),
+    /**
+     * R7b (décision de Louis du 11/11/2026) : l'adresse d'une capture ou d'une photo d'appel du coin
+     * des testeurs, donnée seulement tant qu'un signalement ouvert vise son message ou son appel ;
+     * absente pour toute autre image (la file ne montre pas les photos publiques, qui se voient sur
+     * leur page).
+     */
+    url: z.url().optional(),
+  })
   .strict()
 export type SnapshotImage = z.infer<typeof SnapshotImage>
 
