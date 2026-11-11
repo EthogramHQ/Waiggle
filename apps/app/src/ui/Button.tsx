@@ -13,9 +13,10 @@
 // garde le focus du clavier : désactivé pour de bon, le navigateur le retirerait du parcours au
 // clavier, et le focus retomberait tout en haut de la page.
 // Avec `checked`, il devient un interrupteur (« Suivre » / « Suivi ») : le lecteur d'écran annonce
-// son état, activé ou non, au lieu d'un simple bouton.
+// son état, activé ou non, au lieu d'un simple bouton. Avec `role="link"`, il se lit « lien » : il
+// mène à une autre page (R7b).
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
-import type { ReactNode, Ref } from 'react'
+import { type ReactNode, type Ref, useCallback, useLayoutEffect, useRef } from 'react'
 import {
   ActivityIndicator,
   Platform,
@@ -81,6 +82,12 @@ type Props = {
   describedById?: string | undefined
   /** La même précision sur téléphone, où aria-describedby n'existe pas : un indice lu après le nom. */
   hint?: string | undefined
+  /**
+   * `link` : un bouton qui mène à une autre page (« Le coin des testeurs », R7b) se lit « lien »,
+   * comme ce qu'il fait ; il reste dessiné et touché comme un bouton. `button` par défaut. Sans
+   * effet avec `checked` (un interrupteur reste un interrupteur).
+   */
+  role?: 'button' | 'link'
   /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteComposer). */
   ref?: Ref<View>
 }
@@ -100,9 +107,34 @@ export function Button({
   checked,
   describedById,
   hint,
+  role = 'button',
   ref,
 }: Props) {
   const { colors, shadows } = useTheme()
+  const spokenRole = checked === undefined ? role : 'switch'
+  // Le rôle « lien » sur le web. react-native-web choisit la balise d'après le rôle : `<button>`
+  // pour un bouton, mais `<div>` pour un lien sans adresse. Le même bouton qui passe de
+  // « Rejoindre les testeurs » (bouton) à « Le coin des testeurs » (lien) changerait alors de
+  // balise : React remplacerait l'élément, et le focus du clavier tomberait sur la page. On garde
+  // donc la balise `<button>` (Entrée et Espace l'activent d'eux-mêmes) et l'on écrit le rôle sur
+  // l'élément, comme `title` dans RelativeTime. Sur téléphone, `accessibilityRole` suffit.
+  const webLink = Platform.OS === 'web' && spokenRole !== 'switch'
+  const node = useRef<View | null>(null)
+  // useLayoutEffect : le rôle est écrit avant que le navigateur dessine, avant toute lecture.
+  useLayoutEffect(() => {
+    if (!webLink) return
+    const element = node.current as unknown as HTMLElement | null
+    element?.setAttribute?.('role', spokenRole)
+  }, [webLink, spokenRole])
+  // Deux mains sur la même vue : la nôtre (le rôle) et celle de l'appelant (le focus).
+  const setRefs = useCallback(
+    (view: View | null) => {
+      node.current = view
+      if (typeof ref === 'function') ref(view)
+      else if (ref) (ref as { current: View | null }).current = view
+    },
+    [ref],
+  )
   const inactive = disabled || loading
   // Inactif mais gardé dans le parcours au clavier (web) : le Pressable reste désactivé (il ignore
   // clic, Entrée et Espace, et react-native-web en tire `aria-disabled`), mais avec une étape de
@@ -255,8 +287,9 @@ export function Button({
     // défaut dans react-native-web) : « Suivre ce projet » mesurait 329 points dans un écran de 320.
     <Animated.View style={[{ maxWidth: '100%', flexShrink: 1 }, animated]}>
       <Pressable
-        ref={ref}
-        accessibilityRole={checked === undefined ? 'button' : 'switch'}
+        ref={setRefs}
+        // Sur le web, la balise reste celle d'un bouton ; le rôle « lien » est écrit plus haut.
+        accessibilityRole={webLink ? 'button' : spokenRole}
         accessibilityLabel={spokenLabel ?? label}
         {...describedBy(describedById)}
         // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle (comme IconButton).

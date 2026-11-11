@@ -182,6 +182,10 @@ export function ProjectActionsView({
           icon="users-three"
           variant="secondary"
           size="compact"
+          // « Le coin des testeurs » mène à une autre page : il se lit « lien » (interface A10) ;
+          // « Rejoindre les testeurs » ouvre une feuille sur la page : un bouton. Le même élément
+          // pour les deux (voir le rôle dans Button) : le focus ne se perd pas au changement.
+          role={project.isTester ? 'link' : 'button'}
           onPress={testersAction}
           disabled={!project.isTester && !canJoin}
           // Inactif après un départ : toujours atteint au clavier, le focus ne retombe pas en haut.
@@ -211,6 +215,8 @@ export function ProjectActionsView({
           icon="users-three"
           variant="secondary"
           size="compact"
+          // Il mène à la page du coin : un lien pour les lecteurs d'écran (interface A10).
+          role="link"
           onPress={onOpenCorner}
         />
       ) : null}

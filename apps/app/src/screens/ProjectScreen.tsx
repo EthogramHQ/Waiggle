@@ -305,6 +305,8 @@ function ProjectView({ project }: { project: Project }) {
                 {
                   label: t(($) => $.project.testers.quit),
                   icon: 'sign-out' as const,
+                  // En rouge, comme dans le menu du coin : le même geste, le même dessin (ui-A6).
+                  tone: 'danger' as const,
                   onPress: () => setQuitting(true),
                 },
               ]

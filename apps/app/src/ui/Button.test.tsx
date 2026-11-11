@@ -132,3 +132,55 @@ describe('Button focusableWhenDisabled (R6a)', () => {
     })
   })
 })
+
+// Un bouton qui mène à une autre page (« Le coin des testeurs », R7b, interface A10) : il se lit
+// « lien », comme ce qu'il fait, mais reste un bouton dessiné, avec son élément et son focus (le
+// même élément passe de « Rejoindre les testeurs », un bouton, à « Le coin des testeurs »).
+describe('Button role="link" (R7b)', () => {
+  const CORNER = fr.t(($) => $.project.testers.corner)
+
+  it('stays a button by default (witness)', async () => {
+    await renderWithProviders(<Button label={CORNER} onPress={() => {}} />)
+
+    expect(screen.getByRole('button', { name: CORNER })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: CORNER })).toBeNull()
+  })
+
+  it('reads as a link on a phone, and still answers a press', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<Button label={CORNER} onPress={onPress} role="link" />)
+
+    const link = screen.getByRole('link', { name: CORNER })
+    expect(screen.queryByRole('button', { name: CORNER })).toBeNull()
+    await fireEvent.press(link)
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps its element on the web, and writes the link role on it', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      // L'élément du navigateur : un faux `setAttribute` posé dès que la vue arrive, avant que le
+      // bouton y écrive son rôle.
+      const written: [string, string][] = []
+      const catchNode = (node: unknown) => {
+        if (node)
+          (node as { setAttribute: (name: string, value: string) => void }).setAttribute = (
+            name,
+            value,
+          ) => {
+            written.push([name, value])
+          }
+      }
+      await renderWithProviders(
+        <Button label={CORNER} onPress={() => {}} role="link" ref={catchNode as never} />,
+      )
+
+      // Le même élément qu'un bouton (react-native-web en ferait sinon un autre, `div` au lieu de
+      // `button`, et le focus se perdrait au changement de rôle) : son rôle est écrit dessus.
+      expect(screen.getByRole('button', { name: CORNER })).toBeTruthy()
+      expect(written).toContainEqual(['role', 'link'])
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})

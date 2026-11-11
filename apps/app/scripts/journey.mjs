@@ -651,8 +651,8 @@ try {
   await sam.page.getByRole('heading', { name: 'Rejoindre les testeurs', exact: true }).waitFor()
   await sam.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
   await byRole(sam.page.getByRole('dialog'), 'button', 'Rejoindre les testeurs').click()
-  // R7b : une fois inscrit, le bouton mène au coin des testeurs.
-  await byRole(sam.page, 'button', 'Le coin des testeurs').waitFor()
+  // R7b : une fois inscrit, le bouton mène au coin des testeurs ; il se lit « lien » (correction 7).
+  await byRole(sam.page, 'link', 'Le coin des testeurs').waitFor()
   await waitFor(
     'inscription aux testeurs enregistrée',
     async () => (await readProject(sam, projectId)).isTester === true,
@@ -664,7 +664,7 @@ try {
   const samId = (await (await sam.request.get(`${apiUrl}/v1/me`)).json()).id
   const cornerApi = `${apiUrl}/v1/projects/${projectId}`
   step('Sam ouvre « Le coin des testeurs » et envoie un retour')
-  await byRole(sam.page, 'button', 'Le coin des testeurs').click()
+  await byRole(sam.page, 'link', 'Le coin des testeurs').click()
   await sam.page.waitForURL(`**/projects/${projectId}/testers`)
   await byRole(sam.page, 'tab', 'Retours').click()
   await byRole(sam.page, 'button', 'Envoyer un retour').click()
@@ -792,7 +792,7 @@ try {
   // R7b : le retour de Sam est réglé par la mise à jour de Léa ; Sam le lit sous son retour.
   step('Sam lit « Réglé dans la v1.3 » sous son retour, dans le coin des testeurs')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await byRole(sam.page, 'button', 'Le coin des testeurs').click()
+  await byRole(sam.page, 'link', 'Le coin des testeurs').click()
   await sam.page.waitForURL(`**/projects/${projectId}/testers`)
   await byRole(sam.page, 'tab', 'Retours').click()
   await sam.page.getByText('Réglé dans la v1.3', { exact: true }).waitFor()
