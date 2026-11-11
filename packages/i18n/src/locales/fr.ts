@@ -1982,6 +1982,9 @@ export const fr = {
     count: '{{index}} sur {{count}}',
     previous: 'Photo précédente',
     next: 'Photo suivante',
+    // R7b : une image d'un membre (la capture d'un retour, la photo d'un appel) s'ouvre en entier
+    // au toucher ; le nom du bouton dit ce qu'il fait, puis l'image qu'il ouvre.
+    enlarge: 'Voir en grand : {{description}}',
   },
   // Partager un projet ou une page de membre (R5a, F-Pr1, F-Mb1). Le lien ne contient que l'adresse.
   share: {

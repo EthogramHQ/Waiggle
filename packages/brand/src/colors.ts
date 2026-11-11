@@ -420,6 +420,11 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'outcomePartlyText', on: 'outcomePartlySurface', min: 4.5 },
   { text: 'outcomeNoIcon', on: 'outcomeNoSurface', min: 3 },
   { text: 'outcomeNoText', on: 'outcomeNoSurface', min: 4.5 },
+  // Les mêmes icônes dans les choix de « Ça a marché ? » (feuille « Ton retour », correction 5),
+  // sur le fond d'un choix pas coché (`surface`, `ui/Choices.tsx`) ; coché, l'icône est à l'encre.
+  { text: 'outcomeYesIcon', on: 'surface', min: 3 },
+  { text: 'outcomePartlyIcon', on: 'surface', min: 3 },
+  { text: 'outcomeNoIcon', on: 'surface', min: 3 },
   // « Réglé dans la v1.3 » : sous un retour, dans la bulle du testeur, sur une carte, et dans la
   // bulle de l'auteur.
   { text: 'settledText', on: 'surface', min: 4.5 },

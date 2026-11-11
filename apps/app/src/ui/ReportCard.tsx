@@ -35,6 +35,7 @@ import { ActionDescription } from './CommentAction'
 import { Icon } from './Icon'
 import type { ImageSource } from './image'
 import { Notice } from './Notice'
+import { PICTURE_MAX_HEIGHT } from './OpenableImage'
 import { ProjectCover } from './ProjectCover'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
@@ -43,9 +44,6 @@ import { useTheme } from './theme/ThemeProvider'
 
 /** Un champ de la copie : son libellé (« Pitch ») et sa valeur, telle que le membre l'a écrite. */
 export type SnapshotField = { label: string; value: string }
-
-/** La hauteur de l'image d'un appel ou d'un message (la même que la photo de sa carte). */
-const PICTURE_HEIGHT = 168
 
 /** Le nombre de champs d'une copie montrés avant « Afficher tout ». */
 export const FOLDED_FIELDS = 3
@@ -283,7 +281,8 @@ export function ReportCard({
             accessibilityLabel={name}
           >
             <ProjectCover
-              height={PICTURE_HEIGHT}
+              // La hauteur au plus des images du coin (`OpenableImage`), où le membre les a vues.
+              height={PICTURE_MAX_HEIGHT}
               radius="small"
               image={{ source, label: '', cachePolicy: 'memory' }}
             />

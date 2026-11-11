@@ -31,6 +31,8 @@ const fr = {
   bubblesTitle: 'Les messages d’un fil',
   rowsTitle: 'La liste des fils',
   feedback: 'Retour du testeur, avec capture',
+  portrait:
+    'Capture de téléphone, plus haute que large : entière, à ses proportions ; un appui l’ouvre en grand',
   settled: 'Retour réglé',
   noText: 'Retour sans texte',
   removed: 'Retiré par la modération (vu par le testeur)',
@@ -64,6 +66,8 @@ const en: typeof fr = {
   bubblesTitle: 'The messages of a thread',
   rowsTitle: 'The list of threads',
   feedback: 'Tester’s feedback, with a screenshot',
+  portrait:
+    'Phone screenshot, taller than wide: whole, at its proportions; a press opens it full size',
   settled: 'Settled feedback',
   noText: 'Feedback without text',
   removed: 'Removed by moderation (seen by the tester)',
@@ -106,6 +110,9 @@ const LATER = '2026-11-10T18:05:00.000Z'
 const day = palettes.day
 const CAPTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 104"><rect width="150" height="104" fill="${day.text}"/><circle cx="112" cy="30" r="14" fill="${day.honey}"/><rect x="16" y="64" width="80" height="10" rx="5" fill="${day.background}"/><rect x="16" y="82" width="52" height="8" rx="4" fill="${day.textMuted}"/></svg>`
 const capture = { uri: `data:image/svg+xml;utf8,${encodeURIComponent(CAPTURE_SVG)}` }
+/** Une capture de téléphone, 390 × 844 : l'image que la vignette rognait à 32 % (R7b, B1). */
+const PORTRAIT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844"><rect width="390" height="844" fill="${day.background}"/><rect x="24" y="40" width="342" height="64" rx="16" fill="${day.honey}"/><rect x="24" y="140" width="250" height="24" rx="12" fill="${day.textMuted}"/><rect x="24" y="200" width="342" height="420" rx="24" fill="${day.text}"/><rect x="24" y="740" width="342" height="64" rx="32" fill="${day.honey}"/></svg>`
+const portrait = { uri: `data:image/svg+xml;utf8,${encodeURIComponent(PORTRAIT_SVG)}` }
 
 /** Un exemple légendé (« Retour réglé — nuit »). */
 function Example({ caption, children }: { caption: string; children: ReactNode }) {
@@ -170,6 +177,28 @@ function Bubbles({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] })
               description: t(($) => $.project.testers.feedback.captureName, {
                 nameOf: nameOf(l.ines),
               }),
+            }}
+            menu={menu}
+          />
+        </Example>
+        <Example caption={at(l.portrait)}>
+          <MessageBubble
+            from="tester"
+            kind="feedback"
+            mine={false}
+            name={l.ines}
+            text={null}
+            at={LATER}
+            outcome={outcome('no')}
+            device={device('phone')}
+            deviceKind="phone"
+            capture={{
+              source: portrait,
+              description: t(($) => $.project.testers.feedback.captureName, {
+                nameOf: nameOf(l.ines),
+              }),
+              width: 390,
+              height: 844,
             }}
             menu={menu}
           />

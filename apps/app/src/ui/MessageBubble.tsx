@@ -23,18 +23,16 @@ import type {
   TesterMessageKind,
   TesterRole,
 } from '@ruche/contracts'
-import { Image } from 'expo-image'
 import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, Platform, View } from 'react-native'
-import Svg, { Path } from 'react-native-svg'
 import { useNameOf } from '../useNameOf'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { excerpt } from './CommentAction'
 import { hiddenFrame } from './HiddenHeading'
-import { Icon, type IconName } from './Icon'
-import { iconPaths } from './icons.generated'
+import { Icon, type IconName, SMALL_ICON } from './Icon'
 import type { ImageSource } from './image'
+import { OpenableImage, PICTURE_MAX_HEIGHT } from './OpenableImage'
 import { OutcomePill } from './OutcomePill'
 import { RelativeTime, useRelativeDate } from './RelativeTime'
 import { Text } from './Text'
@@ -64,8 +62,12 @@ type Props = {
    * libellé. Absente : l'appareil s'écrit sans icône.
    */
   deviceKind?: FeedbackDevice | null
-  /** La capture jointe, prête à dessiner, et son nom lu (fixe, jamais une description du membre). */
-  capture?: { source: ImageSource; description: string } | null
+  /**
+   * La capture jointe, prête à dessiner, et son nom lu (fixe, jamais une description du membre).
+   * `width` et `height` : ses dimensions (`TesterMedia` du contrat), pour poser le cadre à ses
+   * proportions dès le premier dessin ; absentes, elles se lisent au chargement de l'image.
+   */
+  capture?: { source: ImageSource; description: string; width?: number; height?: number } | null
   /** « Réglé dans la v1.3 », déjà écrit par l'écran ; null : à traiter. */
   settled?: string | null
   /** L'encadré d'un message retiré par la modération, pour qui l'a écrit (`RemovalNotice`). */
@@ -100,8 +102,6 @@ const deviceIcons: Record<FeedbackDevice, IconName> = {
 
 /** Le coin pointu d'une bulle, du côté de qui parle (planche : 8 points ; les autres, `radii.group`). */
 const TAIL_RADIUS = 8
-/** La capture, en vignette dans la bulle (planche R7b-Fil). */
-const CAPTURE = { width: 150, height: 104 }
 /** La part de la colonne que la bulle peut prendre, au plus. */
 const BUBBLE_MAX = '80%'
 /** L'icône de « Réglé ». */
@@ -192,7 +192,7 @@ export function MessageBubble({
             {deviceKind ? (
               // Décorative : le libellé dit l'appareil. Dans une vue, pour ne pas rétrécir sur le web.
               <View style={{ flexShrink: 0 }} aria-hidden>
-                <Icon name={deviceIcons[deviceKind]} size={15} tone="secondary" />
+                <Icon name={deviceIcons[deviceKind]} size={SMALL_ICON} tone="secondary" />
               </View>
             ) : null}
             <View style={{ flexShrink: 1, minWidth: 0 }}>
@@ -216,22 +216,9 @@ export function MessageBubble({
         borderTopColor: colors.line,
       }}
     >
-      {/* La coche, de la couleur de « Réglé » (les tons d'Icon sont ceux du texte ordinaire), comme
-          l'icône d'OutcomePill. Décorative : le texte dit l'état. */}
+      {/* La coche, de la couleur de « Réglé » (`Icon color`). Décorative : le texte dit l'état. */}
       <View style={{ flexShrink: 0 }}>
-        <Svg
-          width={SETTLED_ICON}
-          height={SETTLED_ICON}
-          viewBox="0 0 256 256"
-          fill={colors.settledText}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          aria-hidden
-        >
-          {iconPaths['check-circle'].map((d) => (
-            <Path key={d} d={d} />
-          ))}
-        </Svg>
+        <Icon name="check-circle" size={SETTLED_ICON} color="settledText" />
       </View>
       <View style={{ flexShrink: 1, minWidth: 0 }}>
         <Text variant="caption" weight={700} tone="settled">
@@ -273,21 +260,13 @@ export function MessageBubble({
         </Text>
       ) : null}
       {capture ? (
-        <Image
+        // Entière, à ses proportions, dans un carré de 240 points au plus ; un appui l'ouvre en
+        // grand (relecture de design B1). En mémoire seulement (sécurité A4).
+        <OpenableImage
           source={capture.source}
-          // En mémoire seulement : jamais écrite sur le disque de l'appareil (sécurité A4).
-          cachePolicy="memory"
-          contentFit="cover"
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={capture.description}
-          style={{
-            width: CAPTURE.width,
-            height: CAPTURE.height,
-            maxWidth: '100%',
-            borderRadius: radii.code,
-            backgroundColor: colors.surfaceGrouped,
-          }}
+          label={capture.description}
+          size={capture}
+          maxWidth={PICTURE_MAX_HEIGHT}
         />
       ) : null}
       {settledLine}

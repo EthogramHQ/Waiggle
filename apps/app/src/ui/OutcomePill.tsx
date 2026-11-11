@@ -16,9 +16,8 @@
 import { type ColorName, radii, space } from '@ruche/brand'
 import type { FeedbackOutcome } from '@ruche/contracts'
 import { Platform, View } from 'react-native'
-import Svg, { Path } from 'react-native-svg'
 import { hiddenFrame } from './HiddenHeading'
-import { type IconName, iconPaths } from './icons.generated'
+import { Icon, type IconName, SMALL_ICON } from './Icon'
 import { Text, type TextTone } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -59,9 +58,20 @@ const looks = {
   { icon: IconName; surface: ColorName; fill: ColorName; tone: TextTone }
 >
 
-/** La hauteur de la pastille (celle d'un statut de projet, `StatusPill`) et la taille de l'icône. */
+/** La hauteur de la pastille (celle d'un statut de projet, `StatusPill`). */
 const PILL_HEIGHT = 26
-const ICON_SIZE = 15
+
+/**
+ * L'icône d'une issue et sa couleur, pour un choix de « Ça a marché ? » (`Choices`, feuille « Ton
+ * retour ») : la même qu'ici, pour que la réponse donnée et la pastille lue ensuite se ressemblent
+ * (planche R7b-Feuille-Retour, correction 5).
+ */
+export const outcomeIcon = (
+  outcome: FeedbackOutcome,
+): { icon: IconName; iconColor: ColorName } => ({
+  icon: looks[outcome].icon,
+  iconColor: looks[outcome].fill,
+})
 
 export function OutcomePill({ outcome, label, spokenLabel }: Props) {
   const { colors } = useTheme()
@@ -85,23 +95,11 @@ export function OutcomePill({ outcome, label, spokenLabel }: Props) {
         maxWidth: '100%',
       }}
     >
-      {/* L'icône, dessinée comme dans Icon, mais de la couleur propre à l'issue : les tons d'Icon sont
-          ceux du texte. Décorative : le libellé dit tout. Dans une vue, pour ne jamais rétrécir sur
-          le web à côté d'un libellé long. */}
+      {/* L'icône, de la couleur propre à l'issue (`Icon color`), la même que dans « Ton retour ».
+          Décorative : le libellé dit tout. Dans une vue, pour ne jamais rétrécir sur le web à côté
+          d'un libellé long. */}
       <View style={{ flexShrink: 0 }}>
-        <Svg
-          width={ICON_SIZE}
-          height={ICON_SIZE}
-          viewBox="0 0 256 256"
-          fill={colors[look.fill]}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          aria-hidden
-        >
-          {iconPaths[look.icon].map((d) => (
-            <Path key={d} d={d} />
-          ))}
-        </Svg>
+        <Icon name={look.icon} size={SMALL_ICON} color={look.fill} />
       </View>
       <View style={{ flexShrink: 1, minWidth: 0 }}>
         <Text variant="caption" weight={700} tone={look.tone}>
