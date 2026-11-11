@@ -129,9 +129,11 @@ const schemes = ['day', 'night'] as const
  * Les dates des appels : fixes, jamais calculées depuis maintenant. La page web est pré-rendue à la
  * construction : une date tirée de l'heure qu'il est différerait entre le serveur et le navigateur
  * (erreur d'hydratation 418). Après l'hydratation, la carte les dit par rapport à aujourd'hui.
+ * Elles précèdent l'heure figée des captures (le 20 octobre 2026 à midi, `scripts/shots.mjs`) :
+ * « il y a 2 h » et « 14 oct. » sur les captures, plutôt que « à l'instant » pour une date à venir.
  */
-const RECENT = '2026-11-10T18:30:00.000Z'
-const OLDER = '2026-11-03T09:15:00.000Z'
+const RECENT = '2026-10-20T08:00:00.000Z'
+const OLDER = '2026-10-14T07:15:00.000Z'
 
 /**
  * Une image d'exemple (le dépôt n'en contient aucune) : un dégradé SVG entre deux couleurs de la
@@ -148,7 +150,11 @@ const sample = (from: ColorName, to: ColorName, disc: ColorName): ImageSource =>
 }
 const rocket = sample('honey', 'amber', 'honeySoft')
 
-/** Un exemple légendé (« Sans photo — nuit »), dans la largeur d'une colonne de téléphone. */
+/**
+ * Un exemple légendé (« Sans photo — nuit »), dans la largeur d'une colonne de téléphone, posé sur
+ * le fond de page de son thème : de nuit, le titre et l'aide d'une partie se lisent sur le noir,
+ * comme dans l'appli, et non sur le fond clair du catalogue.
+ */
 function Example({
   caption,
   narrow = false,
@@ -159,9 +165,20 @@ function Example({
   narrow?: boolean
   children: ReactNode
 }) {
+  const { colors } = useTheme()
   return (
     <Stack gap="xs">
-      <View style={{ width: narrow ? 320 : 390, maxWidth: '100%' }}>{children}</View>
+      <View
+        style={{
+          width: narrow ? 320 : 390,
+          maxWidth: '100%',
+          backgroundColor: colors.background,
+          borderRadius: radii.tile,
+          padding: space.md,
+        }}
+      >
+        {children}
+      </View>
       <Text variant="micro" tone="muted">
         {caption}
       </Text>
@@ -215,20 +232,24 @@ function CornerTabs({ l }: { l: Labels }) {
     },
   ]
   return (
-    <Stack gap="md">
-      <Text tone="secondary">{l.tabsGlass}</Text>
-      {/* Sur le verre : un coin de miel vif, comme la lumière d'ambiance du coin. */}
-      <View style={{ backgroundColor: colors.honey, borderRadius: radii.tile, padding: space.xl }}>
-        <Tabs label={label} tabs={tabs} selected={glassTab} onSelect={setGlassTab} />
-      </View>
-      <Text tone="secondary">{l.tabsGrouped}</Text>
-      <Tabs
-        label={label}
-        tabs={tabs}
-        selected={groupedTab}
-        onSelect={setGroupedTab}
-        variant="grouped"
-      />
+    <Stack gap="lg">
+      <Example caption={l.tabsGlass}>
+        {/* Sur le verre : un coin de miel vif, comme la lumière d'ambiance du coin. */}
+        <View
+          style={{ backgroundColor: colors.honey, borderRadius: radii.tile, padding: space.xl }}
+        >
+          <Tabs label={label} tabs={tabs} selected={glassTab} onSelect={setGlassTab} />
+        </View>
+      </Example>
+      <Example caption={l.tabsGrouped}>
+        <Tabs
+          label={label}
+          tabs={tabs}
+          selected={groupedTab}
+          onSelect={setGroupedTab}
+          variant="grouped"
+        />
+      </Example>
     </Stack>
   )
 }
@@ -288,7 +309,13 @@ export function TestersCornerCatalogue() {
       {schemes.map((scheme) => (
         // Un thème imposé autour des exemples : le jour, puis la nuit.
         <ThemeProvider key={scheme} appearance={scheme}>
-          <CornerTabs l={{ ...l, tabsGlass: `${l.tabsGlass} — ${l[scheme]}` }} />
+          <CornerTabs
+            l={{
+              ...l,
+              tabsGlass: `${l.tabsGlass} — ${l[scheme]}`,
+              tabsGrouped: `${l.tabsGrouped} — ${l[scheme]}`,
+            }}
+          />
         </ThemeProvider>
       ))}
 
