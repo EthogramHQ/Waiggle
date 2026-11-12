@@ -2097,7 +2097,7 @@ export const en: Translation = {
       comment: 'Your comment on <b>{{title}}</b> was removed by moderation',
       commentElsewhere: 'Your comment was removed by moderation',
       call: 'Your call for testing on <b>{{title}}</b> was removed by the moderation',
-      message: 'Your message on “{{title}}” was removed by the moderation',
+      message: 'Your message on <b>{{title}}</b> was removed by the moderation',
     },
     reportHandled: {
       project: {
