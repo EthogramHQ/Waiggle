@@ -2069,8 +2069,11 @@ export const fr = {
       alsoLabel: 'Et aussi :',
       reactions_one: '{{count}} réaction à tes projets',
       reactions_other: '{{count}} réactions à tes projets',
-      follows_one: '{{count}} nouvel abonné',
-      follows_other: '{{count}} nouveaux abonnés',
+      // Les nouveaux abonnés au compte, sur une ligne à part : en pastille sous le dernier projet,
+      // ils se lisaient comme les abonnés de ce projet (relecture de design de R8, Louis 12/11/2026).
+      // La phrase d'Activité.
+      follows_one: '{{count}} personne de plus te suit',
+      follows_other: '{{count}} personnes de plus te suivent',
       // R7a (juridique P4) : chaque projet mis à jour dans la semaine, son nombre et un lien. Jamais
       // le texte d'une mise à jour (sécurité A9).
       updatesTitle: 'Les projets que tu suis ou que tu testes',
@@ -2458,6 +2461,9 @@ export const fr = {
     sections: { today: 'Aujourd’hui', week: 'Cette semaine', earlier: 'Plus tôt' },
     // Sur ordinateur : éteint tout de suite le miel de la page.
     markAllRead: 'Tout marquer comme lu',
+    // Lu par les lecteurs d'écran après l'appui, sans être montré : seul le miel s'éteint à l'œil
+    // (relecture de l'interface de R8, Louis 12/11/2026).
+    allMarkedRead: 'Tout est marqué comme lu.',
     // La roue de la barre du haut (bouton à icône seule : ce texte est son nom).
     settings: 'Régler les notifications',
     // Sous une ligne de retrait par la modération.
@@ -2489,6 +2495,12 @@ export const fr = {
       recapSome:
         'Une partie dans le récap du dimanche, à 10 h ; le reste seulement dans l’Activité.',
       nothing: 'Aucun e‑mail de notification : tout reste dans l’Activité.',
+      // Le récap activé apporte toujours les nouveaux projets des proches, même quand aucun type n'y
+      // passe : « rien ne part » serait faux (relecture juridique de R8, Louis 12/11/2026).
+      nothingFriends:
+        'Aucun e‑mail pour tes notifications ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches.',
+      nowFriends:
+        '{{types}} tout de suite ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches.',
       types: {
         reactions: 'les réactions',
         comments: 'les commentaires sur tes projets',

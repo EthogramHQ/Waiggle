@@ -1721,8 +1721,8 @@ export const en: Translation = {
       alsoLabel: 'Also:',
       reactions_one: '{{count}} reaction to your projects',
       reactions_other: '{{count}} reactions to your projects',
-      follows_one: '{{count}} new follower',
-      follows_other: '{{count}} new followers',
+      follows_one: '{{count}} more person follows you',
+      follows_other: '{{count}} more people follow you',
       updatesTitle: 'Projects you follow or test',
       updates_one: '“{{title}}”: {{count}} update',
       updates_other: '“{{title}}”: {{count}} updates',
@@ -2035,6 +2035,7 @@ export const en: Translation = {
     emptyExplore: 'Explore projects',
     sections: { today: 'Today', week: 'This week', earlier: 'Earlier' },
     markAllRead: 'Mark all as read',
+    allMarkedRead: 'Everything is marked as read.',
     settings: 'Notification settings',
     removedDetail: 'See the reason and how to appeal',
     updateMore_one: '{{line}}, and {{count}} more change',
@@ -2054,6 +2055,10 @@ export const en: Translation = {
       recapAll: 'Everything in the Sunday recap, at 10 am.',
       recapSome: 'Part of it in the Sunday recap, at 10 am; the rest only in your Activity.',
       nothing: 'No notification emails: everything stays in your Activity.',
+      nothingFriends:
+        'No emails for your notifications; the Sunday recap only brings new projects from people you follow.',
+      nowFriends:
+        '{{types}} right away; the Sunday recap only brings new projects from people you follow.',
       types: {
         reactions: 'reactions',
         comments: 'comments on your projects',
