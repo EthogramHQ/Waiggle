@@ -2565,7 +2565,7 @@ Hors de R9, et où ça va :
 
 **Bloquer aussi** (décision des planches, 28/10 : une case avant l'envoi)
 - Étant donné Malik qui signale un contenu d'Inès
-- Alors sous la précision, une case « Bloquer aussi Inès Moreau (@ines) », jamais cochée d'avance
+- Alors sous la précision, une case « Bloquer aussi Inès Haddad (@ines_haddad) », jamais cochée d'avance
 - Quand il la coche et envoie
 - Alors la fenêtre de blocage (A7, plus bas) s'ouvre avant l'envoi ; « Bloquer » envoie le
   signalement puis bloque ; « Annuler » décoche la case et laisse la feuille ouverte
@@ -2574,7 +2574,7 @@ Hors de R9, et où ça va :
 
 **Envoyé** (planche `R9-Signaler-Envoye`)
 - Alors la feuille dit « Merci, ton signalement a été envoyé. La modération va le regarder. », et
-  « Fermer » ; si Malik a bloqué Inès, elle le rappelle (« Tu as aussi bloqué Inès Moreau. »)
+  « Fermer » ; si Malik a bloqué Inès, elle le rappelle (« Tu as aussi bloqué Inès Haddad. »)
 
 **Les cas où l'on ne signale pas**
 - Son propre contenu : « Signaler » n'est dans aucun menu ; un ancien lien ouvre la feuille sur
