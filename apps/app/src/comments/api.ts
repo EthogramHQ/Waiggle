@@ -5,12 +5,20 @@
 // commentaire n'apparaît qu'une fois l'API d'accord (elle peut le refuser : texte invalide, 60
 // commentaires par heure). La liste en cache change alors à la bonne place, sans tout relire : rien
 // ne bouge ailleurs sous les yeux du membre.
-import { Comment, CommentPage, CommentReply, type NewComment, type Project } from '@ruche/contracts'
+import {
+  Comment,
+  CommentContext,
+  CommentPage,
+  CommentReply,
+  type NewComment,
+  type Project,
+} from '@ruche/contracts'
 import {
   type InfiniteData,
   type QueryClient,
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
 import { useMemo } from 'react'
@@ -296,4 +304,44 @@ export const useHideComment = (projectId: string): HideState => {
     error: mutation.isError,
     reason: reasonOf(mutation.error),
   }
+}
+
+// --- Voir en contexte (R8) ------------------------------------------------------------------------
+
+/** Ce que rend `useCommentContext` : où en est la lecture, et, si trouvé, le fil du commentaire. */
+export type CommentContextState =
+  | { status: 'idle' | 'loading' | 'gone' }
+  | { status: 'found'; projectId: string; thread: Comment }
+
+/** Le commentaire visé, avec son fil (GET /v1/comments/{commentId}/context). */
+export const getCommentContext = async (commentId: string): Promise<CommentContext> => {
+  const result = await request(
+    `/v1/comments/${encodeURIComponent(commentId)}/context`,
+    {},
+    CommentContext,
+  )
+  if (!result.ok) throw new ApiError(result.error)
+  return result.data
+}
+
+/**
+ * Hook : le fil d'un commentaire que l'on ouvre depuis une notification
+ * (`/projects/<id>?comment=<commentId>`). `null` : rien à chercher, aucune requête (`idle`).
+ * `gone` : le commentaire n'existe plus ou n'est plus visible pour soi (l'API répond le même 404
+ * dans les deux cas), et aussi toute autre panne : la feuille dit alors « n'est plus là » sans
+ * bloquer la page. Un 404 n'est pas retenté : rien n'y changerait.
+ */
+export const useCommentContext = (commentId: string | null): CommentContextState => {
+  const query = useQuery({
+    queryKey: ['comment-context', commentId],
+    queryFn: () => getCommentContext(commentId as string),
+    // `enabled` coupe la requête tant qu'il n'y a pas d'identifiant : queryFn ne reçoit jamais `null`.
+    enabled: commentId !== null,
+    retry: (count, error) => errorKey(error) !== 'notFound' && count < 1,
+  })
+  if (commentId === null) return { status: 'idle' }
+  if (query.data) {
+    return { status: 'found', projectId: query.data.projectId, thread: query.data.thread }
+  }
+  return { status: query.isError ? 'gone' : 'loading' }
 }

@@ -57,7 +57,15 @@ const PREVIEW_LINES = { phone: 3, column: 5 } as const
 
 const nothing = () => {}
 
-export function Comments({ project }: { project: Project }) {
+export function Comments({
+  project,
+}: {
+  project: Project
+  /** R8 : le commentaire à montrer en contexte (adresse `?comment=`) ; `null` : aucun. Sans effet pour l'instant. */
+  focusCommentId?: string | null
+  /** R8 : appelée à la fermeture de la feuille de contexte, pour retirer le paramètre de l'adresse. */
+  onFocusDone?: () => void
+}) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const { columns } = useLayout()
