@@ -2336,9 +2336,9 @@ icône rouge, et mènent à la raison et à la façon de contester, comme aujour
 ### Deux notifications nouvelles (renvoyées de R6b)
 
 - Étant donné Inès, autrice de « Quel papillon ? », rangé dans « Autre »
-- Quand un administrateur le range dans « Nature »
+- Quand un administrateur le range dans « Animaux »
 - Alors Inès lit dans Activité « L'équipe de {{appName}} a rangé « Quel papillon ? » dans
-  Nature », avec la miniature du projet ; la toucher ouvre le projet
+  Animaux », avec la miniature du projet ; la toucher ouvre le projet
 - Étant donné Malik, qui a écrit l'outil « Glide » en « Autre » sur deux projets
 - Quand un administrateur l'ajoute au catalogue, ou le rattache à un outil existant
 - Alors Malik lit, une seule fois pour ses deux projets, « « Glide » fait maintenant partie des
