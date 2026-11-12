@@ -71,6 +71,7 @@ const icons = [
   'tag',
   'chat-circle',
   'chat-circle-dots',
+  'chat-circle-slash', // « Ce commentaire n'est plus là. », la feuille ouverte depuis une notification (R8)
   'megaphone-simple', // une note dans le fil : l'auteur annonce du nouveau
   'note-pencil', // écrire une note dans le journal
   // Messages et sécurité

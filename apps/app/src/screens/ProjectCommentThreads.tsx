@@ -7,7 +7,7 @@
 // Modal frères ne s'empilent pas, et elle ne s'ouvrirait jamais (relecture de l'interface, ui-M4).
 import type { Comment, CommentReply, Project } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { type ReactNode, type RefObject, useRef, useState } from 'react'
+import { type ReactNode, type Ref, type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
 import { useMediaSources } from '../api/media'
@@ -83,6 +83,25 @@ type Props = {
   leave: (go: () => void) => void
   /** La phrase d'une liste vide (sur un projet privé, elle dit que les commentaires sont gardés). */
   emptyLabel: string
+  /**
+   * R8, « Voir en contexte » : le fil du commentaire visé par une notification, montré en tête et
+   * entier, puis la liste sans lui. `null` : la liste telle quelle.
+   */
+  pinned?: Comment | null
+  /** R8 : le commentaire visé, éclairé de miel (`lit` de la carte) ; `null` : aucun. */
+  litId?: string | null
+  /**
+   * R8 : le commentaire visé n'est plus là (supprimé, plus visible, ou d'un autre projet) : la
+   * phrase grise en tête de la liste, qui reçoit le focus par `goneRef`.
+   */
+  gone?: boolean
+  goneRef?: Ref<Focusable>
+  /**
+   * Appelée après chaque dessin de la liste, une fois ses cartes montées : l'écran y pose le focus
+   * d'arrivée. Ici plutôt que dans l'écran : dans la feuille, la liste peut paraître un dessin après
+   * lui.
+   */
+  onShown?: () => void
 }
 
 export function CommentThreads({
@@ -99,6 +118,11 @@ export function CommentThreads({
   onFocusLost,
   leave,
   emptyLabel,
+  pinned = null,
+  litId = null,
+  gone = false,
+  goneRef,
+  onShown,
 }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -124,6 +148,12 @@ export function CommentThreads({
   const [hideFailed, setHideFailed] = useState<string | null>(null)
   const [hiding, setHiding] = useState<ReadonlySet<string>>(new Set())
   const hidingNow = useRef(new Set<string>())
+
+  // Sans liste de dépendances : après chaque dessin, les cartes du dessin sont là (leurs poignées sont
+  // posées avant cet effet). L'écran ne fait quelque chose qu'une fois.
+  useEffect(() => {
+    onShown?.()
+  })
 
   const setHidden = async (comment: CommentReply, hidden: boolean, fromCard = false) => {
     if (hidingNow.current.has(comment.id)) return
@@ -264,6 +294,7 @@ export function CommentThreads({
         isProjectAuthor={author?.id === project.author.id}
         isProjectTester={author?.isTester}
         highlighted={draft.highlightedId === comment.id}
+        lit={litId === comment.id}
         // Un emplacement masqué que personne n'a masqué : le projet est retiré (le retrait l'emporte,
         // il est aussi public) ou privé.
         {...(project.removal !== null
@@ -312,6 +343,17 @@ export function CommentThreads({
       {/* Toujours montée, vide plutôt qu'absente : un lecteur d'écran n'annonce que ce qui change
           dans une région qu'il connaît déjà. Lue, jamais montrée : le geste se voit déjà. */}
       {announcement === null ? null : <LiveStatus message={announcement} visible={false} />}
+      {/* En tête, avant la liste : c'est ce que le membre est venu voir. Polie : elle ne coupe pas
+          la parole au lecteur d'écran, et l'écran y pose le focus. */}
+      {gone ? (
+        <Notice
+          ref={goneRef}
+          tone="neutral"
+          icon="chat-circle-slash"
+          polite
+          message={t(($) => $.project.comments.gone)}
+        />
+      ) : null}
       {trouble ?? (
         <CommentList
           state={
@@ -332,7 +374,12 @@ export function CommentThreads({
           retryLabel={t(($) => $.common.retry)}
           empty={emptyLabel}
         >
-          {threads.map((root) => (
+          {/* Le fil visé d'abord, puis les autres : une seule liste, la même clé pour un fil où
+              qu'il soit, et jamais deux fois le même. */}
+          {(pinned
+            ? [pinned, ...threads.filter((thread) => thread.id !== pinned.id)]
+            : threads
+          ).map((root) => (
             <CommentThread
               key={root.id}
               // La liste pose déjà l'élément de liste autour de chaque fil (ui-M1).

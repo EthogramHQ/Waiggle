@@ -564,8 +564,10 @@ export function CommentCard({
             right: 0,
             bottom: -space.sm,
             borderRadius: radii.small,
-            backgroundColor: colors.highlightSoft,
-            boxShadow: `0 0 0 ${LIT_RING}px ${colors.honeyLight}`,
+            // Sans couleur hors de l'éclat : une carte ordinaire n'a aucun miel, même invisible
+            // (une lecture de son style, comme celle des tests, n'y voit rien d'éclairé).
+            backgroundColor: lit ? colors.highlightSoft : 'transparent',
+            boxShadow: lit ? `0 0 0 ${LIT_RING}px ${colors.honeyLight}` : 'none',
           },
           glowStyle,
         ]}
