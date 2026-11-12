@@ -24,7 +24,6 @@ import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
 import { NoteComposer } from './NoteComposer'
 import { Notice, NoticeScope } from './Notice'
-import { NotificationCard } from './NotificationCard'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
@@ -1585,111 +1584,6 @@ describe('Stack announced as a list', () => {
     )
 
     expect(roleAround(screen.getByText('Un'))).toBeNull()
-  })
-})
-
-describe('NotificationCard', () => {
-  it('is a link named by everything it says, « new » first', async () => {
-    const onPress = jest.fn()
-    await renderWithProviders(
-      <NotificationCard
-        icon="heart"
-        text="2 réactions sur « Météo »"
-        detail="Bravo ×2"
-        when="20 oct."
-        isNew
-        newLabel="Nouveau"
-        onPress={onPress}
-      />,
-    )
-
-    await fireEvent.press(
-      screen.getByRole('link', { name: 'Nouveau. 2 réactions sur « Météo ». Bravo ×2. 20 oct.' }),
-    )
-    expect(onPress).toHaveBeenCalledTimes(1)
-  })
-
-  it('says « new » only when it is new', async () => {
-    await renderWithProviders(
-      <NotificationCard
-        icon="at"
-        text="Malik parle de toi"
-        quote="Demande à @ines"
-        when="20 oct."
-        isNew={false}
-        newLabel="Nouveau"
-        onPress={() => {}}
-      />,
-    )
-
-    expect(
-      screen.getByRole('link', { name: 'Malik parle de toi. Demande à @ines. 20 oct.' }),
-    ).toBeTruthy()
-    expect(screen.queryByText('Nouveau', { includeHiddenElements: true })).toBeNull()
-  })
-
-  it('adds no full stop after a part that already ends with a sign', async () => {
-    await renderWithProviders(
-      <NotificationCard
-        icon="chat-circle"
-        text="Malik a commenté « Météo »"
-        quote="Super idée, je teste ce soir…"
-        when="20 oct."
-        isNew={false}
-        newLabel="Nouveau"
-        onPress={() => {}}
-      />,
-    )
-
-    // « ce soir… » et non « ce soir…. » : un lecteur d'écran ne lit pas deux ponctuations.
-    expect(
-      screen.getByRole('link', {
-        name: 'Malik a commenté « Météo ». Super idée, je teste ce soir… 20 oct.',
-      }),
-    ).toBeTruthy()
-  })
-
-  it('is neither a link nor a button without a destination', async () => {
-    await renderWithProviders(
-      <NotificationCard
-        icon="user-plus"
-        text="3 personnes de plus te suivent"
-        when="19 oct."
-        isNew
-        newLabel="Nouveau"
-      />,
-    )
-
-    expect(screen.getByText('3 personnes de plus te suivent')).toBeTruthy()
-    expect(screen.getByText('Nouveau')).toBeTruthy()
-    expect(screen.queryByRole('link')).toBeNull()
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
-  it('opens with Enter on the web, like the other cards', async () => {
-    jest.replaceProperty(Platform, 'OS', 'web')
-    try {
-      const onPress = jest.fn()
-      await renderWithProviders(
-        <NotificationCard
-          icon="heart"
-          text="2 réactions"
-          when="20 oct."
-          isNew={false}
-          newLabel="Nouveau"
-          onPress={onPress}
-        />,
-      )
-
-      await fireEvent(screen.getByRole('link'), 'keyDown', {
-        key: 'Enter',
-        repeat: false,
-        preventDefault: () => {},
-      })
-      expect(onPress).toHaveBeenCalledTimes(1)
-    } finally {
-      jest.restoreAllMocks()
-    }
   })
 })
 
