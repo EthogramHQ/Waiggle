@@ -18,7 +18,7 @@ import { appName, palettes, radii } from '@ruche/brand'
 import type { InstantEmailType } from '@ruche/contracts'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
-import type { EmailContent, NotificationLinks } from './templates'
+import { type EmailContent, emailButton, type NotificationLinks } from './templates'
 import { createUnsubscribeToken } from './unsubscribe-token'
 
 /** Les types qu'un e-mail « tout de suite » peut contenir (ceux qui admettent « Tout de suite »). */
@@ -271,7 +271,7 @@ export const instantEmail = (data: InstantData, language: Language): EmailConten
           : `
       <p style="margin:8px 0 0;font-size:13px;color:${c.textMuted}">${escapeHtml(line.note)}</p>`
       }
-      <p style="margin:12px 0 0"><a href="${escapeHtml(line.url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;background:${c.honey};color:${c.onHoney};text-decoration:none;padding:10px 18px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(line.button)}</a></p>
+      <p style="margin:12px 0 0">${emailButton(line.button, line.url, lines.length === 1)}</p>
     </div>`,
     )
     .join('\n    ')

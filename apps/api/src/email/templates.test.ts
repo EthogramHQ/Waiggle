@@ -1,6 +1,7 @@
-import { appName, contactEmail } from '@ruche/brand'
+import { appName, contactEmail, palettes } from '@ruche/brand'
 import { fill, resources } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
+import { instantEmail, instantPreviewData } from './instant'
 import {
   changeEmailConfirmationEmail,
   emailChangedEmail,
@@ -555,6 +556,34 @@ describe('the dressed recap (R8)', () => {
 
   const hrefsOf = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1])
   const imgTags = (html: string) => [...html.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0])
+
+  // R8 (relecture de design) : l'ordre de la planche. Les parties de lecture rapide (tes projets,
+  // les proches, les testeurs) passent avant les listes de liens, sinon le bouton « Tester la
+  // démo » tombait aux trois quarts de la page à 320 px.
+  it('puts the parts in the order of the mock-up, in the HTML and in the text', () => {
+    const email = recapEmail(
+      'fr',
+      dressed({
+        lines: [{ kind: 'mention', name: 'Malik', handle: 'malik', title: 'Météo' }],
+        updates: [{ title: 'Météo', count: 1, url: projectUrl(METEO) }],
+        testers: [{ title: 'Météo', count: 1, url: projectUrl(METEO) }],
+      }),
+    )
+    const titles = [
+      fr.recap.yourProjects,
+      fr.recap.friendsTitle,
+      fr.recap.testersWanted,
+      fill(fr.mentions.heading),
+      fr.recap.updatesTitle,
+      fr.recap.testersTitle,
+    ]
+
+    for (const part of [email.html, email.text]) {
+      const places = titles.map((title) => part.indexOf(title))
+      expect(places.every((place) => place > 0)).toBe(true)
+      expect(places).toEqual([...places].sort((a, b) => a - b))
+    }
+  })
 
   it('greets the member by name in the heading, with the introduction under it', () => {
     const email = recapEmail('fr', dressed())
@@ -1384,6 +1413,31 @@ describe('the order of the e-mails of an address change', () => {
       expect(lines[lines.indexOf(url) - 1]).toBe(fill(label))
     }
     expect(fill(en.newEmail.textLink)).toBe('Confirm this address:')
+  })
+})
+
+// R8 (relecture de design) : dans l'e-mail « tout de suite » de plusieurs nouveautés, huit boutons
+// miel l'un sous l'autre : la planche les dessine blancs (style secondaire du récap). Un seul
+// bouton garde le miel : c'est l'action de l'e-mail.
+describe('the buttons of the instant e-mail', () => {
+  const honeyOf = (html: string) => html.match(/background:#[0-9a-f]{6};color:#[0-9a-f]{6}/gi)
+
+  it('draws no honey button when the e-mail carries several news, and keeps one for a single news', () => {
+    const many = instantPreviewData()
+    expect(many.lines.length).toBeGreaterThan(1)
+    const email = instantEmail(many, 'fr')
+    const secondary = (email.html.match(/border:1px solid/g) ?? []).length
+
+    // Un bouton blanc (fond `surface`, bordure `outline`) par nouveauté.
+    expect(email.html).not.toContain(
+      `background:${palettes.day.honey};color:${palettes.day.onHoney}`,
+    )
+    expect(secondary).toBeGreaterThanOrEqual(many.lines.length)
+
+    // Témoin : une seule nouveauté garde le bouton miel.
+    const one = instantEmail({ ...many, lines: many.lines.slice(0, 1) }, 'fr')
+    expect(one.html).toContain(`background:${palettes.day.honey};color:${palettes.day.onHoney}`)
+    expect(honeyOf(one.html)).not.toBeNull()
   })
 })
 

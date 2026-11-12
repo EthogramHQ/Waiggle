@@ -62,6 +62,15 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
 
+/**
+ * Un bouton d'e-mail (lien en `inline-block`, pour que son fond entoure ses deux lignes à 320 px),
+ * commun au récap et à l'e-mail « tout de suite ». `honey` : le bouton plein de l'action
+ * principale ; sinon le style secondaire (fond `surface`, bordure `outline`), pour les listes où
+ * huit boutons miel l'un sous l'autre cacheraient l'action qui compte.
+ */
+export const emailButton = (label: string, url: string, honey: boolean) =>
+  `<a href="${escapeHtml(url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;padding:${honey ? '12px 20px' : '9px 16px'};border-radius:${radii.pill}px;font-weight:bold;font-size:15px;text-decoration:none;${honey ? `background:${c.honey};color:${c.onHoney}` : `background:${c.surface};color:${c.text};border:1px solid ${c.outline}`}">${escapeHtml(label)}</a>`
+
 type Link = {
   label: string
   url: string
@@ -838,22 +847,6 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
           ...(accountFollows === null ? [] : [accountFollows, '']),
         ]
       : []),
-    ...(lines.length > 0
-      ? [
-          fill(t.mentions.heading),
-          '',
-          ...lines.map((line) => `• ${line}`),
-          '',
-          ...(moreLines === null ? [] : [moreLines, '']),
-        ]
-      : []),
-    ...byProject.flatMap((part) => [
-      part.title,
-      '',
-      ...part.items.flatMap((item) => [`• ${item.line}`, `  ${item.url}`]),
-      '',
-      ...(part.more === null ? [] : [part.more, '']),
-    ]),
     ...(data.friends.length > 0
       ? [
           r.friendsTitle,
@@ -878,6 +871,22 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
           wanted.url,
           '',
         ]),
+    ...(lines.length > 0
+      ? [
+          fill(t.mentions.heading),
+          '',
+          ...lines.map((line) => `• ${line}`),
+          '',
+          ...(moreLines === null ? [] : [moreLines, '']),
+        ]
+      : []),
+    ...byProject.flatMap((part) => [
+      part.title,
+      '',
+      ...part.items.flatMap((item) => [`• ${item.line}`, `  ${item.url}`]),
+      '',
+      ...(part.more === null ? [] : [part.more, '']),
+    ]),
     '—',
     fill(r.reason),
     '',
@@ -903,10 +912,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
     `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:${radii.pill}px;background:${c.honeySoft};color:${c.statusText};font-size:13px;line-height:1.3;font-weight:bold">${escapeHtml(label)}</span>`
   const textLink = (label: string, url: string) =>
     `<a href="${escapeHtml(url)}" style="color:${c.amberText};font-weight:bold;text-decoration:underline">${escapeHtml(label)}</a>`
-  // Un bouton est un lien en `inline-block`, comme dans les autres e-mails : sur deux lignes à
-  // 320 px, son fond entoure les deux lignes.
-  const button = (label: string, url: string, honey: boolean) =>
-    `<a href="${escapeHtml(url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;padding:${honey ? '12px 20px' : '9px 16px'};border-radius:${radii.pill}px;font-weight:bold;font-size:15px;text-decoration:none;${honey ? `background:${c.honey};color:${c.onHoney}` : `background:${c.surface};color:${c.text};border:1px solid ${c.outline}`}">${escapeHtml(label)}</a>`
+  const button = emailButton
   const author = (name: string) =>
     `<p style="margin:0 0 10px;font-size:15px;line-height:1.4;color:${c.textSecondary};${wrap}">${escapeHtml(clean(name))}</p>`
   const list = (items: { line: string; url?: string }[]) =>
@@ -947,26 +953,6 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
           ),
         ]
       : []),
-    ...(lines.length > 0
-      ? [
-          part(
-            [
-              h2(fill(t.mentions.heading)),
-              list(lines.map((line) => ({ line }))),
-              moreLines === null ? '' : paragraph(moreLines),
-            ].join(''),
-          ),
-        ]
-      : []),
-    ...byProject.map((section) =>
-      part(
-        [
-          h2(section.title),
-          list(section.items),
-          section.more === null ? '' : paragraph(section.more),
-        ].join(''),
-      ),
-    ),
     ...(data.friends.length > 0
       ? [
           part(
@@ -1007,6 +993,26 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
             ].join(''),
           ),
         ]),
+    ...(lines.length > 0
+      ? [
+          part(
+            [
+              h2(fill(t.mentions.heading)),
+              list(lines.map((line) => ({ line }))),
+              moreLines === null ? '' : paragraph(moreLines),
+            ].join(''),
+          ),
+        ]
+      : []),
+    ...byProject.map((section) =>
+      part(
+        [
+          h2(section.title),
+          list(section.items),
+          section.more === null ? '' : paragraph(section.more),
+        ].join(''),
+      ),
+    ),
   ]
   // Le pied : pourquoi on le reçoit, puis les deux liens l'un sous l'autre (relecture de design de
   // 6c : chacun se touche du doigt sans toucher l'autre), puis le contact, en texte.
