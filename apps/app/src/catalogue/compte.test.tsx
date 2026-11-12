@@ -40,15 +40,16 @@ describe('AccountCatalogue', () => {
   it('shows the sheet in the page, with its close button and its footer, and opens the real one', async () => {
     await renderWithProviders(<AccountCatalogue />)
 
-    // Deux feuilles posées dans la page (téléphone, ordinateur) : deux « Fermer ».
-    expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(2)
-    expect(screen.getAllByRole('header', { name: 'Supprimer ton compte' })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'Supprimer définitivement' })).toHaveLength(1)
+    // Trois feuilles posées dans la page (téléphone, ordinateur, et la mi-hauteur de R8) : trois
+    // « Fermer ».
+    expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(3)
+    expect(screen.getAllByRole('header', { name: 'Supprimer ton compte' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Supprimer définitivement' })).toHaveLength(2)
 
     await fireEvent.press(screen.getByRole('button', { name: 'Ouvrir la feuille' }))
 
-    expect(screen.getAllByRole('header', { name: 'Supprimer ton compte' })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(3)
+    expect(screen.getAllByRole('header', { name: 'Supprimer ton compte' })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(4)
   })
 
   it('says at what time to try again, as a status, and frees the button by itself', async () => {
