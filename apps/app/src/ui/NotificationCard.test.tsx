@@ -186,7 +186,8 @@ describe('NotificationCard', () => {
       />,
     )
 
-    const sources = everyNode(screen.root as Node).map((node) => node.props.source)
+    // expo-image donne sa source en tableau ([{ uri }]) : on lit les deux formes.
+    const sources = everyNode(screen.root as Node).flatMap((node) => [node.props.source].flat())
     expect(sources).toContainEqual(
       expect.objectContaining({ uri: 'http://localhost:3000/media/meteo.webp' }),
     )
@@ -204,7 +205,8 @@ describe('NotificationCard', () => {
       />,
     )
 
-    const sources = everyNode(screen.root as Node).map((node) => node.props.source)
+    // expo-image donne sa source en tableau ([{ uri }]) : on lit les deux formes.
+    const sources = everyNode(screen.root as Node).flatMap((node) => [node.props.source].flat())
     expect(sources).toContainEqual(
       expect.objectContaining({ uri: 'http://localhost:3000/media/avatars/u4.webp' }),
     )

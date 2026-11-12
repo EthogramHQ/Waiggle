@@ -110,13 +110,20 @@ const projectThumb = (project: { title: string; cover: NotifiedCover | null }): 
 export const presentNotification = (
   notification: Notification,
   t: T,
-  /** La langue de l'écran (« fr », « en ») : elle écrit la date de fin d'une suspension. */
-  language: string,
-  /**
-   * Les catégories lues par `useCategories` : le nom d'une catégorie vient de l'API, dans la langue
-   * du membre. Sans la liste (pas encore lue), la phrase garde le code de la catégorie.
-   */
-  categories?: readonly Category[],
+  /** L'heure de la lecture (les tests la fixent) ; l'API du plan la demande. */
+  _now: Date = new Date(),
+  {
+    language = 'fr',
+    categories,
+  }: {
+    /** La langue de l'écran (« fr », « en ») : elle écrit les dates (fin d'une suspension, mise à jour). */
+    language?: string
+    /**
+     * Les catégories lues par `useCategories` : le nom d'une catégorie vient de l'API, dans la
+     * langue du membre. Sans la liste (pas encore lue), la phrase garde le code de la catégorie.
+     */
+    categories?: readonly Category[]
+  } = {},
 ): Presented => {
   /** Une ligne sans membre : icône ronde, phrase, vignette du projet (si on la donne). */
   const plain = {
