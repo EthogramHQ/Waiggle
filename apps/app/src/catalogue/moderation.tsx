@@ -464,31 +464,31 @@ export function ModerationCatalogue() {
           par ligne, puis l'extrait), un signalement traité sans lien (la cible n'est plus
           visible), et un autre qui mène encore au projet. */}
       <Stack gap="sm" accessibilityRole="list">
+        {/* R8 : les lignes d'Activité, rond rouge pour la modération ; « Nouveau » est lu par la
+            ligne elle-même. */}
         <NotificationCard
-          icon="prohibit"
-          text={l.notifRemoved}
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifRemoved }]}
           detail={l.notifRemovedDetail}
           quote={l.notifRemovedQuote}
           when={l.today}
           isNew
-          newLabel={l.isNew}
           onPress={noop}
         />
         <NotificationCard
-          icon="flag"
-          text={l.notifHandled}
+          leading={{ kind: 'icon', icon: 'flag', tone: 'neutral' }}
+          parts={[{ text: l.notifHandled }]}
           detail={l.notifContest}
           when={l.today}
           isNew
-          newLabel={l.isNew}
+          onPress={null}
         />
         <NotificationCard
-          icon="flag"
-          text={l.notifDismissed}
+          leading={{ kind: 'icon', icon: 'flag', tone: 'neutral' }}
+          parts={[{ text: l.notifDismissed }]}
           detail={l.notifContest}
           when={l.yesterday}
           isNew={false}
-          newLabel={l.isNew}
           onPress={noop}
         />
       </Stack>
