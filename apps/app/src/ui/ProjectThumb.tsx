@@ -7,8 +7,8 @@
 // disparaît. Elle est donc cachée aux lecteurs d'écran (ni la photo ni la corbeille ne sont lues) et
 // rien n'y est touchable. Sans photo, elle garde sa place et son badge, sur la lumière miel d'une
 // couverture sans photo (`ProjectCover`).
-import { borders, layout, space } from '@ruche/brand'
-import { View } from 'react-native'
+import { borders, layout, radii, space } from '@ruche/brand'
+import { Image, View } from 'react-native'
 import { Icon } from './Icon'
 import { type CoverImage, ProjectCover } from './ProjectCover'
 import { useTheme } from './theme/ThemeProvider'
@@ -46,8 +46,25 @@ export function ProjectThumb({ image, badge, size: kind = 'dialog' }: Props) {
       // Rangée à gauche, comme l'image d'un état (charte : image, titre et boutons au même bord).
       style={{ width: size, height: size, alignSelf: 'flex-start' }}
     >
-      {/* La photo, ou la lumière miel sans elle : la couverture d'un projet, en petit. */}
-      <ProjectCover height={size} radius={kind === 'row' ? 'code' : 'small'} image={image} />
+      {kind === 'row' && image?.source ? (
+        // La vignette d'une ligne (48 points) : l'image de React Native, comme la photo d'un membre
+        // (`Avatar`), qui reçoit la source telle quelle (adresse et en-tête de session). Pas de
+        // résumé flou ici : à cette taille, le fond de miel qui attend suffit.
+        <Image
+          accessibilityLabel={image.label}
+          source={image.source}
+          resizeMode="cover"
+          style={{
+            width: size,
+            height: size,
+            borderRadius: radii.code,
+            backgroundColor: colors.honeySoft,
+          }}
+        />
+      ) : (
+        // La photo, ou la lumière miel sans elle : la couverture d'un projet, en petit.
+        <ProjectCover height={size} radius={kind === 'row' ? 'code' : 'small'} image={image} />
+      )}
       {/* Le badge, à cheval sur le coin bas droit ; le liseré couleur du fond le détache de la photo
           (le même que la pastille des nouveautés sur une icône). */}
       {badge ? (

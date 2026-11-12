@@ -20,7 +20,7 @@ import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
 import type { IconName } from '../ui/Icon'
 import { parisDateTime } from '../ui/parisTime'
-import { fillParts, type Part, splitMarks } from './marks'
+import { type Part, splitMarks } from './marks'
 
 type T = ReturnType<typeof useTranslation>['t']
 
@@ -78,7 +78,7 @@ const say = (
   render: (params: Record<string, string>) => string,
 ): { parts: Part[]; text: string } => {
   const holes = Object.fromEntries(Object.keys(values).map((name) => [name, `{{${name}}}`]))
-  const parts = fillParts(splitMarks(render(holes)), values)
+  const parts = splitMarks(render(holes), values)
   return { parts, text: parts.map((part) => part.text).join('') }
 }
 
@@ -418,12 +418,11 @@ export const presentNotification = (
     }
     case 'removed': {
       // Tranche 7a, règle 13 de la relecture du plan (article 17 du DSA) : ce qui est retiré (la
-      // phrase). R8 : la ligne n'écrit plus toute la motivation, elle dit « Voir la raison et
-      // comment contester » et mène au projet, que son auteur voit toujours (un commentaire retiré
-      // s'y lit pour lui seul). Sans lien (un commentaire sur le projet d'un membre qui l'a bloqué,
-      // tranche 7b règle 9), rien ne mènerait à la raison : la ligne la garde alors en entier, une
-      // phrase par ligne (que lui seul le voit, après un signalement ou non, le fondement,
-      // l'explication, comment contester ; jamais de qui, ni l'administrateur).
+      // phrase). La ligne garde toute la motivation, une phrase par ligne (que lui seul le voit,
+      // après un signalement ou non, le fondement, l'explication, comment contester ; jamais de
+      // qui, ni l'administrateur), qu'elle mène quelque part ou non : elle mène au projet, que son
+      // auteur voit toujours, sauf pour un commentaire sur le projet d'un membre qui l'a bloqué
+      // (tranche 7b règle 9).
       const { targetKind, project, excerpt, ground, explanation, afterReport, projectHidden } =
         notification
       const elsewhere = targetKind === 'comment' && projectHidden
@@ -447,15 +446,15 @@ export const presentNotification = (
         icon: 'prohibit',
         leading: iconLeading('prohibit', 'danger'),
         thumb: elsewhere ? null : projectThumb(project),
-        detail: target
-          ? t(($) => $.notifications.removedDetail)
-          : [
-              t(($) => $.removal.onlyYou),
-              afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
-              t(($) => $.removal.grounds[ground]),
-              t(($) => $.removal.explanation, { explanation }),
-              t(($) => $.removal.contest),
-            ].join('\n'),
+        // Toute la motivation, qu'il y ait un lien ou non (article 17 du DSA) : « Voir la raison et
+        // comment contester » ne la remplace jamais.
+        detail: [
+          t(($) => $.removal.onlyYou),
+          afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
+          t(($) => $.removal.grounds[ground]),
+          t(($) => $.removal.explanation, { explanation }),
+          t(($) => $.removal.contest),
+        ].join('\n'),
         quote: excerpt,
         target,
       }

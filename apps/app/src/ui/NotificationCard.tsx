@@ -166,22 +166,26 @@ function Row({
       {/* minWidth 0 : un mot très long (un titre sans espace) se coupe au lieu de déborder. */}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="callout" breakAnywhere>
-          {parts.map((part, index) =>
-            // Le rang pour clé : deux morceaux peuvent porter le même texte (« de », « sur »).
-            part.style === 'strong' ? (
-              // biome-ignore lint/suspicious/noArrayIndexKey: les morceaux d'une phrase ne bougent pas.
-              <Text key={index} variant="callout" weight={700}>
-                {part.text}
-              </Text>
-            ) : part.style === 'version' ? (
-              // biome-ignore lint/suspicious/noArrayIndexKey: les morceaux d'une phrase ne bougent pas.
-              <Text key={index} variant="mono" tone="muted">
-                {part.text}
-              </Text>
-            ) : (
-              part.text
-            ),
-          )}{' '}
+          {/* La phrase seule dans son propre texte (sans la date qui suit) : on la retrouve, et
+              les lecteurs d'écran la lisent, sans la date collée au dernier mot. */}
+          <Text variant="callout">
+            {parts.map((part, index) =>
+              // Le rang pour clé : deux morceaux peuvent porter le même texte (« de », « sur »).
+              part.style === 'strong' ? (
+                // biome-ignore lint/suspicious/noArrayIndexKey: les morceaux d'une phrase ne bougent pas.
+                <Text key={index} variant="callout" weight={700}>
+                  {part.text}
+                </Text>
+              ) : part.style === 'version' ? (
+                // biome-ignore lint/suspicious/noArrayIndexKey: les morceaux d'une phrase ne bougent pas.
+                <Text key={index} variant="mono" tone="muted">
+                  {part.text}
+                </Text>
+              ) : (
+                part.text
+              ),
+            )}
+          </Text>{' '}
           {/* La date, dans la phrase : elle passe à la ligne avec elle, sans colonne à part. */}
           <Text variant="caption" tone="muted">
             {dateShown}

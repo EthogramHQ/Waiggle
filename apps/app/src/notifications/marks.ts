@@ -21,7 +21,11 @@ const MARKED = /<([bv])>([\s\S]*?)<\/\1>/g
  * Découpe un modèle de phrase en morceaux. Les marques ne s'imbriquent pas ; une balise ouverte
  * sans fermeture, ou inconnue, reste dans le texte tel quel. Les morceaux vides disparaissent.
  */
-export const splitMarks = (template: string): Part[] => {
+export const splitMarks = (
+  template: string,
+  /** Les valeurs des {{nom}}, remplies APRÈS le découpage (voir plus haut). */
+  values?: Record<string, string | number>,
+): Part[] => {
   const parts: Part[] = []
   let from = 0
   for (const match of template.matchAll(MARKED)) {
@@ -31,7 +35,7 @@ export const splitMarks = (template: string): Part[] => {
     from = match.index + whole.length
   }
   if (from < template.length) parts.push({ text: template.slice(from) })
-  return parts
+  return values ? fill(parts, values) : parts
 }
 
 /**
@@ -39,7 +43,7 @@ export const splitMarks = (template: string): Part[] => {
  * contient « {{autre}} » ou « <b> » n'est jamais relue. Un nom absent des valeurs reste écrit tel
  * quel (le test des textes le verrait aussitôt).
  */
-export const fillParts = (parts: Part[], values: Record<string, string | number>): Part[] =>
+const fill = (parts: Part[], values: Record<string, string | number>): Part[] =>
   parts.map((part) => ({
     ...part,
     text: part.text.replace(/\{\{(\w+)\}\}/g, (whole, name: string) =>
