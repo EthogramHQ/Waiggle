@@ -1,7 +1,7 @@
 // Changer l'adresse e-mail de son compte (tranche « adresse », docs/scenarios/phase-1.md) : tout
 // ce que l'API ajoute à Better Auth pour ce parcours, rangé ici pour que auth.ts reste lisible.
 //
-// Le parcours de Better Auth (1.7.13) a deux liens, envoyés par e-mail :
+// Le parcours de Better Auth (1.7.18) a deux liens, envoyés par e-mail :
 // 1. la demande (POST /api/auth/change-email) envoie un premier lien à l'adresse ACTUELLE ;
 // 2. ce lien (GET /api/auth/verify-email) envoie un second lien à la NOUVELLE adresse ;
 // 3. ce second lien change l'adresse ; un dernier e-mail prévient l'ancienne.
@@ -75,6 +75,9 @@ const ChangeEmailToken = z.object({
   updateTo: z.string(),
   requestType: ChangeEmailStep,
   iat: z.number(),
+  // Le compte qui a demandé le changement, que Better Auth écrit dans ses liens depuis 1.7.16 (et
+  // nous dans le premier lien d'une adresse prise) : beforeLink le compare au compte de l'adresse.
+  userId: z.string().optional(),
 })
 
 /**
@@ -411,13 +414,14 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
       }
 
       if (await ctx.context.internalAdapter.findUserByEmail(newEmail)) {
-        // Le jeton, fabriqué comme Better Auth le fait pour une adresse libre.
+        // Le jeton, fabriqué comme Better Auth le fait pour une adresse libre, compte compris :
+        // depuis 1.7.16, il refuse un lien de changement qui ne le nomme pas.
         const token = await createEmailVerificationToken(
           ctx.context.secret,
           session.user.email,
           newEmail,
           ctx.context.options.emailVerification?.expiresIn ?? LINK_LIFETIME_SECONDS,
-          { requestType: 'change-email-confirmation' },
+          { requestType: 'change-email-confirmation', userId: session.user.id },
         )
         sendConfirmation(
           session.user,
@@ -476,6 +480,11 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
         throw redirect('INVALID_TOKEN')
       }
 
+      // Un lien qui ne nomme pas le compte de son adresse (`userId` absent ou autre) : Better Auth
+      // le refuse depuis 1.7.16 (montées du 12/11/2026), on le lui laisse. Sans cela, pour une
+      // adresse prise, la réponse plus bas mènerait ce lien à sa page sans erreur.
+      if (payload.userId !== owner.user.id) return proceed
+
       // Une nouvelle adresse prise entre-temps : le second lien est refusé (S5), sans être compté.
       const taken = await ctx.context.internalAdapter.findUserByEmail(payload.updateTo)
       if (taken && step === 'change-email-verification') throw redirect('INVALID_TOKEN')
@@ -507,8 +516,10 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
 
     /**
      * Hook `after` de GET /api/auth/verify-email : le second lien ne connecte personne (S3). Better
-     * Auth crée une session quand l'appareil qui l'ouvre n'en a pas ; avec une faute de frappe dans
-     * la nouvelle adresse, c'est un inconnu qui serait connecté au compte. On l'efface aussitôt.
+     * Auth créait une session quand l'appareil qui l'ouvre n'en avait pas ; avec une faute de frappe
+     * dans la nouvelle adresse, c'est un inconnu qui aurait été connecté au compte. Depuis 1.7.16, il
+     * n'en crée plus (et beforeLink exige déjà une session) : ce hook reste en filet, si une version
+     * revenait en arrière. Une session créée quand même est effacée aussitôt.
      * - `newSession` est posé par toute écriture du cookie de session, y compris quand une session
      *   déjà ouverte est rafraîchie : on n'efface que celle dont le jeton diffère de celui que
      *   l'appareil a présenté.
