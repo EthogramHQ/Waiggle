@@ -135,6 +135,7 @@ import { PublishPromptCatalogue } from './publier-prompt'
 import { PublishDeleteCatalogue } from './publier-supprimer'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
+import { NotificationSettingsCatalogue } from './reglages-notifications'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
@@ -729,6 +730,8 @@ export function CatalogueScreen() {
       </Section>
       {/* Tranche R8, les lignes de la page Activité, jour et nuit (notifications.tsx). */}
       <NotificationsCatalogue />
+      {/* Tranche R8, l'exemple et les lignes de choix des réglages (reglages-notifications.tsx). */}
+      <NotificationSettingsCatalogue />
 
       {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions, le champ. */}
       <CommentCardCatalogue />
