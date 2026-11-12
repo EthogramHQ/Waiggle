@@ -200,6 +200,28 @@ describe('RadioGroup', () => {
   })
 })
 
+// R8 (relecture du plan, UI-A2) : dans une ligne de choix des réglages (`ChoiceRow`), la question
+// est déjà écrite sur la ligne au-dessus. `labelHidden` ne l'écrit pas une seconde fois, mais le
+// groupe garde son nom pour le lecteur d'écran.
+describe('RadioGroup with labelHidden', () => {
+  it('does not write its label, and still names the group by it', async () => {
+    await renderWithProviders(
+      <RadioGroup label="Taille" labelHidden options={options} value="small" onChange={() => {}} />,
+    )
+
+    expect(screen.getByLabelText('Taille').props.accessibilityRole).toBe('radiogroup')
+    expect(screen.queryByText('Taille')).toBeNull()
+    expect(screen.getAllByRole('radio')).toHaveLength(3)
+    expect(screen.getByRole('radio', { name: 'Petite ruche', checked: true })).toBeTruthy()
+  })
+
+  it('writes its label without labelHidden, as before R8', async () => {
+    await renderWithProviders(<Sample />)
+
+    expect(screen.getByText('Taille')).toBeTruthy()
+  })
+})
+
 describe('RadioMark', () => {
   it('draws the round mark without being a radio itself', async () => {
     // Le rond seul, pour ListGroup : la ligne qui le contient porte déjà le rôle « radio » ; un
