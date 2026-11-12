@@ -110,12 +110,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -162,9 +158,7 @@
         "rate_limit_key_unique": {
           "name": "rate_limit_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -247,12 +241,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -262,9 +252,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -335,9 +323,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -484,12 +470,8 @@
           "name": "member_block_blocker_id_user_id_fk",
           "tableFrom": "member_block",
           "tableTo": "user",
-          "columnsFrom": [
-            "blocker_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["blocker_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -497,12 +479,8 @@
           "name": "member_block_blocked_id_user_id_fk",
           "tableFrom": "member_block",
           "tableTo": "user",
-          "columnsFrom": [
-            "blocked_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["blocked_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -510,10 +488,7 @@
       "compositePrimaryKeys": {
         "member_block_blocker_id_blocked_id_pk": {
           "name": "member_block_blocker_id_blocked_id_pk",
-          "columns": [
-            "blocker_id",
-            "blocked_id"
-          ]
+          "columns": ["blocker_id", "blocked_id"]
         }
       },
       "uniqueConstraints": {},
@@ -595,12 +570,8 @@
           "name": "category_created_by_user_id_fk",
           "tableFrom": "category",
           "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -610,16 +581,12 @@
         "category_name_fr_unique": {
           "name": "category_name_fr_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name_fr"
-          ]
+          "columns": ["name_fr"]
         },
         "category_name_en_unique": {
           "name": "category_name_en_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name_en"
-          ]
+          "columns": ["name_en"]
         }
       },
       "policies": {},
@@ -789,12 +756,8 @@
           "name": "project_comment_project_id_project_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -802,12 +765,8 @@
           "name": "project_comment_author_id_user_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "user",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -815,12 +774,8 @@
           "name": "project_comment_root_id_project_comment_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "project_comment",
-          "columnsFrom": [
-            "root_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["root_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -828,12 +783,8 @@
           "name": "project_comment_removal_id_moderation_decision_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "removal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["removal_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -987,12 +938,8 @@
           "name": "email_preference_user_id_user_id_fk",
           "tableFrom": "email_preference",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1031,12 +978,8 @@
           "name": "feed_state_member_id_user_id_fk",
           "tableFrom": "feed_state",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1093,12 +1036,8 @@
           "name": "member_follow_follower_id_user_id_fk",
           "tableFrom": "member_follow",
           "tableTo": "user",
-          "columnsFrom": [
-            "follower_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["follower_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1106,12 +1045,8 @@
           "name": "member_follow_member_id_user_id_fk",
           "tableFrom": "member_follow",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1119,10 +1054,7 @@
       "compositePrimaryKeys": {
         "member_follow_follower_id_member_id_pk": {
           "name": "member_follow_follower_id_member_id_pk",
-          "columns": [
-            "follower_id",
-            "member_id"
-          ]
+          "columns": ["follower_id", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1181,12 +1113,8 @@
           "name": "project_follow_follower_id_user_id_fk",
           "tableFrom": "project_follow",
           "tableTo": "user",
-          "columnsFrom": [
-            "follower_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["follower_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1194,12 +1122,8 @@
           "name": "project_follow_project_id_project_id_fk",
           "tableFrom": "project_follow",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1207,10 +1131,7 @@
       "compositePrimaryKeys": {
         "project_follow_follower_id_project_id_pk": {
           "name": "project_follow_follower_id_project_id_pk",
-          "columns": [
-            "follower_id",
-            "project_id"
-          ]
+          "columns": ["follower_id", "project_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1263,12 +1184,8 @@
           "name": "member_suggestion_dismissal_member_id_user_id_fk",
           "tableFrom": "member_suggestion_dismissal",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1276,12 +1193,8 @@
           "name": "member_suggestion_dismissal_dismissed_id_user_id_fk",
           "tableFrom": "member_suggestion_dismissal",
           "tableTo": "user",
-          "columnsFrom": [
-            "dismissed_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["dismissed_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1289,10 +1202,7 @@
       "compositePrimaryKeys": {
         "member_suggestion_dismissal_member_id_dismissed_id_pk": {
           "name": "member_suggestion_dismissal_member_id_dismissed_id_pk",
-          "columns": [
-            "member_id",
-            "dismissed_id"
-          ]
+          "columns": ["member_id", "dismissed_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1367,12 +1277,8 @@
           "name": "member_handle_user_id_user_id_fk",
           "tableFrom": "member_handle",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1511,12 +1417,8 @@
           "name": "account_suspension_user_id_user_id_fk",
           "tableFrom": "account_suspension",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1524,12 +1426,8 @@
           "name": "account_suspension_decision_id_moderation_decision_id_fk",
           "tableFrom": "account_suspension",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "decision_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["decision_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1537,12 +1435,8 @@
           "name": "account_suspension_lift_decision_id_moderation_decision_id_fk",
           "tableFrom": "account_suspension",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "lift_decision_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lift_decision_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1594,12 +1488,8 @@
           "name": "admin_member_user_id_user_id_fk",
           "tableFrom": "admin_member",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1795,12 +1685,8 @@
           "name": "content_report_reporter_id_user_id_fk",
           "tableFrom": "content_report",
           "tableTo": "user",
-          "columnsFrom": [
-            "reporter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reporter_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1808,12 +1694,8 @@
           "name": "content_report_target_author_id_user_id_fk",
           "tableFrom": "content_report",
           "tableTo": "user",
-          "columnsFrom": [
-            "target_author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_author_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1821,12 +1703,8 @@
           "name": "content_report_decision_id_moderation_decision_id_fk",
           "tableFrom": "content_report",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "decision_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["decision_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2018,12 +1896,8 @@
           "name": "moderation_decision_admin_id_user_id_fk",
           "tableFrom": "moderation_decision",
           "tableTo": "user",
-          "columnsFrom": [
-            "admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2031,12 +1905,8 @@
           "name": "moderation_decision_target_member_id_user_id_fk",
           "tableFrom": "moderation_decision",
           "tableTo": "user",
-          "columnsFrom": [
-            "target_member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_member_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2128,12 +1998,8 @@
           "name": "catalogue_notice_member_id_user_id_fk",
           "tableFrom": "catalogue_notice",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2141,12 +2007,8 @@
           "name": "catalogue_notice_project_id_project_id_fk",
           "tableFrom": "catalogue_notice",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2154,12 +2016,8 @@
           "name": "catalogue_notice_tool_id_tool_id_fk",
           "tableFrom": "catalogue_notice",
           "tableTo": "tool",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2167,12 +2025,8 @@
           "name": "catalogue_notice_category_code_category_code_fk",
           "tableFrom": "catalogue_notice",
           "tableTo": "category",
-          "columnsFrom": [
-            "category_code"
-          ],
-          "columnsTo": [
-            "code"
-          ],
+          "columnsFrom": ["category_code"],
+          "columnsTo": ["code"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2245,12 +2099,8 @@
           "name": "comment_mention_comment_id_project_comment_id_fk",
           "tableFrom": "comment_mention",
           "tableTo": "project_comment",
-          "columnsFrom": [
-            "comment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["comment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2258,12 +2108,8 @@
           "name": "comment_mention_member_id_user_id_fk",
           "tableFrom": "comment_mention",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2271,10 +2117,7 @@
       "compositePrimaryKeys": {
         "comment_mention_comment_id_member_id_pk": {
           "name": "comment_mention_comment_id_member_id_pk",
-          "columns": [
-            "comment_id",
-            "member_id"
-          ]
+          "columns": ["comment_id", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2317,12 +2160,8 @@
           "name": "notification_state_user_id_user_id_fk",
           "tableFrom": "notification_state",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2370,12 +2209,8 @@
           "name": "profile_user_id_user_id_fk",
           "tableFrom": "profile",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2606,12 +2441,8 @@
           "name": "project_author_id_user_id_fk",
           "tableFrom": "project",
           "tableTo": "user",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2619,12 +2450,8 @@
           "name": "project_primary_category_category_code_fk",
           "tableFrom": "project",
           "tableTo": "category",
-          "columnsFrom": [
-            "primary_category"
-          ],
-          "columnsTo": [
-            "code"
-          ],
+          "columnsFrom": ["primary_category"],
+          "columnsTo": ["code"],
           "onDelete": "no action",
           "onUpdate": "cascade"
         },
@@ -2632,12 +2459,8 @@
           "name": "project_secondary_category_category_code_fk",
           "tableFrom": "project",
           "tableTo": "category",
-          "columnsFrom": [
-            "secondary_category"
-          ],
-          "columnsTo": [
-            "code"
-          ],
+          "columnsFrom": ["secondary_category"],
+          "columnsTo": ["code"],
           "onDelete": "no action",
           "onUpdate": "cascade"
         },
@@ -2645,12 +2468,8 @@
           "name": "project_removal_id_moderation_decision_id_fk",
           "tableFrom": "project",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "removal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["removal_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2821,12 +2640,8 @@
           "name": "project_media_project_id_project_id_fk",
           "tableFrom": "project_media",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2834,12 +2649,8 @@
           "name": "project_media_update_id_project_update_id_fk",
           "tableFrom": "project_media",
           "tableTo": "project_update",
-          "columnsFrom": [
-            "update_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["update_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2849,9 +2660,7 @@
         "project_media_storage_key_unique": {
           "name": "project_media_storage_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
+          "columns": ["storage_key"]
         }
       },
       "policies": {},
@@ -2940,12 +2749,8 @@
           "name": "project_reaction_project_id_project_id_fk",
           "tableFrom": "project_reaction",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2953,12 +2758,8 @@
           "name": "project_reaction_member_id_user_id_fk",
           "tableFrom": "project_reaction",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2966,11 +2767,7 @@
       "compositePrimaryKeys": {
         "project_reaction_project_id_member_id_kind_pk": {
           "name": "project_reaction_project_id_member_id_kind_pk",
-          "columns": [
-            "project_id",
-            "member_id",
-            "kind"
-          ]
+          "columns": ["project_id", "member_id", "kind"]
         }
       },
       "uniqueConstraints": {},
@@ -3012,12 +2809,8 @@
           "name": "project_tester_removal_project_id_project_id_fk",
           "tableFrom": "project_tester_removal",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3025,12 +2818,8 @@
           "name": "project_tester_removal_member_id_user_id_fk",
           "tableFrom": "project_tester_removal",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3038,10 +2827,7 @@
       "compositePrimaryKeys": {
         "project_tester_removal_project_id_member_id_pk": {
           "name": "project_tester_removal_project_id_member_id_pk",
-          "columns": [
-            "project_id",
-            "member_id"
-          ]
+          "columns": ["project_id", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3124,12 +2910,8 @@
           "name": "tester_call_project_id_project_id_fk",
           "tableFrom": "tester_call",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3137,12 +2919,8 @@
           "name": "tester_call_removal_id_moderation_decision_id_fk",
           "tableFrom": "tester_call",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "removal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["removal_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3316,12 +3094,8 @@
           "name": "tester_media_project_id_project_id_fk",
           "tableFrom": "tester_media",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3329,12 +3103,8 @@
           "name": "tester_media_owner_id_user_id_fk",
           "tableFrom": "tester_media",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3342,12 +3112,8 @@
           "name": "tester_media_call_id_tester_call_id_fk",
           "tableFrom": "tester_media",
           "tableTo": "tester_call",
-          "columnsFrom": [
-            "call_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["call_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3355,12 +3121,8 @@
           "name": "tester_media_message_id_tester_message_id_fk",
           "tableFrom": "tester_media",
           "tableTo": "tester_message",
-          "columnsFrom": [
-            "message_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["message_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3370,9 +3132,7 @@
         "tester_media_storage_key_unique": {
           "name": "tester_media_storage_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
+          "columns": ["storage_key"]
         }
       },
       "policies": {},
@@ -3527,12 +3287,8 @@
           "name": "tester_message_sender_id_user_id_fk",
           "tableFrom": "tester_message",
           "tableTo": "user",
-          "columnsFrom": [
-            "sender_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sender_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3540,12 +3296,8 @@
           "name": "tester_message_settled_update_id_project_update_id_fk",
           "tableFrom": "tester_message",
           "tableTo": "project_update",
-          "columnsFrom": [
-            "settled_update_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["settled_update_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3553,12 +3305,8 @@
           "name": "tester_message_removal_id_moderation_decision_id_fk",
           "tableFrom": "tester_message",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "removal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["removal_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3566,14 +3314,8 @@
           "name": "tester_message_thread_fk",
           "tableFrom": "tester_message",
           "tableTo": "tester_thread",
-          "columnsFrom": [
-            "project_id",
-            "tester_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "tester_id"
-          ],
+          "columnsFrom": ["project_id", "tester_id"],
+          "columnsTo": ["project_id", "tester_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3654,12 +3396,8 @@
           "name": "tester_thread_project_id_project_id_fk",
           "tableFrom": "tester_thread",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3667,12 +3405,8 @@
           "name": "tester_thread_tester_id_user_id_fk",
           "tableFrom": "tester_thread",
           "tableTo": "user",
-          "columnsFrom": [
-            "tester_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tester_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3680,10 +3414,7 @@
       "compositePrimaryKeys": {
         "tester_thread_project_id_tester_id_pk": {
           "name": "tester_thread_project_id_tester_id_pk",
-          "columns": [
-            "project_id",
-            "tester_id"
-          ]
+          "columns": ["project_id", "tester_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3736,12 +3467,8 @@
           "name": "project_tester_member_id_user_id_fk",
           "tableFrom": "project_tester",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3749,12 +3476,8 @@
           "name": "project_tester_project_id_project_id_fk",
           "tableFrom": "project_tester",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3762,10 +3485,7 @@
       "compositePrimaryKeys": {
         "project_tester_member_id_project_id_pk": {
           "name": "project_tester_member_id_project_id_pk",
-          "columns": [
-            "member_id",
-            "project_id"
-          ]
+          "columns": ["member_id", "project_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3854,12 +3574,8 @@
           "name": "catalogue_change_admin_id_user_id_fk",
           "tableFrom": "catalogue_change",
           "tableTo": "user",
-          "columnsFrom": [
-            "admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3867,12 +3583,8 @@
           "name": "catalogue_change_tool_id_tool_id_fk",
           "tableFrom": "catalogue_change",
           "tableTo": "tool",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3880,12 +3592,8 @@
           "name": "catalogue_change_category_code_category_code_fk",
           "tableFrom": "catalogue_change",
           "tableTo": "category",
-          "columnsFrom": [
-            "category_code"
-          ],
-          "columnsTo": [
-            "code"
-          ],
+          "columnsFrom": ["category_code"],
+          "columnsTo": ["code"],
           "onDelete": "set null",
           "onUpdate": "cascade"
         },
@@ -3893,12 +3601,8 @@
           "name": "catalogue_change_project_id_project_id_fk",
           "tableFrom": "catalogue_change",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3960,12 +3664,8 @@
           "name": "profile_tool_user_id_user_id_fk",
           "tableFrom": "profile_tool",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3973,12 +3673,8 @@
           "name": "profile_tool_tool_id_tool_id_fk",
           "tableFrom": "profile_tool",
           "tableTo": "tool",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3986,10 +3682,7 @@
       "compositePrimaryKeys": {
         "profile_tool_user_id_tool_id_pk": {
           "name": "profile_tool_user_id_tool_id_pk",
-          "columns": [
-            "user_id",
-            "tool_id"
-          ]
+          "columns": ["user_id", "tool_id"]
         }
       },
       "uniqueConstraints": {},
@@ -4048,12 +3741,8 @@
           "name": "project_tool_project_id_project_id_fk",
           "tableFrom": "project_tool",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4061,12 +3750,8 @@
           "name": "project_tool_tool_id_tool_id_fk",
           "tableFrom": "project_tool",
           "tableTo": "tool",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4074,10 +3759,7 @@
       "compositePrimaryKeys": {
         "project_tool_project_id_tool_id_pk": {
           "name": "project_tool_project_id_tool_id_pk",
-          "columns": [
-            "project_id",
-            "tool_id"
-          ]
+          "columns": ["project_id", "tool_id"]
         }
       },
       "uniqueConstraints": {},
@@ -4190,12 +3872,8 @@
           "name": "tool_created_by_user_id_fk",
           "tableFrom": "tool",
           "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4205,16 +3883,12 @@
         "tool_slug_unique": {
           "name": "tool_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         },
         "tool_folded_unique": {
           "name": "tool_folded_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "folded"
-          ]
+          "columns": ["folded"]
         }
       },
       "policies": {},
@@ -4265,12 +3939,8 @@
           "name": "tool_alias_tool_id_tool_id_fk",
           "tableFrom": "tool_alias",
           "tableTo": "tool",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4320,12 +3990,8 @@
           "name": "tool_slug_redirect_tool_id_tool_id_fk",
           "tableFrom": "tool_slug_redirect",
           "tableTo": "tool",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4430,12 +4096,8 @@
           "name": "project_update_project_id_project_id_fk",
           "tableFrom": "project_update",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4443,12 +4105,8 @@
           "name": "project_update_removal_id_moderation_decision_id_fk",
           "tableFrom": "project_update",
           "tableTo": "moderation_decision",
-          "columnsFrom": [
-            "removal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["removal_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
