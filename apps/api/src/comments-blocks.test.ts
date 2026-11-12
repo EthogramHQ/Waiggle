@@ -3,7 +3,7 @@
 // même à l'auteur du projet. Léa publie ; Max et Zoé commentent.
 import { CommentPage, CommentReply, NotificationPage } from '@ruche/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mentionEmails } from './jobs/mention-emails'
+import { instantEmails } from './jobs/instant-emails'
 import { activity } from './testing/activity'
 import {
   createTestContext,
@@ -122,13 +122,14 @@ describe('a mention taken out by an edit', () => {
   }
 
   /**
-   * La tâche des e-mails de mentions, vingt minutes plus tard (elle attend un quart d'heure) : les
-   * e-mails qu'elle envoie à Zoé (pas ceux d'avant, comme la confirmation de son adresse).
+   * La tâche des e-mails « tout de suite » (R8, l'ancien e-mail de mentions), vingt minutes plus
+   * tard (elle attend un quart d'heure) : les e-mails qu'elle envoie à Zoé (pas ceux d'avant, comme
+   * la confirmation de son adresse).
    */
   const runMentionEmails = async () => {
     const before = ctx.mailer.sent.length
     vi.setSystemTime(Date.now() + 20 * 60 * 1000)
-    await mentionEmails(
+    await instantEmails(
       {
         db: ctx.db,
         mailer: ctx.mailer,
@@ -167,7 +168,7 @@ describe('a mention taken out by an edit', () => {
   })
 
   it('gives no link, no notification and no email, and comes back once written again', async () => {
-    await act.setPreferences(zoe, { mentionEmails: true })
+    await act.setPreferences(zoe, { replies: 'now' })
     const project = await act.publish(lea, 'Météo')
     const { handle: zoeHandle } = await act.me(zoe)
     later()

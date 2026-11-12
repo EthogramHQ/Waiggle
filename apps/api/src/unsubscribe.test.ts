@@ -1,8 +1,20 @@
-// Tests d'intégration de la tranche 6c : la désinscription depuis un e-mail, sans connexion.
-// Scénario : docs/scenarios/phase-1.md, « Précisions (tranche 6c) », « Se désinscrire ».
+// Tests d'intégration de la désinscription depuis un e-mail, sans connexion. Tranche 6c (scénario :
+// docs/scenarios/phase-1.md, « Se désinscrire »), puis R8 (docs/scenarios/refonte.md, « Les e-mails
+// tout de suite » ; relecture du plan, sec-A3, jur-2a et jur-2b ; décision de Louis du 12/11/2026).
 //
-// POST /v1/email/unsubscribe?token=…[&scope=all] coupe la sorte d'e-mail du jeton signé (ou les
-// deux avec scope=all). Deux chemins y mènent :
+// POST /v1/email/unsubscribe?token=…[&scope=all][&choice=digest|never] agit selon la sorte du jeton
+// signé :
+// - `recap` coupe le récap de la semaine ;
+// - `instant` (R8, l'e-mail « tout de suite ») passe chaque type réglé sur « Tout de suite » au
+//   choix donné : `digest` (« Dans le récap ») ou `never` ; sans `choice`, `digest` (le « Se
+//   désabonner » d'une messagerie ne lit pas de page) ;
+// - `mentions` (l'ancien e-mail de 6c, dont les liens restent valables) passe « Réponses et
+//   mentions » de « Tout de suite » à « Dans le récap », et seulement de là ;
+// - `scope=all`, quelle que soit la sorte : le récap coupé, et les types « Tout de suite » au choix
+//   donné.
+// Un lien ne rallume jamais rien : `choice=now` est refusé, un type sur « Jamais » y reste.
+//
+// Deux chemins mènent au POST :
 // - le bouton « Confirmer » de la page de désinscription de l'appli (jamais l'ouverture de la
 //   page : un antivirus qui ouvre les liens ne désinscrit personne) ;
 // - le bouton « Se désabonner » de la messagerie (en-tête List-Unsubscribe, RFC 8058), qui envoie
@@ -12,7 +24,7 @@
 // Un lien invalide reçoit toujours la même réponse, 400 unsubscribe_invalid : elle ne dit pas si
 // le compte existe.
 
-import { ErrorResponse } from '@ruche/contracts'
+import { ErrorResponse, type UnsubscribeKind } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { resources } from '@ruche/i18n'
 import { eq, like } from 'drizzle-orm'
@@ -44,6 +56,32 @@ const inesAccount = {
   password: 'ines-long-password',
 }
 
+/** Les réglages d'un membre qui n'a jamais rien changé. */
+const DEFAULTS = {
+  weeklyRecap: true,
+  reactions: 'digest',
+  comments: 'digest',
+  replies: 'digest',
+  follows: 'digest',
+  updates: 'digest',
+  testers: 'digest',
+} as const
+
+/**
+ * Les réglages d'Inès au départ : deux types sur « Tout de suite », le coin des testeurs sur
+ * « Jamais » (aucun lien ne doit le remonter), le reste par défaut.
+ */
+const INES = { ...DEFAULTS, comments: 'now', replies: 'now', testers: 'never' } as const
+/** Ceux de Malik : « Réponses et mentions » sur « Tout de suite ». */
+const MALIK = { ...DEFAULTS, replies: 'now' } as const
+
+/** Pose les réglages voulus, un PATCH par réglage (le contrat n'en prend qu'un à la fois). */
+const setAll = async (cookie: string, wanted: Record<string, unknown>) => {
+  for (const [key, value] of Object.entries(wanted)) {
+    await act.setPreferences(cookie, { [key]: value })
+  }
+}
+
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(START)
@@ -57,9 +95,9 @@ beforeEach(async () => {
   })
   inesId = (await act.me(ines)).id
   malikId = (await act.me(malik)).id
-  // Les deux sortes d'e-mail sont actives chez Inès et chez Malik : on voit ce que coupe chaque lien.
-  await act.setPreferences(ines, { mentionEmails: true })
-  await act.setPreferences(malik, { mentionEmails: true })
+  // Des types sur « Tout de suite » chez Inès et chez Malik : on voit ce que change chaque lien.
+  await setAll(ines, { comments: 'now', replies: 'now', testers: 'never' })
+  await setAll(malik, { replies: 'now' })
 })
 
 afterEach(async () => {
@@ -70,7 +108,7 @@ afterEach(async () => {
 
 const later = (ms: number) => vi.setSystemTime(Date.now() + ms)
 
-const tokenOf = (userId: string, kind: 'recap' | 'mentions') =>
+const tokenOf = (userId: string, kind: UnsubscribeKind) =>
   createUnsubscribeToken(TEST_AUTH_SECRET, userId, kind)
 
 const pathFor = (params: Record<string, string>) =>
@@ -96,38 +134,146 @@ describe('unsubscribing from a link', () => {
 
     expect(res.status).toBe(204)
     expect(await res.text()).toBe('')
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: false, mentionEmails: true })
+    expect(await act.preferences(ines)).toEqual({ ...INES, weeklyRecap: false })
   })
 
-  it('turns off the mention e-mails only, with a mentions link', async () => {
-    const res = await unsubscribe({ token: tokenOf(inesId, 'mentions') })
+  it('moves every « now » type to the recap with an instant link and no choice', async () => {
+    const res = await unsubscribe({ token: tokenOf(inesId, 'instant') })
 
     expect(res.status).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: true, mentionEmails: false })
+    expect(await res.text()).toBe('')
+    // Les deux types « Tout de suite » passent « Dans le récap » ; le récap reste, « Jamais » reste.
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      comments: 'digest',
+      replies: 'digest',
+    })
   })
 
-  it('turns everything off with scope=all, whatever the kind of the link', async () => {
-    for (const kind of ['recap', 'mentions'] as const) {
-      await act.setPreferences(ines, { weeklyRecap: true, mentionEmails: true })
+  it('moves every « now » type to the choice of the page with an instant link', async () => {
+    expect((await unsubscribe({ token: tokenOf(inesId, 'instant'), choice: 'never' })).status).toBe(
+      204,
+    )
+    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'never', replies: 'never' })
 
-      const res = await unsubscribe({ token: tokenOf(inesId, kind), scope: 'all' })
+    await setAll(ines, { comments: 'now', replies: 'now' })
+    expect(
+      (await unsubscribe({ token: tokenOf(inesId, 'instant'), choice: 'digest' })).status,
+    ).toBe(204)
+    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'digest', replies: 'digest' })
+  })
 
-      expect(res.status).toBe(204)
-      expect(await act.preferences(ines)).toEqual({ weeklyRecap: false, mentionEmails: false })
+  it('never raises a "never" type on an instant unsubscribe', async () => {
+    // Le coin des testeurs est sur « Jamais » ; les réactions sont « Dans le récap ».
+    for (const choice of [undefined, 'digest', 'never'] as const) {
+      await setAll(ines, { comments: 'now', replies: 'now' })
+      const params: Record<string, string> = { token: tokenOf(inesId, 'instant') }
+      if (choice) params.choice = choice
+
+      expect((await unsubscribe(params)).status).toBe(204)
+
+      const after = await act.preferences(ines)
+      expect(after.testers, String(choice)).toBe('never')
+      // « Jamais » choisi ne descend que les types « Tout de suite » : les autres ne bougent pas.
+      expect(after.reactions, String(choice)).toBe('digest')
+      expect(after.updates, String(choice)).toBe('digest')
     }
   })
 
-  it('never turns anything back on: the member does it in her profile', async () => {
-    await unsubscribe({ token: tokenOf(inesId, 'recap'), scope: 'all' })
-    await act.setPreferences(ines, { mentionEmails: true })
+  it('refuses choice=now and changes nothing', async () => {
+    await setAll(ines, { comments: 'digest' })
 
-    // Le même lien du récap, ouvert de nouveau : le récap reste coupé, les mentions restent actives.
-    expect((await unsubscribe({ token: tokenOf(inesId, 'recap') })).status).toBe(204)
+    for (const params of [
+      { token: tokenOf(inesId, 'instant'), choice: 'now' },
+      { token: tokenOf(inesId, 'instant'), choice: 'now', scope: 'all' },
+      { token: tokenOf(inesId, 'mentions'), choice: 'now' },
+      { token: tokenOf(inesId, 'recap'), choice: 'now' },
+      { token: tokenOf(inesId, 'instant'), choice: 'soon' },
+      { token: tokenOf(inesId, 'instant'), choice: '' },
+    ]) {
+      await expectInvalid(await unsubscribe(params))
+    }
 
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: false, mentionEmails: true })
+    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'digest' })
   })
 
-  it('creates the settings of a member who never changed them, with the recap off', async () => {
+  it('moves replies from now to digest only, with an old mentions link', async () => {
+    const res = await unsubscribe({ token: tokenOf(inesId, 'mentions') })
+
+    expect(res.status).toBe(204)
+    // Les commentaires restent « Tout de suite » : l'ancien lien ne visait que les réponses.
+    expect(await act.preferences(ines)).toEqual({ ...INES, replies: 'digest' })
+  })
+
+  it('an old mentions link leaves replies at never', async () => {
+    await setAll(ines, { replies: 'never' })
+
+    expect((await unsubscribe({ token: tokenOf(inesId, 'mentions') })).status).toBe(204)
+    expect(await act.preferences(ines)).toEqual({ ...INES, replies: 'never' })
+
+    // « Dans le récap » reste aussi « Dans le récap ».
+    await setAll(ines, { replies: 'digest' })
+    expect((await unsubscribe({ token: tokenOf(inesId, 'mentions') })).status).toBe(204)
+    expect(await act.preferences(ines)).toEqual({ ...INES, replies: 'digest' })
+  })
+
+  it('turns the recap off and the « now » types to the given choice with scope=all, whatever the kind of the link', async () => {
+    for (const kind of ['recap', 'mentions', 'instant'] as const) {
+      await setAll(ines, { weeklyRecap: true, comments: 'now', replies: 'now' })
+
+      const res = await unsubscribe({ token: tokenOf(inesId, kind), scope: 'all' })
+
+      expect(res.status, kind).toBe(204)
+      expect(await act.preferences(ines), kind).toEqual({
+        ...INES,
+        weeklyRecap: false,
+        comments: 'digest',
+        replies: 'digest',
+      })
+    }
+
+    // Avec « Jamais » choisi sur la page d'un lien « tout de suite ».
+    await setAll(ines, { weeklyRecap: true, comments: 'now', replies: 'now' })
+    const res = await unsubscribe({
+      token: tokenOf(inesId, 'instant'),
+      scope: 'all',
+      choice: 'never',
+    })
+    expect(res.status).toBe(204)
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      weeklyRecap: false,
+      comments: 'never',
+      replies: 'never',
+    })
+  })
+
+  it('never turns anything back on: the member does it in her settings', async () => {
+    await unsubscribe({ token: tokenOf(inesId, 'recap'), scope: 'all' })
+    await setAll(ines, { comments: 'now' })
+
+    // Le même lien du récap, ouvert de nouveau : le récap reste coupé, les commentaires restent
+    // « Tout de suite », les réponses « Dans le récap ».
+    expect((await unsubscribe({ token: tokenOf(inesId, 'recap') })).status).toBe(204)
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      weeklyRecap: false,
+      comments: 'now',
+      replies: 'digest',
+    })
+
+    // Un lien « tout de suite » sur des types déjà « Jamais » : ils y restent.
+    await setAll(ines, { comments: 'never' })
+    expect((await unsubscribe({ token: tokenOf(inesId, 'instant') })).status).toBe(204)
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      weeklyRecap: false,
+      comments: 'never',
+      replies: 'digest',
+    })
+  })
+
+  it('creates the settings of a member who never changed them, and changes only what the link names', async () => {
     const zoe = await ctx.verifiedMember({
       name: 'Zoé',
       email: 'zoe@example.com',
@@ -135,21 +281,31 @@ describe('unsubscribing from a link', () => {
     })
     const zoeId = (await act.me(zoe)).id
 
-    expect((await unsubscribe({ token: tokenOf(zoeId, 'recap') })).status).toBe(204)
+    // Rien sur « Tout de suite » chez Zoé : le lien « tout de suite » ne change rien.
+    expect((await unsubscribe({ token: tokenOf(zoeId, 'instant'), choice: 'never' })).status).toBe(
+      204,
+    )
+    expect(await act.preferences(zoe)).toEqual(DEFAULTS)
 
-    expect(await act.preferences(zoe)).toEqual({ weeklyRecap: false, mentionEmails: false })
+    expect((await unsubscribe({ token: tokenOf(zoeId, 'recap') })).status).toBe(204)
+    expect(await act.preferences(zoe)).toEqual({ ...DEFAULTS, weeklyRecap: false })
   })
 
   it('acts on the member of the link only, never on the member signed in', async () => {
     // Un cookie de Malik joint à la requête (son navigateur) : seul le lien compte.
     const res = await unsubscribe(
-      { token: tokenOf(inesId, 'recap'), scope: 'all' },
+      { token: tokenOf(inesId, 'instant'), scope: 'all' },
       { headers: { cookie: malik } },
     )
 
     expect(res.status).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: false, mentionEmails: false })
-    expect(await act.preferences(malik)).toEqual({ weeklyRecap: true, mentionEmails: true })
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      weeklyRecap: false,
+      comments: 'digest',
+      replies: 'digest',
+    })
+    expect(await act.preferences(malik)).toEqual(MALIK)
   })
 })
 
@@ -170,7 +326,17 @@ describe('the one-click unsubscribe of a mail app (RFC 8058)', () => {
     })
 
     expect(res.status).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: false, mentionEmails: true })
+    expect(await act.preferences(ines)).toEqual({ ...INES, weeklyRecap: false })
+  })
+
+  it('one-click POST of an instant link moves now types to digest', async () => {
+    const res = await fromMailServer(tokenOf(inesId, 'instant'), {
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'List-Unsubscribe=One-Click',
+    })
+
+    expect(res.status).toBe(204)
+    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'digest', replies: 'digest' })
   })
 
   it('accepts the same form in multipart, as the RFC prefers', async () => {
@@ -180,26 +346,36 @@ describe('the one-click unsubscribe of a mail app (RFC 8058)', () => {
     const res = await fromMailServer(tokenOf(inesId, 'mentions'), { body: form })
 
     expect(res.status).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: true, mentionEmails: false })
+    expect(await act.preferences(ines)).toEqual({ ...INES, replies: 'digest' })
   })
 
   it('never reads the body: an empty, JSON or unexpected one changes nothing to the answer', async () => {
     for (const init of [
       {},
       { headers: { 'content-type': 'application/json' }, body: '{"scope":"none"}' },
+      // Un « choice » glissé dans le corps n'est jamais lu : seul celui de l'adresse compte.
+      { headers: { 'content-type': 'application/json' }, body: '{"choice":"now"}' },
+      {
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: 'List-Unsubscribe=One-Click&choice=never',
+      },
       { headers: { 'content-type': 'text/plain' }, body: 'anything' },
     ]) {
-      await act.setPreferences(ines, { weeklyRecap: true })
+      await setAll(ines, { weeklyRecap: true, comments: 'now' })
 
-      const res = await fromMailServer(tokenOf(inesId, 'recap'), init)
+      const recap = await fromMailServer(tokenOf(inesId, 'recap'), init)
+      const instant = await fromMailServer(tokenOf(inesId, 'instant'), init)
 
-      expect(res.status).toBe(204)
-      expect((await act.preferences(ines)).weeklyRecap).toBe(false)
+      expect(recap.status).toBe(204)
+      expect(instant.status).toBe(204)
+      const after = await act.preferences(ines)
+      expect(after.weeklyRecap).toBe(false)
+      expect(after.comments).toBe('digest')
     }
   })
 
   it('accepts the POST of a webmail from its own site: the link alone gives the right', async () => {
-    const res = await ctx.request(pathFor({ token: tokenOf(inesId, 'recap') }), {
+    const res = await ctx.request(pathFor({ token: tokenOf(inesId, 'instant') }), {
       method: 'POST',
       headers: {
         origin: 'https://mail.example',
@@ -209,19 +385,21 @@ describe('the one-click unsubscribe of a mail app (RFC 8058)', () => {
     })
 
     expect(res.status).toBe(204)
-    expect((await act.preferences(ines)).weeklyRecap).toBe(false)
+    expect((await act.preferences(ines)).comments).toBe('digest')
   })
 
   it('changes nothing when the link is only opened (GET), and sends to the page of the app', async () => {
-    const token = tokenOf(inesId, 'recap')
+    for (const kind of ['recap', 'instant'] as const) {
+      const token = tokenOf(inesId, kind)
 
-    const res = await ctx.app.request(pathFor({ token }), { method: 'GET' })
+      const res = await ctx.app.request(pathFor({ token }), { method: 'GET' })
 
-    expect(res.status).toBe(303)
-    const location = new URL(res.headers.get('location') ?? '')
-    expect(location.origin + location.pathname).toBe(`${TEST_APP_URL}/unsubscribe`)
-    expect(location.searchParams.get('token')).toBe(token)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: true, mentionEmails: true })
+      expect(res.status).toBe(303)
+      const location = new URL(res.headers.get('location') ?? '')
+      expect(location.origin + location.pathname).toBe(`${TEST_APP_URL}/unsubscribe`)
+      expect(location.searchParams.get('token')).toBe(token)
+    }
+    expect(await act.preferences(ines)).toEqual(INES)
   })
 })
 
@@ -238,8 +416,11 @@ describe('an invalid link', () => {
       // La signature d'Inès sur l'identifiant de Malik : un membre ne peut pas désinscrire un autre.
       { token: `${version}.${malikB64}.recap.${signature}` },
       { token: `${version}.${id}.mentions.${signature}` },
+      // La signature d'un lien du récap sur la sorte `instant` : une sorte ne s'invente pas.
+      { token: `${version}.${id}.instant.${signature}` },
       { token: `${version}.${id}.recap.${flipped}` },
       { token: createUnsubscribeToken('another-secret-that-is-long-enough', inesId, 'recap') },
+      { token: createUnsubscribeToken('another-secret-that-is-long-enough', inesId, 'instant') },
       { token: `${version}.${id}.weekly.${signature}` },
       { token: `${version}.${id}.recap.${signature?.slice(0, 1)}` },
       { token: `${version}.${id}.recap.${signature}A` },
@@ -247,6 +428,7 @@ describe('an invalid link', () => {
       { token: '' },
       { token: `${token}${token}` },
       { token, scope: 'everything' },
+      { token: tokenOf(inesId, 'instant'), choice: 'now' },
       {},
     ]) {
       const body = await expectInvalid(await unsubscribe(params))
@@ -257,8 +439,8 @@ describe('an invalid link', () => {
     bodies.add(JSON.stringify(await expectInvalid(twice)))
 
     expect(bodies.size).toBe(1)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: true, mentionEmails: true })
-    expect(await act.preferences(malik)).toEqual({ weeklyRecap: true, mentionEmails: true })
+    expect(await act.preferences(ines)).toEqual(INES)
+    expect(await act.preferences(malik)).toEqual(MALIK)
   })
 
   it('gives the same 400 to the link of a deleted account, without creating anything', async () => {
@@ -273,9 +455,19 @@ describe('an invalid link', () => {
     const unknownBody = await expectInvalid(unknown)
 
     const deleted = await expectInvalid(await unsubscribe({ token: tokenOf(zoeId, 'recap') }))
+    const deletedInstant = await expectInvalid(
+      await unsubscribe({ token: tokenOf(zoeId, 'instant') }),
+    )
 
     expect(deleted).toEqual(unknownBody)
+    expect(deletedInstant).toEqual(unknownBody)
     expect(await ctx.db.select().from(schema.user).where(eq(schema.user.id, zoeId))).toHaveLength(0)
+    expect(
+      await ctx.db
+        .select()
+        .from(schema.emailPreference)
+        .where(eq(schema.emailPreference.userId, zoeId)),
+    ).toHaveLength(0)
   })
 
   it('says it in the language of the visitor', async () => {
@@ -294,7 +486,7 @@ describe('an invalid link', () => {
     const logs = (['log', 'info', 'warn', 'error'] as const).map((method) =>
       vi.spyOn(console, method).mockImplementation(() => {}),
     )
-    const token = tokenOf(inesId, 'recap')
+    const token = tokenOf(inesId, 'instant')
 
     await unsubscribe({ token })
     await unsubscribe({ token: `${token}x` })
@@ -327,7 +519,7 @@ describe('the limits', () => {
     )
     expect(elsewhere.status).toBe(204)
     later(HOUR)
-    expect((await unsubscribe({ token: tokenOf(inesId, 'mentions') })).status).toBe(204)
+    expect((await unsubscribe({ token: tokenOf(inesId, 'instant') })).status).toBe(204)
   })
 
   // Audit de sécurité du 7/11/2026, N3 : tout un réseau IPv6 « /64 » compte comme une seule
@@ -348,17 +540,17 @@ describe('the limits', () => {
     expect((await act.preferences(ines)).weeklyRecap).toBe(true)
   })
 
-  it('answers 10 valid links an hour per member, whatever the address', async () => {
+  it('answers 10 valid links an hour per member, whatever the address and the kind', async () => {
     for (let i = 0; i < 10; i++) {
       const res = await unsubscribe(
-        { token: tokenOf(inesId, 'recap') },
+        { token: tokenOf(inesId, i % 2 === 0 ? 'recap' : 'instant') },
         { headers: { 'x-real-ip': `198.51.100.${i + 1}` } },
       )
       expect(res.status).toBe(204)
     }
 
     const blocked = await unsubscribe(
-      { token: tokenOf(inesId, 'recap') },
+      { token: tokenOf(inesId, 'instant') },
       { headers: { 'x-real-ip': '198.51.100.50' } },
     )
     expect(blocked.status).toBe(429)
@@ -367,9 +559,11 @@ describe('the limits', () => {
   })
 })
 
-// Décision de Louis (restauration, option a) : chaque refus laisse une ligne de journal,
-// « Unsubscribe <identifiant> <recap|mentions|all> », pour pouvoir le réappliquer après la
-// restauration d'une sauvegarde (docs/ops/serveur.md). Ni adresse, ni nom, ni jeton.
+// Décision de Louis (restauration, option a) : chaque refus laisse une ligne de journal, pour
+// pouvoir le réappliquer après la restauration d'une sauvegarde (docs/ops/serveur.md). Ni adresse,
+// ni nom, ni jeton. R8 (relecture du plan, jur-2b) : une ligne par baisse de choix,
+// « Unsubscribe <identifiant> <type|instant> <digest|never> » ; le récap coupé garde
+// « Unsubscribe <identifiant> recap ».
 describe('the trace of an unsubscribe, for a restored backup', () => {
   /** Ce que l'API écrit dans ses journaux pendant `action`, ligne par ligne. */
   const logsDuring = async (action: () => unknown) => {
@@ -380,17 +574,20 @@ describe('the trace of an unsubscribe, for a restored backup', () => {
     return logs.flatMap((spy) => spy.mock.calls.map((args) => args.map(String).join(' ')))
   }
 
-  it('writes one line with the member and what was turned off, and nothing else about them', async () => {
+  const unsubscribeLines = (lines: string[]) =>
+    lines.filter((line) => line.startsWith('Unsubscribe '))
+
+  it('writes one line with the member and what was lowered, and nothing else about them', async () => {
     const lines = await logsDuring(async () => {
       await unsubscribe({ token: tokenOf(inesId, 'recap') })
-      await unsubscribe({ token: tokenOf(malikId, 'mentions') })
-      await unsubscribe({ token: tokenOf(malikId, 'recap'), scope: 'all' })
+      await unsubscribe({ token: tokenOf(inesId, 'instant') })
+      await unsubscribe({ token: tokenOf(malikId, 'instant'), choice: 'never' })
     })
 
-    expect(lines.filter((line) => line.startsWith('Unsubscribe '))).toEqual([
+    expect(unsubscribeLines(lines)).toEqual([
       `Unsubscribe ${inesId} recap`,
-      `Unsubscribe ${malikId} mentions`,
-      `Unsubscribe ${malikId} all`,
+      `Unsubscribe ${inesId} instant digest`,
+      `Unsubscribe ${malikId} instant never`,
     ])
     const written = lines.join('\n')
     for (const secret of ['ines@example.com', 'malik@example.com', 'Inès', 'Malik']) {
@@ -402,16 +599,41 @@ describe('the trace of an unsubscribe, for a restored backup', () => {
     expect(`${inesId} ${malikId}`).toMatch(/^[A-Za-z0-9]+ [A-Za-z0-9]+$/)
   })
 
-  it('writes nothing for an invalid link or a deleted account', async () => {
+  it('writes a line the restore can read for an old mentions link and for scope=all', async () => {
+    // Chaque ligne dit ce qui a baissé, sous une forme que la procédure de restauration relit.
+    const restorable = new RegExp(
+      `^Unsubscribe ${inesId} (recap|all|mentions|instant (digest|never)|(reactions|comments|replies|follows|updates|testers) (digest|never))$`,
+    )
+    const mentions = unsubscribeLines(
+      await logsDuring(() => unsubscribe({ token: tokenOf(inesId, 'mentions') })),
+    )
+    expect(mentions).toHaveLength(1)
+    expect(mentions[0]).toMatch(restorable)
+
+    await setAll(ines, { replies: 'now' })
+    const all = unsubscribeLines(
+      await logsDuring(() =>
+        unsubscribe({ token: tokenOf(inesId, 'instant'), scope: 'all', choice: 'never' }),
+      ),
+    )
+    expect(all.length).toBeGreaterThan(0)
+    for (const line of all) expect(line).toMatch(restorable)
+    // Le récap coupé et les types passés à « Jamais » s'y lisent tous les deux.
+    expect(all.join('\n')).toMatch(/ (recap|all)$/m)
+    expect(all.join('\n')).toMatch(/ never$/m)
+  })
+
+  it('writes nothing for an invalid link, a refused choice or a deleted account', async () => {
     const lines = await logsDuring(async () => {
       await expectInvalid(await unsubscribe({ token: `${tokenOf(inesId, 'recap')}x` }))
+      await expectInvalid(await unsubscribe({ token: tokenOf(inesId, 'instant'), choice: 'now' }))
       await act.deleteAccount(malik, 'malik-long-password')
-      await expectInvalid(await unsubscribe({ token: tokenOf(malikId, 'recap') }))
+      await expectInvalid(await unsubscribe({ token: tokenOf(malikId, 'instant') }))
     })
 
-    expect(lines.filter((line) => line.startsWith('Unsubscribe '))).toEqual([])
+    expect(unsubscribeLines(lines)).toEqual([])
     // Témoin : un lien valide écrit bien sa ligne.
-    const after = await logsDuring(() => unsubscribe({ token: tokenOf(inesId, 'mentions') }))
-    expect(after).toContain(`Unsubscribe ${inesId} mentions`)
+    const after = await logsDuring(() => unsubscribe({ token: tokenOf(inesId, 'instant') }))
+    expect(after).toContain(`Unsubscribe ${inesId} instant digest`)
   })
 })
