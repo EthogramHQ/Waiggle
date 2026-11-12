@@ -77,9 +77,18 @@ describe('emailSummary', () => {
     )
   })
 
-  it('says the rest stays in the Activity when no other type goes in the recap', () => {
-    expect(inFrench({ ...allTypes('never'), replies: 'now' })).toBe(
+  it('says the rest stays in the Activity when no other type goes in the recap and the recap is off', () => {
+    expect(inFrench({ ...allTypes('never', false), replies: 'now' })).toBe(
       fr.t(($) => $.notifications.summary.nowOnly, { types: 'Les réponses et les mentions' }),
+    )
+  })
+
+  // Relecture juridique de R8 (Louis, 12/11/2026) : le récap activé apporte encore les nouveaux
+  // projets des proches (choix 7 du scénario), même quand aucun type n'y passe. Ce test disait
+  // « le reste seulement dans l'Activité » : il contredisait le scénario.
+  it('says the recap still brings the new projects of the people I follow when no type goes in it', () => {
+    expect(inFrench({ ...allTypes('never'), replies: 'now' })).toBe(
+      fr.t(($) => $.notifications.summary.nowFriends, { types: 'Les réponses et les mentions' }),
     )
   })
 
@@ -98,8 +107,14 @@ describe('emailSummary', () => {
     )
   })
 
-  it('says nothing leaves when every type is « never »', () => {
-    expect(inFrench(allTypes('never'))).toBe(fr.t(($) => $.notifications.summary.nothing))
+  it('says nothing leaves when every type is « never » and the recap is off', () => {
+    expect(inFrench(allTypes('never', false))).toBe(fr.t(($) => $.notifications.summary.nothing))
+  })
+
+  // Même relecture : ce test attendait « Aucun e-mail de notification : tout reste dans
+  // l'Activité » avec le récap activé, alors que le récap part encore le dimanche.
+  it('never says nothing leaves while the recap is on, since it still brings the new projects of the people I follow', () => {
+    expect(inFrench(allTypes('never'))).toBe(fr.t(($) => $.notifications.summary.nothingFriends))
   })
 
   it('writes the list the English way, with a capital first letter', () => {

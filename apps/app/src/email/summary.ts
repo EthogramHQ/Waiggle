@@ -42,7 +42,12 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
     : []
   const someLeftOut = inRecap.length > 0 && inRecap.length < rest.length
 
+  // Le récap activé part même sans aucun type « dans le récap » : il apporte les nouveaux projets
+  // des proches (choix 7 du scénario). La phrase ne dit donc jamais « rien ne part » dans ce cas.
+  const friendsOnly = preferences.weeklyRecap && inRecap.length === 0
+
   if (now.length === 0) {
+    if (friendsOnly) return t(($) => $.notifications.summary.nothingFriends)
     if (inRecap.length === 0) return t(($) => $.notifications.summary.nothing)
     return someLeftOut
       ? t(($) => $.notifications.summary.recapSome)
@@ -51,6 +56,7 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
 
   const names = now.map((type) => t(($) => $.notifications.summary.types[type]))
   const list = capitalize(joinList(names, language), language)
+  if (friendsOnly) return t(($) => $.notifications.summary.nowFriends, { types: list })
   if (inRecap.length === 0) return t(($) => $.notifications.summary.nowOnly, { types: list })
   return someLeftOut
     ? t(($) => $.notifications.summary.nowAndSome, { types: list })
