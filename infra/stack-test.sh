@@ -137,9 +137,13 @@ EOF
 step "Une adresse inconnue mène à « introuvable », avec le code 404"
 page_in_image +not-found.html >"$WORK/not-found"
 # /catalogue : un outil de développement, construit avec l'appli (audit de sécurité du 7/11/2026).
+# --path-as-is envoie le chemin tel quel, sans en retirer les « /./ » : Caddy 2.11.7 servait
+# /_sitemap.html/./ et /catalogue.html/./ (GHSA-25cw, corrigé en 2.11.9, montées du 12/11/2026).
+# /catalogue.html/ et /%63atalogue (« c » encodé) : d'autres façons d'écrire le même nom.
 for path in /nope /projects /projects/a/b/c /members /tags/a/b /sign-in/extra /_sitemap /_sitemap.html \
-  /catalogue /catalogue.html /catalogue.php; do
-  status=$(web -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
+  /catalogue /catalogue.html /catalogue.php /catalogue.html/ /%63atalogue /_sitemap.html/./ \
+  /catalogue.html/./; do
+  status=$(web --path-as-is -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
   expect "code HTTP de $path" "$status" 404
   cmp -s "$WORK/not-found" "$WORK/body" || die "$path ne sert pas la page introuvable"
   echo "ok : $path → 404"

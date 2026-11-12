@@ -22,11 +22,5 @@
     "package": "better-auth",
     "reason": "audit du 7/11/2026, N1 : vise le plugin des organisations, que nous n'avons pas (plugins: [expo()]) ; montée en 1.7.18 le 12/11",
     "until": "2026-11-13"
-  },
-  {
-    "ghsa": "GHSA-r766-rf9f-588h",
-    "package": "github.com/caddyserver/caddy/v2",
-    "reason": "audit du 7/11/2026, N6 : vise une racine de fichiers qui dépend du nom d'hôte ; la nôtre est fixe (root * /srv/app), sur des sites nommés ; montée en 2.11.9 le 12/11",
-    "until": "2026-11-13"
   }
 ]

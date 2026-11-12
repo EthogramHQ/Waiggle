@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@better-auth/expo": "1.7.13",
-    "@hono/node-server": "2.1.5",
+    "@hono/node-server": "2.1.6",
     "@hono/zod-openapi": "1.6.3",
     "@ruche/brand": "workspace:*",
     "@ruche/contracts": "workspace:*",
@@ -23,7 +23,7 @@
     "@ruche/i18n": "workspace:*",
     "better-auth": "1.7.13",
     "drizzle-orm": "0.45.4",
-    "hono": "4.13.14",
+    "hono": "4.13.16",
     "pg-boss": "12.38.0",
     "sharp": "0.35.5",
     "thumbhash": "0.1.1",
