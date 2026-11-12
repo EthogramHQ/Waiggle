@@ -7,10 +7,16 @@
 // « Tout couper » arrête aussi l'autre sorte d'e-mail de notification ; les e-mails du compte
 // (vérification de l'adresse) continuent, et la page le dit.
 //
-// La sorte d'e-mail (le récap ou les mentions) est écrite dans le jeton : la page la lit pour poser
-// la bonne question, mais seule l'API vérifie la signature. La page ne montre aucune donnée du
-// membre, ni nom ni adresse, même s'il est connecté (relecture juridique, R6).
-import { UnsubscribeToken } from '@ruche/contracts'
+// La sorte d'e-mail (le récap, les mentions, ou depuis R8 l'e-mail « tout de suite ») est écrite
+// dans le jeton : la page la lit pour poser la bonne question, mais seule l'API vérifie la
+// signature. La page ne montre aucune donnée du membre, ni nom ni adresse, même s'il est connecté
+// (relecture juridique, R6).
+//
+// R8 (planche `R8-Email-TdS`) : le lien d'un e-mail « tout de suite ». La page ne sait pas quels
+// types sont réglés ainsi (elle sert sans connexion) : elle demande ce qu'ils deviennent, « Dans le
+// récap » (coché d'avance) ou « Jamais ». Toucher un choix n'envoie rien ; seul « Confirmer » envoie
+// le choix. « Tout couper » reste proposé ensuite, comme pour les autres sortes.
+import { type DigestOnlyChoice, UnsubscribeToken } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -20,6 +26,7 @@ import { firstParam } from '../navigation/params'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Emblem } from '../ui/Illustrations'
+import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
@@ -39,7 +46,8 @@ type Step = 'ask' | 'done' | 'allDone' | 'invalid'
 const kindOf = (token: string | undefined) => {
   const parsed = UnsubscribeToken.safeParse(token ?? '')
   if (!parsed.success) return null
-  return parsed.data.split('.')[2] === 'mentions' ? ('mentions' as const) : ('recap' as const)
+  const kind = parsed.data.split('.')[2]
+  return kind === 'mentions' || kind === 'instant' ? kind : ('recap' as const)
 }
 
 /**
@@ -61,6 +69,10 @@ export function UnsubscribeScreen() {
   const [step, setStep] = useState<Step>('ask')
   const [sending, setSending] = useState(false)
   const [failure, setFailure] = useState<ApiErrorKey | null>(null)
+  // R8, lien « tout de suite » : le choix coché (« Dans le récap » d'avance), et celui que
+  // « Confirmer » a envoyé, pour que le message dise ce qui a été fait.
+  const [choice, setChoice] = useState<DigestOnlyChoice>('digest')
+  const [sentChoice, setSentChoice] = useState<DigestOnlyChoice>('digest')
   // Un envoi à la fois : deux touchers rapides n'envoient qu'une demande (l'état `sending`, lui,
   // n'est à jour qu'au dessin suivant).
   const busy = useRef(false)
@@ -93,7 +105,12 @@ export function UnsubscribeScreen() {
     busy.current = true
     setSending(true)
     setFailure(null)
-    const result = await unsubscribe(token, scope)
+    // Le lien « tout de suite » envoie le choix coché ; les autres liens, le jeton seul (et
+    // `scope=all` pour « Tout couper »), comme avant R8.
+    const asked = !scope && kind === 'instant' ? choice : null
+    const result = asked
+      ? await unsubscribe(token, undefined, asked)
+      : await unsubscribe(token, scope)
     busy.current = false
     setSending(false)
     if (result.ok || result.error === 'validation') {
@@ -101,6 +118,7 @@ export function UnsubscribeScreen() {
       const next: Step = !result.ok ? 'invalid' : scope ? 'allDone' : 'done'
       stepNow.current = next
       doneAt.current = Date.now()
+      if (asked) setSentChoice(asked)
       focusMessage.current = true
       setStep(next)
     } else {
@@ -114,7 +132,20 @@ export function UnsubscribeScreen() {
   // répondu (relecture de design de 6c), puis redevient « Tes e-mails ».
   const pageTitle = invalid ? t(($) => $.unsubscribe.invalidTitle) : t(($) => $.unsubscribe.title)
   const question =
-    kind === 'mentions' ? t(($) => $.unsubscribe.askMentions) : t(($) => $.unsubscribe.askRecap)
+    kind === 'instant'
+      ? t(($) => $.unsubscribe.titleInstant)
+      : kind === 'mentions'
+        ? t(($) => $.unsubscribe.askMentions)
+        : t(($) => $.unsubscribe.askRecap)
+  // Ce que dit la confirmation, selon le lien et, pour « tout de suite », le choix envoyé.
+  const doneMessage =
+    kind === 'instant'
+      ? sentChoice === 'never'
+        ? t(($) => $.unsubscribe.doneInstantNever)
+        : t(($) => $.unsubscribe.doneInstantDigest)
+      : kind === 'mentions'
+        ? t(($) => $.unsubscribe.doneMentions)
+        : t(($) => $.unsubscribe.doneRecap)
   const heading = hydrated && !invalid && step === 'ask' ? question : pageTitle
   const manage = (
     <Stack align="center">
@@ -148,6 +179,33 @@ export function UnsubscribeScreen() {
     </Fragment>
   ) : step === 'ask' ? (
     <Fragment key="ask">
+      {kind === 'instant' ? (
+        <>
+          <Text>{t(($) => $.unsubscribe.askInstant)}</Text>
+          {/* Deux choix, « Dans le récap » coché d'avance ; les toucher n'envoie rien. Pendant
+              l'envoi, ils ne répondent plus : le choix parti reste celui qu'on voit. */}
+          <ListGroup radio label={t(($) => $.unsubscribe.titleInstant)}>
+            {(['digest', 'never'] as const).map((value) => (
+              <ListRow
+                key={value}
+                label={
+                  value === 'digest'
+                    ? t(($) => $.unsubscribe.choiceDigest)
+                    : t(($) => $.unsubscribe.choiceNever)
+                }
+                detail={
+                  value === 'digest'
+                    ? t(($) => $.unsubscribe.choiceDigestHint)
+                    : t(($) => $.unsubscribe.choiceNeverHint)
+                }
+                selected={choice === value}
+                disabled={sending}
+                onPress={() => setChoice(value)}
+              />
+            ))}
+          </ListGroup>
+        </>
+      ) : null}
       {failureNotice}
       <Button
         label={t(($) => $.unsubscribe.confirm)}
@@ -157,20 +215,16 @@ export function UnsubscribeScreen() {
       <Stack align="center">
         <TextLink label={t(($) => $.unsubscribe.keep)} onPress={() => router.replace('/')} />
       </Stack>
+      {kind === 'instant' ? (
+        <Text variant="callout" tone="muted" align="center">
+          {t(($) => $.unsubscribe.onlyConfirm)}
+        </Text>
+      ) : null}
     </Fragment>
   ) : step === 'done' ? (
     <Fragment key="done">
       {/* Une confirmation, lue sans couper le lecteur d'écran (role « status »). */}
-      <Notice
-        ref={messageRef}
-        tone="success"
-        polite
-        message={
-          kind === 'mentions'
-            ? t(($) => $.unsubscribe.doneMentions)
-            : t(($) => $.unsubscribe.doneRecap)
-        }
-      />
+      <Notice ref={messageRef} tone="success" polite message={doneMessage} />
       {/* « Gérer mes e-mails » vient avant « Tout couper », pour l'éloigner de la place qu'avait
           « Confirmer » : la page se centre dans la hauteur, et le titre raccourcit après la
           réponse ; sans ce lien entre les deux, « Tout couper » remontait sous le doigt (à 3 pt

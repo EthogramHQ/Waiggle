@@ -65,7 +65,7 @@ export function SettingsSection({
 }) {
   switch (section) {
     case 'notifications':
-      return <EmailSettings titled={false} />
+      return <EmailSettings />
     case 'language':
       return <LanguageSection />
     case 'appearance':
