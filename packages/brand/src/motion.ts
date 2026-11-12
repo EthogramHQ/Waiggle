@@ -37,6 +37,7 @@ export const durations = {
   long: 720, // une grande entrée (l'affiche d'un écran de marque)
   lightFade: 900, // la lumière d'ambiance qui passe d'une source à l'autre
   toast: 2400, // temps de lecture minimal d'un toast (un texte long reste plus longtemps)
+  lit: 1500, // le miel d'un commentaire visé depuis une notification, avant qu'il s'éteigne (R8)
   dance: 2300, // un tour de danse de l'abeille
   heart: 2600, // un battement de cœur de la mascotte
   portal: 4200, // le passage par le portail (un lien qui sort de l'appli)

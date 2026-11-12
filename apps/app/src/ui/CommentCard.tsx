@@ -27,7 +27,11 @@
 // l'auteur et le début du texte (« Léa Moreau : Super idée… »), et le lecteur d'écran dit lequel.
 // L'écran garde une poignée (`handle`) pour ramener le focus sur « … » ou « Répondre » (après la
 // fermeture de la feuille, une suppression voisine).
-import { layout, radii, space } from '@ruche/brand'
+//
+// R8, « Voir en contexte » : le commentaire visé par une notification est éclairé (`lit`) d'un fond
+// miel cerclé d'un anneau, qui s'éteint en 1,5 s ; l'écran y pose le focus (`focusSelf`), pour que
+// le lecteur d'écran commence par lui.
+import { durations, layout, radii, space } from '@ruche/brand'
 import {
   COMMENT_FOLD_LINES,
   type CommentReply,
@@ -35,9 +39,16 @@ import {
   type Mention,
   splitMentions,
 } from '@ruche/contracts'
-import { type Ref, type RefObject, useId, useImperativeHandle, useRef } from 'react'
+import { type Ref, type RefObject, useEffect, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { View } from 'react-native'
+import { Platform, View } from 'react-native'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated'
 import { useNameOf } from '../useNameOf'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { Avatar } from './Avatar'
@@ -55,6 +66,7 @@ import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { useLargeText } from './textScale'
+import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 export type { ActionMenuItem } from './ActionMenu'
@@ -69,6 +81,12 @@ export type CommentCardHandle = {
   focusCard: () => boolean
   /** La vue de la carte, pour l'amener en vue dans une liste (`reveal` de la feuille). */
   view: () => unknown
+  /**
+   * R8 : pose le focus sur le commentaire lui-même (le commentaire visé par une notification), sans
+   * faire défiler ; sur téléphone, y amène le lecteur d'écran. Vrai si c'était possible (une carte
+   * écrite, pas un emplacement ni l'aperçu).
+   */
+  focusSelf: () => boolean
 }
 
 /** Qui a masqué le commentaire, vu par celui qui regarde : lui-même, ou l'auteur du projet. */
@@ -90,6 +108,13 @@ type Props = {
   isProjectTester?: boolean
   /** Le commentaire visé par une réponse ou une modification en cours : le miel pâle. */
   highlighted?: boolean
+  /**
+   * R8 : le commentaire visé par une notification (« Voir en contexte ») : un fond miel cerclé d'un
+   * anneau, qui s'éteint en 1,5 s pour qu'on le trouve d'un coup d'œil. Avec « Réduire les
+   * animations », la teinte reste le même temps, immobile, puis disparaît d'un coup. Il se rallume
+   * si la prop repasse à vrai.
+   */
+  lit?: boolean
   /**
    * Pourquoi un emplacement `hidden` est gardé alors que personne ne l'a masqué : le projet est
    * privé, ou retiré par la modération (l'API rend ce même état pour le commentaire d'un autre sur
@@ -155,6 +180,11 @@ const NAME_HANG = space.sm
 const ACTION_HANG = space.md
 /** L'aperçu montre le début du texte : au plus ces lignes, la feuille donne le reste. */
 const COMPACT_LINES = 3
+/**
+ * L'épaisseur de l'anneau d'une carte éclairée (R8, `lit`), en points : le halo d'un bouton radio
+ * choisi (Radio), ici en miel clair (planche `R8-Contexte`).
+ */
+const LIT_RING = 3
 
 /** L'icône et la phrase de chaque emplacement (planche `R5b-Menu-Etats`). */
 const PLACEHOLDERS: Record<
@@ -210,6 +240,7 @@ export function CommentCard({
   isProjectAuthor,
   isProjectTester = false,
   highlighted = false,
+  lit = false,
   keptBecause,
   compact = false,
   menu,
@@ -238,13 +269,52 @@ export function CommentCard({
   const replyRef = useRef<View>(null)
   const cardRef = useRef<View>(null)
   const frameRef = useRef<View>(null)
+  // Le lien du nom : sur téléphone, c'est là que le lecteur d'écran se pose quand l'écran demande
+  // le commentaire lui-même (`focusSelf`). Le cadre de la carte n'est pas un élément qu'il sait
+  // atteindre (le rendre `accessible` cacherait ses liens et ses boutons à VoiceOver) ; depuis le
+  // nom, il lit la date puis le texte.
+  const authorRef = useRef<View>(null)
   // useImperativeHandle : ce que l'écran reçoit dans `handle`, à la place de la vue elle-même.
   useImperativeHandle(handle, () => ({
     focusMenu: () => focusOn(menuRef),
     focusReply: () => focusOn(replyRef),
     focusCard: () => focusOn(cardRef),
     view: () => frameRef.current,
+    focusSelf: () => {
+      if (Platform.OS !== 'web') {
+        if (!authorRef.current) return false
+        moveReaderTo(authorRef.current)
+        return true
+      }
+      // Sur le web, le cadre lui-même : focalisable sans devenir une étape de Tab (tabIndex -1,
+      // posé au rendu quand la carte est éclairée, ou ici si l'écran le demande sans l'éclairer).
+      // Le lecteur d'écran lit son nom, « Papi Jean : … » ; Tab repart de là, vers le nom.
+      const frame = frameRef.current as unknown as {
+        setAttribute?: (name: string, value: string) => void
+      } | null
+      if (!frame || !authorRef.current) return false
+      frame.setAttribute?.('tabindex', '-1')
+      return focusWithoutScroll(frame)
+    },
   }))
+
+  // L'éclat du commentaire visé (R8, `lit`) : 1 tout allumé, 0 éteint. Une « valeur partagée » de
+  // Reanimated, animée sur le fil des animations sans redessiner la carte à chaque image.
+  const calm = useCalmMotion()
+  const glow = useSharedValue(0)
+  useEffect(() => {
+    if (!lit) {
+      glow.value = 0
+      return
+    }
+    glow.value = 1
+    glow.value = calm
+      ? // Sans mouvement : la teinte reste le même temps, immobile, puis part d'un coup.
+        withDelay(durations.lit, withTiming(0, { duration: 0 }))
+      : // Elle reste presque entière au début (courbe « in »), le temps de la trouver, puis s'éteint.
+        withTiming(0, { duration: durations.lit, easing: Easing.in(Easing.quad) })
+  }, [lit, calm, glow])
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }))
 
   const { author } = comment
   const { large, probe } = useLargeText()
@@ -482,11 +552,37 @@ export function CommentCard({
     // le surlignage arrive ou part, et il reste de l'air entre deux cartes grises (space.md − space.sm).
     <View
       ref={frameRef}
+      // Éclairée (R8), sur le web : un groupe nommé par l'auteur et le début du texte, que l'écran
+      // peut focaliser sans l'ajouter au parcours de Tab ; le lecteur d'écran dit d'abord lequel.
+      {...(lit && Platform.OS === 'web'
+        ? { role: 'group' as const, 'aria-label': described, tabIndex: -1 as const }
+        : null)}
       style={[
         { borderRadius: radii.small, paddingHorizontal: space.sm },
         tint && { ...tint, paddingBottom: space.sm, marginBottom: -space.sm },
       ]}
     >
+      {/* L'éclat (R8, `lit`) : une couche posée sous le contenu (première enfant : derrière les
+          autres), du même dessin que le fond d'une carte visée, plus l'anneau de miel ; elle
+          déborde sous la carte comme ce fond, et s'éteint seule. Toujours montée, à 0 quand la
+          carte n'est pas éclairée : rien ne bouge autour quand elle s'allume. */}
+      <Animated.View
+        pointerEvents="none"
+        aria-hidden
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: -space.sm,
+            borderRadius: radii.small,
+            backgroundColor: colors.highlightSoft,
+            boxShadow: `0 0 0 ${LIT_RING}px ${colors.honeyLight}`,
+          },
+          glowStyle,
+        ]}
+      />
       {probe}
       {yours}
       <ActionDescription id={descriptionId} text={described} />
@@ -543,6 +639,7 @@ export function CommentCard({
             <View style={{ flexShrink: 1, maxWidth: '100%', marginVertical: -hang, zIndex: 1 }}>
               <View style={{ marginLeft: -overPhoto }}>
                 <Pressed
+                  ref={authorRef}
                   label={
                     isProjectAuthor
                       ? t(($) => $.project.comments.authorLink, { name: author.name })
