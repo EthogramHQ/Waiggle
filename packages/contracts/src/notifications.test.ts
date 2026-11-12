@@ -14,10 +14,17 @@ import {
   UnreadCount,
 } from './notifications'
 import { TESTER_EXCERPT_MAX } from './testers'
+import { TOOL_NAME_MAX } from './tools'
 
 const projectId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const commentId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
-const meteo = { id: projectId, title: 'Météo' }
+// R8 : chaque projet nommé porte sa miniature (`cover`), null quand il n'a pas de photo.
+const meteo = { id: projectId, title: 'Météo', cover: null }
+/** Une couverture : l'adresse de la photo et son ThumbHash, rien d'autre (R8, relecture ui-B1). */
+const cover = {
+  url: 'http://localhost:3000/v1/media/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f9',
+  thumbhash: 'HBkSHYSIeHiPiHh8eJd4eTN0EEQG',
+}
 const at = '2026-10-20T09:30:00.000Z'
 
 const reactions = {
@@ -98,6 +105,43 @@ const feedbackSettled = {
   update: { id: '4b1c2d3e-0000-4000-8000-000000000004', version: 'v1.3', createdAt: at },
 }
 
+// R7a : une mise à jour d'un projet suivi ; R8 lui ajoute le nombre des autres lignes.
+const projectUpdate = {
+  id: 'project_update:4b1c2d3e-0000-4000-8000-000000000006',
+  at,
+  isNew: true,
+  kind: 'project_update',
+  project: { ...meteo, cover },
+  author: papiJean,
+  update: {
+    id: '4b1c2d3e-0000-4000-8000-000000000006',
+    title: 'Le vent',
+    version: 'v1.4',
+    firstLine: { family: 'new', text: 'La force du vent, heure par heure' },
+    moreLines: 2,
+  },
+}
+
+// R8 : les deux notifications du catalogue, signées par l'équipe, sans nom d'administrateur.
+const projectCategory = {
+  id: 'project_category:4b1c2d3e-0000-4000-8000-000000000007',
+  at,
+  isNew: true,
+  kind: 'project_category',
+  project: { id: projectId, title: 'Quel papillon ?', cover },
+  category: 'animals',
+}
+const toolAdded = {
+  id: 'tool_added:4b1c2d3e-0000-4000-8000-000000000008',
+  at,
+  isNew: false,
+  kind: 'tool_added',
+  merged: false,
+  typedName: 'glide',
+  toolSlug: 'glide',
+  toolName: 'Glide',
+}
+
 const all = [
   reactions,
   projectFollows,
@@ -108,10 +152,13 @@ const all = [
   testerCall,
   testerMessage,
   feedbackSettled,
+  projectUpdate,
+  projectCategory,
+  toolAdded,
 ]
 
 describe('Notification', () => {
-  it('describes each of the nine kinds', () => {
+  it('describes each kind', () => {
     for (const notification of all) {
       expect(Notification.parse(notification), notification.kind).toEqual(notification)
     }
@@ -237,6 +284,123 @@ describe('the notifications of the testers corner (R7b)', () => {
       })
     }
     expect(Notification.safeParse({ ...removed, targetKind: 'thread' }).success).toBe(false)
+  })
+})
+
+// R8 : la miniature du projet nommé (relecture du plan ui-B1). Elle reprend l'adresse et le
+// ThumbHash d'une photo du projet, et rien d'autre : ni ses dimensions, ni sa description.
+describe('the cover of a notified project (R8)', () => {
+  it('gives the address and the thumbhash of the cover, or null without a photo', () => {
+    expect(Notification.parse(projectCategory)).toMatchObject({ project: { cover } })
+    expect(Notification.parse(reactions)).toMatchObject({ project: { cover: null } })
+  })
+
+  it('always says whether there is a cover: a project without the field is refused', () => {
+    const { cover: _cover, ...withoutCover } = meteo
+    expect(Notification.safeParse({ ...comment, project: withoutCover }).success).toBe(false)
+  })
+
+  it('refuses a cover without its thumbhash, or with an address that is not one', () => {
+    const { thumbhash: _thumbhash, ...urlOnly } = cover
+    expect(
+      Notification.safeParse({ ...hidden, project: { ...meteo, cover: urlOnly } }).success,
+    ).toBe(false)
+    expect(
+      Notification.safeParse({
+        ...hidden,
+        project: { ...meteo, cover: { ...cover, url: 'photo' } },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('carries nothing else of the photo than its address and its thumbhash', () => {
+    const parsed = Notification.parse({
+      ...hidden,
+      project: {
+        ...meteo,
+        cover: { ...cover, width: 800, height: 600, description: 'Le jardin de Léa' },
+      },
+    })
+    expect(parsed).toMatchObject({ project: { cover } })
+    expect(JSON.stringify(parsed)).not.toContain('Le jardin de Léa')
+    expect(JSON.stringify(parsed)).not.toContain('800')
+  })
+})
+
+describe('the update of a followed project (R8)', () => {
+  it('counts the other lines of the update, zero when it has only one', () => {
+    expect(Notification.parse(projectUpdate)).toMatchObject({ update: { moreLines: 2 } })
+    const single = { ...projectUpdate, update: { ...projectUpdate.update, moreLines: 0 } }
+    expect(Notification.parse(single)).toMatchObject({ update: { moreLines: 0 } })
+  })
+
+  it('refuses an update without the number of other lines, or with a negative or broken one', () => {
+    const { moreLines: _moreLines, ...withoutMore } = projectUpdate.update
+    expect(Notification.safeParse({ ...projectUpdate, update: withoutMore }).success).toBe(false)
+    for (const moreLines of [-1, 1.5, '2']) {
+      const update = { ...projectUpdate.update, moreLines }
+      expect(Notification.safeParse({ ...projectUpdate, update }).success, String(moreLines)).toBe(
+        false,
+      )
+    }
+  })
+})
+
+// R8 : les deux notifications du catalogue (renvoyées de R6b). Elles sont signées « L'équipe de
+// {{appName}} » par l'appli : rien dans le contrat ne peut porter l'administrateur qui a agi.
+describe('the notifications of the catalogue (R8)', () => {
+  it('gives the project filed and the code of its category, never the administrator', () => {
+    const parsed = Notification.parse({
+      ...projectCategory,
+      admin: { id: 'louis-id', name: 'Louis' },
+      adminId: 'louis-id',
+    })
+    expect(parsed).toEqual(projectCategory)
+    expect(JSON.stringify(parsed)).not.toContain('louis')
+  })
+
+  it('refuses a category that is not a code, and a filed project without its project', () => {
+    for (const category of ['Animaux', '', 'a/b']) {
+      expect(Notification.safeParse({ ...projectCategory, category }).success, category).toBe(false)
+    }
+    const { project: _project, ...withoutProject } = projectCategory
+    expect(Notification.safeParse(withoutProject).success).toBe(false)
+  })
+
+  it('tells an added tool from a merged one, with the name typed and the catalogue tool', () => {
+    const merged = {
+      ...toolAdded,
+      merged: true,
+      typedName: 'Glide app',
+      toolSlug: 'glide-apps',
+      toolName: 'Glide Apps',
+    }
+    expect(Notification.parse(merged)).toEqual(merged)
+    const { merged: _merged, ...withoutMerged } = toolAdded
+    expect(Notification.safeParse(withoutMerged).success).toBe(false)
+  })
+
+  it('keeps the typed name to 40 characters, like an « other » tool', () => {
+    expect(TOOL_NAME_MAX).toBe(40)
+    const typed = (length: number) => ({ ...toolAdded, typedName: 'g'.repeat(length) })
+    expect(Notification.safeParse(typed(TOOL_NAME_MAX)).success).toBe(true)
+    expect(Notification.safeParse(typed(TOOL_NAME_MAX + 1)).success).toBe(false)
+  })
+
+  it('refuses a tool slug that could slip something else into the address', () => {
+    for (const toolSlug of ['glide/../admin', 'glide apps', 'glide.app', '']) {
+      expect(Notification.safeParse({ ...toolAdded, toolSlug }).success, toolSlug).toBe(false)
+    }
+  })
+
+  it('names no project and no member in a tool notification', () => {
+    const parsed = Notification.parse({
+      ...toolAdded,
+      project: meteo,
+      projects: [projectId],
+      admin: { id: 'louis-id', name: 'Louis' },
+    })
+    expect(parsed).toEqual(toolAdded)
   })
 })
 
