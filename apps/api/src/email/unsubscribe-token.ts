@@ -1,6 +1,8 @@
 // Le jeton des liens de désinscription (tranche 6c). Il dit « le membre X peut couper telle sorte
 // d'e-mail », sans connexion, et rien d'autre : il ne donne accès à aucune donnée et ne rallume
-// jamais rien. Forme fixe : `v1.<id du membre en base64url>.<sorte>.<signature>`.
+// jamais rien. Forme fixe : `v1.<id du membre en base64url>.<sorte>.<signature>`. Les sortes :
+// `recap`, `mentions` (l'e-mail de 6c, dont les liens restent valables) et `instant` (R8, l'e-mail
+// « tout de suite ») ; la liste vient du contrat (`UnsubscribeKind`).
 //
 // La signature est une empreinte HMAC-SHA256 : un calcul qui mêle le texte signé et une clé
 // secrète. Sans la clé, impossible de fabriquer l'empreinte d'un autre texte (un autre membre, une
