@@ -18,7 +18,7 @@
 // d'une décision de la modération, qui reste absolue et visible sans survol (jur-J2).
 import type { Notification } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
@@ -38,6 +38,7 @@ import { Columns } from '../ui/Columns'
 import { EmailSummary } from '../ui/EmailSummary'
 import { FeedEnd, type FirstArrived, useFirstArrived } from '../ui/FeedEnd'
 import { IconButton } from '../ui/IconButton'
+import { LiveStatus } from '../ui/LiveStatus'
 import {
   NotificationCard,
   type NotificationLeading,
@@ -120,6 +121,13 @@ function MemberNotifications() {
 
   const items = list.data?.pages.flatMap((page) => page.items) ?? []
   const honey = useVisitHoney(items)
+  // Ce que dit le lecteur d'écran après « Tout marquer comme lu » : à l'œil, seul le miel s'éteint,
+  // et le bouton reste à sa place (relecture de l'interface de R8, Louis 12/11/2026).
+  const [allReadAnnounced, setAllReadAnnounced] = useState('')
+  const markAllRead = () => {
+    honey.markAllRead()
+    setAllReadAnnounced(t(($) => $.notifications.allMarkedRead))
+  }
   // La première notification arrivée avec la dernière page : le focus du clavier y va quand
   // « Afficher la suite » disparaît, la liste finissant sans phrase (jur-RF2).
   const arrived = useFirstArrived(items.length, list.isFetchingNextPage)
@@ -267,12 +275,17 @@ function MemberNotifications() {
       // l'appui (rien ne bouge sous le doigt) ; il n'a simplement plus rien à éteindre.
       titleAside={
         columns && items.length > 0 ? (
-          <Button
-            label={t(($) => $.notifications.markAllRead)}
-            variant="secondary"
-            size="compact"
-            onPress={honey.markAllRead}
-          />
+          <>
+            <Button
+              label={t(($) => $.notifications.markAllRead)}
+              variant="secondary"
+              size="compact"
+              onPress={markAllRead}
+            />
+            {/* Montée avec le bouton, vide jusqu'à l'appui : une région déjà connue du lecteur
+                d'écran annonce ce qui y change. Lue, jamais dessinée. */}
+            <LiveStatus message={allReadAnnounced} visible={false} />
+          </>
         ) : undefined
       }
       width={columns ? 'page' : undefined}

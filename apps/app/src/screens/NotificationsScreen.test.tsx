@@ -1053,6 +1053,23 @@ describe('the honey of what is new (R8)', () => {
     }
   })
 
+  // Relecture de l'interface de R8 : sans annonce, un membre aveugle ne savait pas si l'appui avait
+  // marché (seul le miel s'éteint, et le bouton reste là).
+  it('tells screen readers that everything is marked as read, on a computer', async () => {
+    const restoreWindow = setDesktopWindow()
+    try {
+      await renderWithProviders(<NotificationsScreen />)
+      // Témoin : rien n'est annoncé avant l'appui.
+      expect(screen.queryByText(t(($) => $.notifications.allMarkedRead))).toBeNull()
+
+      await fireEvent.press(control(t(($) => $.notifications.markAllRead)))
+
+      expect(screen.getByText(t(($) => $.notifications.allMarkedRead))).toBeTruthy()
+    } finally {
+      restoreWindow()
+    }
+  })
+
   it('offers « mark all as read » only on a computer', async () => {
     await renderWithProviders(<NotificationsScreen />)
 
