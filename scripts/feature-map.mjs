@@ -104,6 +104,17 @@ const features = [
     routes: /^(\w+ \/v1\/projects\/\{id\}\/visuals|GET \/media)/,
     tables: /^project_media$/,
   },
+  // R7b : le coin des testeurs. Avant « suivre », qui garde l'inscription et le départ de R7a
+  // (POST et DELETE …/testers) : la première fonctionnalité qui correspond l'emporte.
+  {
+    id: 'coin-testeurs',
+    name: 'Le coin des testeurs',
+    tranche: 'R7b',
+    pages: /^\/projects\/\[id\]\/testers/,
+    routes:
+      /^(\w+ \/v1\/projects\/\{id\}\/(calls|threads|messages|feedback|testers\/)|GET \/v1\/projects\/\{id\}\/testers$)/,
+    tables: /^(project_tester_removal|tester_(call|thread|message|media))$/,
+  },
   // Avant « membres » : la première fonctionnalité qui correspond l'emporte, et les routes de suivi
   // (/v1/members/{id}/follow) appartiennent à celle-ci.
   {

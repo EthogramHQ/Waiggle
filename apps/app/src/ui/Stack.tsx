@@ -38,6 +38,12 @@ type Props = {
    * premier avec la dernière page reçoit la vue que `FeedEnd` focalise (`useFirstArrived`, jur-RF2).
    */
   firstArrived?: FirstArrived
+  /**
+   * R7b : avec `accessibilityRole="list"`, les enfants sont déjà des éléments de liste (une bulle
+   * du fil, `MessageBubble`, pose elle-même son `listitem`) : la pile ne les enveloppe pas. Sinon,
+   * un élément de liste dans un autre, du HTML invalide que React signale (#418).
+   */
+  ownItems?: boolean
 }
 
 const alignments = {
@@ -65,6 +71,7 @@ export function Stack({
   ref,
   nativeID,
   firstArrived,
+  ownItems = false,
 }: Props) {
   const style: ViewStyle = {
     flexDirection: direction,
@@ -81,7 +88,7 @@ export function Stack({
   // Une liste annoncée (« liste, 8 éléments ») : chaque enfant y devient un élément de liste. Les
   // lecteurs d'écran disent ainsi combien il y en a, et permettent de sauter d'un élément au suivant.
   const items =
-    accessibilityRole === 'list'
+    accessibilityRole === 'list' && !ownItems
       ? Children.toArray(children).map((child, index) => (
           <View
             key={isValidElement(child) && child.key !== null ? child.key : index}

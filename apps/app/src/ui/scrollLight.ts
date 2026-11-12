@@ -44,6 +44,11 @@ export type ScreenScroll = {
    */
   jumpTo: (y: number) => void
   /**
+   * Fait défiler la zone qui défile jusqu'à sa fin, d'un saut (R7b, K11 : un fil s'ouvre sur son
+   * dernier message). Facultatif : un canal fait à la main (un test) peut ne pas l'offrir.
+   */
+  toEnd?: () => void
+  /**
    * La hauteur du haut de la fenêtre couverte par la barre fixe (0 quand la barre suit le contenu,
    * ou qu'il n'y en a pas). Tenue à jour par Screen ; la lumière qui suit le défilement compte son
    * « milieu de l'écran » dans la place qui reste dessous (ui-15).
@@ -64,6 +69,7 @@ export function useScreenScrollChannel(
   onScroll?: (event: ScrollEvent) => void,
   toTop?: () => void,
   jumpTo?: (y: number) => void,
+  toEnd?: () => void,
 ) {
   // Des « refs » : gardées d'un affichage à l'autre, sans rien redessiner quand elles changent.
   const listeners = useRef(new Set<ScrollListener>())
@@ -75,6 +81,8 @@ export function useScreenScrollChannel(
   latestToTop.current = toTop
   const latestJumpTo = useRef(jumpTo)
   latestJumpTo.current = jumpTo
+  const latestToEnd = useRef(toEnd)
+  latestToEnd.current = toEnd
 
   const subscribe = useCallback((listener: ScrollListener) => {
     listeners.current.add(listener)
@@ -91,6 +99,7 @@ export function useScreenScrollChannel(
     coveredTop,
     toTop: () => latestToTop.current?.(),
     jumpTo: (y) => latestJumpTo.current?.(y),
+    toEnd: () => latestToEnd.current?.(),
   }).current
 
   const handleScroll = useCallback((event: ScrollEvent) => {

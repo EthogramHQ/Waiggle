@@ -72,6 +72,7 @@ import { inLayerAbove, layerStillOpening, openModalLayer, sameLayer } from './mo
 import { Notice, type NoticeAction } from './Notice'
 import { SheetHeader } from './SheetHeader'
 import { Surface } from './Surface'
+import { SheetFade, useBelowFold } from './sheetFade'
 import { type SheetReveal, useSheetReveal } from './sheetReveal'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -1137,6 +1138,7 @@ export function SheetPanel({
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const reveal = useSheetReveal(revealRef, useCalmMotion())
+  const fold = useBelowFold()
   const phone = disposition === 'phone'
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par
   // son titre (celui de Sheet, quand la couche du Modal porte déjà le nom).
@@ -1378,10 +1380,21 @@ export function SheetPanel({
 
   // Le contenu, qui défile dans la feuille, le titre et le pied restant en place.
   // keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du premier
-  // coup.
+  // coup. Les mesures de la zone passent aussi au fondu du bas (`fold`), après celles de `reveal`.
+  const listProps = revealRef ? reveal.listProps : null
   const content = (
     <ScrollView
       {...(revealRef ? { ref: reveal.scroller, ...reveal.listProps } : null)}
+      scrollEventThrottle={16}
+      onScroll={(event) => {
+        listProps?.onScroll(event)
+        fold.onScroll(event)
+      }}
+      onLayout={(event) => {
+        listProps?.onLayout(event)
+        fold.onLayout(event)
+      }}
+      onContentSizeChange={fold.onContentSizeChange}
       style={{ flexShrink: 1 }}
       contentContainerStyle={{
         paddingHorizontal: space.xl,
@@ -1413,6 +1426,13 @@ export function SheetPanel({
           l'action est dans la tête, il n'y a pas de pied où la poser. */}
       {phone && footerNote ? footerNote : null}
     </ScrollView>
+  )
+  // Avec le fondu, posé juste après la zone qui défile, par-dessus son bas (voir `SheetFade`).
+  const scrolling = (
+    <>
+      {content}
+      {fold.more ? <SheetFade /> : null}
+    </>
   )
 
   // Les boutons du pied sur ordinateur (R6a, planche R6-Publier-Desktop) : la phrase à gauche, qui
@@ -1494,7 +1514,9 @@ export function SheetPanel({
             {/* Deux vues de largeur fixée autour des zones qui défilent : la largeur posée sur une
                 ScrollView de react-native-web n'était pas tenue (l'aperçu prenait 600 points et le
                 formulaire 230, capture du catalogue à 1440 px). */}
-            <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>{content}</View>
+            <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
+              {scrolling}
+            </View>
             <View style={{ width: ASIDE_WIDTH, flexGrow: 0, flexShrink: 0, minHeight: 0 }}>
               <ScrollView
                 style={{ flexShrink: 1 }}
@@ -1509,7 +1531,7 @@ export function SheetPanel({
             </View>
           </View>
         ) : (
-          content
+          scrolling
         )}
         {pinned ? (
           <View

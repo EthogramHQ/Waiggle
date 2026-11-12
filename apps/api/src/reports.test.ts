@@ -17,6 +17,9 @@
 // - le texte visé est copié depuis la base au moment du signalement, jamais pris du client ;
 // - 20 signalements par jour au plus, compteur consulté avant même de lire le corps.
 //
+// Tranche R7b : un appel à tester (`call`) et un message d'un fil de testeur (`message`) se signalent
+// seulement par qui les voit (fin du fichier).
+//
 // Le temps est maîtrisé par le test (fausse horloge, voir comments.test.ts).
 import { randomUUID } from 'node:crypto'
 import {
@@ -32,6 +35,9 @@ import {
   REPORTS_PER_DAY,
   ReportSnapshot,
   ReportTargetPreview,
+  TesterCall,
+  TesterMedia,
+  TesterMessage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
@@ -1270,5 +1276,452 @@ describe('removing an update', () => {
       .from(schema.projectUpdate)
       .where(eq(schema.projectUpdate.id, update.id))
     expect(row).toEqual({ removedAt: new Date(Date.now()), removalId: decision.id })
+  })
+})
+
+// ─── R7b : le coin des testeurs, un appel et un message de fil ──────────────────────────────────
+
+// Plan R7b, « Modération et données » ; décision 2 de Louis (11/11/2026) et relecture de sécurité
+// B3 : on ne signale que ce qu'on voit. Un appel se voit des testeurs actuels du projet (et de son
+// auteur, qui ne signale pas le sien) ; un message, de l'autre personne de son fil seulement :
+// l'auteur du projet pour un message du testeur, le testeur pour une réponse de l'auteur. Le testeur
+// garde son fil, donc le droit de signaler les réponses de l'auteur, après un départ, un retrait par
+// l'auteur ou un blocage dans un sens ou dans l'autre (sec-B3) ; un coin fermé (projet privé, retiré,
+// auteur suspendu) lui est introuvable. Pour tout autre membre, la même réponse 404 qu'une cible
+// inconnue, mot pour mot. Le signaleur reste inconnu de l'autre : rien ne le prévient.
+//
+// La copie suit celle d'une mise à jour (moderation/inputs.ts) : le texte sous `body` (le texte d'un
+// commentaire), la photo d'un appel ou la capture d'un retour sous `photo` (sa clé seulement),
+// suivie de sa description pour une photo d'appel (`photoDescription`).
+//
+// Léa est l'autrice du projet testable « Décollage » ; Max en est le testeur ; Zoé n'est rien au
+// début (puis, selon le test, une autre testeuse).
+describe('reporting in the testers corner', () => {
+  let corner: { id: string } // le projet testable de Léa
+  let zoeId: string
+
+  const TESTABLE = { status: 'testable', demoUrl: 'https://demo.example.com/' }
+  const projectPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}`
+
+  /** Une réponse 204 : réussie, et sans corps. */
+  const expectDone = async (res: Response) => {
+    expect(res.status).toBe(204)
+    expect(await res.text()).toBe('')
+  }
+  const join = async (projectId: string, cookie: string) => {
+    later()
+    await expectDone(await act.send('POST', `${projectPath(projectId)}/testers`, cookie))
+  }
+  const quit = async (projectId: string, cookie: string) => {
+    later()
+    await expectDone(await act.send('DELETE', `${projectPath(projectId)}/testers`, cookie))
+  }
+  /** L'autrice retire un membre de ses testeurs (DELETE …/testers/{memberId}). */
+  const removeTester = async (projectId: string, memberId: string) => {
+    later()
+    await expectDone(
+      await act.send(
+        'DELETE',
+        `${projectPath(projectId)}/testers/${encodeURIComponent(memberId)}`,
+        lea,
+      ),
+    )
+  }
+
+  /** Envoie une image du coin (photo d'appel ou capture), « en attente » ; rend son id et sa clé. */
+  const upload = async (projectId: string, cookie: string, kind: 'call' | 'capture') => {
+    later()
+    const form = new FormData()
+    form.append(
+      'file',
+      new File([new Uint8Array(await jpegImage(800, 600))], 'image.jpg', { type: 'image/jpeg' }),
+    )
+    form.append('kind', kind)
+    const res = await ctx.request(`${projectPath(projectId)}/testers/media`, {
+      method: 'POST',
+      headers: { cookie },
+      body: form,
+    })
+    expect(res.status).toBe(201)
+    const { id } = TesterMedia.parse(await res.json())
+    const [row] = await ctx.db
+      .select({ key: schema.testerMedia.storageKey })
+      .from(schema.testerMedia)
+      .where(eq(schema.testerMedia.id, id))
+    if (!row) throw new Error(`no tester media ${id}`)
+    return { id, key: row.key }
+  }
+
+  /** Léa lance un appel, sans photo, ou avec une photo et sa description. */
+  const launch = async (
+    text: string,
+    photo: { id: string; description: string | null } | null = null,
+    projectId = corner.id,
+  ) => {
+    later()
+    const res = await act.send('POST', `${projectPath(projectId)}/calls`, lea, {
+      text,
+      photoId: photo?.id ?? null,
+      photoDescription: photo?.description ?? null,
+    })
+    expect(res.status).toBe(201)
+    return TesterCall.parse(await res.json())
+  }
+
+  /** Envoie un message dans le fil de ce testeur, et vérifie qu'il est accepté. */
+  const send = async (testerId: string, cookie: string, body: object, projectId = corner.id) => {
+    later()
+    const res = await act.send(
+      'POST',
+      `${projectPath(projectId)}/threads/${encodeURIComponent(testerId)}/messages`,
+      cookie,
+      body,
+    )
+    expect(res.status).toBe(201)
+    return TesterMessage.parse(await res.json())
+  }
+  const feedback = (text: string | null, captureId: string | null = null) => ({
+    kind: 'feedback',
+    outcome: 'partly',
+    device: 'phone',
+    text,
+    captureId,
+  })
+  const reply = (text: string) => ({ kind: 'reply', text })
+
+  /** Max envoie un retour, puis Léa lui répond : le fil de Max. */
+  const maxThread = async () => {
+    const sent = await send(maxId, max, feedback('Le score repart à zéro au niveau 3.'))
+    const answer = await send(maxId, lea, reply('Merci Max, je regarde ça ce soir.'))
+    return { feedback: sent, reply: answer }
+  }
+
+  const unknownCall = () => postReport(max, target('call', UNKNOWN))
+  const unknownMessage = () => postReport(max, target('message', UNKNOWN))
+  const previewOf = (cookie: string, kind: string, id: string) =>
+    act.send('GET', `/v1/reports/target?${new URLSearchParams({ kind, id })}`, cookie)
+
+  beforeEach(async () => {
+    corner = await act.publish(lea, 'Décollage', {
+      pitch: 'Un quiz de l’espace pour les petits.',
+      ...TESTABLE,
+    })
+    await join(corner.id, max)
+    zoeId = (await act.me(zoe)).id
+  })
+
+  describe('a call to test', () => {
+    it('lets a tester report a call, kept under its project and its author', async () => {
+      const call = await launch('Essayez le niveau 3 ce week-end, surtout sur téléphone.')
+
+      const res = await postReport(max, target('call', call.id))
+
+      expect(res.status).toBe(201)
+      const { id } = CreatedReport.parse(await res.json())
+      expect(await storedReports()).toEqual([
+        expect.objectContaining({
+          id,
+          reporterId: maxId,
+          targetKind: 'call',
+          targetId: call.id,
+          projectId: corner.id,
+          targetAuthorId: leaId,
+          status: 'open',
+        }),
+      ])
+    })
+
+    it('copies the text of a call, then the key of its photo and its description', async () => {
+      const photo = await upload(corner.id, lea, 'call')
+      const call = await launch('Testez la fusée sur tablette.', {
+        id: photo.id,
+        description: 'La fusée sur la rampe de lancement',
+      })
+
+      expect((await postReport(max, target('call', call.id))).status).toBe(201)
+
+      const [row] = await storedReports()
+      expect(ReportSnapshot.parse(row?.snapshot)).toEqual([
+        { field: 'body', value: 'Testez la fusée sur tablette.' },
+        { field: 'photo', value: photo.key },
+        { field: 'photoDescription', value: 'La fusée sur la rampe de lancement' },
+      ])
+    })
+
+    it('refuses a call to a member who does not test the project, like an unknown call', async () => {
+      const call = await launch('Un appel pour les testeurs seulement.')
+
+      await expectSameNotFound(await postReport(zoe, target('call', call.id)), await unknownCall())
+      await expectSameNotFound(await previewOf(zoe, 'call', call.id), await unknownCall())
+      // Témoin : Max, testeur, le signale.
+      expect((await postReport(max, target('call', call.id))).status).toBe(201)
+      expect((await storedReports()).map((r) => r.reporterId)).toEqual([maxId])
+    })
+
+    it('refuses a call to a former tester, a removed tester and a tester kept apart by a block', async () => {
+      const first = await launch('Le premier appel.')
+      await quit(corner.id, max)
+      await expectSameNotFound(await postReport(max, target('call', first.id)), await unknownCall())
+      // Témoin : revenu parmi les testeurs, Max le signale.
+      await join(corner.id, max)
+      expect((await postReport(max, target('call', first.id))).status).toBe(201)
+
+      const second = await launch('Le deuxième appel.')
+      await removeTester(corner.id, maxId)
+      await expectSameNotFound(
+        await postReport(max, target('call', second.id)),
+        await unknownCall(),
+      )
+
+      // Un blocage vaut un départ (décision 6), dans un sens comme dans l'autre.
+      await join(corner.id, zoe)
+      const third = await launch('Le troisième appel.')
+      later()
+      await act.block(leaId, zoe)
+      await expectSameNotFound(await postReport(zoe, target('call', third.id)), await unknownCall())
+      expect((await storedReports()).map((r) => r.targetId)).toEqual([first.id])
+    })
+
+    it('refuses a removed call, or a call of a closed corner, like an unknown one', async () => {
+      // Témoins : Zoé, testeuse elle aussi, signale chaque appel avant le retrait ou la fermeture.
+      await join(corner.id, zoe)
+      const removed = await launch('Un appel retiré par la modération.')
+      expect((await postReport(zoe, target('call', removed.id))).status).toBe(201)
+      await ctx.db
+        .update(schema.testerCall)
+        .set({ removedAt: new Date() })
+        .where(eq(schema.testerCall.id, removed.id))
+      await expectSameNotFound(
+        await postReport(max, target('call', removed.id)),
+        await unknownCall(),
+      )
+
+      const kept = await launch('Un appel d’un coin qui se ferme.')
+      expect((await postReport(zoe, target('call', kept.id))).status).toBe(201)
+      later()
+      await act.setVisibility(corner.id, lea, 'private')
+      await expectSameNotFound(await postReport(max, target('call', kept.id)), await unknownCall())
+      expect((await storedReports()).map((r) => r.reporterId)).toEqual([zoeId, zoeId])
+    })
+
+    it('refuses the author to report her own call', async () => {
+      const call = await launch('Mon propre appel.')
+
+      await expectError(await postReport(lea, target('call', call.id)), 422, 'own_content')
+      expect(await storedReports()).toEqual([])
+    })
+
+    it('previews the text of a call, its project and its author', async () => {
+      const call = await launch('Essayez le mode nuit.')
+      const { handle } = await act.me(lea)
+
+      const res = await previewOf(max, 'call', call.id)
+
+      expect(res.status).toBe(200)
+      expect(ReportTargetPreview.parse(await res.json())).toEqual({
+        target: { kind: 'call', id: call.id },
+        text: 'Essayez le mode nuit.',
+        projectId: corner.id,
+        author: { id: leaId, name: 'Léa', handle, isBlocked: false },
+      })
+    })
+  })
+
+  describe('a message of a thread', () => {
+    it('lets the author report a feedback of her thread, with its text and the key of its capture', async () => {
+      const capture = await upload(corner.id, max, 'capture')
+      const sent = await send(maxId, max, feedback('Le score repart à zéro.', capture.id))
+
+      const res = await postReport(lea, target('message', sent.id))
+
+      expect(res.status).toBe(201)
+      const [row] = await storedReports()
+      expect(row).toMatchObject({
+        reporterId: leaId,
+        targetKind: 'message',
+        targetId: sent.id,
+        projectId: corner.id,
+        targetAuthorId: maxId,
+        status: 'open',
+      })
+      // Une capture n'a pas de description (son nom lu est fixe, relecture sec-A15).
+      expect(ReportSnapshot.parse(row?.snapshot)).toEqual([
+        { field: 'body', value: 'Le score repart à zéro.' },
+        { field: 'photo', value: capture.key },
+      ])
+    })
+
+    it('copies only the capture of a feedback sent without a text', async () => {
+      const capture = await upload(corner.id, max, 'capture')
+      const sent = await send(maxId, max, feedback(null, capture.id))
+
+      expect((await postReport(lea, target('message', sent.id))).status).toBe(201)
+
+      const [row] = await storedReports()
+      expect(ReportSnapshot.parse(row?.snapshot)).toEqual([{ field: 'photo', value: capture.key }])
+    })
+
+    it('lets a tester report a reply the author sent him, kept under the author', async () => {
+      const { reply: answer } = await maxThread()
+
+      expect((await postReport(max, target('message', answer.id))).status).toBe(201)
+
+      const [row] = await storedReports()
+      expect(row).toMatchObject({
+        reporterId: maxId,
+        targetKind: 'message',
+        targetId: answer.id,
+        projectId: corner.id,
+        targetAuthorId: leaId,
+      })
+      expect(ReportSnapshot.parse(row?.snapshot)).toEqual([
+        { field: 'body', value: 'Merci Max, je regarde ça ce soir.' },
+      ])
+    })
+
+    it('lets a removed tester report a reply the author sent him', async () => {
+      const { reply: answer } = await maxThread()
+      await removeTester(corner.id, maxId)
+
+      expect((await postReport(max, target('message', answer.id))).status).toBe(201)
+    })
+
+    it('lets a former tester who quit report a reply of his thread', async () => {
+      const { reply: answer } = await maxThread()
+      await quit(corner.id, max)
+
+      expect((await postReport(max, target('message', answer.id))).status).toBe(201)
+    })
+
+    it('lets a tester who blocked the author report a reply of his thread', async () => {
+      const { reply: answer } = await maxThread()
+      later()
+      await act.block(leaId, max) // Max bloque Léa
+
+      expect((await postReport(max, target('message', answer.id))).status).toBe(201)
+    })
+
+    it('lets a tester blocked by the author report a reply of his thread, and the author his feedback', async () => {
+      const thread = await maxThread()
+      later()
+      await act.block(maxId, lea) // Léa bloque Max
+
+      expect((await postReport(max, target('message', thread.reply.id))).status).toBe(201)
+      // L'autrice lit tout chez elle (décision 2 : le fil reste lisible des deux côtés).
+      expect((await postReport(lea, target('message', thread.feedback.id))).status).toBe(201)
+    })
+
+    it('previews a reply without the author handle once a block separates them', async () => {
+      const { reply: answer } = await maxThread()
+      const { handle } = await act.me(lea)
+      const before = await previewOf(max, 'message', answer.id)
+      expect(before.status).toBe(200)
+      expect(ReportTargetPreview.parse(await before.json())).toEqual({
+        target: { kind: 'message', id: answer.id },
+        text: 'Merci Max, je regarde ça ce soir.',
+        projectId: corner.id,
+        author: { id: leaId, name: 'Léa', handle, isBlocked: false },
+      })
+
+      later()
+      await act.block(leaId, max)
+
+      const after = await previewOf(max, 'message', answer.id)
+      expect(after.status).toBe(200)
+      expect(ReportTargetPreview.parse(await after.json()).author).toEqual({
+        id: leaId,
+        name: 'Léa',
+        handle: null,
+        isBlocked: true,
+      })
+    })
+
+    it('refuses a message to every member outside the thread, like an unknown message', async () => {
+      const thread = await maxThread()
+      // Zoé teste aussi le projet : elle a son fil à elle, jamais celui de Max.
+      await join(corner.id, zoe)
+      await send(zoeId, zoe, feedback('Mon retour à moi.'))
+
+      for (const message of [thread.feedback, thread.reply]) {
+        await expectSameNotFound(
+          await postReport(zoe, target('message', message.id)),
+          await unknownMessage(),
+        )
+        await expectSameNotFound(
+          await previewOf(zoe, 'message', message.id),
+          await unknownMessage(),
+        )
+      }
+      expect(await storedReports()).toEqual([])
+      // Témoins : les deux personnes du fil, elles, signalent le message de l'autre.
+      expect((await postReport(lea, target('message', thread.feedback.id))).status).toBe(201)
+      expect((await postReport(max, target('message', thread.reply.id))).status).toBe(201)
+    })
+
+    it('refuses to report her own message', async () => {
+      const thread = await maxThread()
+
+      await expectError(
+        await postReport(max, target('message', thread.feedback.id)),
+        422,
+        'own_content',
+      )
+      await expectError(
+        await postReport(lea, target('message', thread.reply.id)),
+        422,
+        'own_content',
+      )
+      expect(await storedReports()).toEqual([])
+    })
+
+    it('refuses a message removed by the moderation to the other person, like an unknown one', async () => {
+      const thread = await maxThread()
+      for (const message of [thread.feedback, thread.reply]) {
+        await ctx.db
+          .update(schema.testerMessage)
+          .set({ removedAt: new Date() })
+          .where(eq(schema.testerMessage.id, message.id))
+      }
+
+      await expectSameNotFound(
+        await postReport(lea, target('message', thread.feedback.id)),
+        await unknownMessage(),
+      )
+      await expectSameNotFound(
+        await postReport(max, target('message', thread.reply.id)),
+        await unknownMessage(),
+      )
+      expect(await storedReports()).toEqual([])
+      // Témoin : un autre retour de Max, resté en place, se signale.
+      const kept = await send(maxId, max, feedback('Un second retour, resté en place.'))
+      expect((await postReport(lea, target('message', kept.id))).status).toBe(201)
+    })
+
+    it('refuses a reply of a closed corner to the tester, and lets the author report a feedback there', async () => {
+      const thread = await maxThread()
+      later()
+      await act.setVisibility(corner.id, lea, 'private')
+
+      await expectSameNotFound(
+        await postReport(max, target('message', thread.reply.id)),
+        await unknownMessage(),
+      )
+      expect((await postReport(lea, target('message', thread.feedback.id))).status).toBe(201)
+    })
+
+    it('tells the author of a reported reply nothing, and never names who reported', async () => {
+      const { reply: answer } = await maxThread()
+      await act.openNotifications(lea)
+      const before = NotificationPage.parse(
+        await (await act.send('GET', '/v1/notifications', lea)).json(),
+      )
+
+      expect((await postReport(max, target('message', answer.id))).status).toBe(201)
+
+      const after = NotificationPage.parse(
+        await (await act.send('GET', '/v1/notifications', lea)).json(),
+      )
+      expect(after.items).toEqual(before.items)
+    })
   })
 })

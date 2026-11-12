@@ -8,8 +8,9 @@
 // notifications.test.ts, l'export et la suppression du compte par accounts.test.ts, les photos en
 // attente par visuals.test.ts, les testeurs par testers.test.ts.
 //
-// Quatre membres : Papi Jean (l'auteur), Inès (une autre membre), Malik (un troisième, qui signale)
-// et Louis (l'administrateur, qui retire).
+// Quatre membres : Papi Jean (l'auteur), Inès (une autre membre ; en R7b, sa testeuse), Malik (un
+// troisième, qui signale) et Louis (l'administrateur, qui retire). R7b ajoute, en fin de fichier, les
+// retours de testeurs qu'une mise à jour règle (`settledFeedbackIds`).
 //
 // Le temps est maîtrisé par le test (vi.useFakeTimers, seule Date est remplacée) : les mises à jour
 // ont des dates distinctes et dans un ordre connu, et la limite de 10 mises à jour par jour se
@@ -22,9 +23,12 @@ import {
   ErrorResponse,
   type NewProjectUpdate,
   NotificationPage,
+  OpenFeedbackList,
   Project,
   ProjectUpdate,
   ProjectUpdatePage,
+  TesterMessage,
+  TesterMessagePage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, type SQL, sql } from 'drizzle-orm'
@@ -1025,6 +1029,225 @@ describe('a suspended member', () => {
     await expectDone(await act.send('DELETE', `/v1/projects/${inesProject.id}/testers`, jean))
     await expectDone(await deleteUpdate(project.id, published.id, jean))
     expect(await storedUpdateCount()).toBe(0)
+  })
+})
+
+// --- R7b : les retours de testeurs qu'une mise à jour règle (« Réglé dans la v1.3 ») ---
+// Scénario : docs/scenarios/refonte.md, section R7b, « Réglé dans la v1.3 ». Inès devient testeuse
+// de Décollage ! et envoie ses retours par la route des fils (tester-threads.test.ts la teste) ; un
+// retrait par la modération est posé en base, comme reports/decide.ts l'écrit.
+
+const TESTABLE = { status: 'testable', demoUrl: 'https://demo.example.com/' }
+
+/** Rejoindre les testeurs (R7a), une minute après ce qui précède. */
+const joinTesters = async (projectId: string, cookie: string) => {
+  later()
+  await expectDone(await act.send('POST', `/v1/projects/${projectId}/testers`, cookie))
+}
+
+/** Inès envoie un retour (« En partie », sur téléphone) dans son fil, et le rend. */
+const sendFeedback = async (projectId: string, text = 'Le score repart à zéro au niveau 3.') => {
+  later()
+  const res = await act.send('POST', `/v1/projects/${projectId}/threads/${inesId}/messages`, ines, {
+    kind: 'feedback',
+    outcome: 'partly',
+    device: 'phone',
+    text,
+    captureId: null,
+  })
+  expect(res.status).toBe(201)
+  return TesterMessage.parse(await res.json())
+}
+
+/** Le fil d'Inès, lu par ce membre : ses messages, du plus récent au plus ancien. */
+const inesThread = async (projectId: string, cookie = ines) => {
+  const res = await act.send('GET', `/v1/projects/${projectId}/threads/${inesId}/messages`, cookie)
+  expect(res.status).toBe(200)
+  return TesterMessagePage.parse(await res.json()).items
+}
+
+/** Ce que ce retour dit de son règlement, dans le fil d'Inès. */
+const settledOf = async (projectId: string, messageId: string, cookie = ines) =>
+  (await inesThread(projectId, cookie)).find((message) => message.id === messageId)?.settled
+
+/** Les retours encore à traiter (la partie « Retours réglés » de la feuille). */
+const openFeedbackIds = async (projectId: string) => {
+  const res = await act.send('GET', `/v1/projects/${projectId}/feedback/open`, jean)
+  expect(res.status).toBe(200)
+  return OpenFeedbackList.parse(await res.json()).map((item) => item.id)
+}
+
+/** Un projet testable de Papi Jean, dont Inès est testeuse. */
+const testedProject = async (title = 'Décollage !') => {
+  const project = await act.publish(jean, title, {
+    pitch: 'Un quiz de l’espace pour les petits.',
+    ...TESTABLE,
+  })
+  await joinTesters(project.id, ines)
+  return project
+}
+
+describe('the feedback an update settles', () => {
+  it('settles the cited feedback, with the version and the date of the update', async () => {
+    const project = await testedProject()
+    const settled = await sendFeedback(project.id)
+    const open = await sendFeedback(project.id, 'Le son ne marche pas sur tablette.')
+
+    const update = await publishUpdate(project.id, {
+      version: 'v1.3',
+      lines: [{ family: 'fixed', text: 'Le score ne repart plus à zéro au niveau 3' }],
+      settledFeedbackIds: [settled.id],
+    })
+
+    const expected = {
+      at: update.createdAt,
+      update: { id: update.id, version: 'v1.3', createdAt: update.createdAt },
+    }
+    expect(await settledOf(project.id, settled.id)).toEqual(expected)
+    expect(await settledOf(project.id, settled.id, jean)).toEqual(expected)
+    expect(await settledOf(project.id, open.id)).toBeNull()
+    expect(await openFeedbackIds(project.id)).toEqual([open.id])
+  })
+
+  it('settles by the date of an update without a version', async () => {
+    const project = await testedProject()
+    const feedback = await sendFeedback(project.id)
+
+    const update = await publishUpdate(project.id, { settledFeedbackIds: [feedback.id] })
+
+    expect(await settledOf(project.id, feedback.id)).toEqual({
+      at: update.createdAt,
+      update: { id: update.id, version: null, createdAt: update.createdAt },
+    })
+  })
+
+  it('refuses a feedback of another project, and publishes nothing', async () => {
+    const project = await testedProject()
+    const garden = await testedProject('Le carnet de jardin')
+    const here = await sendFeedback(project.id)
+    const elsewhere = await sendFeedback(garden.id)
+
+    const res = await postUpdate(
+      project.id,
+      jean,
+      simple({ settledFeedbackIds: [here.id, elsewhere.id] }),
+    )
+
+    await expectError(res, 400, 'invalid_feedback')
+    expect(await storedUpdateCount()).toBe(0)
+    // Tout est annulé : même le retour de ce projet reste à traiter.
+    expect(await settledOf(project.id, here.id)).toBeNull()
+    expect(await settledOf(garden.id, elsewhere.id)).toBeNull()
+  })
+
+  it('refuses a feedback already settled or removed, and publishes nothing', async () => {
+    const project = await testedProject()
+    const byHand = await sendFeedback(project.id, 'Réglé à la main.')
+    const removed = await sendFeedback(project.id, 'Retiré par la modération.')
+    const open = await sendFeedback(project.id, 'Encore à traiter.')
+    later()
+    await expectDone(
+      await act.send('POST', `/v1/projects/${project.id}/messages/${byHand.id}/settled`, jean),
+    )
+    await ctx.db
+      .update(schema.testerMessage)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.testerMessage.id, removed.id))
+
+    for (const id of [byHand.id, removed.id]) {
+      const res = await postUpdate(project.id, jean, simple({ settledFeedbackIds: [open.id, id] }))
+      await expectError(res, 400, 'invalid_feedback')
+    }
+
+    expect(await storedUpdateCount()).toBe(0)
+    expect(await settledOf(project.id, open.id)).toBeNull()
+    // Le règlement à la main reste tel quel, sans mise à jour.
+    expect((await settledOf(project.id, byHand.id))?.update).toBeNull()
+  })
+
+  it('refuses a reply or an unknown identifier, and publishes nothing', async () => {
+    const project = await testedProject()
+    const feedback = await sendFeedback(project.id)
+    later()
+    const replyRes = await act.send(
+      'POST',
+      `/v1/projects/${project.id}/threads/${inesId}/messages`,
+      jean,
+      {
+        kind: 'reply',
+        text: 'Merci Inès, je regarde ça.',
+      },
+    )
+    expect(replyRes.status).toBe(201)
+    const reply = TesterMessage.parse(await replyRes.json())
+
+    for (const id of [reply.id, UNKNOWN]) {
+      const res = await postUpdate(
+        project.id,
+        jean,
+        simple({ settledFeedbackIds: [feedback.id, id] }),
+      )
+      await expectError(res, 400, 'invalid_feedback')
+    }
+    expect(await storedUpdateCount()).toBe(0)
+    expect(await settledOf(project.id, feedback.id)).toBeNull()
+  })
+
+  it('settles 20 feedback at most, each once', async () => {
+    const project = await testedProject()
+    const ids: string[] = []
+    for (let i = 0; i < 21; i++) ids.push((await sendFeedback(project.id, `Retour ${i + 1}.`)).id)
+    const [first = ''] = ids
+
+    for (const settledFeedbackIds of [ids, [first, first]]) {
+      await expectError(
+        await postUpdate(project.id, jean, simple({ settledFeedbackIds })),
+        400,
+        'validation',
+      )
+    }
+    expect(await storedUpdateCount()).toBe(0)
+
+    // Témoin : 20 retours d'un coup.
+    await publishUpdate(project.id, { settledFeedbackIds: ids.slice(0, 20) })
+    expect(await openFeedbackIds(project.id)).toEqual([ids[20]])
+  })
+
+  it('settles the feedback of a former tester', async () => {
+    const project = await testedProject()
+    const feedback = await sendFeedback(project.id)
+    later()
+    await expectDone(await act.send('DELETE', `/v1/projects/${project.id}/testers`, ines))
+
+    const update = await publishUpdate(project.id, { settledFeedbackIds: [feedback.id] })
+
+    expect((await settledOf(project.id, feedback.id, jean))?.update?.id).toBe(update.id)
+  })
+
+  it('lets the author put a feedback settled by an update back to « À traiter »', async () => {
+    const project = await testedProject()
+    const feedback = await sendFeedback(project.id)
+    await publishUpdate(project.id, { version: 'v1.3', settledFeedbackIds: [feedback.id] })
+
+    later()
+    await expectDone(
+      await act.send('DELETE', `/v1/projects/${project.id}/messages/${feedback.id}/settled`, jean),
+    )
+
+    expect(await settledOf(project.id, feedback.id)).toBeNull()
+    expect(await openFeedbackIds(project.id)).toEqual([feedback.id])
+  })
+
+  it('refuses another member citing the feedback of a project that is not his', async () => {
+    const project = await testedProject()
+    const feedback = await sendFeedback(project.id)
+    const own = await publishProject(malik)
+
+    const res = await postUpdate(own.id, malik, simple({ settledFeedbackIds: [feedback.id] }))
+
+    await expectError(res, 400, 'invalid_feedback')
+    expect(await storedUpdateCount()).toBe(0)
+    expect(await settledOf(project.id, feedback.id)).toBeNull()
   })
 })
 

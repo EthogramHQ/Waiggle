@@ -11,6 +11,12 @@ import { Removal } from './removal'
 import { ReportExport } from './reports'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
+import {
+  TesterCallExport,
+  TesterMessageExport,
+  TesterRemovalExport,
+  TesterThreadReadExport,
+} from './testers'
 import { UpdateFamily } from './updates'
 
 /**
@@ -68,6 +74,17 @@ export const AccountExport = z
     testerOf: z.array(
       z.object({ projectId: ProjectId, title: z.string().nullable(), since: z.iso.datetime() }),
     ),
+    /**
+     * R7b : le coin des testeurs, des plus anciens aux plus récents. Ses appels (comme auteur) ;
+     * ses messages, retours et réponses, jamais ceux de l'autre personne du fil ; les membres qu'il a
+     * retirés de ses testeurs, par pseudo ; et jusqu'où il a lu chacun de ses fils. Les images sont
+     * données par leur adresse, pas par le fichier. `title` vaut null quand le projet ne lui est plus
+     * visible, comme pour `testerOf`.
+     */
+    testerCalls: z.array(TesterCallExport),
+    testerMessages: z.array(TesterMessageExport),
+    testerRemovals: z.array(TesterRemovalExport),
+    testerThreadReads: z.array(TesterThreadReadExport),
     /**
      * Ce que le membre suit : seulement l'identifiant et la date. Un projet suivi a pu devenir privé
      * depuis : son titre n'appartient pas au membre qui le suit, l'export ne le donne donc pas.

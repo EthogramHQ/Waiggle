@@ -23,6 +23,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   not,
   or,
   type SQL,
@@ -302,21 +303,42 @@ export const authorsOf = async (
   db: Reader,
   authorIds: string[],
   publicApiUrl: string,
+  projectId: string,
 ): Promise<Map<string, CommentAuthor>> => {
   const ids = [...new Set(authorIds)]
   if (ids.length === 0) return new Map()
   const h = schema.memberHandle
-  const rows = await db
-    .select({
-      id: schema.user.id,
-      name: schema.user.name,
-      handle: h.handle,
-      avatarKey: schema.profile.avatarKey,
-    })
-    .from(schema.user)
-    .leftJoin(h, and(eq(h.userId, schema.user.id), isNull(h.releasedAt)))
-    .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
-    .where(inArray(schema.user.id, ids))
+  const pt = schema.projectTester
+  // Le badge « Testeur » (R7b) : parmi ces auteurs, les testeurs actuels de CE projet, en une requête
+  // de groupe. En SQL : select member_id from project_tester join project on project.id =
+  // project_id where project_id = $projet and member_id in (…) and member_id <> author_id. La clé
+  // primaire (member_id, project_id) trouve chaque inscription. « Jamais l'auteur du projet » : la
+  // jointure vers project compare chaque membre à l'auteur. Un ancien testeur n'a plus de ligne.
+  const [rows, testers] = await Promise.all([
+    db
+      .select({
+        id: schema.user.id,
+        name: schema.user.name,
+        handle: h.handle,
+        avatarKey: schema.profile.avatarKey,
+      })
+      .from(schema.user)
+      .leftJoin(h, and(eq(h.userId, schema.user.id), isNull(h.releasedAt)))
+      .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
+      .where(inArray(schema.user.id, ids)),
+    db
+      .select({ memberId: pt.memberId })
+      .from(pt)
+      .innerJoin(schema.project, eq(schema.project.id, pt.projectId))
+      .where(
+        and(
+          eq(pt.projectId, projectId),
+          inArray(pt.memberId, ids),
+          ne(pt.memberId, schema.project.authorId),
+        ),
+      ),
+  ])
+  const testerIds = new Set(testers.map((row) => row.memberId))
   return new Map(
     rows.map((row) => [
       row.id,
@@ -325,6 +347,7 @@ export const authorsOf = async (
         name: row.name,
         handle: row.handle,
         avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+        isTester: testerIds.has(row.id),
       },
     ]),
   )
@@ -495,6 +518,7 @@ export const loadCommentPage = async (
         : [row.authorId],
     ),
     publicApiUrl,
+    projectId,
   )
 
   // 4. Les mentions des commentaires dont ce membre lit le texte (ni supprimés, ni sans auteur, ni

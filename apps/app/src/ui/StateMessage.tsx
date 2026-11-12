@@ -2,9 +2,10 @@
 // réservée aux membres, ou liste vide (qui invite à agir). Toujours la même allure, et toujours une issue : un état dit ce qui se
 // passe et propose quoi faire ensuite (« Réessayer », « Revenir », « Me connecter »).
 import { layout, space } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native'
 import { Button, type ButtonVariant } from './Button'
+import type { Focusable } from './focus'
 import type { IconName } from './Icon'
 import { Emblem } from './Illustrations'
 import { Mascot, type MascotPose } from './Mascot'
@@ -63,6 +64,11 @@ type Props = {
    * dessiner deux fois. Sans elle, l'image du genre, comme avant.
    */
   picture?: ReactNode
+  /**
+   * Où l'écran pose le focus sur l'état : son titre, sinon son premier paragraphe (R7b, K10 : le fil
+   * qui perd son dernier message, en lecture seule, n'a plus rien d'autre à focaliser).
+   */
+  focusRef?: Ref<Focusable>
 }
 
 export function StateMessage({
@@ -75,6 +81,7 @@ export function StateMessage({
   actions = [],
   level = 2,
   picture: givenPicture,
+  focusRef,
 }: Props) {
   const { colors } = useTheme()
   const { height } = useLayout()
@@ -150,7 +157,12 @@ export function StateMessage({
             {/* breakAnywhere : un mot plus large que l'écran (« introuvable » à 200 % sur 320
                 points) se coupe plutôt que d'être rogné. */}
             {title ? (
-              <Text variant="title2" heading={level} breakAnywhere>
+              <Text
+                variant="title2"
+                heading={level}
+                breakAnywhere
+                {...(focusRef ? { focusRef } : null)}
+              >
                 {title}
               </Text>
             ) : null}
@@ -165,6 +177,7 @@ export function StateMessage({
                 key={index}
                 tone={title ? 'secondary' : 'default'}
                 {...(kind === 'error' ? { accessibilityRole: 'alert' as const } : null)}
+                {...(focusRef && !title && index === 0 ? { focusRef } : null)}
               >
                 {paragraph}
               </Text>

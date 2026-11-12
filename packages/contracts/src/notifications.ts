@@ -10,6 +10,7 @@ import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
 import { RemovalGround } from './removal'
 import { StoredReportTargetKind } from './reports'
+import { SettledUpdate, TESTER_EXCERPT_MAX, TesterMessageKind, TesterRole } from './testers'
 import { UpdateId, UpdateLineOut } from './updates'
 
 /** L'écran charge les notifications 20 par 20, de la plus récente à la plus ancienne. */
@@ -108,6 +109,46 @@ export const ProjectUpdateNotification = z.object({
   }),
 })
 
+/**
+ * R7b : un appel à tester d'un projet qu'il teste, une par appel. Seuls les appels lancés après son
+ * inscription comptent ; un appel supprimé ou retiré, un départ, un retrait, un blocage, ou un coin
+ * fermé (projet retiré, privé, auteur suspendu) la font disparaître.
+ */
+export const TesterCallNotification = z.object({
+  ...Common,
+  kind: z.literal('tester_call'),
+  project: NotifiedProject,
+  author: ProjectAuthor,
+  call: z.object({ id: z.uuid(), excerpt: z.string().max(TESTER_EXCERPT_MAX + 1) }),
+})
+
+/**
+ * R7b : un message de l'autre personne d'un fil de testeur : un retour ou une réponse du testeur,
+ * pour l'auteur ; une réponse de l'auteur, pour le testeur. `role` : le rôle de l'expéditeur.
+ * `message.testerId` : le testeur du fil (l'appli y mène l'auteur). Jamais le texte : le fil est
+ * privé, l'appli l'ouvre pour le lire.
+ */
+export const TesterMessageNotification = z.object({
+  ...Common,
+  kind: z.literal('tester_message'),
+  project: NotifiedProject,
+  from: ProjectAuthor,
+  role: TesterRole,
+  message: z.object({ id: z.uuid(), kind: TesterMessageKind, testerId: z.string() }),
+})
+
+/**
+ * R7b : un de ses retours a été réglé : par une mise à jour (« dans la v1.3 », ou « dans la mise à
+ * jour du 12 nov. »), ou à la main (`update` null). « Remettre à traiter » la fait disparaître.
+ */
+export const FeedbackSettledNotification = z.object({
+  ...Common,
+  kind: z.literal('feedback_settled'),
+  project: NotifiedProject,
+  author: ProjectAuthor,
+  update: SettledUpdate.nullable(),
+})
+
 /** Son commentaire a été masqué par l'auteur du projet ; démasqué, la notification disparaît. */
 export const HiddenNotification = z.object({
   ...Common,
@@ -125,8 +166,11 @@ export const HiddenNotification = z.object({
 export const RemovedNotification = z.object({
   ...Common,
   kind: z.literal('removed'),
-  /** R7a : `update` remplace `note` (les notes ont été effacées avec le Journal). */
-  targetKind: z.enum(['project', 'update', 'comment']),
+  /**
+   * R7a : `update` remplace `note` (les notes ont été effacées avec le Journal). R7b : un appel à
+   * tester (`call`) ou un message d'un fil de testeur (`message`).
+   */
+  targetKind: z.enum(['project', 'update', 'comment', 'call', 'message']),
   project: NotifiedProject,
   /**
    * L'extrait d'un commentaire, ou la première ligne d'une mise à jour, retirés ; null pour un
@@ -212,6 +256,9 @@ export const Notification = z
     ReportHandledNotification,
     SuspendedNotification,
     SuspensionEndedNotification,
+    TesterCallNotification,
+    TesterMessageNotification,
+    FeedbackSettledNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

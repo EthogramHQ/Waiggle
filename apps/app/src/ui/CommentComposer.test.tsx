@@ -584,4 +584,114 @@ describe('CommentComposer', () => {
       expect(screen.queryByText(tail)).toBeNull()
     })
   })
+
+  // R7b (relecture du plan ui-B2) : le même champ sert à répondre dans le fil privé d'un testeur.
+  // Il y dit « Répondre à Inès », son bouton « Envoyer la réponse », il ne propose aucune mention
+  // (le fil n'est lu que par deux personnes) et peut se passer de la photo du membre. Ces réglages
+  // sont facultatifs : sans eux, rien ne change pour les commentaires.
+  describe('reused in a testers thread (R7b)', () => {
+    const replyTo = fr.t(($) => $.project.testers.thread.replyPlaceholder, { name: 'Inès' })
+    const replyLabel = fr.t(($) => $.project.testers.thread.replyLabel)
+    const ines = { ...inesMember, avatar: null }
+
+    it('shows the placeholder it is given instead of « Écrire un commentaire »', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf({ placeholder: replyTo })} />)
+
+      expect(field().props.placeholder).toBe(replyTo)
+      expect(field().props.placeholder).not.toBe(fr.t(($) => $.project.comments.add))
+    })
+
+    it('names its field by the placeholder it is given, never « Écrire un commentaire »', async () => {
+      // Le nom lu suit ce que le champ affiche (WCAG 2.5.3) : un lecteur d'écran qui entend
+      // « Écrire un commentaire » dans le fil d'un testeur se croirait sous le projet.
+      await renderWithProviders(<CommentComposer {...propsOf({ placeholder: replyTo })} />)
+
+      expect(field().props.accessibilityLabel).toBe(replyTo)
+    })
+
+    it('sends with the label it is given, in the sheet and in the column', async () => {
+      const { rerender } = await renderWithProviders(
+        <CommentComposer {...propsOf({ value: 'Merci !', sendLabel: replyLabel })} />,
+      )
+      expect(screen.getByRole('button', { name: replyLabel })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: sendLabel })).toBeNull()
+
+      await rerender(
+        <CommentComposer
+          {...propsOf({ value: 'Merci !', sendLabel: replyLabel, place: 'column' })}
+        />,
+      )
+      expect(screen.getByRole('button', { name: replyLabel })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: sendLabel })).toBeNull()
+    })
+
+    it('offers no mention suggestions when mentions are off', async () => {
+      const onQueryChange = jest.fn()
+      const onChangeText = jest.fn()
+      /** Même avec une recherche qui répondrait, le champ sans mentions n'ouvre aucune liste. */
+      function Typing() {
+        const [value, setValue] = useState('')
+        return (
+          <CommentComposer
+            {...propsOf({
+              value,
+              onChangeText: (text) => {
+                onChangeText(text)
+                setValue(text)
+              },
+              onQueryChange,
+              suggestions: [ines],
+              suggestionsFor: 'in',
+              mentions: false,
+            })}
+          />
+        )
+      }
+      await renderWithProviders(<Typing />)
+
+      await fireEvent.changeText(field() as never, 'Merci @in')
+
+      expect(onChangeText).toHaveBeenLastCalledWith('Merci @in') // témoin : la frappe arrive
+      expect(onQueryChange).not.toHaveBeenCalledWith('in')
+      expect(screen.queryByRole('option')).toBeNull()
+      // Ni liste déroulante annoncée : le champ n'est plus un « combobox ».
+      expect(field().props.role).not.toBe('combobox')
+      expect(field().props['aria-expanded']).toBeUndefined()
+    })
+
+    it('needs no suggestions, search nor photo when mentions are off', async () => {
+      // Le fil du testeur ne donne que ce qui le concerne : ni membres à proposer, ni photo.
+      const { suggestions, suggestionsFor, onQueryChange, avatar, memberName, ...rest } = propsOf()
+      await renderWithProviders(<CommentComposer {...rest} mentions={false} />)
+
+      await fireEvent.changeText(field() as never, 'Merci @in')
+
+      expect(field()).toBeTruthy() // témoin
+      expect(screen.queryByRole('option')).toBeNull()
+    })
+
+    it('shows no photo when it is given no avatar', async () => {
+      const { avatar, memberName, ...rest } = propsOf()
+      await renderWithProviders(<CommentComposer {...rest} />)
+
+      expect(field()).toBeTruthy() // témoin
+      // Ni image, ni initiales : rien n'est dessiné à la place de la photo.
+      expect(screen.queryAllByRole('image', { includeHiddenElements: true })).toHaveLength(0)
+      expect(all().some((node) => node.type === 'Image')).toBe(false)
+    })
+
+    it('keeps the comment field as it was without these settings (témoin)', async () => {
+      // Rien ne change pour les commentaires : le nom, le texte d'attente, le bouton, la photo et
+      // les mentions par défaut.
+      await renderWithProviders(<CommentComposer {...propsOf({ value: 'Merci !' })} />)
+
+      expect(field().props.accessibilityLabel).toBe(fr.t(($) => $.project.comments.add))
+      expect(field().props.placeholder).toBe(fr.t(($) => $.project.comments.add))
+      expect(sendButton()).toBeTruthy()
+      expect(
+        screen.queryAllByLabelText('Sam Petit', { includeHiddenElements: true }),
+      ).not.toHaveLength(0)
+      expect(field().props.role).toBe('combobox')
+    })
+  })
 })

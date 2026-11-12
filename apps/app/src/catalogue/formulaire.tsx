@@ -27,6 +27,18 @@ const fr = {
   requiredError: 'Coche cette case pour continuer.',
   longLabel:
     'Montrer mes projets publics aux membres des ruches dont je fais partie, y compris celles où je n’ai encore rien publié',
+  detailed:
+    'Avec un détail sous le libellé (retours réglés, R7b) : libre, cochée, inactive, en erreur',
+  ines: 'Inès · En partie',
+  inesDetail: '« le score repart à zéro au niveau 3 » · il y a 2 jours',
+  hugo: 'Hugo · Non',
+  hugoDetail: '« sur ma tablette, la fusée reste bloquée au départ » · mardi',
+  lea: 'Léa · En partie',
+  leaDetail: '« les questions vont trop vite pour un enfant de 6 ans » · 4 nov.',
+  sam: 'Sam · Oui',
+  samDetail:
+    '« tout marche, mais le bouton pour recommencer la partie est caché tout en bas de l’écran, sous les scores » · 2 nov.',
+  detailError: 'Choisis au moins un retour.',
   radios: 'Boutons radio',
   marks: 'Le rond seul (RadioMark) : choisi, libre, inactif',
   sizeLabel: 'Taille de la ruche',
@@ -60,6 +72,18 @@ const en: typeof fr = {
   requiredError: 'Check this box to continue.',
   longLabel:
     'Show my public projects to the members of the hives I belong to, including those where I have not published anything yet',
+  detailed:
+    'With a detail under the label (settled feedback, R7b): free, checked, disabled, in error',
+  ines: 'Inès · Partly',
+  inesDetail: '“the score goes back to zero at level 3” · 2 days ago',
+  hugo: 'Hugo · No',
+  hugoDetail: '“on my tablet, the rocket stays stuck at the start” · Tuesday',
+  lea: 'Léa · Partly',
+  leaDetail: '“the questions go too fast for a 6-year-old” · Nov 4',
+  sam: 'Sam · Yes',
+  samDetail:
+    '“everything works, but the button to restart the game is hidden at the very bottom of the screen, under the scores” · Nov 2',
+  detailError: 'Choose at least one piece of feedback.',
   radios: 'Radio buttons',
   marks: 'The mark alone (RadioMark): chosen, free, disabled',
   sizeLabel: 'Hive size',
@@ -95,6 +119,7 @@ export function FormSamples() {
         {l.section}
       </Text>
       <Checkboxes l={l} />
+      <DetailedCheckboxes l={l} />
       <Radios l={l} />
       {/* Un fournisseur propre à la section : le bouton « Montrer » y trouve son toast. */}
       <ToastProvider>
@@ -143,6 +168,28 @@ function Checkboxes({ l }: { l: Labels }) {
         error={required ? undefined : l.requiredError}
       />
       <Checkbox label={l.longLabel} value={long} onValueChange={setLong} />
+    </Part>
+  )
+}
+
+/** Les cases avec un détail (R7b) : un retour par case, son extrait et sa date dessous. */
+function DetailedCheckboxes({ l }: { l: Labels }) {
+  const [ines, setInes] = useState(false)
+  const [hugo, setHugo] = useState(true)
+  const [sam, setSam] = useState(false)
+  return (
+    <Part title={l.detailed}>
+      <Checkbox label={l.ines} detail={l.inesDetail} value={ines} onValueChange={setInes} />
+      <Checkbox label={l.hugo} detail={l.hugoDetail} value={hugo} onValueChange={setHugo} />
+      <Checkbox label={l.lea} detail={l.leaDetail} value onValueChange={() => {}} disabled />
+      {/* Le détail le plus long, et l'erreur sous lui tant que la case n'est pas cochée. */}
+      <Checkbox
+        label={l.sam}
+        detail={l.samDetail}
+        value={sam}
+        onValueChange={setSam}
+        error={sam ? undefined : l.detailError}
+      />
     </Part>
   )
 }

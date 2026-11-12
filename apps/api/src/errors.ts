@@ -48,6 +48,14 @@ const errorMessages = {
   not_testable: 'notTestable',
   testers_full: 'testersFull',
   update_photos_full: 'updatePhotosFull',
+  // Tranche R7b : le coin des testeurs.
+  corner_closed: 'cornerClosed',
+  thread_closed: 'threadClosed',
+  invalid_photo: 'invalidPhoto',
+  invalid_feedback: 'invalidFeedback',
+  tester_media_full: 'testerMediaFull',
+  // Le quota des appels d'un projet : même texte que « trop de demandes », un code à part.
+  project_calls_limited: 'rateLimited',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

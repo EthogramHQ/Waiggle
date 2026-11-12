@@ -11,6 +11,8 @@
 // - le titre, les lignes de « Ce qui a changé » (`UpdateLinesField`, qui tient son titre, son
 //   compteur et son aide), la version, les photos (`PhotoTiles`, par `usePhotoTiles` en mode
 //   `update`) et, dès deux photos, l'interrupteur « Avant / après » ;
+// - sous les photos, s'il y a des retours de testeurs à traiter, « Retours réglés » (R7b) : les
+//   cases cochées partent avec la mise à jour (`settledFeedbackIds`) ;
 // - au pied, qui lira la mise à jour (projet public ou privé, textes du juridique).
 // Les valeurs et ce qui part à l'API sont des fonctions pures (`updates/form.ts`) ; l'envoi passe
 // par `usePublishUpdate` (`updates/api.ts`).
@@ -31,7 +33,9 @@ import { useRouteSheet } from '../navigation/useRouteSheet'
 import { useMe } from '../profile/hooks'
 import { useProject } from '../projects/hooks'
 import { usePhotoTiles } from '../projects/usePhotoTiles'
+import { useOpenFeedback } from '../testers/corner-api'
 import { DiscardDialog } from '../ui/DiscardDialog'
+import { relativeDate } from '../ui/relativeDate'
 import { Sheet, type SheetNotice } from '../ui/Sheet'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
@@ -42,7 +46,7 @@ import { useToast } from '../ui/theme/toast'
 import { usePublishUpdate } from '../updates/api'
 import { emptyLine, isDirty, toPayload, type UpdateFormValues } from '../updates/form'
 import { ProjectScreen } from './ProjectScreen'
-import { UpdateSheetFields } from './UpdateSheetFields'
+import { UpdateSheetFields, type UpdateSheetSettled } from './UpdateSheetFields'
 
 type ScreenProps = {
   id: string
@@ -230,6 +234,23 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
 
   const photos = usePhotoTiles(project.id, { slot: 'update', max: UPDATE_PHOTOS_MAX })
   const { publish, pending, error: failed, reason } = usePublishUpdate(project.id)
+  // R7b : les retours de testeurs encore à traiter, pour la partie « Retours réglés ». Lus ici
+  // seulement : ce formulaire n'existe que pour l'auteur (le projet d'un autre ne demande rien).
+  const openFeedback = useOpenFeedback(project.id)
+  const settled = useSettledPart(openFeedback)
+  const openList = openFeedback.data
+  const refetchOpenFeedback = openFeedback.refetch
+  // La liste relue (après un refus `invalid_feedback`, ou plus tard) : une case cochée dont le
+  // retour n'est plus à traiter s'en va du formulaire, sinon elle partirait sans se voir.
+  useEffect(() => {
+    if (!openList) return
+    const known = new Set(openList.map((one) => one.id))
+    setForm((now) => {
+      const ids = now.settledIds ?? []
+      const kept = ids.filter((one) => known.has(one))
+      return kept.length === ids.length ? now : { ...now, settledIds: kept }
+    })
+  }, [openList])
   // Vrai dès la tape sur « Publier », avant même que React redessine : une seconde tape n'envoie rien.
   const inFlight = useRef(false)
 
@@ -332,9 +353,14 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
           ? t(($) => $.errors.unauthorized)
           : reason === 'invalidPhotos'
             ? t(($) => $.errors.invalidPhotos)
-            : t(($) => $.project.updates.error),
+            : reason === 'invalidFeedback'
+              ? t(($) => $.errors.invalidFeedback)
+              : t(($) => $.project.updates.error),
     )
-  }, [failed, reason, t])
+    // Un retour coché n'est plus à traiter : la liste est relue, et la case de ce retour s'en va
+    // (l'effet plus haut) ; les autres cases restent cochées, rien de ce qui est écrit ne se perd.
+    if (reason === 'invalidFeedback') void refetchOpenFeedback({ cancelRefetch: false })
+  }, [failed, reason, t, refetchOpenFeedback])
 
   // --- Le message au pied de la feuille (un seul à la fois) ---
   const cut = photos.cut
@@ -419,6 +445,7 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
             count: kept,
           }}
           busy={pending}
+          settled={settled}
         />
       </Sheet>
       <DiscardDialog
@@ -430,4 +457,47 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
       />
     </>
   )
+}
+
+/**
+ * Hook : ce que montre la partie « Retours réglés », d'après la lecture des retours à traiter.
+ * - Lus, et au moins un : une case par retour, dans l'ordre de l'API (le plus récent en tête),
+ *   nommée « Inès · En partie » et décrite par l'extrait et la date (« il y a 2 jours », « mardi »,
+ *   « 4 nov. », comme la planche) ; « Ne teste plus » pour un ancien testeur (le composant l'ajoute).
+ * - Lus, et aucun : pas de partie.
+ * - Pas lus (panne) : la phrase `settledField.loadError` et « Réessayer », jamais rien (publier sans
+ *   le savoir réglerait moins que voulu). React Query v5 efface l'erreur pendant la relecture : le
+ *   nombre de pannes (`errorUpdateCount`) garde la phrase jusqu'à la réponse, sans clignoter.
+ * - Coin fermé (409 `corner_closed` : projet privé ou retiré) : pas de partie ; aucun testeur ne
+ *   lirait « Réglé », et réessayer n'y changerait rien.
+ * - Encore en lecture : pas de partie ; elle arrive en bas de la feuille, sous tout ce qu'on touche.
+ */
+function useSettledPart(query: ReturnType<typeof useOpenFeedback>): UpdateSheetSettled | null {
+  const { t, i18n } = useTranslation()
+  const { data, error, errorUpdateCount, isError, isFetching, refetch } = query
+  if (data) {
+    if (data.length === 0) return null
+    return {
+      state: 'ready',
+      items: data.map((one) => {
+        const date = relativeDate(one.createdAt, i18n.language).label
+        const outcome = t(($) => $.project.testers.feedback.outcomes[one.outcome])
+        return {
+          id: one.id,
+          label: t(($) => $.project.testers.settledField.item, { name: one.tester.name, outcome }),
+          detail:
+            one.excerpt === null
+              ? t(($) => $.project.testers.settledField.detailNoText, { date })
+              : t(($) => $.project.testers.settledField.detail, { excerpt: one.excerpt, date }),
+          former: !one.tester.current,
+        }
+      }),
+    }
+  }
+  if (isError && errorKey(error) === 'cornerClosed') return null
+  if (isError || (errorUpdateCount > 0 && isFetching)) {
+    // `cancelRefetch: false` : une seconde tape pendant la relecture ne la relance pas.
+    return { state: 'error', retry: () => void refetch({ cancelRefetch: false }) }
+  }
+  return null
 }

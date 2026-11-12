@@ -273,7 +273,16 @@ function ReportForm({
             showCount
             maxLength={REPORT_DETAILS_MAX}
           />
-          <Hint icon="shield-check" text={t(($) => $.report.anonymity)} />
+          {/* Un message d'un fil de testeur se lit à deux : l'autre personne peut deviner qui
+              signale, on le dit avec son nom (R7b, juridique J3). */}
+          <Hint
+            icon="shield-check"
+            text={
+              target.kind === 'message'
+                ? t(($) => $.report.anonymityThread, { name: author.name })
+                : t(($) => $.report.anonymity)
+            }
+          />
           {/* Un refus de l'API, au-dessus d'« Envoyer » : il reste en place pendant le nouvel
               envoi, rien ne saute sous le doigt. */}
           {failureMessage ? (

@@ -160,7 +160,28 @@ export const memberCounterKeys = (userId: string) => ({
   // mal formées comprises.
   suggestionDismissHour: `suggestion-dismiss-hour:${userId}`,
   suggestionDismissDay: `suggestion-dismiss-day:${userId}`,
+  // Les demandes d'appel à tester (R7b, sécurité B1) : 20 par jour et par membre, tous projets
+  // ensemble, comptées avant tout examen. Le plafond de 5 appels par jour d'un projet est une autre
+  // clé (`projectCallKey`), comptée après le droit d'auteur.
+  testerCall: `tester-call:${userId}`,
+  // Les messages du coin (retours et réponses), tous projets ensemble : 30 par 24 heures, comptés
+  // avant tout examen (R7b, sécurité B1).
+  testerMessage: `tester-message:${userId}`,
+  // « Marquer comme réglé » et « Remettre à traiter » : un seul compteur, 120 par heure, mal formées
+  // comprises (R7b, sécurité A8).
+  testerSettle: `tester-settle:${userId}`,
+  // « Marquer un fil lu » (R7b, sécurité A2) : une écriture, donc 300 par heure, mal formées comprises.
+  testerRead: `tester-read:${userId}`,
 })
+
+/**
+ * Le compteur des appels à tester d'un projet (R7b) : 5 par jour, pour l'auteur seul (la route ne le
+ * compte qu'après avoir vérifié qu'il l'est). La clé porte le projet, pas un membre : elle ne part
+ * donc pas avec un compte (`deleteMemberCounters`), mais avec la purge de nuit, à la fin de sa fenêtre.
+ * L'identifiant est mis en minuscules : `z.uuid()` et PostgreSQL ignorent la casse, pas le compteur, et
+ * l'auteur aurait sinon un compteur par graphie (relecture de sécurité R7b, A1).
+ */
+export const projectCallKey = (projectId: string) => `call:${projectId.toLowerCase()}`
 
 /**
  * Une adresse e-mail sous la forme qu'on compare : sans blancs autour, en minuscules. Better Auth

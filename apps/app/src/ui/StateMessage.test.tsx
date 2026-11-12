@@ -17,6 +17,26 @@ import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { StateMessage } from './StateMessage'
 
+// R7b, K10 : l'écran peut poser le focus sur l'état (son titre, sinon son premier paragraphe).
+describe('the focus place of a state', () => {
+  it('gives the title to `focusRef`', async () => {
+    const ref = { current: null as unknown }
+    await renderWithProviders(
+      <StateMessage kind="empty" title="Rien ici" message="Pas encore." focusRef={ref as never} />,
+    )
+    expect(ref.current).not.toBeNull()
+    expect((ref.current as { props: { children: unknown } }).props.children).toBe('Rien ici')
+  })
+
+  it('gives the first paragraph to `focusRef` without a title', async () => {
+    const ref = { current: null as unknown }
+    await renderWithProviders(
+      <StateMessage kind="empty" message={['Pas encore.', 'Plus tard.']} focusRef={ref as never} />,
+    )
+    expect((ref.current as { props: { children: unknown } }).props.children).toBe('Pas encore.')
+  })
+})
+
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 

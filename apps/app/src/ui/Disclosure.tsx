@@ -4,8 +4,8 @@
 // Les lecteurs d'écran annoncent « replié » ou « déplié » : `aria-expanded`, que React Native
 // traduit aussi en `accessibilityState.expanded` pour VoiceOver et TalkBack (Disclosure.test.tsx
 // le vérifie : les deux disent toujours la même chose).
-import { radii, space } from '@ruche/brand'
-import { type ReactNode, useState } from 'react'
+import { layout, radii, space } from '@ruche/brand'
+import { type ReactNode, type Ref, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { Icon, type IconName } from './Icon'
@@ -23,12 +23,73 @@ type Props = {
   icon?: IconName | null
   /** Déplié dès l'affichage (par exemple quand la section contient déjà quelque chose). */
   initiallyOpen?: boolean
+  /**
+   * card (par défaut) : une carte blanche, son titre en gras, le contenu dedans. inline (R7b) : un
+   * simple texte de légende suivi de sa petite flèche, rangé à gauche, et le contenu posé dessous
+   * sans cadre : « 12 testeurs », sous le titre du coin des testeurs, qui déplie la liste (planche
+   * validée 1) ; une carte y pèserait plus lourd que les onglets qui suivent. `icon` et `hint` ne
+   * servent qu'à la carte.
+   */
+  variant?: 'card' | 'inline'
+  /**
+   * Le bouton qui déplie et replie (R7b, K5) : pour y rendre le focus quand le contenu perd son
+   * dernier élément (le seul testeur retiré de « 1 testeur »), au lieu de le laisser se perdre.
+   */
+  toggleRef?: Ref<View>
   children: ReactNode
 }
 
-export function Disclosure({ title, hint, icon = 'plus', initiallyOpen = false, children }: Props) {
+export function Disclosure({
+  title,
+  hint,
+  icon = 'plus',
+  initiallyOpen = false,
+  variant = 'card',
+  toggleRef,
+  children,
+}: Props) {
   const { colors, shadows } = useTheme()
   const [open, setOpen] = useState(initiallyOpen)
+  if (variant === 'inline') {
+    return (
+      <View style={{ gap: space.xs }}>
+        <Pressable
+          ref={toggleRef}
+          accessibilityRole="button"
+          accessibilityLabel={title}
+          aria-expanded={open}
+          onPress={() => setOpen((previous) => !previous)}
+          // Rangé à gauche par lui-même (pas par son parent : le contenu dessous garde toute la
+          // largeur), 44 points de haut, et il se replie plutôt que de sortir du cadre à 200 %
+          // (react-native-web interdit sinon à toute vue de rétrécir).
+          style={{
+            alignSelf: 'flex-start',
+            maxWidth: '100%',
+            flexShrink: 1,
+            minHeight: layout.controlHeight.regular,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space.xs,
+          }}
+        >
+          <View style={{ flexShrink: 1, minWidth: 0 }}>
+            <Text variant="callout" tone="secondary">
+              {title}
+            </Text>
+          </View>
+          {/* La flèche ne rétrécit jamais (sur le web, un dessin rétrécit avec sa rangée). */}
+          <View style={{ flexShrink: 0, transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+            <Icon name="caret-down" size={16} tone="secondary" />
+          </View>
+        </Pressable>
+        {open ? (
+          <Animated.View entering={FadeIn} style={{ gap: space.sm }}>
+            {children}
+          </Animated.View>
+        ) : null}
+      </View>
+    )
+  }
   return (
     <View
       style={{
@@ -40,6 +101,7 @@ export function Disclosure({ title, hint, icon = 'plus', initiallyOpen = false, 
       }}
     >
       <Pressable
+        ref={toggleRef}
         accessibilityRole="button"
         accessibilityLabel={title}
         aria-expanded={open}

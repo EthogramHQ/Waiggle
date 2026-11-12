@@ -290,7 +290,7 @@ export const fr = {
       profileItem: 'Ton profil et ta photo',
       projectsItem: 'Tes projets',
       projectsDetail:
-        'Avec leur description, leur recette, leurs prompts, leurs photos, leurs mises à jour, leurs commentaires et leurs testeurs',
+        'Avec leur description, leur recette, leurs prompts, leurs photos, leurs mises à jour, leurs commentaires, leurs testeurs, leurs appels et les retours de leurs testeurs',
       followsItem: 'Tes abonnements, tes abonnés et tes inscriptions de testeur',
       handleItem: 'Ton pseudo',
       handleDetail:
@@ -298,6 +298,10 @@ export const fr = {
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
+      // R7b (juridique J7) : un fil disparaît en entier avec le compte du testeur.
+      testerFeedbackItem: 'Tes retours de testeur, avec leurs captures',
+      testerFeedbackDetail:
+        'Chaque fil où tu as écrit disparaît en entier, réponses des auteurs comprises.',
       notificationsItem:
         'Tes notifications, et les liens vers toi dans les commentaires des autres',
       notificationsDetail:
@@ -759,21 +763,17 @@ export const fr = {
     // (décision de Louis du 10/11/2026, juridique T2) ; jamais le nombre pour un autre que l'auteur.
     testers: {
       join: 'Rejoindre les testeurs',
-      joined: 'Tu testes ce projet',
       joinTitle: 'Rejoindre les testeurs',
       joinBody:
-        'Tu aides {{name}} à améliorer « {{title}} ». Tu recevras ses mises à jour, et bientôt ses appels à tester. {{name}} verra ton nom et ta photo dans sa liste de testeurs.',
+        'Tu aides {{name}} à améliorer « {{title}} » : tu recevras ses mises à jour et ses appels à tester, et tu pourras lui envoyer des retours qu’aucun autre membre ne lit. {{name}} verra ton nom, ta photo et ta date d’inscription. Dans les commentaires de ce projet, un badge « Testeur » s’affichera à côté de ton nom.',
       confirm: 'Rejoindre les testeurs',
       cancel: 'Annuler',
       joinedToast: 'Tu fais partie des testeurs de « {{title}} ».',
-      memberTitle: 'Tu testes ce projet',
-      memberBody: 'Tu fais partie des testeurs de « {{title}} ». Tu reçois ses mises à jour.',
       quit: 'Quitter les testeurs',
-      close: 'Fermer',
       quitToast: 'Tu ne fais plus partie des testeurs de « {{title}} ».',
       // juridique (T3) : jamais le nombre de testeurs d'un autre.
       full: 'Ce projet ne prend plus de nouveaux testeurs.',
-      notTestable: 'Ce projet ne cherche plus de testeurs.',
+      notTestable: 'Tu ne peux pas rejoindre les testeurs de ce projet.',
       // Pour l'auteur seul, à côté du nombre d'abonnés.
       count_one: '{{count}} testeur',
       count_other: '{{count}} testeurs',
@@ -786,6 +786,194 @@ export const fr = {
       // juridique (T5) : ne plus suivre un projet qu'on teste.
       stillTester:
         'Tu fais toujours partie des testeurs : ses mises à jour continueront d’arriver.',
+      // R7b : le coin des testeurs (/projects/<id>/testers). Textes des planches validées et des
+      // relectures du plan (juridique J1 à J12, interface ui-B5), sans genre imposé.
+      corner: 'Le coin des testeurs',
+      cornerTitle: 'Le coin des testeurs de « {{title}} »',
+      cornerMenu: 'Actions du coin des testeurs',
+      cornerLoadError: 'Le coin des testeurs n’a pas pu se charger.',
+      // juridique (J5) : quitter demande une confirmation, qui dit ce qui reste chez l'auteur.
+      quitTitle: 'Quitter les testeurs de « {{title}} » ?',
+      quitBody:
+        'Tu ne verras plus les appels du coin des testeurs. Tes retours restent lisibles par {{name}} : tant que le coin est ouvert, tu pourras y relire ton fil et supprimer tes messages. Sinon, écris-nous à {{contactEmail}}.',
+      quitConfirm: 'Quitter',
+      // juridique (J5) : le retrait est silencieux et définitif ; le nom, jamais « Elle » (ui-B5).
+      remove: 'Retirer des testeurs',
+      removeTitle: 'Retirer {{name}} des testeurs ?',
+      removeBody:
+        '{{name}} ne verra plus le coin des testeurs et ne pourra plus les rejoindre ; aucune notification ne part. Ses retours te restent lisibles. Impossible de revenir en arrière.',
+      removeConfirm: 'Retirer',
+      removedToast: '{{name}} ne fait plus partie de tes testeurs.',
+      removeError: 'Le retrait n’a pas pu être enregistré. Réessaie.',
+      tabs: { label: 'Le coin des testeurs', calls: 'Appels', feedback: 'Retours' },
+      list: {
+        since: 'depuis le {{date}}',
+        sinceLong: 'Dans les testeurs depuis le {{date}}',
+        showMore_one: 'Afficher l’autre testeur',
+        showMore_other: 'Afficher les {{count}} autres',
+        menu: 'Actions pour {{name}}',
+        empty: 'Personne ne teste ce projet pour l’instant.',
+      },
+      // Pour l'auteur, quand le projet est retiré, privé, ou son compte suspendu (ui-A6).
+      closedAuthor:
+        'Ton coin des testeurs est fermé : tes testeurs ne le voient plus tant que le projet est privé, retiré par la modération, ou que ton compte est suspendu. Tu peux tout relire, mais plus y écrire.',
+      // Un ancien testeur garde son fil en lecture seule (décision de Louis du 11/11/2026).
+      formerTester:
+        'Tu ne fais plus partie des testeurs : tu peux relire ton fil avec {{name}} et supprimer tes messages.',
+      calls: {
+        launch: 'Lancer un appel',
+        sheetTitle: 'Nouvel appel',
+        send: 'Envoyer',
+        cancel: 'Annuler',
+        audience_one: 'Pour ton testeur',
+        audience_other: 'Pour tes {{count}} testeurs',
+        audienceNone: 'Pour tes futurs testeurs',
+        field: 'Ton appel',
+        placeholder: 'Par exemple : essayez le niveau 3 ce week-end, surtout sur téléphone',
+        // juridique (J8) : un appel est lu de tous les testeurs, même futurs.
+        hint: 'Tous tes testeurs liront cet appel, y compris ceux qui arriveront plus tard. Ne nomme personne et ne cite aucun retour sans l’accord de la personne.',
+        required: 'Écris ton appel.',
+        photo: 'Photo',
+        optional: 'facultative',
+        addPhoto: 'Ajouter une photo',
+        // juridique (J8) : l'aide du droit à l'image de la galerie, et la description lue.
+        photoConsent:
+          'Ne publie la photo d’une personne qu’avec son accord, et seulement des images que tu as le droit de partager.',
+        photoDescription: 'Description de la photo, facultative',
+        photoDescriptionHint:
+          'Lue à voix haute par les lecteurs d’écran, pour chaque testeur. Ne nomme personne sans son accord.',
+        photoName: 'Photo jointe à l’appel',
+        invalidPhoto: 'La photo n’est plus disponible. Ajoute-la de nouveau.',
+        limited: 'Tu as lancé {{max}} appels aujourd’hui sur ce projet. Réessaie demain.',
+        error: 'L’appel n’a pas pu être envoyé. Réessaie.',
+        empty: 'Aucun appel pour l’instant.',
+        emptyAuthor:
+          'Aucun appel pour l’instant. Lance le premier : tes testeurs seront prévenus dans Activité.',
+        more: 'Afficher les appels précédents',
+        moreError: 'Les appels précédents n’ont pas pu se charger.',
+        loadError: 'Les appels n’ont pas pu se charger.',
+        menu: 'Actions de l’appel « {{excerpt}} »',
+        delete: 'Supprimer',
+        // juridique (J7) : ce que la suppression emporte ; un appel retiré garde la phrase T4.
+        deleteTitle: 'Supprimer cet appel ?',
+        deleteBody: 'Il disparaîtra du coin des testeurs et des notifications, avec sa photo.',
+        deleteBodyRemoved:
+          'Il disparaîtra du coin des testeurs et des notifications, avec sa photo. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision.',
+        deleteConfirm: 'Supprimer',
+        deleteError: 'L’appel n’a pas pu être supprimé. Réessaie.',
+        report: 'Signaler',
+      },
+      feedback: {
+        send: 'Envoyer un retour',
+        sheetTitle: 'Ton retour',
+        submit: 'Envoyer',
+        cancel: 'Annuler',
+        byAuthor: 'Projet {{nameOf}}',
+        clearDraft: 'Effacer le brouillon',
+        outcome: 'Ça a marché ?',
+        outcomes: { yes: 'Oui', partly: 'En partie', no: 'Non' },
+        outcomeRequired: 'Choisis Oui, En partie ou Non.',
+        outcomeSpoken: 'Ça a marché : {{outcome}}',
+        device: 'Sur quoi ?',
+        devices: { phone: 'Téléphone', computer: 'Ordinateur', tablet: 'Tablette' },
+        optional: 'facultatif',
+        clearDevice: 'Effacer',
+        text: 'Raconte, facultatif',
+        placeholder: 'Ce qui a marché, ce qui a coincé, ce que tu as aimé',
+        capture: 'Une capture d’écran',
+        addCapture: 'Ajouter une capture',
+        // juridique (J8) : les données des autres aussi (le scénario est amendé).
+        captureHint:
+          'Retire de ta capture ce qui est personnel, à toi ou à d’autres : noms, messages, adresses.',
+        // juridique (J8) : une capture a un nom lu fixe, jamais une description.
+        captureName: 'Capture d’écran jointe au retour {{nameOf}}',
+        captureNameMine: 'Capture d’écran jointe à ton retour',
+        // juridique (J2) : « aucun autre membre », jamais « personne » : la modération lit un
+        // message signalé.
+        privacy:
+          'Ton retour reste entre {{name}} et toi : aucun autre membre ne le lit. {{name}} reçoit une notification.',
+        invalidCapture: 'La capture n’est plus disponible. Ajoute-la de nouveau.',
+        limited: 'Tu as envoyé {{max}} messages aujourd’hui. Réessaie demain.',
+        error: 'Le retour n’a pas pu être envoyé. Réessaie.',
+      },
+      thread: {
+        pageTitle: 'Le fil {{nameOf}} sur « {{title}} »',
+        showEarlier: 'Afficher les précédents',
+        earlierError: 'Les messages précédents n’ont pas pu se charger.',
+        loadError: 'Le fil n’a pas pu se charger.',
+        // juridique (J2), mot pour mot.
+        privacyAuthor: 'Ce fil reste entre {{name}} et toi : aucun autre membre ne le lit.',
+        privacyTester: 'Ton retour reste entre {{name}} et toi : aucun autre membre ne le lit.',
+        privacyList:
+          'Chaque fil reste entre toi et la personne qui l’a ouvert : aucun autre membre ne le lit.',
+        replyPlaceholder: 'Répondre à {{name}}',
+        reply: 'Répondre',
+        replyLabel: 'Envoyer la réponse',
+        replyError: 'La réponse n’a pas pu être envoyée. Réessaie.',
+        closedFormer: 'Tu ne peux plus répondre : {{name}} ne fait plus partie des testeurs.',
+        closedCorner: 'Le coin est fermé : tu ne peux plus répondre.',
+        // Le nom lu de chaque bulle (ui-B5 : {{nameOf}} élide « d’Inès »).
+        feedbackOf: 'Retour {{nameOf}}, {{time}}',
+        replyOf: 'Réponse {{nameOf}}, {{time}}',
+        mineFeedback: 'Ton retour, {{time}}',
+        mineReply: 'Ta réponse, {{time}}',
+        menu: 'Actions du message « {{excerpt}} »',
+        menuNoText: 'Actions du retour {{nameOf}}',
+        menuMineNoText: 'Actions de ton retour',
+        settle: 'Marquer comme réglé',
+        unsettle: 'Remettre à traiter',
+        settled: 'Réglé',
+        settledIn: 'Réglé dans la {{version}}',
+        settledOn: 'Réglé dans la mise à jour du {{date}}',
+        settleError: 'Le changement n’a pas pu être enregistré. Réessaie.',
+        settleLimited: 'Trop de changements en une heure. Réessaie plus tard.',
+        delete: 'Supprimer',
+        // juridique (J7).
+        deleteTitle: 'Supprimer ce message ?',
+        deleteBody: 'Il disparaîtra du fil, pour {{name}} aussi, avec sa capture.',
+        deleteBodyRemoved:
+          'Il disparaîtra du fil, pour {{name}} aussi, avec sa capture. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision.',
+        deleteConfirm: 'Supprimer',
+        deleteError: 'Le message n’a pas pu être supprimé. Réessaie.',
+        report: 'Signaler',
+        // La liste des fils de l'auteur (ui-A1, juridique J12 : « Ne teste plus »).
+        you: 'Toi : {{excerpt}}',
+        noText: 'Un retour, sans texte',
+        unread: 'non lu',
+        rowName: '{{name}}, non lu',
+        former: 'Ne teste plus',
+        filterLabel: 'Filtrer les retours',
+        filters: { open: 'À traiter', settled: 'Réglés' },
+        filterSpoken_one: '{{label}}, {{count}} fil',
+        filterSpoken_other: '{{label}}, {{count}} fils',
+        emptyOpen: 'Aucun retour à traiter.',
+        emptySettled: 'Aucun retour réglé pour l’instant.',
+        emptyAuthor:
+          'Aucun retour pour l’instant. Tes testeurs peuvent t’en envoyer depuis ce coin.',
+        emptyTester: 'Pas encore de retour. Dis à {{name}} ce qui marche et ce qui coince.',
+        more: 'Afficher la suite',
+        moreError: 'La suite n’a pas pu se charger.',
+        listLoadError: 'Les retours n’ont pas pu se charger.',
+        // Sur ordinateur, la colonne de droite tant qu'aucun fil n'est ouvert (planche R7b-Desktop).
+        choose: 'Choisis un fil dans la liste pour le lire ici.',
+        // Sous un retour, pendant « Marquer comme réglé » ou « Remettre à traiter » (ui-A1).
+        settling: 'Enregistrement…',
+      },
+      // La partie « Retours réglés » de la feuille « Nouvelle mise à jour ».
+      settledField: {
+        title: 'Retours réglés',
+        count: '{{count}} sur {{total}}',
+        countSpoken_one: '{{count}} retour coché sur {{total}}',
+        countSpoken_other: '{{count}} retours cochés sur {{total}}',
+        // juridique (J9) : un ancien testeur ne lira rien.
+        hint: 'Coche les retours que cette mise à jour règle : ils passeront dans « Réglés ». Les personnes qui testent encore ce projet le liront sous leur retour et recevront une notification.',
+        item: '{{name}} · {{outcome}}',
+        detail: '« {{excerpt}} », {{date}}',
+        detailNoText: 'Sans texte, {{date}}',
+        max: '{{max}} retours au plus par mise à jour.',
+        former: 'Ne teste plus',
+        loadError: 'Les retours à traiter n’ont pas pu se charger.',
+      },
     },
     reactions: {
       amazing: 'Bluffant',
@@ -862,6 +1050,9 @@ export const fr = {
       author: 'Auteur',
       // Le lien du nom de l'auteur du projet, lu avec son badge (R5b, ui-M1).
       authorLink: '{{name}}, Auteur',
+      // R7b : le badge des testeurs, dessiné comme « Auteur ».
+      tester: 'Testeur',
+      testerLink: '{{name}}, Testeur',
       menu: 'Actions du commentaire {{nameOf}}',
       yours: 'Ton commentaire',
       // La carte compacte de l'aperçu : un seul bouton, nommé par l'auteur et l'extrait (ui-B7).
@@ -964,10 +1155,10 @@ export const fr = {
       deleteTitle: 'Supprimer « {{title}} » ?',
       // juridique (jur-J9, puis T1 de R7a) : les mises à jour ont remplacé les notes.
       deleteConfirm:
-        'Le projet, sa description, ses photos, ses prompts et ses mises à jour disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
+        'Le projet, sa description, ses photos, ses prompts, ses mises à jour et son coin des testeurs disparaissent tout de suite, avec les commentaires, les réactions et les retours des autres membres. Impossible de revenir en arrière.',
       // Un projet retiré par la modération : la décision et la copie du signalement restent un an.
       deleteConfirmRemoved:
-        'Le projet, sa description, ses photos, ses prompts et ses mises à jour disparaissent tout de suite, avec les commentaires et les réactions des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
+        'Le projet, sa description, ses photos, ses prompts, ses mises à jour et son coin des testeurs disparaissent tout de suite, avec les commentaires, les réactions et les retours des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
       deleteConfirmButton: 'Supprimer',
       notFoundTitle: 'Ce projet est introuvable',
       // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
@@ -1012,12 +1203,17 @@ export const fr = {
     project: 'Signaler ce projet',
     update: 'Signaler cette mise à jour',
     member: 'Signaler ce profil',
+    // R7b : un appel à tester, un message d'un fil de testeur.
+    call: 'Signaler cet appel',
+    message: 'Signaler ce message',
     target: {
       project: 'Le projet signalé',
       note: 'La note signalée',
       update: 'La mise à jour signalée',
       comment: 'Le commentaire signalé',
       member: 'Le profil signalé',
+      call: 'L’appel signalé',
+      message: 'Le message signalé',
     },
     reasonLabel: 'Pourquoi le signales-tu ?',
     reasons: {
@@ -1036,6 +1232,9 @@ export const fr = {
       'Dis-nous pourquoi ce contenu te semble illégal. En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
     anonymity:
       'La personne concernée ne saura pas que c’est toi. La modération voit qui signale, pour éviter les abus.',
+    // R7b (juridique J3) : dans un fil à deux, l'autre peut deviner.
+    anonymityThread:
+      'Ton nom n’est pas transmis. Mais vous êtes les deux seules personnes à lire ce fil : {{name}} pourra deviner que le signalement vient de toi. La modération voit qui signale, pour éviter les abus.',
     danger: 'Quelqu’un est en danger ? Appelle le 112.',
     submit: 'Envoyer',
     sent: 'Merci, ton signalement a été envoyé. La modération va le regarder.',
@@ -1071,7 +1270,7 @@ export const fr = {
       'Vous ne verrez plus les projets, les mises à jour et les commentaires l’un de l’autre, et vous ne pourrez plus interagir.',
     // Relecture juridique (R1) : ce qui reste visible malgré le blocage (règles 1 et 2 du plan).
     remains:
-      'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, et ceux où tu as écrit son pseudo. Pour les retirer, supprime-les avant de bloquer.',
+      'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, ceux où tu as écrit son pseudo, et tes messages du coin des testeurs. Pour les retirer, supprime-les avant de bloquer.',
     follows:
       'Vos abonnements de l’un à l’autre sont retirés, comme vos inscriptions de testeur sur les projets de l’autre ; rien ne reviendra si tu débloques.',
     notTold: '@{{handle}} ne reçoit aucun message, mais pourra le remarquer.',
@@ -1125,6 +1324,8 @@ export const fr = {
       note: 'Note (ancien journal)',
       comment: 'Commentaire',
       member: 'Profil',
+      call: 'Appel à tester',
+      message: 'Message d’un fil de testeur',
     },
     // Tranche 7b : la copie champ par champ, et ses images (jamais copiées, seulement suivies).
     fields: {
@@ -1463,7 +1664,7 @@ export const fr = {
     direct: 'Une personne de la modération a décidé de suspendre ton compte.',
     explanation: 'Explication : {{explanation}}',
     canStill:
-      'Tu peux toujours tout lire, supprimer tes projets, tes mises à jour et tes commentaires, quitter les testeurs d’un projet, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
+      'Tu peux toujours tout lire, supprimer tes projets, tes mises à jour, tes commentaires, tes appels et tes retours, quitter les testeurs d’un projet, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
     // Les recours (J3, formulation à faire valider par un professionnel).
     // Suivi de l’adresse, en lien qui ouvre la messagerie (Louis, 27/10/2026).
     contest: 'Pour contester : écris à {{contactEmail}}. Tu peux aussi saisir la justice.',
@@ -1781,6 +1982,9 @@ export const fr = {
     count: '{{index}} sur {{count}}',
     previous: 'Photo précédente',
     next: 'Photo suivante',
+    // R7b : une image d'un membre (la capture d'un retour, la photo d'un appel) s'ouvre en entier
+    // au toucher ; le nom du bouton dit ce qu'il fait, puis l'image qu'il ouvre.
+    enlarge: 'Voir en grand : {{description}}',
   },
   // Partager un projet ou une page de membre (R5a, F-Pr1, F-Mb1). Le lien ne contient que l'adresse.
   share: {
@@ -1841,6 +2045,12 @@ export const fr = {
       updates_other: '« {{title}} » : {{count}} mises à jour',
       updatesMore_one: 'Et {{count}} autre projet',
       updatesMore_other: 'Et {{count}} autres projets',
+      // R7b (juridique J12) : par projet, un nombre et un lien, jamais de texte.
+      testersTitle: 'Le coin des testeurs',
+      testers_one: '« {{title}} » : {{count}} nouveauté dans le coin des testeurs',
+      testers_other: '« {{title}} » : {{count}} nouveautés dans le coin des testeurs',
+      testersMore_one: 'Et {{count}} autre projet',
+      testersMore_other: 'Et {{count}} autres projets',
       button: 'Voir mes notifications',
       last: 'Ce récap est le dernier pour l’instant : le prochain partira après ta prochaine visite.',
       reason: 'Tu reçois ce récap parce qu’il est activé dans tes réglages {{appName}}.',
@@ -1985,7 +2195,7 @@ export const fr = {
       },
       explanation: 'Explication : {{explanation}}',
       meanwhile:
-        'Pendant la suspension, tu peux tout lire, supprimer tes projets, tes mises à jour et tes commentaires, quitter les testeurs d’un projet, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
+        'Pendant la suspension, tu peux tout lire, supprimer tes projets, tes mises à jour, tes commentaires, tes appels et tes retours, quitter les testeurs d’un projet, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
       contest:
         'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
       // La salutation, sans le nom : l'e-mail ne cite que la décision (7c).
@@ -2129,6 +2339,15 @@ export const fr = {
     // R7a : une mise à jour d'un projet qu'on suit ou qu'on teste ; sa première ligne en dessous.
     projectUpdate: '{{name}} a publié une mise à jour de « {{title}} »',
     projectUpdateVersion: '{{name}} a publié une mise à jour de « {{title}} » · {{version}}',
+    // R7b : le coin des testeurs.
+    testerCall: '{{name}} lance un appel à tester « {{title}} »',
+    testerFeedback: '{{name}} a envoyé un retour sur « {{title}} »',
+    testerReplyToTester: '{{name}} a répondu à ton retour sur « {{title}} »',
+    testerReplyToAuthor: '{{name}} a répondu sur « {{title}} »',
+    feedbackSettled: '{{name}} a réglé ton retour sur « {{title}} »',
+    feedbackSettledVersion: '{{name}} a réglé ton retour dans la {{version}} de « {{title}} »',
+    feedbackSettledUpdate:
+      '{{name}} a réglé ton retour dans la mise à jour du {{date}} de « {{title}} »',
     memberFollows_one: '{{count}} personne de plus te suit',
     memberFollows_other: '{{count}} personnes de plus te suivent',
     projectFollows_one: '{{count}} personne de plus suit « {{title}} »',
@@ -2144,6 +2363,9 @@ export const fr = {
       comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
       // Tranche 7b, règle 9 : sur le projet d'un membre qui t'a bloqué, ni titre ni lien.
       commentElsewhere: 'Ton commentaire a été retiré par la modération',
+      // R7b.
+      call: 'Ton appel à tester « {{title}} » a été retiré par la modération',
+      message: 'Ton message sur « {{title}} » a été retiré par la modération',
     },
     reportHandled: {
       // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).
@@ -2167,6 +2389,15 @@ export const fr = {
       member: {
         removed: 'Ton signalement d’un profil a été traité : la modération est intervenue.',
         dismissed: 'Ton signalement d’un profil a été traité : nous n’avons rien changé.',
+      },
+      // R7b.
+      call: {
+        removed: 'Ton signalement d’un appel à tester a été traité : l’appel a été retiré.',
+        dismissed: 'Ton signalement d’un appel à tester a été traité : nous ne l’avons pas retiré.',
+      },
+      message: {
+        removed: 'Ton signalement d’un message a été traité : le message a été retiré.',
+        dismissed: 'Ton signalement d’un message a été traité : nous ne l’avons pas retiré.',
       },
       contest: 'Pas d’accord ? Écris-nous : {{contactEmail}}',
     },
@@ -2222,9 +2453,16 @@ export const fr = {
     // Tranche R7a.
     invalidPhotos: 'Une des photos n’est plus disponible. Retire-la, puis ajoute-la de nouveau.',
     cannotTestOwn: 'Tu ne peux pas rejoindre les testeurs de ton propre projet.',
-    notTestable: 'Ce projet ne cherche pas de testeurs pour l’instant.',
+    notTestable: 'Tu ne peux pas rejoindre les testeurs de ce projet.',
     testersFull: 'Ce projet ne prend plus de nouveaux testeurs.',
     updatePhotosFull:
       'Ce projet a atteint 100 photos de mises à jour. Supprime une ancienne mise à jour pour en ajouter.',
+    // Tranche R7b.
+    cornerClosed: 'Ce coin des testeurs est fermé : rien ne peut y être écrit pour l’instant.',
+    threadClosed: 'Tu ne peux pas répondre dans ce fil.',
+    invalidPhoto: 'L’image n’est plus disponible. Ajoute-la de nouveau.',
+    invalidFeedback:
+      'Un des retours cochés n’est plus à traiter : la liste est à jour, vérifie-la puis publie.',
+    testerMediaFull: 'Ce fil ou ce coin a atteint 100 images. Supprimes-en une pour en ajouter.',
   },
 } as const

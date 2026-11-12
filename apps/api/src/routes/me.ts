@@ -37,6 +37,7 @@ import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limi
 import { reactionsOfMember } from '../reactions/load'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
+import { testerCornerExport } from '../testers/export'
 import { chargeOtherTools } from '../tools/quota'
 import { countChargedOtherTools, NoFreeToolSlugError, resolveTools } from '../tools/resolve'
 import { replaceProfileTools } from '../tools/write'
@@ -391,6 +392,10 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       since: row.since.toISOString(),
     }))
 
+    // Le coin des testeurs (R7b) : ses appels, ses messages, ses retraits, ses dates de lecture
+    // (testers/export.ts : jamais ce que l'autre personne d'un fil a écrit ou lu).
+    const testerCorner = await testerCornerExport(db, user.id, publicApiUrl)
+
     // Ce qu'il suit : l'identifiant et la date, rien de plus. Ses abonnés, eux, ne font pas partie
     // de ses données. Les deux requêtes partent de la clé primaire (follower_id, …).
     // Un projet suivi devenu privé n'y figure pas (l'abonnement est gardé, mais ne montre plus
@@ -490,6 +495,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         categoryChanges,
         updates,
         testerOf,
+        ...testerCorner,
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
         comments: comments.map((comment) => ({

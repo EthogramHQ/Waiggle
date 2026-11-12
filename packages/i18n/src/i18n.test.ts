@@ -117,12 +117,19 @@ describe('translations', () => {
       .map(([key, text]) => `${key}: ${text}`)
     expect(offending, 'write {{nameOf}} instead').toEqual([])
 
-    // Les quatre textes passés à {{nameOf}} au commit du contrat le gardent.
+    // Les textes passés à {{nameOf}} au commit du contrat (R6b, puis R7b) le gardent.
     for (const key of [
       'project.comments.menu',
       'project.comments.openLine',
       'moderation.suspend.title',
       'moderation.lift.title',
+      // R7b (interface B5) : les textes du coin des testeurs qui nomment un membre après « de ».
+      'project.testers.feedback.byAuthor',
+      'project.testers.feedback.captureName',
+      'project.testers.thread.pageTitle',
+      'project.testers.thread.feedbackOf',
+      'project.testers.thread.replyOf',
+      'project.testers.thread.menuNoText',
     ]) {
       expect(fr[key], `missing ${key}`).toContain('{{nameOf}}')
     }

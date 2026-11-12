@@ -301,7 +301,8 @@ const recipesShown = {
   latestUpdate: recipesUpdates[0],
   updateCount: 3,
   version: 'v1.2',
-  testerCount: 4,
+  // Le même nombre que le coin de ce projet (`testerCornersAtStart`) : 12 testeurs.
+  testerCount: 12,
 }
 // Une note de 1 000 caractères, et une adresse sans espace : rien ne doit déborder.
 const longNote = Array.from({ length: 20 }, () => 'Une note très longue, pour voir la coupure. ')
@@ -732,7 +733,8 @@ const handleOf = {
 }
 const comment = (n, author, body, day, hour, fields = {}) => ({
   id: `5e6f7081-92a3-4b4c-8d5e-${String(n).padStart(12, '0')}`,
-  author: author && { ...author, handle: handleOf[author.id] ?? null },
+  // R7b : isTester est obligatoire dans l'auteur d'un commentaire (badge « Testeur »).
+  author: author && { ...author, handle: handleOf[author.id] ?? null, isTester: false },
   body: author ? body : '',
   createdAt: new Date(Date.UTC(2026, 9, day, hour)).toISOString(),
   editedAt: null,
@@ -1581,12 +1583,238 @@ const testedProject = {
   status: 'testable',
   demoUrl: 'https://decollage.example.org',
   isTester: true,
+  // Comme son coin (`testerCornersAtStart`) : 9 testeurs.
+  testerCount: 9,
   latestUpdate: { ...recipesUpdates[0], title: 'Le décompte de la fusée' },
   updateCount: 1,
   version: 'v1.2',
 }
 cardProjects.set(testedProject.id, testedProject)
 updatesOf.set(testedProject.id, [testedProject.latestUpdate])
+
+// R7b : le coin des testeurs. Trois coins : celui du projet de recettes de Léa (elle en est
+// l'autrice : 12 testeurs, la liste, deux appels, quatre fils), celui de « Décollage ! » de Max
+// (Léa y est testeuse : les appels, son fil avec Max), et celui d'« Avis express », retiré par la
+// modération (le coin fermé : Léa relit tout, n'écrit plus). Pages : coin-testeurs-auteur,
+// coin-testeurs-testeur, coin-testeurs-fil, feuille-appel, feuille-retour, coin-ferme.
+const cornerAgo = (days, hours = 0) =>
+  new Date(SHOT_NOW - days * 86_400_000 - hours * 3_600_000).toISOString()
+// Un identifiant (UUID v4) par famille (« a » appels, « c » messages, « d » images) et numéro.
+const cornerId = (family, n) =>
+  `${family.repeat(8)}-${family.repeat(4)}-4${family.repeat(3)}-8${family.repeat(3)}-${String(n).padStart(12, '0')}`
+const testerMedia = (n, description = null) => {
+  const { id, url, width, height, thumbhash } = photo(cornerId('d', n), 1600, 1000, description)
+  return {
+    id,
+    url: url.replace('/media/visuals/', '/media/testers/'),
+    width,
+    height,
+    thumbhash,
+    description,
+  }
+}
+const cornerTesterNames = [
+  ['ines-id', 'Inès Martin'],
+  ['sam-id', 'Sam Petit'],
+  ['chloe-id', 'Chloé Bernard'],
+  ['hugo-id', 'Hugo Leroy'],
+  ['nora-id', 'Nora Diallo'],
+  ['paul-id', 'Paul Roux'],
+  ['jade-id', 'Jade Fournier'],
+  ['malik-id', 'Malik Benali'],
+  ['emma-id', 'Emma Girard'],
+  ['theo-id', 'Théo Morel'],
+  ['zoe-id', 'Zoé Lambert'],
+  ['yanis-id', 'Yanis Faure'],
+]
+// Les testeurs de Léa, du plus récent inscrit au plus ancien.
+const cornerTesters = cornerTesterNames.map(([id, name], index) => ({
+  id,
+  name,
+  handle: index % 3 === 0 ? null : id.replace('-id', ''),
+  avatarUrl: null,
+  since: cornerAgo(2 + index * 2),
+}))
+const cornerCall = (n, text, days, photoOf = null) => ({
+  id: cornerId('a', n),
+  text,
+  photo: photoOf,
+  createdAt: cornerAgo(days),
+  removal: null,
+})
+const cornerMessage = (n, fields) => ({
+  id: cornerId('c', n),
+  kind: 'reply',
+  sender: 'tester',
+  outcome: null,
+  device: null,
+  text: null,
+  capture: null,
+  createdAt: cornerAgo(0, 1),
+  settled: null,
+  removal: null,
+  mine: false,
+  ...fields,
+})
+const cornerThread = (tester, fields, current = true) => ({
+  tester: {
+    id: tester.id,
+    name: tester.name,
+    handle: current ? tester.handle : null,
+    avatarUrl: null,
+    current,
+    since: current ? tester.since : null,
+  },
+  lastAt: cornerAgo(0, 2),
+  lastFrom: 'tester',
+  unread: false,
+  state: 'open',
+  excerpt: null,
+  ...fields,
+})
+const [cornerInes, cornerSam, cornerChloe, cornerHugo] = cornerTesters
+/** Ce que chaque coin contient au départ ; `fakeApi` en garde une copie par capture. */
+const testerCornersAtStart = () => ({
+  [recipesProject.id]: {
+    corner: { role: 'author', closed: false, testerCount: 12, testers: cornerTesters },
+    calls: [
+      cornerCall(1, 'Essayez la recette du frigo vide ce week-end, surtout sur téléphone.', 1),
+      cornerCall(
+        2,
+        'Nouveau : le menu de la semaine se partage en un lien. Dites-moi s’il s’ouvre chez vous.',
+        6,
+        testerMedia(1, 'Le menu de la semaine, sept plats en colonne'),
+      ),
+    ],
+    threads: [
+      cornerThread(cornerInes, {
+        unread: true,
+        excerpt: 'Pareil sur ordinateur, au fait.',
+      }),
+      cornerThread(cornerSam, {
+        lastFrom: 'author',
+        lastAt: cornerAgo(1, 3),
+        excerpt: 'Merci Sam, c’est corrigé dans la v1.3 !',
+      }),
+      cornerThread(cornerChloe, { lastAt: cornerAgo(4), excerpt: null }, false),
+      cornerThread(cornerHugo, {
+        state: 'settled',
+        lastAt: cornerAgo(9),
+        excerpt: 'Le bouton « Imprimer » ne fait rien sur tablette.',
+      }),
+    ],
+    messages: {
+      [cornerInes.id]: [
+        cornerMessage(1, {
+          kind: 'feedback',
+          outcome: 'partly',
+          device: 'phone',
+          text: 'Les quantités se doublent bien, mais la liste de courses repart à zéro quand je reviens en arrière.',
+          capture: testerMedia(2),
+          createdAt: cornerAgo(2, 5),
+        }),
+        cornerMessage(2, {
+          sender: 'author',
+          text: 'Merci Inès, je regarde ce soir !',
+          createdAt: cornerAgo(2, 1),
+          mine: true,
+        }),
+        cornerMessage(3, { text: 'Pareil sur ordinateur, au fait.', createdAt: cornerAgo(0, 2) }),
+      ],
+      [cornerSam.id]: [
+        cornerMessage(4, {
+          kind: 'feedback',
+          outcome: 'no',
+          device: 'computer',
+          text: 'Le menu partagé s’ouvre sur une page blanche.',
+          createdAt: cornerAgo(3),
+          settled: {
+            at: cornerAgo(1, 3),
+            update: { id: recipesUpdates[0].id, version: 'v1.3', createdAt: cornerAgo(1, 3) },
+          },
+        }),
+        cornerMessage(5, {
+          sender: 'author',
+          text: 'Merci Sam, c’est corrigé dans la v1.3 !',
+          createdAt: cornerAgo(1, 3),
+          mine: true,
+        }),
+      ],
+      // Chloé ne teste plus : son retour sans texte reste à traiter (« Ne teste plus » dans la
+      // feuille de mise à jour), et Hugo a déjà un retour réglé.
+      [cornerChloe.id]: [
+        cornerMessage(9, {
+          kind: 'feedback',
+          outcome: 'yes',
+          device: 'tablet',
+          createdAt: cornerAgo(4),
+        }),
+      ],
+      [cornerHugo.id]: [
+        cornerMessage(10, {
+          kind: 'feedback',
+          outcome: 'no',
+          device: 'tablet',
+          text: 'Le bouton « Imprimer » ne fait rien sur tablette.',
+          createdAt: cornerAgo(9),
+          settled: {
+            at: cornerAgo(8),
+            update: { id: recipesUpdates[1].id, version: 'v1.1', createdAt: cornerAgo(8) },
+          },
+        }),
+      ],
+    },
+  },
+  [testedProject.id]: {
+    corner: { role: 'tester', closed: false, testerCount: 9, testers: null },
+    calls: [
+      cornerCall(3, 'Essayez le niveau 3 ce week-end, surtout sur téléphone.', 1),
+      cornerCall(
+        4,
+        'Le compte à rebours a une nouvelle fusée. Elle décolle bien chez vous ?',
+        5,
+        testerMedia(3, 'Une fusée orange au-dessus du compte à rebours'),
+      ),
+    ],
+    threads: [],
+    messages: {
+      [leaMe.id]: [
+        cornerMessage(6, {
+          kind: 'feedback',
+          outcome: 'partly',
+          device: 'phone',
+          text: 'Le score repart à zéro au niveau 3.',
+          capture: testerMedia(4),
+          createdAt: cornerAgo(2, 4),
+          mine: true,
+        }),
+        cornerMessage(7, {
+          sender: 'author',
+          text: 'Bien vu, merci Léa ! Je corrige pour la prochaine version.',
+          createdAt: cornerAgo(1, 6),
+        }),
+      ],
+    },
+  },
+  [removedProject.id]: {
+    corner: { role: 'author', closed: true, testerCount: 3, testers: cornerTesters.slice(0, 3) },
+    calls: [cornerCall(5, 'Essayez la version anglaise avant vendredi.', 12)],
+    threads: [cornerThread(cornerSam, { excerpt: 'Les avis anglais sont bien traduits.' })],
+    messages: {
+      [cornerSam.id]: [
+        cornerMessage(8, {
+          kind: 'feedback',
+          outcome: 'yes',
+          device: 'tablet',
+          text: 'Les avis anglais sont bien traduits.',
+          createdAt: cornerAgo(11),
+        }),
+      ],
+    },
+  },
+})
+/** Le fil d'un coin tel que l'API le rend : le plus récent en tête. */
+const newestFirst = (messages) => [...messages].reverse()
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
@@ -1635,6 +1863,8 @@ const fakeApi = (
   // R7a : les testeurs de ce navigateur (POST / DELETE …/testers) : `isTester` suit le dernier geste,
   // pour que la relecture qui suit la feuille rende l'état voulu et non celui d'avant.
   const testers = new Map()
+  // R7b : les coins des testeurs de cette capture, que ses gestes changent (appel, retour, retrait).
+  const corners = structuredClone(testerCornersAtStart())
   const withExtras = (project) => ({
     ...project,
     isTester: testers.has(project.id) ? testers.get(project.id) : project.isTester,
@@ -1743,6 +1973,114 @@ const fakeApi = (
       /name="slot"\r?\n\r?\nupdate/.test(route.request().postData() ?? '')
     ) {
       return json(201, photo(crypto.randomUUID(), 1600, 900, null))
+    }
+    // R7b : le coin des testeurs, avec son état (un appel lancé paraît en tête, un retour envoyé
+    // dans le fil, un testeur retiré quitte la liste). Un projet sans coin : 404, comme l'API.
+    const cornerRoute = pathname.match(
+      /^\/v1\/projects\/([^/]+)\/(testers|calls|threads|messages|feedback)(?:\/(.*))?$/,
+    )
+    const cornerOf = cornerRoute ? corners[cornerRoute[1]] : undefined
+    if (cornerRoute && !(cornerRoute[2] === 'testers' && method !== 'GET' && !cornerRoute[3])) {
+      const [, , part, rest = ''] = cornerRoute
+      const empty = () => route.fulfill({ status: 204, body: '' })
+      if (!cornerOf) return json(404, { error: { code: 'not_found', message: '' } })
+      const body = () => JSON.parse(route.request().postData() ?? '{}')
+      if (part === 'testers' && !rest && method === 'GET') return json(200, cornerOf.corner)
+      if (part === 'testers' && rest === 'media' && method === 'POST') {
+        cornerOf.uploads = (cornerOf.uploads ?? 0) + 1
+        return json(201, testerMedia(50 + cornerOf.uploads))
+      }
+      if (part === 'testers' && rest && method === 'DELETE') {
+        const left = cornerOf.corner.testers?.filter((one) => one.id !== rest) ?? null
+        cornerOf.corner = { ...cornerOf.corner, testers: left, testerCount: left?.length ?? 0 }
+        return empty()
+      }
+      if (part === 'calls' && !rest && method === 'GET')
+        return json(200, { items: cornerOf.calls, nextCursor: null })
+      if (part === 'calls' && !rest && method === 'POST') {
+        const { text, photoId, photoDescription } = body()
+        const call = cornerCall(60 + cornerOf.calls.length, text, 0)
+        call.createdAt = new Date(SHOT_NOW).toISOString()
+        if (photoId) call.photo = { ...testerMedia(50, photoDescription ?? null), id: photoId }
+        cornerOf.calls = [call, ...cornerOf.calls]
+        return json(201, call)
+      }
+      if (part === 'calls' && rest && method === 'DELETE') {
+        cornerOf.calls = cornerOf.calls.filter((one) => one.id !== rest)
+        return empty()
+      }
+      if (part === 'threads' && !rest && method === 'GET') {
+        const state = url.searchParams.get('state') ?? 'open'
+        const counts = {
+          open: cornerOf.threads.filter((one) => one.state === 'open').length,
+          settled: cornerOf.threads.filter((one) => one.state === 'settled').length,
+        }
+        const items = cornerOf.threads.filter((one) => one.state === state)
+        return json(200, { items, nextCursor: null, counts })
+      }
+      const thread = rest.match(/^([^/]+)\/(messages|read)$/)
+      if (part === 'threads' && thread?.[2] === 'read') return empty()
+      if (part === 'threads' && thread && method === 'GET')
+        return json(200, {
+          items: newestFirst(cornerOf.messages[thread[1]] ?? []),
+          nextCursor: null,
+        })
+      if (part === 'threads' && thread && method === 'POST') {
+        const sent = body()
+        const message = cornerMessage(70 + Object.values(cornerOf.messages).flat().length, {
+          kind: sent.kind,
+          sender: cornerOf.corner.role === 'author' ? 'author' : 'tester',
+          outcome: sent.outcome ?? null,
+          device: sent.device ?? null,
+          text: sent.text ?? null,
+          capture: sent.captureId ? { ...testerMedia(51), id: sent.captureId } : null,
+          createdAt: new Date(SHOT_NOW).toISOString(),
+          mine: true,
+        })
+        cornerOf.messages[thread[1]] = [...(cornerOf.messages[thread[1]] ?? []), message]
+        return json(201, message)
+      }
+      const settle = rest.match(/^([^/]+)\/settled$/)
+      if (part === 'messages' && (settle || method === 'DELETE')) {
+        const messageId = settle ? settle[1] : rest
+        for (const [testerId, list] of Object.entries(cornerOf.messages)) {
+          cornerOf.messages[testerId] = settle
+            ? list.map((one) =>
+                one.id === messageId
+                  ? {
+                      ...one,
+                      settled:
+                        method === 'POST'
+                          ? { at: new Date(SHOT_NOW).toISOString(), update: null }
+                          : null,
+                    }
+                  : one,
+              )
+            : list.filter((one) => one.id !== messageId)
+        }
+        return empty()
+      }
+      // Les retours à régler de la feuille « Nouvelle mise à jour » (les retours non réglés).
+      if (part === 'feedback' && rest === 'open' && method === 'GET') {
+        const open = cornerOf.threads.flatMap((one) =>
+          (cornerOf.messages[one.tester.id] ?? [])
+            .filter((message) => message.kind === 'feedback' && !message.settled)
+            .map((message) => ({
+              id: message.id,
+              tester: { name: one.tester.name, current: one.tester.current },
+              outcome: message.outcome,
+              // Comme l'API (`excerptOf`) : 80 caractères au plus, puis « … ».
+              excerpt: message.text
+                ? message.text.length > 80
+                  ? `${message.text.slice(0, 80)}…`
+                  : message.text
+                : null,
+              createdAt: message.createdAt,
+            })),
+        )
+        return json(200, open)
+      }
+      return json(404, { error: { code: 'not_found', message: '' } })
     }
     // Rejoindre les testeurs ou les quitter : accepté (204), et l'état est gardé (`withExtras`).
     const testersOf = pathname.match(/^\/v1\/projects\/([^/]+)\/testers$/)
@@ -2093,7 +2431,8 @@ const fakeApi = (
       return json(500, { error: { code: 'internal', message: '' } })
     const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
     if (tag) return json(200, { slug: tag[1], label: null, projects: [] })
-    const media = pathname.match(/^\/media\/visuals\/([0-9a-f-]+)\.webp$/)
+    // R7b : les images du coin des testeurs (photos d'appel, captures) ont leur propre dossier.
+    const media = pathname.match(/^\/media\/(?:visuals|testers)\/([0-9a-f-]+)\.webp$/)
     if (media) {
       return route.fulfill({
         status: 200,
@@ -2107,6 +2446,16 @@ const fakeApi = (
 
 // 4. Ce qu'on photographie.
 const project = `/projects/${recipesProject.id}`
+// R7b : le projet que Léa teste (« Décollage ! »), et la feuille « Ton retour » remplie : « En
+// partie », « Téléphone » et un texte.
+const tested = `/projects/${testedProject.id}/testers`
+const fillFeedback = async (page) => {
+  await page.getByRole('radio', { name: fr.project.testers.feedback.outcomes.partly }).click()
+  await page.getByRole('radio', { name: fr.project.testers.feedback.devices.phone }).click()
+  await page
+    .getByLabel(fr.project.testers.feedback.text)
+    .fill('Le score repart à zéro au niveau 3.')
+}
 // La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
 // servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
 // simulée du contexte), puis la page est relue.
@@ -2430,9 +2779,10 @@ const pages = [
     },
   },
   // R7a : les testeurs. La feuille d'inscription (page de Décollage !, d'Inès, « Testable » avec sa
-  // démo), la feuille « Tu testes ce projet » (page de Max), la page une fois les testeurs quittés
-  // (le bouton redevient « Rejoindre les testeurs »), le refus « plus de nouveaux testeurs », et la
-  // page de sortie de la démo (la ligne « Tu veux aider Inès ? »).
+  // démo), le refus « plus de nouveaux testeurs », et la page de sortie de la démo (la ligne « Tu
+  // veux aider Inès ? »). R7b : une fois inscrit, « Le coin des testeurs » à la place du bouton (page
+  // de Max ; la feuille « Tu testes ce projet » a disparu), et l'arrivée du coin après « Quitter les
+  // testeurs » (?focus=join : le focus sur « Rejoindre les testeurs », l'adresse nettoyée).
   {
     name: 'testeur',
     path: `/projects/${launchProject.id}`,
@@ -2447,19 +2797,20 @@ const pages = [
     path: `/projects/${testedProject.id}`,
     signedIn: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: fr.project.testers.joined }).click()
-      await page.getByRole('heading', { name: fr.project.testers.memberTitle }).waitFor()
+      // Il mène au coin : il se lit « lien » (R7b, correction 7).
+      await page.getByRole('link', { name: fr.project.testers.corner }).waitFor()
     },
   },
   {
-    name: 'testeur-quitte',
-    path: `/projects/${testedProject.id}`,
+    name: 'testeur-retour',
+    path: `/projects/${launchProject.id}?focus=join`,
     signedIn: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: fr.project.testers.joined }).click()
-      await page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
-      await page.getByRole('button', { name: fr.project.testers.quit }).click()
-      await page.getByRole('button', { name: fr.project.testers.join }).waitFor()
+      await page.waitForFunction(
+        (name) => document.activeElement?.textContent?.includes(name) ?? false,
+        fr.project.testers.join,
+      )
+      await page.waitForFunction(() => !window.location.search.includes('focus='))
     },
   },
   {
@@ -2489,6 +2840,121 @@ const pages = [
     signedIn: true,
     prepare: async (page) => {
       await page.getByRole('link', { name: fr.project.testers.leavingLink }).waitFor()
+    },
+  },
+  // R7b : le coin des testeurs. L'autrice (Léa, 12 testeurs : la liste, les appels, puis les fils à
+  // traiter), la testeuse (Léa chez Max : les appels, puis son fil), un fil ouvert (sur ordinateur, le
+  // coin à gauche et le fil à droite), et le coin fermé par la modération (relecture seule).
+  { name: 'coin-testeurs-auteur', path: `${project}/testers`, signedIn: true, fullPage: true },
+  {
+    name: 'coin-testeurs-auteur-retours',
+    path: `${project}/testers?tab=feedback`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByText(fr.project.testers.thread.privacyList).first().waitFor()
+    },
+  },
+  {
+    name: 'coin-testeurs-testeur',
+    path: `/projects/${testedProject.id}/testers`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'coin-testeurs-testeur-retours',
+    path: `/projects/${testedProject.id}/testers?tab=feedback`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.feedback.send }).waitFor()
+    },
+  },
+  {
+    name: 'coin-testeurs-fil',
+    path: `${project}/testers/threads/${cornerInes.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByText('Pareil sur ordinateur, au fait.').last().waitFor()
+    },
+  },
+  {
+    name: 'coin-ferme',
+    path: `/projects/${removedProject.id}/testers`,
+    signedIn: true,
+    fullPage: true,
+  },
+  // R7b : la feuille « Nouvel appel » (vide, puis remplie) de l'autrice. La feuille ignore les tapes
+  // de ses 600 premières ms (`guardTaps`) : on attend plus que d'habitude.
+  { name: 'feuille-appel', path: `${project}/testers/new-call`, signedIn: true, wait: 1500 },
+  {
+    name: 'feuille-appel-remplie',
+    path: `${project}/testers/new-call`,
+    signedIn: true,
+    wait: 1500,
+    prepare: async (page) => {
+      await page
+        .getByLabel(fr.project.testers.calls.field)
+        .fill('Essayez le niveau 3 ce week-end, surtout sur téléphone.')
+    },
+  },
+  // R7b : la feuille « Ton retour » du testeur (Léa chez Max) : vide, remplie, l'erreur sans issue
+  // (« Choisis Oui, En partie ou Non. »), et un brouillon rouvert. Le brouillon vit en mémoire : la
+  // feuille est rouverte par un clic dans l'appli, jamais par `page.goto`, qui le viderait.
+  { name: 'feuille-retour', path: `${tested}/new-feedback`, signedIn: true, wait: 1500 },
+  {
+    name: 'feuille-retour-remplie',
+    path: `${tested}/new-feedback`,
+    signedIn: true,
+    wait: 1500,
+    prepare: fillFeedback,
+  },
+  {
+    name: 'feuille-retour-erreur',
+    path: `${tested}/new-feedback`,
+    signedIn: true,
+    wait: 1500,
+    prepare: async (page) => {
+      await page.getByLabel(fr.project.testers.feedback.text).fill('Le score repart à zéro.')
+      await page
+        .getByRole('button', { name: fr.project.testers.feedback.submit, exact: true })
+        .last()
+        .click()
+      await page.getByText(fr.project.testers.feedback.outcomeRequired).first().waitFor()
+    },
+  },
+  {
+    name: 'feuille-retour-brouillon',
+    path: `${tested}?tab=feedback`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.feedback.send }).click()
+      await page.getByRole('heading', { name: fr.project.testers.feedback.sheetTitle }).waitFor()
+      await page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+      await fillFeedback(page)
+      await page
+        .getByRole('button', { name: fr.project.testers.feedback.cancel, exact: true })
+        .first()
+        .click()
+      await page
+        .getByRole('heading', { name: fr.project.testers.feedback.sheetTitle })
+        .waitFor({ state: 'detached' })
+      await page.getByRole('button', { name: fr.project.testers.feedback.send }).click()
+      await page.getByRole('button', { name: fr.project.testers.feedback.clearDraft }).waitFor()
+    },
+  },
+  // R7b : la feuille « Nouvelle mise à jour » de l'autrice avec la partie « Retours réglés » : les
+  // retours à traiter (dont celui d'un ancien testeur), et un coché.
+  {
+    name: 'maj-retours-regles',
+    path: `${project}/update`,
+    signedIn: true,
+    fullPage: true,
+    wait: 1500,
+    prepare: async (page) => {
+      await page.getByText(fr.project.testers.settledField.title).first().waitFor()
+      await page.getByRole('checkbox').first().click()
     },
   },
   // Les commentaires d'un projet (R5b) : l'aperçu sous le projet, puis la feuille (sur téléphone) ou

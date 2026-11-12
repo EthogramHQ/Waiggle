@@ -81,6 +81,32 @@ const mark = async (
           .returning({ id: t.id })
       ).length
     }
+    case 'call': {
+      // R7b : un appel à tester retiré disparaît du coin pour les testeurs ; l'auteur le voit
+      // encore, avec la mention du retrait. Photo et texte restent en base (comme une mise à jour).
+      const t = schema.testerCall
+      const state = removal ? isNull(t.removedAt) : isNotNull(t.removedAt)
+      return (
+        await tx
+          .update(t)
+          .set(set)
+          .where(and(eq(t.id, target.id), state))
+          .returning({ id: t.id })
+      ).length
+    }
+    case 'message': {
+      // R7b : un message d'un fil retiré ne se voit plus que de son expéditeur ; la capture jointe
+      // le suit (le service des fichiers lit tester_message.removed_at).
+      const t = schema.testerMessage
+      const state = removal ? isNull(t.removedAt) : isNotNull(t.removedAt)
+      return (
+        await tx
+          .update(t)
+          .set(set)
+          .where(and(eq(t.id, target.id), state))
+          .returning({ id: t.id })
+      ).length
+    }
     case 'comment': {
       const t = schema.projectComment
       const state = removal ? isNull(t.removedAt) : isNotNull(t.removedAt)

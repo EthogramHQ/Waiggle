@@ -44,6 +44,16 @@ describe('ReportTarget', () => {
     expect(ReportTarget.safeParse({ kind: 'member', id: '' }).success).toBe(false)
   })
 
+  // R7b : un appel à tester et un message d'un fil se signalent par leur uuid, jamais par un autre
+  // identifiant (la route répond 400 avant toute requête en base).
+  it('accepts a call and a message by their uuid, and refuses any other id', () => {
+    for (const kind of ['call', 'message'] as const) {
+      expect(ReportTarget.parse({ kind, id: projectId }), kind).toEqual({ kind, id: projectId })
+      expect(ReportTarget.safeParse({ kind, id: 'Xy3_member-id' }).success, kind).toBe(false)
+      expect(ReportTarget.safeParse({ kind, id: '' }).success, kind).toBe(false)
+    }
+  })
+
   it('refuses an unknown kind', () => {
     expect(ReportTarget.safeParse({ kind: 'reaction', id: projectId }).success).toBe(false)
   })
@@ -61,6 +71,8 @@ describe('ReportTarget', () => {
       'update',
       'comment',
       'member',
+      'call',
+      'message',
       'note',
     ])
   })

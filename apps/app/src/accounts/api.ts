@@ -17,6 +17,7 @@ import { Platform, Share } from 'react-native'
 import { apiFetch } from '../api/client'
 import { queryClient } from '../api/query-client'
 import { webAppUrl } from '../config'
+import { clearAllDrafts } from '../testers/drafts'
 import { authClient } from './auth-client'
 import { type AuthErrorKey, authErrorKey } from './errors'
 import { setPendingEmail } from './pendingVerification'
@@ -286,6 +287,8 @@ export const signOut = async (): Promise<Result<'generic'>> => {
     // pas même l'adresse qui attendait sa vérification.
     queryClient.clear()
     setPendingEmail(null)
+    // Les brouillons du coin des testeurs (en mémoire) sont privés : ils partent aussi.
+    clearAllDrafts()
   }
 }
 
@@ -299,6 +302,7 @@ export const deleteAccount = async (
     forgetSession()
     queryClient.clear()
     setPendingEmail(null)
+    clearAllDrafts()
     // Sur téléphone, le plugin Expo garde une copie de la session dans le coffre-fort et ne la vide
     // qu'à une déconnexion (avant même d'envoyer la demande) : sans elle, une appli relancée hors
     // ligne remontrerait le compte supprimé. Le serveur répondra « pas de session » : peu importe,

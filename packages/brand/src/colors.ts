@@ -100,6 +100,33 @@ const day = {
   familyPolishIcon: '#5E5A51',
   familyPolishText: '#6B675E',
 
+  // R7b, le coin des testeurs : l'issue d'un retour (« Ça a marché ? », ui/OutcomePill.tsx). Chaque
+  // issue a trois rôles, comme les familles d'une mise à jour : le fond de sa pastille, son icône
+  // (au moins 3:1 sur ce fond) et son libellé (4,5:1). « Oui » : une coche verte, le libellé à
+  // l'encre (planche R7b-Fil) ; « En partie » : un demi-cercle ambre, plus sombre que `amber`, qui
+  // ne ferait que 2,9:1 sur la crème ; « Non » : une croix rouge sur le rose d'une erreur.
+  outcomeYesSurface: '#E0F2E9',
+  outcomeYesIcon: '#12805C',
+  outcomeYesText: '#1C1B19',
+  outcomePartlySurface: '#FFF0C2',
+  outcomePartlyIcon: '#A36800',
+  outcomePartlyText: '#6A4300',
+  outcomeNoSurface: '#FEE4E2',
+  outcomeNoIcon: '#D92D20',
+  outcomeNoText: '#B42318',
+  // « Réglé dans la v1.3 », sous un retour : un vert plus sombre que `success`, qui tombait à
+  // 4,3:1 sur la crème d'une bulle de l'auteur.
+  settledText: '#0F7453',
+  // Les bulles d'un fil : la couleur suit le rôle de qui écrit, quel que soit le lecteur. L'auteur
+  // du projet en crème miel (à droite), le testeur en blanc (à gauche, avec une bordure `line`).
+  bubbleAuthor: '#FFF0C2',
+  bubbleTester: '#FFFFFF',
+  // Le point d'un fil non lu (ThreadRow) : du miel, cerclé d'un liseré ambre. Le miel seul ne fait
+  // que 1,6:1 sur une carte blanche : c'est le liseré qui dessine le point, à 3:1 au moins sur la
+  // carte et sur le surlignage d'une ligne choisie (`highlight`, où `amber` ne faisait que 2,6:1).
+  unreadDot: '#FFC21A',
+  unreadDotRing: '#A36800',
+
   // La pastille rouge des nouveautés (la cloche des notifications) et son chiffre, en blanc. Un
   // rouge assez sombre pour qu'un chiffre blanc s'y lise (contraste 4,5 : voir contrastPairs).
   badge: '#D1343A',
@@ -198,6 +225,24 @@ const night = {
   familyPolishSurface: '#2C2821',
   familyPolishIcon: '#CFC7B5',
   familyPolishText: '#B3AB99',
+  // La nuit, les issues prennent les fonds sombres teintés des familles et des messages ; icône et
+  // libellé, les teintes vives. Le libellé de « Oui » reste la crème du texte.
+  outcomeYesSurface: '#143426',
+  outcomeYesIcon: '#3CCB8E',
+  outcomeYesText: '#F7F3EA',
+  outcomePartlySurface: '#3F3417',
+  outcomePartlyIcon: '#E0A030',
+  outcomePartlyText: '#FFD666',
+  outcomeNoSurface: '#3A1A17',
+  outcomeNoIcon: '#F97066',
+  outcomeNoText: '#FDA29B',
+  settledText: '#3CCB8E',
+  // La bulle de l'auteur, un brun miel (planche R7b-Fil-Nuit) ; celle du testeur, la carte.
+  bubbleAuthor: '#3F3417',
+  bubbleTester: '#1A1712',
+  // Le miel se détache seul du fond sombre ; le liseré ambre le garde à 3,9:1 sur le surlignage.
+  unreadDot: '#FFC933',
+  unreadDotRing: '#E0A030',
   badge: '#D1343A',
   onBadge: '#FFFFFF',
 
@@ -366,6 +411,35 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'familyNewText', on: 'honeySoft', min: 4.5 },
   { text: 'familyFixedText', on: 'honeySoft', min: 4.5 },
   { text: 'familyPolishText', on: 'honeySoft', min: 4.5 },
+  // R7b (relecture du plan, interface B4) : l'issue d'un retour. L'icône sur le fond opaque de sa
+  // pastille (une forme : 3), le libellé sur le même fond (un texte : 4,5) ; la pastille est opaque,
+  // où qu'elle soit posée (une bulle, une ligne de la feuille « Nouvelle mise à jour »).
+  { text: 'outcomeYesIcon', on: 'outcomeYesSurface', min: 3 },
+  { text: 'outcomeYesText', on: 'outcomeYesSurface', min: 4.5 },
+  { text: 'outcomePartlyIcon', on: 'outcomePartlySurface', min: 3 },
+  { text: 'outcomePartlyText', on: 'outcomePartlySurface', min: 4.5 },
+  { text: 'outcomeNoIcon', on: 'outcomeNoSurface', min: 3 },
+  { text: 'outcomeNoText', on: 'outcomeNoSurface', min: 4.5 },
+  // Les mêmes icônes dans les choix de « Ça a marché ? » (feuille « Ton retour », correction 5),
+  // sur le fond d'un choix pas coché (`surface`, `ui/Choices.tsx`) ; coché, l'icône est à l'encre.
+  { text: 'outcomeYesIcon', on: 'surface', min: 3 },
+  { text: 'outcomePartlyIcon', on: 'surface', min: 3 },
+  { text: 'outcomeNoIcon', on: 'surface', min: 3 },
+  // « Réglé dans la v1.3 » : sous un retour, dans la bulle du testeur, sur une carte, et dans la
+  // bulle de l'auteur.
+  { text: 'settledText', on: 'surface', min: 4.5 },
+  { text: 'settledText', on: 'bubbleTester', min: 4.5 },
+  { text: 'settledText', on: 'bubbleAuthor', min: 4.5 },
+  // Le texte d'un message et l'appareil d'un retour, dans les deux bulles.
+  { text: 'text', on: 'bubbleAuthor', min: 4.5 },
+  { text: 'textSecondary', on: 'bubbleAuthor', min: 4.5 },
+  { text: 'text', on: 'bubbleTester', min: 4.5 },
+  { text: 'textSecondary', on: 'bubbleTester', min: 4.5 },
+  // Le liseré du point non lu (une forme : 3), sur la carte de la liste et sur une ligne surlignée.
+  { text: 'unreadDotRing', on: 'surface', min: 3 },
+  { text: 'unreadDotRing', on: 'highlight', min: 3 },
+  // R7b : la ligne du fil choisi passe sur highlightSoft (textMuted y garde son contraste de nuit).
+  { text: 'unreadDotRing', on: 'highlightSoft', min: 3 },
   { text: 'focusRing', on: 'background', min: 3 },
   // Les contrôles (WCAG 1.4.11) : le bord d'une case ou d'un rond vide, la piste d'un interrupteur
   // éteint, et le liseré du rond ou de la case choisis, sur une carte comme sur la page.

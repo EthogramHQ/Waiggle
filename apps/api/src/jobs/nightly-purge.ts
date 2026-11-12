@@ -13,7 +13,8 @@
 // - les « Autre » (noms d'outils tapés par des membres) que plus rien ne cite, et les lignes du
 //   journal du catalogue de plus d'un an (tranche R6b) ; les « Autre » laissés hors du catalogue
 //   depuis plus d'un an, quand plus rien ne les cite (relecture juridique jur-J5) ;
-// - les photos de mise à jour restées « en attente » plus de 24 heures (R7a), ligne et fichier.
+// - les photos de mise à jour restées « en attente » plus de 24 heures (R7a), ligne et fichier ;
+// - les images du coin des testeurs restées « en attente » plus de 24 heures (R7b), de même.
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
@@ -141,8 +142,31 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     }
   }
 
+  // R7b : les images du coin des testeurs « en attente » (ni photo d'un appel, ni capture d'un
+  // message) de plus de 24 heures. Même démarche que ci-dessus : la ligne d'abord, puis le fichier.
+  // Lecture par l'index partiel tester_media_pending_idx (seulement ces images) ; la date se
+  // compare ensuite sur ce petit lot.
+  const pendingTesterImages = await db
+    .delete(schema.testerMedia)
+    .where(
+      and(
+        sql`${schema.testerMedia.callId} is null`,
+        sql`${schema.testerMedia.messageId} is null`,
+        sql`${schema.testerMedia.createdAt} < ${utc(new Date(now.getTime() - PENDING_PHOTO_KEEP_MS))}`,
+      ),
+    )
+    .returning({ storageKey: schema.testerMedia.storageKey })
+  for (const { storageKey } of pendingTesterImages) {
+    try {
+      await storage.delete(storageKey)
+    } catch (error) {
+      console.error('Nightly purge: a pending tester image could not be erased', storageKey, error)
+    }
+  }
+
   const purged = {
     pendingPhotos: pendingPhotos.length,
+    pendingTesterImages: pendingTesterImages.length,
     sessions: sessions.length,
     verifications: verifications.length,
     rateLimits: rateLimits.length,

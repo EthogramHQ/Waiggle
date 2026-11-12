@@ -74,6 +74,18 @@ describe('request', () => {
     expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'rateLimited' })
   })
 
+  it('flags the quota of the calls of a project (R7b), with the same message as too many requests', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json({ error: { code: 'project_calls_limited', message: '…' } }, 429),
+    )
+
+    expect(await request('/v1/me', {}, Me)).toEqual({
+      ok: false,
+      error: 'rateLimited',
+      projectLimit: true,
+    })
+  })
+
   it('tells apart the refusals of reporting and moderating, by the code of the answer (slice 7a)', async () => {
     // Trois refus « 409 » (déjà signalé, déjà décidé, contenu retiré) et un « 422 » (son propre
     // contenu) : chacun a son message, que seul le code du corps de la réponse désigne.

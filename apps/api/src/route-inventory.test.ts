@@ -45,7 +45,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /api/auth/*': ['public', 'allowed'],
   'POST /api/auth/*': ['public', 'allowed'],
   // Les fichiers : une clé tirée au hasard, neuve à chaque photo (règle 11).
-  'GET /media/:folder{(?:avatars|visuals)}/:file': ['public', 'allowed'],
+  'GET /media/:folder/:file': ['public', 'allowed'],
   // Mon compte.
   'GET /v1/me': ['own', 'allowed'],
   'PATCH /v1/me': ['own', 'allowed'],
@@ -80,6 +80,28 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'DELETE /v1/projects/:id/updates/:updateId': ['own', 'allowed'],
   'POST /v1/projects/:id/testers': ['hidesBlocked', 'refused'],
   'DELETE /v1/projects/:id/testers': ['own', 'allowed'],
+  // R7b : le coin des testeurs. Entrer dans le coin montre l'inscription d'autres membres (l'auteur)
+  // et un blocage défait l'accès du testeur (il n'a plus que son fil) ; retirer un testeur est un
+  // geste de l'auteur sur son projet, permis pendant une suspension comme tout DELETE (le coin est
+  // alors fermé : 409). Lancer un appel et envoyer une image écrivent : refusés à un suspendu.
+  'GET /v1/projects/:id/testers': ['hidesBlocked', 'allowed'],
+  'DELETE /v1/projects/:id/testers/:memberId': ['own', 'allowed'],
+  'POST /v1/projects/:id/testers/media': ['own', 'refused'],
+  'GET /v1/projects/:id/calls': ['hidesBlocked', 'allowed'],
+  'POST /v1/projects/:id/calls': ['own', 'refused'],
+  'DELETE /v1/projects/:id/calls/:callId': ['own', 'allowed'],
+  // R7b : les fils de retours. Lire la liste ou un fil montre les messages d'un autre : un blocage
+  // fait du testeur un ancien testeur, et son pseudo et sa photo disparaissent de la liste. Écrire un
+  // message est refusé à un suspendu ; marquer lu et « Marquer comme réglé » restent permis (la
+  // seconde répond elle-même 409 `corner_closed` : sécurité A7) ; les DELETE passent toujours.
+  'GET /v1/projects/:id/threads': ['hidesBlocked', 'allowed'],
+  'GET /v1/projects/:id/threads/:testerId/messages': ['hidesBlocked', 'allowed'],
+  'POST /v1/projects/:id/threads/:testerId/messages': ['hidesBlocked', 'refused'],
+  'POST /v1/projects/:id/threads/:testerId/read': ['own', 'allowed'],
+  'DELETE /v1/projects/:id/messages/:messageId': ['own', 'allowed'],
+  'POST /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed'],
+  'DELETE /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed'],
+  'GET /v1/projects/:id/feedback/open': ['own', 'allowed'],
   'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused'],
   'DELETE /v1/projects/:id/reactions/:kind': ['own', 'allowed'],
   'GET /v1/projects/:id/comments': ['hidesBlocked', 'allowed'],
@@ -171,6 +193,27 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'POST /v1/projects/:id/testers': {
     file: 'testers.test.ts',
     test: 'answers 404 to a blocked member who tries to become a tester, in both directions',
+  },
+  // R7b : un blocage fait de l'ancien testeur un lecteur de son seul fil (404 sur le reste).
+  'GET /v1/projects/:id/testers': {
+    file: 'tester-corner.test.ts',
+    test: 'keeps a read-only corner after a block, in both directions',
+  },
+  'GET /v1/projects/:id/calls': {
+    file: 'tester-calls.test.ts',
+    test: 'refuses a former tester the calls',
+  },
+  'GET /v1/projects/:id/threads': {
+    file: 'tester-threads.test.ts',
+    test: 'hides the handle and photo of a blocked former tester in the thread list',
+  },
+  'GET /v1/projects/:id/threads/:testerId/messages': {
+    file: 'tester-threads.test.ts',
+    test: 'treats a block like a departure, in both directions',
+  },
+  'POST /v1/projects/:id/threads/:testerId/messages': {
+    file: 'tester-threads.test.ts',
+    test: 'treats a block like a departure, in both directions',
   },
   'PUT /v1/projects/:id/reactions/:kind': {
     file: 'blocks.test.ts',

@@ -218,6 +218,7 @@ describe('Project with its visuals', () => {
     version: null,
     isTester: false,
     testerCount: null,
+    testerJoinable: true,
     reactions: NO_REACTIONS,
     commentCount: 0,
     removal: null,

@@ -396,6 +396,130 @@ describe('blocking and the testers', () => {
   })
 })
 
+// R7b : l'auteur peut retirer un testeur (DELETE /v1/projects/{id}/testers/{memberId}, testé par
+// tester-corner.test.ts). Le membre retiré ne peut plus rejoindre les testeurs de ce projet, sans
+// que la réponse le distingue d'un projet fermé (choix du plan, validé avec le scénario).
+describe('a member removed by the author', () => {
+  /** L'auteur retire un membre de ses testeurs. */
+  const removeTester = async (projectId: string, memberId: string) => {
+    later()
+    await expectDone(
+      await act.send('DELETE', `${testersPath(projectId)}/${encodeURIComponent(memberId)}`, jean),
+    )
+  }
+
+  it('refuses a removed member who joins again with 409 not_testable, like a closed project', async () => {
+    const project = await publishProject()
+    const building = await publishProject(jean, {
+      status: 'building',
+      demoUrl: 'https://demo.example.com/',
+    })
+    const closed = await join(building.id, ines)
+    expect(closed.status).toBe(409)
+    const expected = await closed.json()
+    await expectDone(await join(project.id, ines))
+
+    await removeTester(project.id, inesId)
+    const res = await join(project.id, ines)
+
+    // Le même corps que n'importe quel projet fermé : le retrait n'est pas révélé.
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual(expected)
+    expect(await testerRows(project.id)).toBe(0)
+    // Témoin : le projet reste ouvert aux autres.
+    await expectDone(await join(project.id, malik))
+  })
+
+  it('does not lift the removal when the member quits and joins again', async () => {
+    const project = await publishProject()
+    await expectDone(await join(project.id, ines))
+    await removeTester(project.id, inesId)
+
+    await expectDone(await quit(project.id, ines))
+
+    await expectError(await join(project.id, ines), 409, 'not_testable')
+    expect(await testerRows(project.id)).toBe(0)
+  })
+
+  it('only bars the removed member from this project', async () => {
+    const project = await publishProject()
+    const garden = await publishProject(jean, { ...TESTABLE, title: 'Le carnet de jardin' })
+    await expectDone(await join(project.id, ines))
+    await removeTester(project.id, inesId)
+
+    await expectDone(await join(garden.id, ines))
+    expect(await readProject(garden.id, ines)).toMatchObject({ isTester: true })
+  })
+
+  it('checks the removal under the lock of the project', async () => {
+    // PGlite n'a qu'une connexion : l'espion fait le retrait juste avant la transaction de
+    // l'inscription, puis la laisse faire. Inès, déjà testeuse, redemande à rejoindre (204 tant
+    // qu'elle l'est) : sa transaction doit relire le retrait, sinon elle se réinscrirait. Cela
+    // prouve la relecture sous le verrou, pas l'attente du verrou elle-même.
+    const project = await publishProject()
+    await expectDone(await join(project.id, ines))
+    const original = ctx.db.transaction.bind(ctx.db)
+    let armed = true
+    const spy = vi.spyOn(ctx.db, 'transaction').mockImplementation(async (...args) => {
+      if (armed) {
+        armed = false
+        await removeTester(project.id, inesId)
+      }
+      return original(...args)
+    })
+
+    const res = await join(project.id, ines)
+
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+    await expectError(res, 409, 'not_testable')
+    expect(await testerRows(project.id)).toBe(0)
+  })
+})
+
+describe('who may join, as the project page says (testerJoinable)', () => {
+  it('offers to join to any other member, whatever the status of the project', async () => {
+    const testable = await publishProject()
+    const building = await publishProject(jean, { status: 'building', demoUrl: null })
+
+    expect(await readProject(testable.id, ines)).toMatchObject({ testerJoinable: true })
+    expect(await readProject(building.id, ines)).toMatchObject({ testerJoinable: true })
+    // L'auteur ne rejoint pas ses propres testeurs.
+    expect(await readProject(testable.id, jean)).toMatchObject({ testerJoinable: false })
+  })
+
+  it('no longer offers to join to a member removed by the author, even after quitting', async () => {
+    const project = await publishProject()
+    await expectDone(await join(project.id, ines))
+    await expectDone(await join(project.id, malik))
+    expect(await readProject(project.id, ines)).toMatchObject({ testerJoinable: true }) // témoin
+
+    later()
+    await expectDone(
+      await act.send('DELETE', `${testersPath(project.id)}/${encodeURIComponent(inesId)}`, jean),
+    )
+
+    expect(await readProject(project.id, ines)).toMatchObject({
+      isTester: false,
+      testerJoinable: false,
+    })
+    await expectDone(await quit(project.id, ines))
+    expect(await readProject(project.id, ines)).toMatchObject({ testerJoinable: false })
+    // Malik, resté testeur, et l'auteur n'en savent rien de plus.
+    expect(await readProject(project.id, malik)).toMatchObject({ testerJoinable: true })
+  })
+
+  it('still offers to join to a member who quit by himself', async () => {
+    const project = await publishProject()
+    await expectDone(await join(project.id, ines))
+
+    await expectDone(await quit(project.id, ines))
+
+    expect(await readProject(project.id, ines)).toMatchObject({ testerJoinable: true })
+    await expectDone(await join(project.id, ines))
+  })
+})
+
 describe('limits against abuse', () => {
   it('counts even requests on an unknown project in the tester quota', async () => {
     const project = await publishProject()

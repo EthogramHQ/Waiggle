@@ -284,6 +284,13 @@ export const Project = z
     isTester: z.boolean(),
     /** Le nombre de testeurs, pour l'auteur seul ; null pour tous les autres (R7a). */
     testerCount: z.int().nonnegative().nullable(),
+    /**
+     * R7b : faux pour l'auteur et pour un membre que l'auteur a retiré de ses testeurs (l'appli ne
+     * lui propose plus « Rejoindre les testeurs ») ; vrai sinon, même pour un projet plein ou qui
+     * n'est pas « Testable » : l'appli regarde aussi le statut, et un projet plein garde son refus
+     * « plein » (sécurité S1 : le retrait reste devinable, risque accepté).
+     */
+    testerJoinable: z.boolean(),
     /** Les réactions (tranche 5) : les nombres par type, et celles du membre qui regarde. */
     reactions: ReactionState,
     /**

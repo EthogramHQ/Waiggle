@@ -51,6 +51,7 @@ import { type Focusable, focusTarget, holdsFocus } from './focus'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
+import { ScreenFooterOutlet, useScreenFooterSlot } from './ScreenFooterSlot'
 import { rememberedTopBarSpace, ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
 import { Surface } from './Surface'
 import { useScreenFocused, useScreenShownCount } from './screenFocus'
@@ -230,10 +231,12 @@ export function Screen({
   const calm = useCalmMotion()
   const toTop = useCallback(() => scroller.current?.scrollTo({ y: 0, animated: !calm }), [calm])
   const jumpTo = useCallback((y: number) => scroller.current?.scrollTo({ y, animated: false }), [])
+  const toEnd = useCallback(() => scroller.current?.scrollToEnd({ animated: false }), [])
   // Le canal du défilement : `onScroll` de l'écran, et les composants posés dedans qui l'écoutent
   // (la lumière au défilement du fil, ui/scrollLight.ts) ; `toTop()` pour remonter en haut (RF),
-  // `jumpTo(y)` pour la barre qui suit le contenu et reçoit le focus (ui/ScreenTopBar.tsx).
-  const scroll = useScreenScrollChannel(onScroll, toTop, jumpTo)
+  // `jumpTo(y)` pour la barre qui suit le contenu et reçoit le focus (ui/ScreenTopBar.tsx) ;
+  // `toEnd()` pour ouvrir un fil sur son dernier message (R7b, K11).
+  const scroll = useScreenScrollChannel(onScroll, toTop, jumpTo, toEnd)
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
   // langue réels du visiteur (voir theme/hydration.ts).
   useEffect(() => markHydrated(), [])
@@ -292,7 +295,10 @@ export function Screen({
     focusTarget(place)?.focus?.({ preventScroll: true })
   }, [asideAway, refocus])
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
-  const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
+  // R7b (K12) : le pied peut aussi venir du contenu (`ScreenFooterSlot`, le compositeur d'un onglet).
+  const canPinFooter = sizeClass !== 'wide' && !brand
+  const footerSlot = useScreenFooterSlot(canPinFooter)
+  const pinnedFooter = (footer !== undefined || footerSlot.filled) && canPinFooter
   // La place flottante (R5a) : sa hauteur mesurée (0 tant qu'elle ne l'est pas, ou sans place), la
   // distance entre elle et le bas de l'écran, et la réserve à laisser sous le contenu.
   const [measuredFloating, setMeasuredFloating] = useState(0)
@@ -425,210 +431,215 @@ export function Screen({
         shown={shown}
       >
         <ScreenScrollContext.Provider value={scroll.channel}>
-          <AmbientSourceSync thumbhash={thumbhash} held={scroll.channel.lightHeld} />
-          {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
+          <footerSlot.Provider value={footerSlot.slot}>
+            <AmbientSourceSync thumbhash={thumbhash} held={scroll.channel.lightHeld} />
+            {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
           horizontal). */}
-          <View
-            style={{
-              flex: 1,
-              // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
-              // dans le bas de l'écran. Dans l'hôte de la lumière, l'hôte pose le fond de l'appli,
-              // sous la lumière commune : l'écran est transparent, sinon il la cacherait.
-              backgroundColor: brand
-                ? colors.surface
-                : lightHosted
-                  ? 'transparent'
-                  : colors.background,
-              overflow: 'hidden',
-            }}
-          >
-            {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
+            <View
+              style={{
+                flex: 1,
+                // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
+                // dans le bas de l'écran. Dans l'hôte de la lumière, l'hôte pose le fond de l'appli,
+                // sous la lumière commune : l'écran est transparent, sinon il la cacherait.
+                backgroundColor: brand
+                  ? colors.surface
+                  : lightHosted
+                    ? 'transparent'
+                    : colors.background,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
           téléphone, il n'y a pas d'onglet : rien à faire. */}
-            {Platform.OS === 'web' ? (
-              <Head>
-                <title>{tabTitle}</title>
-              </Head>
-            ) : null}
-            {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. Dans
+              {Platform.OS === 'web' ? (
+                <Head>
+                  <title>{tabTitle}</title>
+                </Head>
+              ) : null}
+              {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. Dans
                 l'hôte, la lumière est la sienne : l'écran n'en pose pas. */}
-            {ambient && !brand && !lightHosted ? <AmbientLight /> : null}
-            {topBar ? (
-              // La barre du haut (RF), avant la zone qui défile dans l'arbre : lue et atteinte par
-              // Tab d'abord (ui-4). Toujours à cette place, fixe ou non : passer de l'un à l'autre
-              // ne la remonte pas (ui-10). `belowBar` seulement quand elle est fixe.
-              <ScreenTopBar
-                belowBar={barPinned ? shownBelowBar : undefined}
-                belowRef={asideUnderBar}
-                onSpace={setBarSpace}
-              >
-                {header}
-              </ScreenTopBar>
-            ) : null}
-            {pinned ? (
-              // La barre fixe, hors de la zone qui défile. Son fond « feuille » cache le contenu qui
-              // passe dessous : opaque de jour (la crème de la page, décision du 7/11/2026), presque
-              // opaque de nuit, où il laisse transparaître la lumière d'ambiance.
-              <View
-                style={{
-                  paddingTop: insets.top + space.sm,
-                  paddingBottom: space.sm,
-                  paddingHorizontal: padding,
-                  alignItems: 'center',
-                  backgroundColor: colors.sheet,
-                  borderBottomWidth: borders.hairline,
-                  borderBottomColor: colors.line,
-                }}
-              >
-                <View
-                  style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}
+              {ambient && !brand && !lightHosted ? <AmbientLight /> : null}
+              {topBar ? (
+                // La barre du haut (RF), avant la zone qui défile dans l'arbre : lue et atteinte par
+                // Tab d'abord (ui-4). Toujours à cette place, fixe ou non : passer de l'un à l'autre
+                // ne la remonte pas (ui-10). `belowBar` seulement quand elle est fixe.
+                <ScreenTopBar
+                  belowBar={barPinned ? shownBelowBar : undefined}
+                  belowRef={asideUnderBar}
+                  onSpace={setBarSpace}
                 >
                   {header}
-                  {notice}
-                </View>
-              </View>
-            ) : null}
-            {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
-            {brand ? (
-              // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
-              // miel), le décor et la feuille qui porte le contenu.
-              <ScrollView
-                ref={scroller}
-                contentContainerStyle={{ flexGrow: 1 }}
-                keyboardShouldPersistTaps="handled"
-                onScroll={scroll.handleScroll}
-                scrollEventThrottle={SCROLL_EVENT_MS}
-              >
-                {/* Le fondu des pages : tout le miel est le contenu de la page. */}
-                <ScreenFade fade={fade} style={styles.grow}>
-                  <BrandAmbiance
-                    header={brandHeader}
-                    scene={scene}
-                    hero={withHero ? hero : undefined}
+                </ScreenTopBar>
+              ) : null}
+              {pinned ? (
+                // La barre fixe, hors de la zone qui défile. Son fond « feuille » cache le contenu qui
+                // passe dessous : opaque de jour (la crème de la page, décision du 7/11/2026), presque
+                // opaque de nuit, où il laisse transparaître la lumière d'ambiance.
+                <View
+                  style={{
+                    paddingTop: insets.top + space.sm,
+                    paddingBottom: space.sm,
+                    paddingHorizontal: padding,
+                    alignItems: 'center',
+                    backgroundColor: colors.sheet,
+                    borderBottomWidth: borders.hairline,
+                    borderBottomColor: colors.line,
+                  }}
+                >
+                  <View
+                    style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}
                   >
-                    {body}
-                  </BrandAmbiance>
-                </ScreenFade>
-              </ScrollView>
-            ) : (
-              // KeyboardAvoidingView : sur iOS, la zone se raccourcit de la hauteur du clavier quand
-              // il s'ouvre, si bien que le pied collé remonte au-dessus de lui et que le contenu
-              // défile dans la place qui reste (Android le fait de lui-même, le web aussi). Sans
-              // pied collé, rien ne change : la zone qui défile reste seule.
-              <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                enabled={pinnedFooter}
-                {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
-              >
+                    {header}
+                    {notice}
+                  </View>
+                </View>
+              ) : null}
+              {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
+              {brand ? (
+                // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
+                // miel), le décor et la feuille qui porte le contenu.
                 <ScrollView
                   ref={scroller}
-                  // Sur le web, le navigateur fait défiler le contrôle qui reçoit le focus (Tab,
-                  // Maj+Tab) jusqu'entre ces marges : il ne finit caché ni sous la place flottante
-                  // (`scroll-padding-bottom`), ni sous la barre fixe et ce qui se pose dessous
-                  // (`scroll-padding-top`, jur-RF3). Les types de React Native ignorent ces deux
-                  // propriétés ; react-native-web les transmet.
-                  style={scrollPadding(floatingTop, barPinned ? barSpace.scrollPaddingTop : 0)}
-                  contentContainerStyle={{
-                    flexGrow: 1,
-                    alignItems: 'center',
-                    // Sous la barre de ScreenTopBar, sa hauteur mesurée (voir `contentTop`) ; sous
-                    // une barre collée, l'encoche du téléphone est déjà dégagée par la barre.
-                    paddingTop: contentTop,
-                    // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
-                    // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
-                    // bas de l'appareil comprise) plus un peu d'air.
-                    // Une place flottante mesurée : la fin du contenu remonte au-dessus d'elle (barre
-                    // d'onglets ou zone sûre comprises, dans `floatingTop`), plus le même air.
-                    paddingBottom: pinnedFooter
-                      ? space.xl
-                      : floatingTop > 0
-                        ? floatingTop + space.xl
-                        : tabBar.height > 0
-                          ? tabBar.height + space.xl
-                          : insets.bottom + space.huge,
-                    paddingHorizontal: padding,
-                    gap: space.xl,
-                  }}
+                  contentContainerStyle={{ flexGrow: 1 }}
                   keyboardShouldPersistTaps="handled"
                   onScroll={scroll.handleScroll}
                   scrollEventThrottle={SCROLL_EVENT_MS}
                 >
-                  {/* Le fondu des pages (RF) : autour du contenu seul, dans la zone qui défile. Il
-                      prend la largeur du contenu, que la colonne de la zone qui défile centre ; il
-                      s'étire en hauteur pour qu'un formulaire seul reste au milieu de l'écran. */}
-                  <ScreenFade
-                    fade={fade}
-                    style={{
-                      width: '100%',
-                      maxWidth: withHero ? layout.maxContentWidth : maxWidthFor(width, false),
-                      flexGrow: 1,
-                    }}
-                  >
-                    {withHero ? (
-                      // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
-                      <View
-                        style={{
-                          width: '100%',
-                          flexGrow: 1,
-                          // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-                          // mais s'affiche à droite de la scène.
-                          flexDirection: 'row-reverse',
-                          alignItems: 'center',
-                          gap: space.huge,
-                        }}
-                      >
-                        <View style={{ width: layout.formWidth - 80 }}>
-                          <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                            {body}
-                          </Surface>
-                        </View>
-                        <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
-                      </View>
-                    ) : (
-                      <View
-                        style={{
-                          width: '100%',
-                          gap: space.xl,
-                          // Un formulaire seul se place au milieu de la hauteur de l'écran.
-                          ...(width === 'form' && !onBack && !header
-                            ? { flexGrow: 1, justifyContent: 'center' }
-                            : null),
-                        }}
-                      >
-                        {body}
-                      </View>
-                    )}
+                  {/* Le fondu des pages : tout le miel est le contenu de la page. */}
+                  <ScreenFade fade={fade} style={styles.grow}>
+                    <BrandAmbiance
+                      header={brandHeader}
+                      scene={scene}
+                      hero={withHero ? hero : undefined}
+                    >
+                      {body}
+                    </BrandAmbiance>
                   </ScreenFade>
                 </ScrollView>
-                {pinnedFooter ? (
-                  // Les boutons de la page font partie de son contenu : ils apparaissent avec lui,
-                  // et ne prennent aucun clic tant qu'il n'est pas plein (S1).
-                  <ScreenFade fade={fade}>
-                    <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
-                  </ScreenFade>
-                ) : null}
-                {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
+              ) : (
+                // KeyboardAvoidingView : sur iOS, la zone se raccourcit de la hauteur du clavier quand
+                // il s'ouvre, si bien que le pied collé remonte au-dessus de lui et que le contenu
+                // défile dans la place qui reste (Android le fait de lui-même, le web aussi). Sans
+                // pied collé, rien ne change : la zone qui défile reste seule.
+                <KeyboardAvoidingView
+                  style={{ flex: 1 }}
+                  enabled={pinnedFooter}
+                  {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
+                >
+                  <ScrollView
+                    ref={scroller}
+                    // Sur le web, le navigateur fait défiler le contrôle qui reçoit le focus (Tab,
+                    // Maj+Tab) jusqu'entre ces marges : il ne finit caché ni sous la place flottante
+                    // (`scroll-padding-bottom`), ni sous la barre fixe et ce qui se pose dessous
+                    // (`scroll-padding-top`, jur-RF3). Les types de React Native ignorent ces deux
+                    // propriétés ; react-native-web les transmet.
+                    style={scrollPadding(floatingTop, barPinned ? barSpace.scrollPaddingTop : 0)}
+                    contentContainerStyle={{
+                      flexGrow: 1,
+                      alignItems: 'center',
+                      // Sous la barre de ScreenTopBar, sa hauteur mesurée (voir `contentTop`) ; sous
+                      // une barre collée, l'encoche du téléphone est déjà dégagée par la barre.
+                      paddingTop: contentTop,
+                      // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
+                      // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
+                      // bas de l'appareil comprise) plus un peu d'air.
+                      // Une place flottante mesurée : la fin du contenu remonte au-dessus d'elle (barre
+                      // d'onglets ou zone sûre comprises, dans `floatingTop`), plus le même air.
+                      paddingBottom: pinnedFooter
+                        ? space.xl
+                        : floatingTop > 0
+                          ? floatingTop + space.xl
+                          : tabBar.height > 0
+                            ? tabBar.height + space.xl
+                            : insets.bottom + space.huge,
+                      paddingHorizontal: padding,
+                      gap: space.xl,
+                    }}
+                    keyboardShouldPersistTaps="handled"
+                    onScroll={scroll.handleScroll}
+                    scrollEventThrottle={SCROLL_EVENT_MS}
+                  >
+                    {/* Le fondu des pages (RF) : autour du contenu seul, dans la zone qui défile. Il
+                      prend la largeur du contenu, que la colonne de la zone qui défile centre ; il
+                      s'étire en hauteur pour qu'un formulaire seul reste au milieu de l'écran. */}
+                    <ScreenFade
+                      fade={fade}
+                      style={{
+                        width: '100%',
+                        maxWidth: withHero ? layout.maxContentWidth : maxWidthFor(width, false),
+                        flexGrow: 1,
+                      }}
+                    >
+                      {withHero ? (
+                        // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+                        <View
+                          style={{
+                            width: '100%',
+                            flexGrow: 1,
+                            // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                            // mais s'affiche à droite de la scène.
+                            flexDirection: 'row-reverse',
+                            alignItems: 'center',
+                            gap: space.huge,
+                          }}
+                        >
+                          <View style={{ width: layout.formWidth - 80 }}>
+                            <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                              {body}
+                            </Surface>
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            width: '100%',
+                            gap: space.xl,
+                            // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                            ...(width === 'form' && !onBack && !header
+                              ? { flexGrow: 1, justifyContent: 'center' }
+                              : null),
+                          }}
+                        >
+                          {body}
+                        </View>
+                      )}
+                    </ScreenFade>
+                  </ScrollView>
+                  {pinnedFooter ? (
+                    // Les boutons de la page font partie de son contenu : ils apparaissent avec lui,
+                    // et ne prennent aucun clic tant qu'il n'est pas plein (S1).
+                    <ScreenFade fade={fade}>
+                      <ScreenFooter width={maxWidthFor(width, false)}>
+                        {footer}
+                        {footerSlot.filled ? <ScreenFooterOutlet slot={footerSlot.slot} /> : null}
+                      </ScreenFooter>
+                    </ScreenFade>
+                  ) : null}
+                  {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
                   écran seul), rien n'écoute, et le composant n'a pas besoin de la navigation. */}
-                {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
-              </KeyboardAvoidingView>
-            )}
-            {hasFloating ? (
-              <ScreenFloating
-                lift={floatingLift}
-                width={maxWidthFor(width, false)}
-                onHeight={setMeasuredFloating}
-              >
-                {floating}
-              </ScreenFloating>
-            ) : null}
-            {/* La couche du dessus (R6a), après tout le reste : dessinée au-dessus de la page. */}
-            {/* Enveloppée en `box-none` : la couche ne prend aucun toucher elle-même, ses seuls
+                  {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
+                </KeyboardAvoidingView>
+              )}
+              {hasFloating ? (
+                <ScreenFloating
+                  lift={floatingLift}
+                  width={maxWidthFor(width, false)}
+                  onHeight={setMeasuredFloating}
+                >
+                  {floating}
+                </ScreenFloating>
+              ) : null}
+              {/* La couche du dessus (R6a), après tout le reste : dessinée au-dessus de la page. */}
+              {/* Enveloppée en `box-none` : la couche ne prend aucun toucher elle-même, ses seuls
               enfants dessinés en reçoivent. On ne compte plus sur l'enfant pour la laisser passer. */}
-            {overlay ? (
-              <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-                {overlay}
-              </View>
-            ) : null}
-          </View>
+              {overlay ? (
+                <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+                  {overlay}
+                </View>
+              ) : null}
+            </View>
+          </footerSlot.Provider>
         </ScreenScrollContext.Provider>
       </ScreenAmbient>
     </NoticeScope>

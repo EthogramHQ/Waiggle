@@ -69,6 +69,10 @@ import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
 import { InvalidChoicesCatalogue } from './champs-invalides'
 import { LoadingCatalogue } from './chargement'
+import { TestersCornerHeadsCatalogue } from './coin-entetes'
+import { TestersCornerCatalogue } from './coin-testeurs'
+import { TesterThreadCatalogue } from './coin-testeurs-fil'
+import { TestersListCatalogue } from './coin-testeurs-liste'
 import { CommentCardCatalogue } from './commentaires-carte'
 import { CommentComposerCatalogue } from './commentaires-composer'
 import { CommentThreadCatalogue } from './commentaires-fil'
@@ -134,6 +138,7 @@ import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
+import { TesterBricksCatalogue } from './testeurs-briques'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -854,6 +859,16 @@ export function CatalogueScreen() {
       <UpdateFamiliesCatalogue />
       {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
       <TestersCatalogue />
+      {/* Tranche R7b, les briques du coin des testeurs (testeurs-briques.tsx). */}
+      <TesterBricksCatalogue />
+      {/* Tranche R7b, les en-têtes des feuilles et du fil du coin des testeurs (coin-entetes.tsx). */}
+      <TestersCornerHeadsCatalogue />
+      {/* Tranche R7b, le fil des retours : bulles et liste des fils (coin-testeurs-fil.tsx). */}
+      <TesterThreadCatalogue />
+      {/* Tranche R7b, la liste des testeurs du coin, que l'auteur déplie (coin-testeurs-liste.tsx). */}
+      <TestersListCatalogue />
+      {/* Tranche R7b, les onglets, les appels et les retours réglés du coin (coin-testeurs.tsx). */}
+      <TestersCornerCatalogue />
       {/* Tranche R7a, l'avant / après d'une mise à jour (avant-apres.tsx). */}
       <BeforeAfterCatalogue />
       {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}

@@ -89,13 +89,28 @@ export const NewProjectUpdate = z
         message: 'each photo once',
       }),
     beforeAfter: z.boolean(),
+    /**
+     * R7b : les retours de testeurs que cette mise à jour règle (« Réglé dans la v1.3 »), 20 au plus,
+     * chacun une fois ; absent, aucun. Chacun doit être un retour à traiter de ce projet, sinon 400
+     * `invalid_feedback` et rien n'est publié. 20 est `SETTLED_PER_UPDATE_MAX` (testers.ts), écrit
+     * ici en dur : testers.ts lit ce fichier.
+     */
+    settledFeedbackIds: z
+      .array(z.uuid())
+      .max(20)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'each feedback once' })
+      .default([]),
   })
   .refine((update) => !update.beforeAfter || update.photos.length >= 2, {
     message: 'a before / after needs two photos',
     path: ['beforeAfter'],
   })
   .meta({ id: 'NewProjectUpdate' })
-export type NewProjectUpdate = z.infer<typeof NewProjectUpdate>
+/**
+ * Le type de ce qu'on envoie (`z.input`), pas de ce que Zod rend : `settledFeedbackIds` y est
+ * facultatif, et l'appli comme les tests peuvent l'omettre (R7b).
+ */
+export type NewProjectUpdate = z.input<typeof NewProjectUpdate>
 
 /**
  * Une mise à jour publiée. Une mise à jour retirée par la modération ne paraît plus que pour

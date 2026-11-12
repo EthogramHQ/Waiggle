@@ -594,7 +594,9 @@ describe('the profile photo of a blocked member', () => {
       expect(
         items.map((item) => [item.id, item.author]),
         projectId,
-      ).toEqual([[commentId, { id: malikId, name: 'Malik', handle: null, avatarUrl: null }]])
+      ).toEqual([
+        [commentId, { id: malikId, name: 'Malik', handle: null, avatarUrl: null, isTester: false }],
+      ])
       expect(text, projectId).not.toContain(photo)
       const preview = await act.send(
         'GET',
@@ -618,7 +620,7 @@ describe('the profile photo of a blocked member', () => {
     await act.block(malikId, ines)
     const { text, items } = await readAsInes(meteo.id)
     expect(items.map((item) => item.author)).toEqual([
-      { id: malikId, name: 'Malik', handle: null, avatarUrl: null },
+      { id: malikId, name: 'Malik', handle: null, avatarUrl: null, isTester: false },
     ])
     expect(text).not.toContain(photo)
     const preview = await act.send(

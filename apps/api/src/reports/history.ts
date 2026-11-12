@@ -44,6 +44,8 @@ export const loadDecisionHistory = async (
   const p = schema.project
   const u = schema.projectUpdate
   const c = schema.projectComment
+  const tc = schema.testerCall
+  const tm = schema.testerMessage
   const id = targetUuid('moderation_decision')
 
   const conditions: (SQL | undefined)[] = []
@@ -72,6 +74,8 @@ export const loadDecisionHistory = async (
       projectId: p.id,
       updateProjectId: u.projectId,
       commentProjectId: c.projectId,
+      callProjectId: tc.projectId,
+      messageProjectId: tm.projectId,
     })
     .from(d)
     .leftJoin(admin, eq(admin.id, d.adminId))
@@ -87,6 +91,10 @@ export const loadDecisionHistory = async (
     // Un commentaire supprimé alors qu'il avait des réponses (deleted_at) n'a plus de texte : pas
     // de lien vers lui.
     .leftJoin(c, and(eq(d.targetKind, 'comment'), sql`${c.id} = ${id}`, isNull(c.deletedAt)))
+    // R7b : un appel ou un message du coin des testeurs, par la clé primaire de sa table (le message
+    // porte lui-même l'identifiant de son projet).
+    .leftJoin(tc, and(eq(d.targetKind, 'call'), sql`${tc.id} = ${id}`))
+    .leftJoin(tm, and(eq(d.targetKind, 'message'), sql`${tm.id} = ${id}`))
     .where(and(...conditions))
     .orderBy(desc(d.createdAt), desc(d.id))
     .limit(MODERATION_PAGE_SIZE + 1)
@@ -127,7 +135,13 @@ export const loadDecisionHistory = async (
             ? { id: row.adminId, name: row.adminName, handle: row.adminHandle }
             : null,
         target: target.data,
-        projectId: row.projectId ?? row.updateProjectId ?? row.commentProjectId ?? null,
+        projectId:
+          row.projectId ??
+          row.updateProjectId ??
+          row.commentProjectId ??
+          row.callProjectId ??
+          row.messageProjectId ??
+          null,
         member:
           row.memberId !== null && row.memberName !== null
             ? { id: row.memberId, name: row.memberName, handle: row.memberHandle }

@@ -8,16 +8,21 @@
 // changer. Comme tout écran, ce fichier n'assemble que des composants de `src/ui`.
 import {
   PHOTO_DESCRIPTION_MAX,
+  SETTLED_PER_UPDATE_MAX,
   UPDATE_PHOTOS_MAX,
   UPDATE_TITLE_MAX,
   UPDATE_VERSION_MAX,
 } from '@ruche/contracts'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PhotoActions } from '../projects/usePhotoTiles'
+import { type Focusable, focusTarget, focusWithoutScroll, holdsFocus } from '../ui/focus'
+import { Notice } from '../ui/Notice'
 import { type PhotoTile, PhotoTiles, type PhotoTilesLabels } from '../ui/PhotoTiles'
 import type { CoverImage } from '../ui/ProjectCover'
 import { ProjectStrip } from '../ui/ProjectStrip'
 import { RelativeTime } from '../ui/RelativeTime'
+import { SettledFeedbackField, type SettledFeedbackItem } from '../ui/SettledFeedbackField'
 import { Row, Stack } from '../ui/Stack'
 import { Switch } from '../ui/Switch'
 import { Text } from '../ui/Text'
@@ -34,6 +39,17 @@ export type UpdateSheetProject = {
   /** La version de la dernière mise à jour qui en a une ; null : « Dernière mise à jour : … ». */
   version: string | null
 }
+
+/**
+ * La partie « Retours réglés » (R7b), telle que l'écran l'a lue (`useOpenFeedback`) :
+ * - `ready` : les retours à traiter, déjà écrits (nom, issue, extrait, date) ; jamais vide (sans
+ *   retour à traiter, l'écran ne passe pas la partie) ;
+ * - `error` : la liste n'a pas pu se charger ; la phrase le dit à sa place, avec « Réessayer »
+ *   (jamais tue : publier sans le savoir réglerait moins que voulu). `retry` relance la lecture.
+ */
+export type UpdateSheetSettled =
+  | { state: 'ready'; items: SettledFeedbackItem[] }
+  | { state: 'error'; retry: () => void }
 
 /** Les photos de la feuille : ce que rend `usePhotoTiles(id, { slot: 'update' })`. */
 export type UpdateSheetPhotos = {
@@ -58,6 +74,12 @@ type Props = {
   photos: UpdateSheetPhotos
   /** L'envoi est en cours : tout est en lecture seule. */
   busy: boolean
+  /**
+   * La partie « Retours réglés », sous les photos (R7b) ; absente ou null : pas de partie (aucun
+   * retour à traiter, ou la liste se lit encore : elle arrive en bas de la feuille, sous tout ce
+   * qu'on touche, et rien ne bouge sous le doigt).
+   */
+  settled?: UpdateSheetSettled | null
   /** L'heure, pour figer la date de la tête (catalogue) ; l'horloge de l'appareil sinon. */
   now?: Date
 }
@@ -70,6 +92,7 @@ export function UpdateSheetFields({
   linesErrorId = null,
   photos,
   busy,
+  settled = null,
   now,
 }: Props) {
   const { t } = useTranslation()
@@ -234,6 +257,76 @@ export function UpdateSheetFields({
           />
         ) : null}
       </Stack>
+      {settled ? (
+        <SettledPart
+          settled={settled}
+          value={form.settledIds ?? []}
+          onChange={(settledIds) => onChange({ ...form, settledIds })}
+          busy={busy}
+        />
+      ) : null}
     </Stack>
   )
+}
+
+/**
+ * « Retours réglés » ou, si la liste n'a pas pu se charger, la phrase qui le dit et « Réessayer ».
+ * Après « Réessayer », la phrase disparaît quand la liste arrive : le focus, s'il était sur le
+ * bouton (ou retombé sur la page), passe à la première case, au lieu de se perdre.
+ */
+function SettledPart({
+  settled,
+  value,
+  onChange,
+  busy,
+}: {
+  settled: UpdateSheetSettled
+  value: string[]
+  onChange: (ids: string[]) => void
+  busy: boolean
+}) {
+  const { t } = useTranslation()
+  const placeRef = useRef<Focusable>(null)
+  // Vrai entre « Réessayer » et l'arrivée de la liste.
+  const retried = useRef(false)
+  const ready = settled.state === 'ready'
+  useEffect(() => {
+    if (!ready || !retried.current) return
+    retried.current = false
+    if (holdsFocus(placeRef.current) || focusFell()) {
+      focusWithoutScroll(focusTarget(placeRef.current))
+    }
+  }, [ready])
+
+  return (
+    <Stack ref={placeRef} gap="sm">
+      {settled.state === 'ready' ? (
+        <SettledFeedbackField
+          items={settled.items}
+          value={value}
+          onChange={onChange}
+          max={SETTLED_PER_UPDATE_MAX}
+          editable={!busy}
+        />
+      ) : (
+        <Notice
+          message={t(($) => $.project.testers.settledField.loadError)}
+          action={{
+            label: t(($) => $.common.retry),
+            role: 'button',
+            onPress: () => {
+              retried.current = true
+              settled.retry()
+            },
+          }}
+        />
+      )}
+    </Stack>
+  )
+}
+
+/** Sur le web, le focus est-il retombé sur la page (son élément a disparu) ? */
+const focusFell = (): boolean => {
+  const page = (globalThis as { document?: { activeElement?: unknown; body?: unknown } }).document
+  return page !== undefined && (page.activeElement === null || page.activeElement === page.body)
 }

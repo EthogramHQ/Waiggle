@@ -43,6 +43,7 @@ import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
 import {
   useDecide,
   useDecisionHistory,
@@ -63,6 +64,7 @@ import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import type { ImageSource } from '../ui/image'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
@@ -125,6 +127,21 @@ const imageLines = (images: readonly SnapshotImage[], t: T): string[] => {
   })
 }
 
+/**
+ * R7b : l'image d'une capture ou d'une photo d'appel, quand l'API en donne l'adresse (un signalement
+ * ouvert vise son message ou son appel). Son nom lu est le libellé du champ (« Photo »), le seul texte
+ * existant qui lui convienne. Une image sans adresse, ou déjà partie, reste dite par son état seul.
+ */
+const pictures = (
+  images: readonly SnapshotImage[],
+  t: T,
+  mediaSource: (url: string) => ImageSource | null,
+): { name: string; source: ImageSource }[] =>
+  images.flatMap(({ field, state, url }) => {
+    const source = state === 'present' && url ? mediaSource(url) : null
+    return source ? [{ name: t(($) => $.moderation.images[field]), source }] : []
+  })
+
 /** Le résultat d'une décision, posé sur sa carte : une confirmation, ou « déjà décidé ». */
 type Outcome = { message: string; ok: boolean }
 
@@ -185,6 +202,8 @@ export function ModerationScreen() {
 function AdminModeration() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
+  // Les images privées du coin des testeurs voyagent avec la session (cookie sur téléphone).
+  const mediaSource = useMediaSources()
   const back = useGoBack('/settings')
   // L'adresse peut ouvrir l'historique, filtré sur un membre (`?tab=history&member=<id>`, depuis la
   // page du membre). Elle n'est connue que dans le navigateur : la page pré-rendue l'ignore, et
@@ -521,6 +540,7 @@ function AdminModeration() {
         snapshotLabel={t(($) => $.moderation.snapshot)}
         snapshotNote={item.snapshotsDiffer ? t(($) => $.moderation.snapshotsDiffer) : undefined}
         images={imageLines(item.images, t)}
+        pictures={pictures(item.images, t, mediaSource)}
         reasons={item.reasons.map(({ reason, count }) =>
           t(($) => $.moderation.reasonCount, {
             reason: t(($) => $.report.reasons[reasonTextKey[reason]]),

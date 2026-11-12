@@ -119,9 +119,11 @@ type Deps = {
   auth: Pick<Auth, '$context'>
   /** L'e-mail au membre suspendu (tranche 7c), envoyé après la décision. */
   mailer: Mailer
+  /** R7b : pour l'adresse d'une image du coin des testeurs visée par un signalement ouvert. */
+  publicApiUrl: string
 }
 
-export const moderationRoutes = ({ db, limiter, auth, mailer }: Deps) => {
+export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl }: Deps) => {
   const app = createRouter()
 
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
@@ -144,7 +146,10 @@ export const moderationRoutes = ({ db, limiter, auth, mailer }: Deps) => {
     // Les signalements d'une cible disparue entre-temps sont d'abord classés « sans objet » : elle
     // ne s'affiche plus (règle 29).
     await voidReportsOfGoneTargets(db, new Date())
-    return c.json(ModerationQueuePage.parse(await loadQueuePage(db, user.id, cursor)), 200)
+    return c.json(
+      ModerationQueuePage.parse(await loadQueuePage(db, user.id, cursor, publicApiUrl)),
+      200,
+    )
   })
 
   app.openapi(removedRoute, async (c) => {

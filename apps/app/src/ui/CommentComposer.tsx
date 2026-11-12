@@ -18,6 +18,12 @@
 // - le focus ne se perd jamais : un contrôle qui disparaît ou devient inactif le rend au champ.
 //
 // Le membre suspendu n'a pas ce champ du tout : l'écran ne le rend pas (relecture du plan, ui-I1).
+//
+// R7b (relecture du plan, ui-B2) : le même champ sert à répondre dans le fil d'un testeur. Il y
+// reçoit son exemple et son nom (`placeholder`, « Répondre à Inès »), le nom lu de son bouton
+// d'envoi (`sendLabel`, « Envoyer la réponse »), sans mentions (`mentions={false}` : un fil se lit
+// à deux, personne d'autre à prévenir) et sans photo (ni `avatar` ni `memberName`). Sans ces props,
+// rien ne change pour les commentaires.
 import { layout, space } from '@ruche/brand'
 import { COMMENT_COUNTER_FROM, COMMENT_MAX } from '@ruche/contracts'
 import { type Ref, useEffect, useId, useImperativeHandle, useRef } from 'react'
@@ -33,7 +39,7 @@ import { escapeCloses } from './keyboard'
 import { type MentionSuggestion, useMentionField } from './MentionField'
 import { Notice, type NoticeAction } from './Notice'
 import { Text } from './Text'
-import type { TextFieldInput } from './TextField'
+import { TextField, type TextFieldInput } from './TextField'
 import { useTapGuard } from './tapGuard'
 import { useLayout } from './theme/layout'
 
@@ -47,7 +53,28 @@ export type CommentBanner =
   | { kind: 'edit' }
   | null
 
-type Props = {
+/**
+ * Les mentions : par défaut, le champ propose des membres après « @ », et l'écran lui donne les
+ * suggestions et la recherche à laquelle elles répondent (MentionField). `mentions={false}` : ni
+ * liste ni recherche, la saisie est un champ simple ; ces trois props deviennent facultatives (et
+ * ne servent à rien).
+ */
+type MentionProps =
+  | {
+      mentions?: true
+      /** Les membres à proposer après « @ », et la recherche à laquelle ils répondent. */
+      suggestions: readonly MentionSuggestion[]
+      suggestionsFor: string | null
+      onQueryChange: (query: string | null) => void
+    }
+  | {
+      mentions: false
+      suggestions?: readonly MentionSuggestion[]
+      suggestionsFor?: string | null
+      onQueryChange?: (query: string | null) => void
+    }
+
+type Props = MentionProps & {
   value: string
   onChangeText: (text: string) => void
   /** Le membre envoie : seulement avec un texte qui peut partir, et une seule fois par double tape. */
@@ -63,17 +90,28 @@ type Props = {
   onCancelBanner: () => void
   /** La légende : qui lira ce commentaire. C'est l'écran qui la choisit (relecture jur-P1). */
   caption: string
-  avatar: ImageSource | null
-  memberName: string
+  /**
+   * La photo et le nom de qui écrit, posés devant le champ. Sans `memberName`, pas de photo du tout
+   * (le fil d'un testeur, R7b) ; `avatar` null : ses initiales.
+   */
+  avatar?: ImageSource | null | undefined
+  memberName?: string | undefined
   /** `sheet` : la feuille d'un téléphone (la flèche ronde) ; `column` : la colonne d'un ordinateur. */
   place: 'sheet' | 'column'
-  /** Les membres à proposer après « @ », et la recherche à laquelle ils répondent (MentionField). */
-  suggestions: readonly MentionSuggestion[]
-  suggestionsFor: string | null
-  onQueryChange: (query: string | null) => void
   /** La saisie, pour que l'écran y pose le focus (« Répondre », après un envoi). */
   inputRef: Ref<TextFieldInput>
+  /**
+   * L'exemple grisé du champ vide, qui est aussi son nom lu (« Répondre à Inès ») ; absent :
+   * « Écrire un commentaire ».
+   */
+  placeholder?: string | undefined
+  /** Le nom lu du bouton d'envoi (« Envoyer la réponse ») ; absent : « Envoyer le commentaire ». */
+  sendLabel?: string | undefined
 }
+
+/** Une recherche de mentions qui n'écoute rien : celle d'un champ sans mentions. */
+const ignoreQuery = () => {}
+const NO_SUGGESTIONS: readonly MentionSuggestion[] = []
 
 /** La taille de la photo, en points : plus petite que la rangée d'un champ d'une ligne (44). */
 const PHOTO_SIZE = 36
@@ -150,10 +188,13 @@ export function CommentComposer({
   avatar,
   memberName,
   place,
+  mentions = true,
   suggestions,
   suggestionsFor,
   onQueryChange,
   inputRef,
+  placeholder,
+  sendLabel,
 }: Props) {
   const { t } = useTranslation()
   const { width, height } = useLayout()
@@ -230,13 +271,15 @@ export function CommentComposer({
   // La saisie et la liste des membres sont posées séparément : la liste prend toute la largeur du
   // composant, au-dessus du bandeau (planche `R5b-Repondre`), la saisie reste dans sa rangée. Quand elle
   // grandit, le champ, collé au bas de la feuille, ne bouge pas sous le doigt.
-  const { field, list } = useMentionField({
+  // Le nom du champ est son exemple : « Écrire un commentaire », ou « Répondre à Inès » dans un fil.
+  const fieldName = placeholder ?? t(($) => $.project.comments.add)
+  // Ce que le champ est, avec ou sans mentions : le même, au détail près de la liste des membres.
+  const fieldProps = {
     // Échap referme le bandeau, comme la croix (web), sauf pendant l'envoi. Sans bandeau, elle
     // fait ce qu'elle fait d'habitude. (Avec une liste de membres, elle la referme d'abord.)
     ...(banner ? escapeCloses(cancelBanner, pending) : null),
-    inputRef: input,
-    label: t(($) => $.project.comments.add),
-    placeholder: t(($) => $.project.comments.add),
+    label: fieldName,
+    placeholder: fieldName,
     value,
     onChangeText,
     compact: true,
@@ -247,22 +290,36 @@ export function CommentComposer({
     invalid: over > 0,
     describedElsewhere,
     autoCapitalize: 'sentences',
-    suggestions,
-    suggestionsFor,
+  } as const
+  // Un hook s'appelle à chaque rendu, dans le même ordre : sans mentions, il tourne quand même, sans
+  // suggestions ni saisie à lui (une `ref` à part), et rien de ce qu'il rend ne s'affiche.
+  const unusedInput = useRef<TextFieldInput>(null)
+  const mentionParts = useMentionField({
+    ...fieldProps,
+    inputRef: mentions ? input : unusedInput,
+    suggestions: mentions ? (suggestions ?? NO_SUGGESTIONS) : NO_SUGGESTIONS,
+    suggestionsFor: mentions ? (suggestionsFor ?? null) : null,
     suggestionsLabel: t(($) => $.mentions.suggestions),
     suggestionsTitle: t(($) => $.mentions.title),
     ...(place === 'sheet'
       ? { suggestionsMaxHeight: Math.max(MENTION_LIST_MIN, height - MENTION_LIST_ROOM) }
       : null),
-    onQueryChange,
+    onQueryChange: (mentions && onQueryChange) || ignoreQuery,
   })
+  // Sans mentions, un champ simple : pas une liste déroulante (combobox) qui ne s'ouvrirait jamais.
+  const field = mentions ? mentionParts.field : <TextField {...fieldProps} inputRef={input} />
+  const list = mentions ? mentionParts.list : null
   // La même saisie, partagée avec l'écran (useImperativeHandle : ce que voit la `ref` du parent). Après
   // `useMentionField`, qui remplit `input` : dans un composant, ces poignées se posent dans l'ordre.
   useImperativeHandle(inputRef, () => input.current as TextFieldInput)
 
   // En mode réponse, sous 360 points, la photo laisse sa place au champ (décision 20). Son emplacement
-  // reste réservé dans l'arbre (`null`) : la saisie ne se remonte pas, et garde le focus.
-  const showPhoto = !(banner?.kind === 'reply' && width < REPLY_PHOTO_FROM)
+  // reste réservé dans l'arbre (`null`) : la saisie ne se remonte pas, et garde le focus. Sans nom de
+  // membre (le fil d'un testeur), jamais de photo.
+  const hasPhoto = memberName !== undefined
+  const showPhoto = hasPhoto && !(banner?.kind === 'reply' && width < REPLY_PHOTO_FROM)
+  // Le nom lu du bouton d'envoi, qu'il soit une flèche ronde ou « Envoyer » (son libellé affiché).
+  const spokenSend = sendLabel ?? t(($) => $.project.comments.sendLabel)
 
   return (
     <View style={{ gap: space.sm }}>
@@ -337,9 +394,14 @@ export function CommentComposer({
         >
           {/* La photo est un décor : son nom n'apporte rien à qui écrit. Dans une boîte haute d'une
               ligne de champ, pour rester centrée sur lui quand il n'a qu'une ligne. */}
-          {showPhoto ? (
+          {showPhoto && memberName !== undefined ? (
             <View aria-hidden style={{ height: layout.touchTarget, justifyContent: 'center' }}>
-              <Avatar name={memberName} source={avatar} label={memberName} size={PHOTO_SIZE} />
+              <Avatar
+                name={memberName}
+                source={avatar ?? null}
+                label={memberName}
+                size={PHOTO_SIZE}
+              />
             </View>
           ) : null}
           <View style={{ flex: 1, minWidth: 0 }}>{field}</View>
@@ -349,7 +411,7 @@ export function CommentComposer({
             ref={sendControl}
             icon="arrow-up"
             variant="honey"
-            label={t(($) => $.project.comments.sendLabel)}
+            label={spokenSend}
             onPress={send}
             disabled={blocked}
             loading={pending}
@@ -362,7 +424,7 @@ export function CommentComposer({
             variant="secondary"
             size="compact"
             label={t(($) => $.project.comments.send)}
-            spokenLabel={t(($) => $.project.comments.sendLabel)}
+            spokenLabel={spokenSend}
             onPress={send}
             disabled={blocked}
             loading={pending}
@@ -371,7 +433,9 @@ export function CommentComposer({
       </View>
       {/* Dans la colonne, sous le champ, au bord de son texte ; dans la feuille, où la place manque,
           sur toute la largeur. */}
-      <View style={place === 'column' ? { paddingLeft: PHOTO_SIZE + space.sm } : undefined}>
+      <View
+        style={place === 'column' && hasPhoto ? { paddingLeft: PHOTO_SIZE + space.sm } : undefined}
+      >
         {/* La région existe toujours, même vide : un lecteur d'écran ne suit que les régions qu'il
             connaît déjà. Polie : elle n'interrompt pas la frappe. Vide, elle ne prend aucune place. */}
         <View nativeID={tooLongId} aria-live="polite">

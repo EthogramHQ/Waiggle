@@ -1,12 +1,13 @@
-// La section « Les testeurs » du catalogue (R7a, U5a) : ce que la page d'un projet montre des
-// testeurs, et ses deux feuilles.
+// La section « Les testeurs » du catalogue (R7a, U5a ; R7b) : ce que la page d'un projet montre des
+// testeurs, et la feuille d'inscription.
 // - Les actions de la page (projects/ProjectActions, `ProjectActionsView`) : « Rejoindre les
-//   testeurs » sous « Suivre ce projet », pour un autre membre sur un projet « Testable » ; « Tu
-//   testes ce projet » une fois inscrit, même sur un projet qui ne cherche plus de testeurs, et pour
-//   un compte suspendu (pour pouvoir partir) ; pour l'auteur, « 12 testeurs » à côté des abonnés.
-// - Les feuilles (screens/TesterSheet, `useTesterPanel`, posées ouvertes dans la page par
-//   `SheetPanel`) : « Rejoindre les testeurs » et « Tu testes ce projet », sur téléphone et sur
-//   ordinateur, puis leurs états : en cours, complet, plus « Testable », panne, départ refusé.
+//   testeurs » sous « Suivre ce projet », pour un autre membre sur un projet « Testable » ; « Le coin
+//   des testeurs » une fois inscrit (R7b), même sur un projet qui ne cherche plus de testeurs, et
+//   pour un compte suspendu (pour relire son fil et partir) ; rien pour un membre que l'auteur a
+//   retiré ; pour l'auteur, « Le coin des testeurs » et « 12 testeurs » à côté, sous « Modifier ».
+// - La feuille d'inscription (screens/TesterSheet, `useTesterPanel`, posée ouverte dans la page par
+//   `SheetPanel`), sur téléphone et sur ordinateur, puis ses états : en cours, complet, refus,
+//   panne, session expirée. La feuille « Tu testes ce projet » de R7a a disparu (R7b).
 // De jour et de nuit. Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs
 // personnes y travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
@@ -27,25 +28,26 @@ import { ThemeProvider, useTheme } from '../ui/theme/ThemeProvider'
 const fr = {
   title: 'Les testeurs',
   intro:
-    'Sur la page d’un projet « Testable » qui a une démo, un autre membre lit « Rejoindre les testeurs » sous « Suivre ce projet », en blanc : « Tester la démo » reste la seule action miel. Le bouton ouvre une feuille qui dit ce que l’inscription veut dire ; une fois inscrit, il devient « Tu testes ce projet », qui ouvre la feuille d’où l’on part. L’auteur lit le nombre de ses testeurs à côté de ses abonnés ; personne d’autre ne le voit.',
+    'Sur la page d’un projet « Testable » qui a une démo, un autre membre lit « Rejoindre les testeurs » sous « Suivre ce projet », en blanc : « Tester la démo » reste la seule action miel. Le bouton ouvre une feuille qui dit ce que l’inscription veut dire ; une fois inscrit, le même bouton devient « Le coin des testeurs », qui mène à la page du coin (on quitte depuis le coin ou le menu « … »). L’auteur lit « Le coin des testeurs » et le nombre de ses testeurs sous « Modifier » ; personne d’autre ne voit ce nombre.',
   actionsTitle: 'Sur la page du projet',
   offer: 'Un autre membre, projet « Testable » : « Rejoindre les testeurs »',
-  tester: 'Inscrit : « Tu testes ce projet »',
-  noLonger: 'Inscrit, projet passé « En pause » : le bouton reste, pour partir',
-  suspended: 'Compte suspendu, inscrit : « Suivre ce projet » inactif, le départ reste possible',
-  author: 'L’auteur : « 12 testeurs » à côté des abonnés',
-  sheetsTitle: 'Les feuilles',
+  tester: 'Inscrit : « Le coin des testeurs »',
+  noLonger: 'Inscrit, projet passé « En pause » : le coin reste',
+  suspended: 'Compte suspendu, inscrit : « Suivre ce projet » inactif, le coin reste',
+  removed: 'Retiré par l’auteur : ni « Rejoindre », ni coin, sans dire pourquoi',
+  author: 'L’auteur : « Le coin des testeurs » et « 12 testeurs », sous « Modifier »',
+  authorNone: 'L’auteur, projet « Testable » sans testeur : « 0 testeur »',
+  authorSuspended: 'L’auteur suspendu : ni « Modifier », le coin reste (fermé aux testeurs)',
+  authorIdea: 'L’auteur, projet « Idée » qui n’a jamais eu de testeur : pas de coin',
+  sheetsTitle: 'La feuille d’inscription',
   joinPhone: '« Rejoindre les testeurs », téléphone',
-  memberPhone: '« Tu testes ce projet », téléphone',
   joinDesktop: '« Rejoindre les testeurs », ordinateur',
-  memberDesktop: '« Tu testes ce projet », ordinateur',
-  statesTitle: 'États des feuilles (téléphone)',
+  statesTitle: 'États de la feuille (téléphone)',
   pending: 'Inscription en cours : le bouton charge, « Annuler » attend',
   full: 'Complet (409 testers_full) : jamais un nombre',
-  notTestable: 'Ne cherche plus de testeurs (409 not_testable)',
+  notTestable: 'Refus (409 not_testable) : vrai pour toutes les causes',
   failed: 'Panne : réessayer reste possible',
-  quitPending: 'Départ en cours',
-  quitFailed: 'Départ refusé (panne)',
+  expired: 'Session expirée : « Me reconnecter »',
   day: 'jour',
   night: 'nuit',
 }
@@ -53,25 +55,26 @@ const fr = {
 const en: typeof fr = {
   title: 'Testers',
   intro:
-    'On the page of a “Testable” project with a demo, another member reads “Join the testers” under “Follow this project”, in white: “Try the demo” stays the only honey action. The button opens a sheet that says what joining means; once in, it becomes “You test this project”, which opens the sheet to leave from. The author reads the number of testers beside the followers; nobody else sees it.',
+    'On the page of a “Testable” project with a demo, another member reads “Join the testers” under “Follow this project”, in white: “Try the demo” stays the only honey action. The button opens a sheet that says what joining means; once in, the same button becomes “The testers’ corner”, which leads to the corner page (one leaves from the corner or the “…” menu). The author reads “The testers’ corner” and the number of testers under “Edit”; nobody else sees that number.',
   actionsTitle: 'On the project page',
   offer: 'Another member, “Testable” project: “Join the testers”',
-  tester: 'Joined: “You test this project”',
-  noLonger: 'Joined, project now “Paused”: the button stays, to leave',
-  suspended: 'Suspended account, joined: “Follow this project” inactive, leaving still possible',
-  author: 'The author: “12 testers” beside the followers',
-  sheetsTitle: 'The sheets',
+  tester: 'Joined: “The testers’ corner”',
+  noLonger: 'Joined, project now “Paused”: the corner stays',
+  suspended: 'Suspended account, joined: “Follow this project” inactive, the corner stays',
+  removed: 'Removed by the author: neither “Join” nor corner, without saying why',
+  author: 'The author: “The testers’ corner” and “12 testers”, under “Edit”',
+  authorNone: 'The author, “Testable” project without testers: “0 testers”',
+  authorSuspended: 'Suspended author: no “Edit”, the corner stays (closed to testers)',
+  authorIdea: 'The author, “Idea” project that never had testers: no corner',
+  sheetsTitle: 'The join sheet',
   joinPhone: '“Join the testers”, phone',
-  memberPhone: '“You test this project”, phone',
   joinDesktop: '“Join the testers”, computer',
-  memberDesktop: '“You test this project”, computer',
   statesTitle: 'Sheet states (phone)',
   pending: 'Joining: the button loads, “Cancel” waits',
   full: 'Full (409 testers_full): never a number',
-  notTestable: 'No longer looking for testers (409 not_testable)',
+  notTestable: 'Refused (409 not_testable): true for every cause',
   failed: 'Failure: trying again stays possible',
-  quitPending: 'Leaving',
-  quitFailed: 'Leaving refused (failure)',
+  expired: 'Session expired: “Sign in again”',
   day: 'day',
   night: 'night',
 }
@@ -80,7 +83,7 @@ type Labels = typeof fr
 const noop = () => {}
 const schemes = ['day', 'night'] as const
 
-/** Le projet de Léa, vu par un autre membre : « Testable », avec une démo, deux abonnés. */
+/** Le projet de Papi Jean, vu par un autre membre : « Testable », avec une démo, douze abonnés. */
 const seen: ActionsProject = {
   ...recipesProject,
   title: 'Décollage !',
@@ -90,7 +93,11 @@ const seen: ActionsProject = {
   followerCount: 12,
   isTester: false,
   testerCount: null,
+  testerJoinable: true,
 }
+
+/** Le même projet, vu par son auteur : douze testeurs. */
+const mine: ActionsProject = { ...seen, isMine: true, testerCount: 12, testerJoinable: false }
 
 /** Un exemple légendé (« Inscrit — nuit »). */
 function Example({ caption, children }: { caption: string; children: ReactNode }) {
@@ -114,6 +121,7 @@ function Actions({ project, suspended = false }: { project: ActionsProject; susp
         onEdit={noop}
         onToggleFollow={noop}
         onOpenTesters={noop}
+        onOpenCorner={noop}
         suspended={suspended}
       />
     </Surface>
@@ -121,7 +129,7 @@ function Actions({ project, suspended = false }: { project: ActionsProject; susp
 }
 
 /** Ce qui ne change pas d'un exemple de feuille à l'autre. */
-const sheetBase: Omit<TesterPanelProps, 'mode'> = {
+const sheetBase: TesterPanelProps = {
   authorName: 'Papi Jean',
   title: 'Décollage !',
   pending: false,
@@ -130,11 +138,11 @@ const sheetBase: Omit<TesterPanelProps, 'mode'> = {
   onClose: noop,
 }
 
-/** Une feuille des testeurs ouverte dans la page, sur le voile, comme posée sur l'écran. */
+/** La feuille d'inscription ouverte dans la page, sur le voile, comme posée sur l'écran. */
 function SheetExample({
   layout,
   ...panel
-}: Partial<TesterPanelProps> & Pick<TesterPanelProps, 'mode'> & { layout: 'phone' | 'desktop' }) {
+}: Partial<TesterPanelProps> & { layout: 'phone' | 'desktop' }) {
   const { colors } = useTheme()
   const content = useTesterPanel({ ...sheetBase, ...panel })
   const phone = layout === 'phone'
@@ -157,8 +165,10 @@ function SheetExample({
 }
 
 export function TestersCatalogue() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const l: Labels = i18n.language === 'en' ? en : fr
+  // « Me reconnecter », le lien de l'appli sous le message d'une session expirée.
+  const signIn = t(($) => $.states.signIn)
   // Côte à côte sur un écran large ; l'un sous l'autre ailleurs (un cadre de 390 points déborderait
   // d'une rangée dans un catalogue de 390).
   const wide = useLayout().sizeClass === 'wide'
@@ -191,11 +201,27 @@ export function TestersCatalogue() {
                 <Example caption={l.suspended}>
                   <Actions project={{ ...seen, isTester: true, isFollowed: false }} suspended />
                 </Example>
+                <Example caption={l.removed}>
+                  <Actions project={{ ...seen, testerJoinable: false }} />
+                </Example>
               </>
             ) : null}
             <Example caption={`${l.author} — ${l[scheme]}`}>
-              <Actions project={{ ...seen, isMine: true, testerCount: 12 }} />
+              <Actions project={mine} />
             </Example>
+            {scheme === 'day' ? (
+              <>
+                <Example caption={l.authorNone}>
+                  <Actions project={{ ...mine, testerCount: 0 }} />
+                </Example>
+                <Example caption={l.authorSuspended}>
+                  <Actions project={mine} suspended />
+                </Example>
+                <Example caption={l.authorIdea}>
+                  <Actions project={{ ...mine, status: 'idea', testerCount: 0 }} />
+                </Example>
+              </>
+            ) : null}
           </Stack>
         </ThemeProvider>
       ))}
@@ -205,24 +231,14 @@ export function TestersCatalogue() {
       </Text>
       {schemes.map((scheme) => (
         <ThemeProvider key={scheme} appearance={scheme}>
-          <Stack gap="lg">
-            <Stack direction={pair} gap="lg" wrap={wide}>
-              <Example caption={`${l.joinPhone} — ${l[scheme]}`}>
-                <SheetExample layout="phone" mode="join" />
-              </Example>
-              <Example caption={`${l.memberPhone} — ${l[scheme]}`}>
-                <SheetExample layout="phone" mode="member" />
-              </Example>
-            </Stack>
+          <Stack direction={pair} gap="lg" wrap={wide}>
+            <Example caption={`${l.joinPhone} — ${l[scheme]}`}>
+              <SheetExample layout="phone" />
+            </Example>
             {wide ? (
-              <>
-                <Example caption={`${l.joinDesktop} — ${l[scheme]}`}>
-                  <SheetExample layout="desktop" mode="join" />
-                </Example>
-                <Example caption={`${l.memberDesktop} — ${l[scheme]}`}>
-                  <SheetExample layout="desktop" mode="member" />
-                </Example>
-              </>
+              <Example caption={`${l.joinDesktop} — ${l[scheme]}`}>
+                <SheetExample layout="desktop" />
+              </Example>
             ) : null}
           </Stack>
         </ThemeProvider>
@@ -233,22 +249,23 @@ export function TestersCatalogue() {
       </Text>
       <Stack direction={pair} gap="lg" wrap={wide}>
         <Example caption={l.pending}>
-          <SheetExample layout="phone" mode="join" pending />
+          <SheetExample layout="phone" pending />
         </Example>
         <Example caption={l.full}>
-          <SheetExample layout="phone" mode="join" problem="full" />
+          <SheetExample layout="phone" problem="full" />
         </Example>
         <Example caption={l.notTestable}>
-          <SheetExample layout="phone" mode="join" problem="notTestable" />
+          <SheetExample layout="phone" problem="notTestable" />
         </Example>
         <Example caption={l.failed}>
-          <SheetExample layout="phone" mode="join" problem="failed" />
+          <SheetExample layout="phone" problem="failed" />
         </Example>
-        <Example caption={l.quitPending}>
-          <SheetExample layout="phone" mode="member" pending />
-        </Example>
-        <Example caption={l.quitFailed}>
-          <SheetExample layout="phone" mode="member" problem="failed" />
+        <Example caption={l.expired}>
+          <SheetExample
+            layout="phone"
+            problem="expired"
+            problemAction={{ label: signIn, onPress: noop }}
+          />
         </Example>
       </Stack>
     </Stack>

@@ -88,6 +88,8 @@ const mockServer = {
       return ok(added)
     }
     if (method === 'DELETE' && VISUAL.test(path)) return ok(this.project)
+    // R7b : la feuille lit les retours à traiter (« Retours réglés ») ; ici, aucun.
+    if (method === 'GET' && /\/feedback\/open$/.test(path)) return ok([])
     if (method === 'POST' && UPDATES.test(path)) {
       const sentBody = body as { title: string | null; version: string | null }
       const published: ProjectUpdate = {
@@ -469,7 +471,11 @@ describe('publishing an update', () => {
     await publish()
 
     await waitFor(() => expect(publishedBodies()).toHaveLength(1))
-    expect(publishedBodies()[0]).toEqual({
+    // R7b : `settledFeedbackIds` peut partir vide ou ne pas partir (facultatif à l'envoi) ;
+    // UpdateSheet.settled.test.tsx teste les retours réglés.
+    const { settledFeedbackIds = [], ...sent } = publishedBodies()[0] as Record<string, unknown>
+    expect(settledFeedbackIds).toEqual([])
+    expect(sent).toEqual({
       title: 'Le décompte de la fusée',
       version: 'v1.3',
       lines: [{ family: 'new', text: 'Un compte à rebours avant chaque question' }],

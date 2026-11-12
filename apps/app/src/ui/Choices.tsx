@@ -27,6 +27,13 @@ type Option<T extends string> = {
    * jamais seule, le texte dit tout, et le rond est caché aux lecteurs d'écran.
    */
   dot?: ColorName
+  /**
+   * R7b : la couleur de l'icône, par son rôle dans la marque, tant que le choix n'est pas coché
+   * (la coche verte, le demi-cercle ambre, la croix rouge de « Ça a marché ? »). Coché, sur le miel,
+   * l'icône passe à l'encre comme son texte : le rouge et le vert s'y liraient mal. Décorative : le
+   * texte dit le choix. Le rôle a son couple contre `surface` dans `contrastPairs`.
+   */
+  iconColor?: ColorName
 }
 
 // <T extends string> : un composant « générique ». T est le type des valeurs possibles
@@ -203,7 +210,12 @@ export function Choices<T extends string>(props: Props<T>) {
               })}
             >
               {option.icon ? (
-                <Icon name={option.icon} size={18} tone={checked ? 'onHoney' : 'muted'} />
+                <Icon
+                  name={option.icon}
+                  size={18}
+                  tone={checked ? 'onHoney' : 'muted'}
+                  {...(option.iconColor && !checked ? { color: option.iconColor } : null)}
+                />
               ) : null}
               {option.dot ? (
                 // Le rond de couleur, caché aux lecteurs d'écran (iOS, Android, web) : le texte dit

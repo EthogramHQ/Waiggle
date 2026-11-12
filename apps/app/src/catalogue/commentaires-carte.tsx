@@ -27,6 +27,8 @@ const fr = {
   other: 'Un autre membre, sur le projet d’un autre (« Signaler » seul)',
   author: 'L’auteur du projet : le badge, et « modifié »',
   mine: 'Le sien : fond gris, lu « Ton commentaire »',
+  tester: 'Un testeur du projet : le badge « Testeur », lu « Hugo Lefèvre, Testeur »',
+  bodyTester: 'Testé ce matin sur tablette : tout marche, bravo.',
   highlighted: 'Visé par une réponse : miel pâle',
   reply: 'Une réponse : photo plus petite',
   mention: 'Avec une mention',
@@ -65,6 +67,8 @@ const en: typeof fr = {
     'A comment in the sheet: the photo and the name (a link), the “Author” badge, the date, “edited”, the text, “Reply” under it and “…” on the right. One’s own comments on grey, the targeted comment in pale honey; placeholders with no name, date nor action; the compact card of the preview, a single button.',
   other: 'Another member, on someone else’s project (“Report” only)',
   author: 'The project’s author: the badge, and “edited”',
+  tester: 'A tester of the project: the “Tester” badge, read “Hugo Lefèvre, Tester”',
+  bodyTester: 'Tested this morning on a tablet: it all works, well done.',
   mine: 'One’s own: grey, read “Your comment”',
   highlighted: 'Targeted by a reply: pale honey',
   reply: 'A reply: a smaller photo',
@@ -103,9 +107,21 @@ const noop = () => {}
 const NOW = new Date('2026-11-05T12:00:00.000Z')
 const HOURS_AGO = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
 
-const LEA = { id: 'lea', name: 'Léa Moreau', avatarUrl: null, handle: 'lea_moreau' }
-const HUGO = { id: 'hugo', name: 'Hugo Lefèvre', avatarUrl: null, handle: 'hugo_l' }
-const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b' }
+const LEA = {
+  id: 'lea',
+  name: 'Léa Moreau',
+  avatarUrl: null,
+  handle: 'lea_moreau',
+  isTester: false,
+}
+const HUGO = {
+  id: 'hugo',
+  name: 'Hugo Lefèvre',
+  avatarUrl: null,
+  handle: 'hugo_l',
+  isTester: false,
+}
+const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b', isTester: false }
 
 /** Un commentaire, tel que l'API le rend : visible par défaut, sans mention ni modification. */
 const sample = (overrides: Partial<CommentReply> & { id: string }): CommentReply => ({
@@ -231,6 +247,19 @@ function Cards({ l, only }: { l: Labels; only?: 'night' }) {
           editedAt: HOURS_AGO(1),
         })}
         isProjectAuthor
+        menu={menu.elsewhere}
+        onReply={noop}
+      />
+    </Example>,
+    <Example key="tester" caption={l.tester}>
+      <CommentCard
+        {...base}
+        comment={sample({
+          id: 'tester',
+          author: { ...HUGO, isTester: true },
+          body: l.bodyTester,
+        })}
+        isProjectTester
         menu={menu.elsewhere}
         onReply={noop}
       />

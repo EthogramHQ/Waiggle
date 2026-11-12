@@ -28,6 +28,7 @@ import { z } from 'zod'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { isoDate } from '../jobs/shared'
 import { utc } from '../notifications/load'
+import { mediaUrl } from '../profile/me'
 import { activeSuspensionSql } from '../suspension/load'
 import { readLines } from '../updates/load'
 import { blockedByAdmin } from './decide'
@@ -44,7 +45,8 @@ const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 
 /**
  * Les signalements ouverts dont la cible n'existe plus (projet, mise à jour ou commentaire supprimé
- * par son auteur, compte supprimé, ancienne note du Journal) passent à « void », datés de `now` : la purge les efface 30 jours
+ * par son auteur, appel ou message du coin des testeurs effacé, compte supprimé, ancienne note du
+ * Journal) passent à « void », datés de `now` : la purge les efface 30 jours
  * plus tard. La personne qui a signalé n'est pas prévenue (règle 29).
  *
  * « not exists (select 1 …) » est vrai quand la sous-requête ne trouve rien. Chaque sous-requête
@@ -72,6 +74,8 @@ export const voidReportsOfGoneTargets = async (db: Database, now: Date) => {
           when 'note' then true
           when 'comment' then not exists (
             select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
+          when 'call' then not exists (select 1 from tester_call tc where tc.id = ${id})
+          when 'message' then not exists (select 1 from tester_message tm where tm.id = ${id})
           else not exists (select 1 from "user" u where u.id = content_report.target_id)
         end`,
       ),
@@ -119,7 +123,8 @@ const Group = z.object({
  * 2. tous les signalements ouverts de ces cibles (index content_report_target_idx), avec la copie
  *    du plus récent seulement (tranche 7b, règle 13) ;
  * 3. l'état actuel de chaque cible, une requête par sorte présente sur la page (clés primaires) ;
- * 4. les images des copies encore là, au plus deux requêtes (projets, profils) ;
+ * 4. les images des copies encore là, au plus cinq requêtes (projets, mises à jour, profils, appels
+ *    et messages du coin des testeurs) ;
  * 5. les auteurs visés que l'administrateur a bloqués (règle 17, clé primaire de member_block).
  *
  * La modération ignore les blocages (précision 7) : un auteur qui a bloqué l'administrateur reste
@@ -129,6 +134,7 @@ export const loadQueuePage = async (
   db: Database,
   adminId: string,
   cursor: CursorContent | null,
+  publicApiUrl: string,
 ): Promise<ModerationQueuePage> => {
   // `(a, b) > (c, d)` : une comparaison de couples (voir cursor.ts), dans l'ordre croissant. Le
   // curseur vient du client : il n'entre que par des paramètres liés.
@@ -260,16 +266,21 @@ export const loadQueuePage = async (
       // Les textes de la copie ; ses images à part, sans leur clé : encore là, ou parties depuis.
       authorRecord: memberId === null ? null : recordOf(records, memberId, adminId, blocked),
       snapshot: copy.filter((entry) => !isImageField(entry.field)),
-      images: copy.flatMap((entry): SnapshotImage[] =>
-        isImageField(entry.field)
-          ? [
-              {
-                field: entry.field,
-                state: present.has(`${keyOf(target)}|${entry.value}`) ? 'present' : 'gone',
-              },
-            ]
-          : [],
-      ),
+      images: copy.flatMap((entry): SnapshotImage[] => {
+        if (!isImageField(entry.field)) return []
+        const here = present.has(`${keyOf(target)}|${entry.value}`)
+        // R7b (décision 4 de Louis) : l'adresse de la capture ou de la photo d'appel visée, tant que
+        // son signalement est ouvert (la file ne liste que ceux-là) et qu'elle est encore là. Jamais
+        // celle d'une autre image du fil : la copie ne nomme que l'image de l'objet signalé.
+        const coin = target.kind === 'call' || target.kind === 'message'
+        return [
+          {
+            field: entry.field,
+            state: here ? 'present' : 'gone',
+            ...(coin && here ? { url: mediaUrl(publicApiUrl, entry.value) } : {}),
+          },
+        ]
+      }),
       snapshotsDiffer: new Set(mine.map((x) => x.snapshotHash)).size > 1,
       state: states.get(keyOf(target)) ?? 'gone',
       // Son contenu ou son profil, ou celui d'un membre qu'il a bloqué (règle 17) : il n'en décide
@@ -473,6 +484,28 @@ const imagesStillThere = async (db: Database, copies: Map<string, ReportSnapshot
       .where(inArray(pr.userId, members))
     for (const row of rows) if (row.key) present.add(`member:${row.userId}|${row.key}`)
   }
+  // R7b : la photo d'un appel et la capture d'un message du coin des testeurs. Une ligne de
+  // tester_media est rattachée à un appel (call_id) ou à un message (message_id) : chaque requête
+  // passe par l'index de sa colonne (tester_media_call_idx, tester_media_message_idx). Une photo
+  // remplacée ou effacée n'est plus rattachée : sa clé est « partie ».
+  const calls = withImages('call')
+  if (calls.length > 0) {
+    const tm = schema.testerMedia
+    const rows = await db
+      .select({ callId: tm.callId, key: tm.storageKey })
+      .from(tm)
+      .where(inArray(tm.callId, calls))
+    for (const row of rows) present.add(`call:${row.callId}|${row.key}`)
+  }
+  const messages = withImages('message')
+  if (messages.length > 0) {
+    const tm = schema.testerMedia
+    const rows = await db
+      .select({ messageId: tm.messageId, key: tm.storageKey })
+      .from(tm)
+      .where(inArray(tm.messageId, messages))
+    for (const row of rows) present.add(`message:${row.messageId}|${row.key}`)
+  }
   return present
 }
 
@@ -520,6 +553,26 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
         .where(and(inArray(c.id, comments), isNull(c.deletedAt))),
     )
   }
+  // R7b : un appel ou un message du coin des testeurs, par la clé primaire de sa table.
+  const calls = idsOf('call')
+  if (calls.length > 0) {
+    const tc = schema.testerCall
+    note(
+      'call',
+      await db.select({ id: tc.id, removedAt: tc.removedAt }).from(tc).where(inArray(tc.id, calls)),
+    )
+  }
+  const messages = idsOf('message')
+  if (messages.length > 0) {
+    const tm = schema.testerMessage
+    note(
+      'message',
+      await db
+        .select({ id: tm.id, removedAt: tm.removedAt })
+        .from(tm)
+        .where(inArray(tm.id, messages)),
+    )
+  }
   const members = idsOf('member')
   if (members.length > 0) {
     const rows = await db
@@ -552,13 +605,17 @@ export const loadRemovedPage = async (
   const p = schema.project
   const u = schema.projectUpdate
   const c = schema.projectComment
+  const tc = schema.testerCall
+  const tm = schema.testerMessage
   const id = targetUuid('moderation_decision')
   // L'auteur d'une mise à jour est celui de son projet : la table project, une seconde fois, sous un
   // autre nom (« alias » up), pour ne pas la confondre avec celle du projet retiré.
   const up = alias(schema.project, 'up')
+  // De même pour l'auteur d'un appel : celui de son projet (sous le nom « cp »).
+  const cp = alias(schema.project, 'cp')
   const conditions: (SQL | undefined)[] = [
     eq(d.action, 'remove'),
-    or(isNotNull(p.id), isNotNull(u.id), isNotNull(c.id)),
+    or(isNotNull(p.id), isNotNull(u.id), isNotNull(c.id), isNotNull(tc.id), isNotNull(tm.id)),
   ]
   // « Après le curseur », dans l'ordre décroissant de la page (cursor.ts).
   if (cursor) conditions.push(after(cursor, d.createdAt, d.id))
@@ -583,6 +640,14 @@ export const loadRemovedPage = async (
       commentProjectId: c.projectId,
       commentAuthorId: c.authorId,
       commentRemovedAt: c.removedAt,
+      callText: tc.text,
+      callProjectId: tc.projectId,
+      callAuthorId: cp.authorId,
+      callRemovedAt: tc.removedAt,
+      messageText: tm.text,
+      messageProjectId: tm.projectId,
+      messageSenderId: tm.senderId,
+      messageRemovedAt: tm.removedAt,
     })
     .from(d)
     .leftJoin(
@@ -594,6 +659,17 @@ export const loadRemovedPage = async (
       and(eq(d.targetKind, 'update'), sql`${u.id} = ${id}`, sql`${u.removalId} = ${d.id}`),
     )
     .leftJoin(up, eq(up.id, u.projectId))
+    // R7b : un appel ou un message retiré, retrouvé par la clé primaire de sa table, tant que sa
+    // décision de retrait est encore la sienne.
+    .leftJoin(
+      tc,
+      and(eq(d.targetKind, 'call'), sql`${tc.id} = ${id}`, sql`${tc.removalId} = ${d.id}`),
+    )
+    .leftJoin(cp, eq(cp.id, tc.projectId))
+    .leftJoin(
+      tm,
+      and(eq(d.targetKind, 'message'), sql`${tm.id} = ${id}`, sql`${tm.removalId} = ${d.id}`),
+    )
     .leftJoin(
       c,
       and(eq(d.targetKind, 'comment'), sql`${c.id} = ${id}`, sql`${c.removalId} = ${d.id}`),
@@ -612,9 +688,13 @@ export const loadRemovedPage = async (
   // « Te concerne » (règle 17 de 7b, comme dans la file) : son contenu, ou celui d'un membre qu'il
   // a bloqué ; rétablir lui est alors refusé (decide.ts). Une requête pour toute la page.
   const authors = page.flatMap((row) =>
-    [row.projectAuthorId, row.updateAuthorId, row.commentAuthorId].filter(
-      (id): id is string => id !== null,
-    ),
+    [
+      row.projectAuthorId,
+      row.updateAuthorId,
+      row.commentAuthorId,
+      row.callAuthorId,
+      row.messageSenderId,
+    ].filter((id): id is string => id !== null),
   )
   const blocked = await blockedByAdmin(db, adminId, [...new Set(authors)])
   const concerns = (authorId: string | null) =>
@@ -657,6 +737,29 @@ export const loadRemovedPage = async (
           text: row.commentBody,
           removedAt: row.commentRemovedAt.toISOString(),
           concernsMe: concerns(row.commentAuthorId),
+        },
+      ]
+    }
+    if (row.callText !== null && row.callRemovedAt !== null) {
+      return [
+        {
+          ...base,
+          projectId: row.callProjectId,
+          text: row.callText,
+          removedAt: row.callRemovedAt.toISOString(),
+          concernsMe: concerns(row.callAuthorId),
+        },
+      ]
+    }
+    // Le texte d'un retour peut manquer (une capture seule) : on se fie à la date de retrait.
+    if (row.messageProjectId !== null && row.messageRemovedAt !== null) {
+      return [
+        {
+          ...base,
+          projectId: row.messageProjectId,
+          text: row.messageText ?? '',
+          removedAt: row.messageRemovedAt.toISOString(),
+          concernsMe: concerns(row.messageSenderId),
         },
       ]
     }

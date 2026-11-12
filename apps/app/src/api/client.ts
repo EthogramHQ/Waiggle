@@ -4,7 +4,12 @@
 import { Platform } from 'react-native'
 import { authClient } from '../accounts/auth-client'
 import { apiUrl } from '../config'
-import { AMBIGUOUS_STATUSES, type ApiResult, errorKeyFor } from './errors'
+import {
+  AMBIGUOUS_STATUSES,
+  type ApiResult,
+  errorKeyFor,
+  PROJECT_CALLS_LIMITED_CODE,
+} from './errors'
 import { reloadIfNewVersion } from './newVersion'
 
 /**
@@ -70,7 +75,10 @@ const send = async (path: string, init: RequestInit): Promise<ApiResult<Response
   // Un statut partagé par plusieurs refus (409) : le code du corps dit lequel. Pour les autres, on
   // ne lit pas le corps : un « 413 » peut venir de Caddy, en HTML.
   const code = AMBIGUOUS_STATUSES.has(res.status) ? await readErrorCode(res) : undefined
-  return { ok: false, error: errorKeyFor(res.status, code) }
+  const error = errorKeyFor(res.status, code)
+  return code === PROJECT_CALLS_LIMITED_CODE
+    ? { ok: false, error, projectLimit: true }
+    : { ok: false, error }
 }
 
 /** Le code d'erreur du corps d'une réponse (`{ error: { code: 'handle_taken' } }`), s'il y en a un. */

@@ -16,6 +16,7 @@ import {
   ProjectUpdate,
   SearchResults,
   startedMonthMax,
+  TesterMedia,
   ToolPage,
   toolSlug,
 } from '@ruche/contracts'
@@ -791,6 +792,76 @@ describe('erasing a project with its updates (R7a)', () => {
     expect(ctx.storage.files.has(attached.storage_key)).toBe(false)
     expect(ctx.storage.files.has(pending.storage_key)).toBe(false)
     expect(await rows(sql`select id from project_update where project_id = ${id}`)).toEqual([])
+  })
+})
+
+// R7b, scénario « Mes données » : les fils de ses testeurs disparaissent avec son projet. Les lignes
+// du coin partent en cascade avec le projet ; leurs fichiers (photos d'appel, captures des
+// testeurs, en attente comprises) doivent partir aussi, sinon ils resteraient sur le disque pour
+// toujours, sans ligne pour les retrouver.
+describe('erasing a project with its testers corner (R7b)', () => {
+  /** Envoie une image du coin (photo d'appel de l'autrice, capture d'un testeur), en attente. */
+  const uploadTesterImage = async (projectId: string, cookie: string, kind: 'call' | 'capture') => {
+    const form = new FormData()
+    form.append(
+      'file',
+      new File([new Uint8Array(await jpegImage(800, 600))], 'photo.jpg', { type: 'image/jpeg' }),
+    )
+    form.append('kind', kind)
+    const res = await ctx.request(`/v1/projects/${projectId}/testers/media`, {
+      method: 'POST',
+      headers: { cookie },
+      body: form,
+    })
+    expect(res.status).toBe(201)
+    return TesterMedia.parse(await res.json())
+  }
+  const testerFiles = () =>
+    [...ctx.storage.files.keys()].filter((key) => key.startsWith('testers/'))
+
+  it('erases the call photos and the tester captures with the project, pending ones included', async () => {
+    const { id } = await publish({
+      ...recipes,
+      status: 'testable',
+      demoUrl: 'https://example.com/demo',
+    })
+    expect((await send('POST', `/v1/projects/${id}/testers`, max)).status).toBe(204)
+    const maxId = Me.parse(await (await send('GET', '/v1/me', max)).json()).id
+    const photo = await uploadTesterImage(id, lea, 'call')
+    expect(
+      (
+        await send('POST', `/v1/projects/${id}/calls`, lea, {
+          text: 'Essayez le menu du dimanche.',
+          photoId: photo.id,
+          photoDescription: null,
+        })
+      ).status,
+    ).toBe(201)
+    await uploadTesterImage(id, lea, 'call') // en attente
+    const capture = await uploadTesterImage(id, max, 'capture')
+    expect(
+      (
+        await send('POST', `/v1/projects/${id}/threads/${maxId}/messages`, max, {
+          kind: 'feedback',
+          outcome: 'no',
+          device: 'computer',
+          text: 'Le menu reste vide.',
+          captureId: capture.id,
+        })
+      ).status,
+    ).toBe(201)
+    await uploadTesterImage(id, max, 'capture') // en attente
+    // Témoin : les quatre fichiers du coin sont dans le stockage avant la suppression.
+    expect(testerFiles()).toHaveLength(4)
+
+    expect((await send('DELETE', `/v1/projects/${id}`, lea)).status).toBe(204)
+
+    expect(testerFiles()).toEqual([])
+    expect(await rows(sql`select id from tester_media where project_id = ${id}`)).toEqual([])
+    expect(await rows(sql`select id from tester_message where project_id = ${id}`)).toEqual([])
+    expect(await rows(sql`select tester_id from tester_thread where project_id = ${id}`)).toEqual(
+      [],
+    )
   })
 })
 

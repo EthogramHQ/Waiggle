@@ -91,6 +91,16 @@
 		rewrite @project_update /projects/[id]/update.html
 		@project_updates path_regexp ^/projects/[^/.]+/updates$
 		rewrite @project_updates /projects/[id]/updates.html
+		# R7b : le coin des testeurs (Expo exporte testers/index.tsx en testers.html), le fil d'un testeur et
+		# les deux feuilles « Nouvel appel » et « Ton retour ».
+		@project_testers path_regexp ^/projects/[^/.]+/testers$
+		rewrite @project_testers /projects/[id]/testers.html
+		@project_tester_thread path_regexp ^/projects/[^/.]+/testers/threads/[^/.]+$
+		rewrite @project_tester_thread /projects/[id]/testers/threads/[member].html
+		@project_new_call path_regexp ^/projects/[^/.]+/testers/new-call$
+		rewrite @project_new_call /projects/[id]/testers/new-call.html
+		@project_new_feedback path_regexp ^/projects/[^/.]+/testers/new-feedback$
+		rewrite @project_new_feedback /projects/[id]/testers/new-feedback.html
 		@project path_regexp ^/projects/[^/.]+$
 		rewrite @project /projects/[id].html
 		@member path_regexp ^/members/[^/.]+$

@@ -94,12 +94,30 @@ export type ReportSnapshot = z.infer<typeof ReportSnapshot>
  * remplacée).
  */
 export const SnapshotImage = z
-  .object({ field: z.enum(IMAGE_INPUT_FIELDS), state: z.enum(['present', 'gone']) })
+  .object({
+    field: z.enum(IMAGE_INPUT_FIELDS),
+    state: z.enum(['present', 'gone']),
+    /**
+     * R7b (décision de Louis du 11/11/2026) : l'adresse d'une capture ou d'une photo d'appel du coin
+     * des testeurs, donnée seulement tant qu'un signalement ouvert vise son message ou son appel ;
+     * absente pour toute autre image (la file ne montre pas les photos publiques, qui se voient sur
+     * leur page).
+     */
+    url: z.url().optional(),
+  })
   .strict()
 export type SnapshotImage = z.infer<typeof SnapshotImage>
 
 /** Ce qu'on peut signaler. Une réponse est un commentaire. R7a : `update` remplace `note`. */
-export const ReportTargetKind = z.enum(['project', 'update', 'comment', 'member'])
+/** R7b : un appel à tester (`call`) et un message d'un fil de testeur (`message`), en fin de liste. */
+export const ReportTargetKind = z.enum([
+  'project',
+  'update',
+  'comment',
+  'member',
+  'call',
+  'message',
+])
 export type ReportTargetKind = z.infer<typeof ReportTargetKind>
 
 /**
@@ -123,6 +141,8 @@ export const ReportTarget = z
     z.object({ kind: z.literal('update'), id: UpdateId }),
     z.object({ kind: z.literal('comment'), id: CommentId }),
     z.object({ kind: z.literal('member'), id: MemberId }),
+    z.object({ kind: z.literal('call'), id: z.uuid() }),
+    z.object({ kind: z.literal('message'), id: z.uuid() }),
   ])
   .meta({ id: 'ReportTarget' })
 export type ReportTarget = z.infer<typeof ReportTarget>

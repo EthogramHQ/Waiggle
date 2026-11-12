@@ -388,3 +388,17 @@ describe('while the account is being deleted', () => {
     expect(mockBack).toHaveBeenCalledTimes(1)
   })
 })
+
+// R7b (relecture juridique, J7) : un fil disparaît en entier avec le compte du testeur.
+describe('the testers feedback of the member', () => {
+  it('says that each thread written in goes whole, with the replies of the authors', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.testerFeedbackItem))).length,
+    ).toBe(1)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.testerFeedbackDetail))).length,
+    ).toBeGreaterThan(0)
+  })
+})

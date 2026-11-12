@@ -1,4 +1,4 @@
-// Tests du récap de la semaine (tranche 6c). Scénario : docs/scenarios/phase-1.md, « Précisions
+// Tests du récap de la semaine (tranche 6c ; ses parties de R7a et R7b à la fin). Scénario : docs/scenarios/phase-1.md, « Précisions
 // (tranche 6c) », « Le récap » ; règles détaillées : plan 6c, « Les tâches », et les relectures du
 // plan (sécurité S-B1, S-B2 ; juridique R1, R3, R4, R5).
 //
@@ -11,7 +11,7 @@
 // mentionnent, réagissent et suivent). La fausse horloge part d'un lundi fixe, loin d'aujourd'hui.
 import { randomUUID } from 'node:crypto'
 import { appName } from '@ruche/brand'
-import { NotificationPage } from '@ruche/contracts'
+import { NotificationPage, TesterCall, TesterMessage } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
 import { eq, type SQL, sql } from 'drizzle-orm'
@@ -1075,5 +1075,277 @@ describe('an old report on a journal note (R7a, security B1)', () => {
     const [, , warn, error] = logs
     expect(error?.mock.calls).toEqual([])
     expect(warn?.mock.calls).toEqual([])
+  })
+})
+
+// ─── Tranche R7b : « Le coin des testeurs » ──────────────────────────────────────────────────────
+// Scénario : docs/scenarios/refonte.md, section R7b, « Les notifications » ; plan R7b, « API »,
+// partie « Notifications » ; relecture juridique J12 et de sécurité du plan. Le récap du lundi
+// ajoute une partie « Le coin des testeurs » : par projet, le nombre de nouveautés du coin (appels,
+// messages de l'autre personne d'un fil, retours réglés) et un lien vers le coin
+// (/projects/<id>/testers), 5 projets au plus puis « Et N autres projets ». Jamais de texte : ni
+// celui d'un appel, ni celui d'un message (le fil est privé). Les nouveautés se comptent après les
+// règles de la source des notifications (coin fermé, blocage, départ…), relues à l'envoi.
+//
+// Ici, Inès est l'autrice des projets et Malik leur testeur ; Zoé et Sam montrent ce que voient
+// les autres. Les gestes passent par les routes du coin (testées dans tester-*.test.ts).
+describe('the testers corner of the recap (R7b)', () => {
+  let malikId: string
+
+  beforeEach(async () => {
+    malikId = (await act.me(malik)).id
+  })
+
+  const TESTABLE = { status: 'testable', demoUrl: 'https://demo.example.com/' }
+  const projectPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}`
+
+  const publishTestable = (title: string, cookie = ines) => act.publish(cookie, title, TESTABLE)
+
+  const join = async (projectId: string, cookie = malik) => {
+    later()
+    const res = await act.send('POST', `${projectPath(projectId)}/testers`, cookie)
+    expect(res.status).toBe(204)
+  }
+
+  /** Lance un appel, une seconde plus tard. */
+  const postCall = async (projectId: string, text = 'Essayez le niveau 3 ce soir') => {
+    later()
+    const res = await act.send('POST', `${projectPath(projectId)}/calls`, ines, {
+      text,
+      photoId: null,
+      photoDescription: null,
+    })
+    expect(res.status).toBe(201)
+    return TesterCall.parse(await res.json())
+  }
+
+  /** Envoie un message dans le fil de Malik, une seconde plus tard ; rend son identifiant. */
+  const postMessage = async (projectId: string, cookie: string, body: object) => {
+    later()
+    const res = await act.send(
+      'POST',
+      `${projectPath(projectId)}/threads/${encodeURIComponent(malikId)}/messages`,
+      cookie,
+      body,
+    )
+    expect(res.status).toBe(201)
+    return TesterMessage.parse(await res.json()).id
+  }
+  const feedback = (text = 'Le score repart à zéro au niveau 3.') => ({
+    kind: 'feedback',
+    outcome: 'partly',
+    device: 'phone',
+    text,
+    captureId: null,
+  })
+  const reply = (text = 'Merci, je regarde ça ce soir.') => ({ kind: 'reply', text })
+
+  const settle = async (projectId: string, messageId: string) => {
+    later()
+    const res = await act.send(
+      'POST',
+      `${projectPath(projectId)}/messages/${messageId}/settled`,
+      ines,
+    )
+    expect(res.status).toBe(204)
+  }
+
+  /** La ligne d'un projet dans la partie : « « Météo » : 3 nouveautés dans le coin des testeurs ». */
+  const testersLine = (
+    title: string,
+    count: number,
+    t: { recap: { testers_one: string; testers_other: string } } = fr,
+  ) =>
+    fill(count === 1 ? t.recap.testers_one : t.recap.testers_other, {
+      title,
+      count: String(count),
+    })
+  const cornerUrl = (projectId: string) => `${TEST_APP_URL}/projects/${projectId}/testers`
+
+  /** Retire du texte tout ce qui est prévu ; il ne doit rester que de la ponctuation (test R1). */
+  const onlyExpected = (text: string, expected: string[]) => {
+    let rest = text.replace(/https?:\/\/\S+/g, ' ')
+    for (const part of [...expected].sort((a, b) => b.length - a.length)) {
+      rest = rest.replaceAll(part, ' ')
+    }
+    expect(rest).toMatch(/^[\s\p{P}\p{S}]*$/u)
+  }
+  const frame = (name: string) => [
+    fill(fr.recap.intro),
+    fill(fr.recap.first),
+    fill(fr.recap.button),
+    fill(fr.recap.reason),
+    fr.recap.unsubscribe,
+    fr.manage,
+    fill(fr.footer),
+    fill(fr.greeting, { name }),
+    appName,
+  ]
+
+  it('counts the news of the corner by project, for the tester and for the author, with a link', async () => {
+    const meteo = await publishTestable('Météo')
+    await join(meteo.id)
+    // Pour Malik : l'appel, la réponse d'Inès et le retour réglé. Pour Inès : le retour de Malik.
+    await postCall(meteo.id)
+    const sent = await postMessage(meteo.id, malik, feedback())
+    await postMessage(meteo.id, ines, reply())
+    await settle(meteo.id, sent)
+    later(HOUR)
+
+    await runRecap()
+
+    const forMalik = onlyRecapTo(malikAccount.email)
+    const forInes = onlyRecapTo(inesAccount.email)
+    for (const part of [forMalik.text, forMalik.html]) {
+      expect(part).toContain(fill(fr.recap.testersTitle))
+      expect(part).toContain(testersLine('Météo', 3))
+    }
+    for (const part of [forInes.text, forInes.html]) {
+      expect(part).toContain(fill(fr.recap.testersTitle))
+      expect(part).toContain(testersLine('Météo', 1))
+    }
+    // Le projet mène à son coin, une adresse fabriquée par le serveur.
+    expect(hrefsOf(forMalik.html)).toContain(cornerUrl(meteo.id))
+    expect(hrefsOf(forInes.html)).toContain(cornerUrl(meteo.id))
+    // Rien d'autre que ce qui est prévu (comme le test R1 plus haut).
+    onlyExpected(forMalik.text, [
+      ...frame(malikAccount.name),
+      fill(fr.recap.testersTitle),
+      testersLine('Météo', 3),
+    ])
+    onlyExpected(forInes.text, [
+      ...frame(inesAccount.name),
+      fill(fr.recap.testersTitle),
+      testersLine('Météo', 1),
+    ])
+    // Zoé et Sam n'ont rien de neuf : aucun récap.
+    expect(recapsTo(zoeAccount.email)).toEqual([])
+    expect(recapsTo(samAccount.email)).toEqual([])
+  })
+
+  // Relecture juridique J12 et de sécurité du plan : jamais de texte du coin dans le récap.
+  it('never puts the text of a call or a message in the recap', async () => {
+    const meteo = await publishTestable('Météo')
+    await join(meteo.id)
+    await postCall(meteo.id, 'ZZAPPEL caché')
+    const sent = await postMessage(meteo.id, malik, feedback('ZZRETOUR caché'))
+    await postMessage(meteo.id, ines, reply('ZZREPONSE cachée'))
+    await postMessage(meteo.id, malik, reply('ZZRELANCE cachée'))
+    await settle(meteo.id, sent)
+    later(HOUR)
+
+    await runRecap()
+
+    for (const recap of [onlyRecapTo(malikAccount.email), onlyRecapTo(inesAccount.email)]) {
+      expect(recap.text).toContain(fill(fr.recap.testersTitle)) // témoin : la partie est là
+      for (const part of [recap.subject, recap.text, recap.html]) {
+        for (const secret of ['ZZAPPEL', 'ZZRETOUR', 'ZZREPONSE', 'ZZRELANCE']) {
+          expect(part, secret).not.toContain(secret)
+        }
+      }
+    }
+  })
+
+  it('shows five projects of the corner at most, then « and N more projects »', async () => {
+    const titles = ['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six', 'Sept'].map(
+      (n) => `Projet ${n}`,
+    )
+    const projects = []
+    for (const title of titles) projects.push(await publishTestable(title))
+    for (const project of projects) await join(project.id)
+    for (const project of projects) await postCall(project.id)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    const shown = titles.filter((title) => recap.text.includes(testersLine(title, 1)))
+    expect(shown).toHaveLength(5)
+    // Le plus récent en tête de la partie, comme les autres lignes du récap.
+    expect(shown).toContain('Projet Sept')
+    expect(recap.text).toContain(fill(fr.recap.testersMore_other, { count: '2' }))
+  })
+
+  // Choix de la session et décision 1 de Louis : un coin fermé ne prévient plus ses testeurs ;
+  // compté après ce filtre, relu à l'envoi (comme la partie de R7a).
+  it('leaves out a corner closed before the sending', async () => {
+    const meteo = await publishTestable('Météo')
+    const secret = await publishTestable('Projet secret')
+    await join(meteo.id)
+    await join(secret.id)
+    await postCall(meteo.id)
+    await postCall(secret.id)
+    later()
+    await act.setVisibility(secret.id, ines, 'private')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    expect(recap.text).toContain(testersLine('Météo', 1)) // témoin
+    for (const part of [recap.text, recap.html]) {
+      expect(part).not.toContain('Projet secret')
+      expect(part).not.toContain(secret.id)
+      expect(part).not.toContain(fill(fr.recap.testersMore_one, { count: '1' }))
+    }
+  })
+
+  it('writes the testers part in the language of the member', async () => {
+    await act.updateProfile(malik, { language: 'en' })
+    const garden = await publishTestable('Garden')
+    await join(garden.id)
+    await postCall(garden.id)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    expect(recap.text).toContain(fill(en.recap.testersTitle))
+    expect(recap.text).toContain(testersLine('Garden', 1, en))
+    expect(recap.text).not.toContain(fill(fr.recap.testersTitle))
+  })
+
+  // Les notifications de la modération restent dans l'appli (plus haut) : le retrait d'un appel
+  // ou d'un message n'est pas une nouveauté du coin.
+  it('counts no moderation notice of a call or a message as news of the corner', async () => {
+    const meteo = await publishTestable('Météo')
+    const jardin = await publishTestable('Jardin')
+    await join(meteo.id)
+    await join(jardin.id)
+    const call = await postCall(meteo.id, 'Un appel publicitaire')
+    await postCall(jardin.id)
+    later()
+    const decisionId = randomUUID()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id: decisionId,
+      targetKind: 'call',
+      targetId: call.id,
+      action: 'remove',
+      ground: 'rules',
+      explanation: 'Publicité déguisée.',
+      adminId: zoeId,
+      createdAt: new Date(),
+      targetMemberId: inesId,
+    })
+    await ctx.db
+      .update(schema.testerCall)
+      .set({ removedAt: new Date(), removalId: decisionId })
+      .where(eq(schema.testerCall.id, call.id))
+    later()
+    // Témoin : Inès a aussi du nouveau, un commentaire de Zoé.
+    await act.comment(meteo.id, zoe, 'Bravo pour le niveau 3.')
+    later(HOUR)
+
+    await runRecap()
+
+    // L'appel de Météo est retiré : rien du coin pour Inès, et pour Malik seulement Jardin.
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+    for (const part of [recap.text, recap.html]) {
+      expect(part).not.toContain(fill(fr.recap.testersTitle))
+    }
+    const forMalik = onlyRecapTo(malikAccount.email)
+    expect(forMalik.text).toContain(testersLine('Jardin', 1)) // témoin : la partie est là
+    expect(forMalik.text).not.toContain('Météo')
   })
 })

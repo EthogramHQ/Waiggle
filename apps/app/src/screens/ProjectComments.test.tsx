@@ -521,7 +521,7 @@ describe('writing a comment in the sheet', () => {
     mockComments([
       commentOf({
         id: '9a0b1c2d-3e4f-4a5b-8c6d-7e8f90a1b2c3',
-        author: { id: 'u4', name: 'Malik', handle: 'malik', avatarUrl: null },
+        author: { id: 'u4', name: 'Malik', handle: 'malik', avatarUrl: null, isTester: false },
         body: 'Bravo !',
         createdAt: '2026-10-16T09:00:00.000Z',
         isMine: true,

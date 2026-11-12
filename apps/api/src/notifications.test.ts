@@ -1,4 +1,5 @@
-// Tests d'intégration de la tranche 6b : les notifications dans l'appli. Scénario :
+// Tests d'intégration de la tranche 6b : les notifications dans l'appli (puis celles des mises à
+// jour, R7a, et du coin des testeurs, R7b, à la fin du fichier). Scénario :
 // docs/scenarios/phase-1.md, « Précisions (tranche 6b) ». Quatre membres : Inès (l'autrice du
 // projet « Météo »), Malik (qui réagit, commente et mentionne), Zoé et Sam (qui répondent, suivent,
 // et montrent ce que voient les autres). Les mentions elles-mêmes (écriture, pseudo changé, liste
@@ -23,6 +24,8 @@ import {
   Project,
   ProjectUpdate,
   type ReportTarget,
+  TesterCall,
+  TesterMessage,
   UnreadCount,
   type UpdateLine,
 } from '@ruche/contracts'
@@ -1777,5 +1780,670 @@ describe('an old report on a journal note (R7a, security B1)', () => {
     await seedNoteReport(inesId, new Date(Date.now() - HOUR))
 
     expect(await unread(ines)).toBe(1)
+  })
+})
+
+// ─── Tranche R7b : le coin des testeurs ─────────────────────────────────────────────────────────
+// Scénario : docs/scenarios/refonte.md, section R7b, « Les notifications » ; plan R7b, « API »,
+// partie « Notifications », et la relecture du plan (décisions de Louis du 11/11/2026 : un auteur
+// suspendu ferme le coin aux testeurs ; un ancien testeur ne reçoit plus rien du coin).
+//
+// Trois sortes neuves, calculées à la lecture comme les autres :
+// - `tester_call` : un appel à tester, pour chaque testeur actuel inscrit avant l'appel ;
+// - `tester_message` : un message de l'autre personne d'un fil (un retour ou une réponse du
+//   testeur, pour l'auteur ; une réponse de l'auteur, pour le testeur), jamais son texte ;
+// - `feedback_settled` : un de ses retours réglé, à la main ou par une mise à jour.
+// Le coin fermé (projet privé, retiré par la modération, auteur suspendu), un départ, un retrait,
+// un blocage, un appel ou un message supprimé ou retiré, « Remettre à traiter » : la notification
+// disparaît d'elle-même.
+//
+// Ici, Inès est l'autrice de « Météo », un projet ouvert aux testeurs ; Malik et Zoé en sont les
+// testeurs ; Sam n'y est pour rien (et devient administrateur quand un test le demande). Les
+// gestes passent par les routes du coin (testées dans tester-*.test.ts) ; un retrait par la
+// modération est écrit en base, comme le fait la décision (reports.test.ts teste la route).
+describe('the testers corner (R7b)', () => {
+  let act: ReturnType<typeof activity>
+  let zoeId: string
+  let samId: string
+
+  beforeEach(async () => {
+    act = activity(ctx)
+    zoeId = (await me(zoe)).id
+    samId = (await me(sam)).id
+  })
+
+  const TESTABLE = { status: 'testable', demoUrl: 'https://demo.example.com/' }
+  const TESTER_KINDS: Notification['kind'][] = ['tester_call', 'tester_message', 'feedback_settled']
+  const REMOVAL_TEXT = 'Ce contenu enfreint les règles de la communauté.'
+
+  const projectPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}`
+  const threadPath = (projectId: string, testerId: string) =>
+    `${projectPath(projectId)}/threads/${encodeURIComponent(testerId)}`
+
+  /** Publie « Météo », ouvert aux testeurs. */
+  const publishTestable = (cookie = ines, title = 'Météo') =>
+    publish(cookie, { title, ...TESTABLE })
+
+  /** Rejoint les testeurs, une seconde plus tard. */
+  const join = async (projectId: string, cookie: string) => {
+    later()
+    await expectDone(await send('POST', `${projectPath(projectId)}/testers`, cookie))
+  }
+  const quit = async (projectId: string, cookie: string) => {
+    later()
+    await expectDone(await send('DELETE', `${projectPath(projectId)}/testers`, cookie))
+  }
+  /** L'autrice retire un membre de ses testeurs. */
+  const removeTester = async (projectId: string, memberId: string) => {
+    later()
+    await expectDone(
+      await send(
+        'DELETE',
+        `${projectPath(projectId)}/testers/${encodeURIComponent(memberId)}`,
+        ines,
+      ),
+    )
+  }
+
+  /** Lance un appel, une seconde plus tard, et le rend. */
+  const postCall = async (
+    projectId: string,
+    text = 'Essayez le niveau 3 ce soir',
+    cookie = ines,
+  ) => {
+    later()
+    const res = await send('POST', `${projectPath(projectId)}/calls`, cookie, {
+      text,
+      photoId: null,
+      photoDescription: null,
+    })
+    expect(res.status).toBe(201)
+    return TesterCall.parse(await res.json())
+  }
+  const deleteCall = async (projectId: string, callId: string) => {
+    later()
+    await expectDone(await send('DELETE', `${projectPath(projectId)}/calls/${callId}`, ines))
+  }
+
+  /** Un retour « En partie », sur téléphone, sans capture. */
+  const feedback = (text: string | null = 'Le score repart à zéro au niveau 3.') => ({
+    kind: 'feedback',
+    outcome: 'partly',
+    device: 'phone',
+    text,
+    captureId: null,
+  })
+  const reply = (text = 'Merci, je regarde ça ce soir.') => ({ kind: 'reply', text })
+
+  /** Envoie un message dans le fil de ce testeur, une seconde plus tard, et le rend. */
+  const postMessage = async (projectId: string, testerId: string, cookie: string, body: object) => {
+    later()
+    const res = await send('POST', `${threadPath(projectId, testerId)}/messages`, cookie, body)
+    expect(res.status).toBe(201)
+    return TesterMessage.parse(await res.json())
+  }
+  const deleteMessage = async (projectId: string, messageId: string, cookie: string) => {
+    later()
+    await expectDone(
+      await send('DELETE', `${projectPath(projectId)}/messages/${messageId}`, cookie),
+    )
+  }
+
+  /** « Marquer comme réglé » ; rend l'heure du geste. */
+  const settle = async (projectId: string, messageId: string) => {
+    later()
+    await expectDone(
+      await send('POST', `${projectPath(projectId)}/messages/${messageId}/settled`, ines),
+    )
+    return new Date().toISOString()
+  }
+  /** « Remettre à traiter ». */
+  const unsettle = async (projectId: string, messageId: string) => {
+    later()
+    await expectDone(
+      await send('DELETE', `${projectPath(projectId)}/messages/${messageId}/settled`, ines),
+    )
+  }
+
+  /** Publie une mise à jour qui règle ces retours. */
+  const postSettlingUpdate = async (projectId: string, ids: string[], version: string | null) => {
+    later()
+    const res = await send('POST', `${projectPath(projectId)}/updates`, ines, {
+      title: null,
+      version,
+      lines: [{ family: 'fixed', text: 'Le score ne repart plus à zéro' }],
+      photos: [],
+      beforeAfter: false,
+      settledFeedbackIds: ids,
+    })
+    expect(res.status).toBe(201)
+    return ProjectUpdate.parse(await res.json())
+  }
+
+  /** La modération retire un appel ou un message : la décision et le retrait, écrits en base. */
+  const removeByModeration = async (
+    kind: 'call' | 'message',
+    targetId: string,
+    targetMemberId: string,
+  ) => {
+    later()
+    const decisionId = randomUUID()
+    const at = new Date()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id: decisionId,
+      targetKind: kind,
+      targetId,
+      action: 'remove',
+      ground: 'rules',
+      explanation: REMOVAL_TEXT,
+      adminId: samId,
+      createdAt: at,
+      targetMemberId,
+    })
+    const removal = { removedAt: at, removalId: decisionId }
+    if (kind === 'call')
+      await ctx.db.update(schema.testerCall).set(removal).where(eq(schema.testerCall.id, targetId))
+    else
+      await ctx.db
+        .update(schema.testerMessage)
+        .set(removal)
+        .where(eq(schema.testerMessage.id, targetId))
+    return { decisionId, at: at.toISOString() }
+  }
+
+  /** Les trois manières de fermer un coin (décision 1 de Louis : la suspension aussi). */
+  const closeCorner = async (how: string, projectId: string) => {
+    later()
+    if (how === 'private') await setVisibility(projectId, ines, 'private')
+    else if (how === 'removed')
+      await ctx.db
+        .update(schema.project)
+        .set({ removedAt: new Date() })
+        .where(eq(schema.project.id, projectId))
+    else {
+      await act.makeAdmin(samId)
+      await act.decide(sam, {
+        action: 'suspend',
+        memberId: inesId,
+        duration: '7d',
+        ground: 'rules',
+        explanation: 'Messages insultants répétés.',
+      })
+    }
+  }
+
+  /** Remet une inscription de testeur en base : un blocage l'efface, aucune route ne la recrée. */
+  const testAgain = (projectId: string, memberId: string, at: Date) =>
+    ctx.db.execute(sql`
+      insert into project_tester (member_id, project_id, created_at)
+      values (${memberId}, ${projectId}, ${at.toISOString()})
+      on conflict do nothing`)
+
+  /** Les notifications du coin de ce membre. */
+  const cornerOf = async (cookie: string) =>
+    (await notifications(cookie)).filter((n) => TESTER_KINDS.includes(n.kind))
+  /** Leurs clés, dans l'ordre de la liste. */
+  const cornerKeys = async (cookie: string) => (await cornerOf(cookie)).map((n) => n.id)
+
+  const inesAuthor = () => ({ id: inesId, name: 'Inès Morel', avatarUrl: null })
+  const malikAuthor = () => ({ id: malikId, name: 'Malik', avatarUrl: null })
+
+  describe('« tester_call », to the testers', () => {
+    it('tells each current tester about a call, with the author and an excerpt', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await join(meteo.id, zoe)
+
+      const call = await postCall(meteo.id)
+
+      const expected = {
+        // Une clé par appel.
+        id: `tester_call:${call.id}`,
+        kind: 'tester_call',
+        at: call.createdAt,
+        isNew: true,
+        project: { id: meteo.id, title: 'Météo' },
+        author: inesAuthor(),
+        call: { id: call.id, excerpt: 'Essayez le niveau 3 ce soir' },
+      }
+      expect(await cornerOf(malik)).toEqual([expected])
+      expect(await cornerOf(zoe)).toEqual([expected])
+      // Sam ne teste pas Météo ; Inès l'a lancé : rien pour eux.
+      expect(await cornerOf(sam)).toEqual([])
+      expect(await cornerOf(ines)).toEqual([])
+    })
+
+    it('cuts a long call to an excerpt of 80 characters', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const text = `${'Essayez le niveau 3, puis dites-moi si le score tient. '.repeat(4)}Merci.`
+
+      await postCall(meteo.id, text)
+
+      const [notification] = await cornerOf(malik)
+      if (notification?.kind !== 'tester_call') throw new Error('expected a tester_call')
+      const { excerpt } = notification.call
+      expect(excerpt.length).toBeLessThanOrEqual(81)
+      expect(excerpt.length).toBeGreaterThan(40)
+      expect(excerpt.endsWith('…')).toBe(true)
+      expect(text.startsWith(excerpt.slice(0, -1).trimEnd())).toBe(true)
+    })
+
+    // Choix de la session (comme R7a, sécurité S1) : seuls les appels lancés après l'inscription.
+    it('only tells about calls made after the sign-up as a tester', async () => {
+      const meteo = await publishTestable()
+      await postCall(meteo.id, 'Avant les testeurs')
+      await join(meteo.id, malik)
+
+      const after = await postCall(meteo.id, 'Après les testeurs')
+
+      expect(await cornerKeys(malik)).toEqual([`tester_call:${after.id}`])
+    })
+
+    it('never tells the author of the project about her own call', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      // Aucune route ne la fait testeuse de son propre projet : posé en base, pour vérifier que la
+      // source écarte l'auteur elle-même.
+      await testAgain(meteo.id, inesId, new Date())
+
+      const call = await postCall(meteo.id)
+
+      expect(await cornerOf(ines)).toEqual([])
+      expect(await cornerKeys(malik)).toEqual([`tester_call:${call.id}`]) // témoin
+    })
+
+    it('removes the notification once the call is deleted, or removed by the moderation', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await openScreen(malik)
+      const deleted = await postCall(meteo.id, 'Lancé par erreur')
+      const removed = await postCall(meteo.id, 'Retiré par la modération')
+      expect(await unread(malik)).toBe(2) // témoin
+
+      await deleteCall(meteo.id, deleted.id)
+      expect(await cornerKeys(malik)).toEqual([`tester_call:${removed.id}`])
+
+      await removeByModeration('call', removed.id, inesId)
+      expect(await cornerOf(malik)).toEqual([])
+      expect(await unread(malik)).toBe(0)
+    })
+
+    it('stops telling a tester who quits, or whom the author removes', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await join(meteo.id, zoe)
+      const call = await postCall(meteo.id)
+      for (const cookie of [malik, zoe]) {
+        expect(await cornerKeys(cookie)).toEqual([`tester_call:${call.id}`]) // témoins
+      }
+
+      await quit(meteo.id, malik)
+      await removeTester(meteo.id, zoeId)
+
+      expect(await cornerOf(malik), 'Malik quit').toEqual([])
+      expect(await cornerOf(zoe), 'Zoé was removed').toEqual([])
+    })
+  })
+
+  describe('« tester_message », between a tester and the author', () => {
+    it('tells the author about each feedback and each reply of a tester, never the text', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+
+      const sent = await postMessage(meteo.id, malikId, malik, feedback('ZZRETOUR caché'))
+      const again = await postMessage(meteo.id, malikId, malik, reply('ZZREPONSE cachée'))
+
+      const expected = (message: typeof sent, kind: 'feedback' | 'reply') => ({
+        id: `tester_message:${message.id}`,
+        kind: 'tester_message',
+        at: message.createdAt,
+        isNew: true,
+        project: { id: meteo.id, title: 'Météo' },
+        from: malikAuthor(),
+        role: 'tester',
+        message: { id: message.id, kind, testerId: malikId },
+      })
+      expect(await cornerOf(ines)).toEqual([expected(again, 'reply'), expected(sent, 'feedback')])
+      // Le fil est privé : son texte n'est nulle part dans la page des notifications.
+      const raw = await (await send('GET', '/v1/notifications', ines)).text()
+      expect(raw).not.toContain('ZZRETOUR')
+      expect(raw).not.toContain('ZZREPONSE')
+    })
+
+    it('tells the tester about each reply of the author', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await postMessage(meteo.id, malikId, malik, feedback())
+
+      const answer = await postMessage(meteo.id, malikId, ines, reply())
+
+      expect(await cornerOf(malik)).toEqual([
+        {
+          id: `tester_message:${answer.id}`,
+          kind: 'tester_message',
+          at: answer.createdAt,
+          isNew: true,
+          project: { id: meteo.id, title: 'Météo' },
+          from: inesAuthor(),
+          role: 'author',
+          message: { id: answer.id, kind: 'reply', testerId: malikId },
+        },
+      ])
+    })
+
+    it('never tells the sender about his own message, nor anybody outside the thread', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await join(meteo.id, zoe)
+
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+      const answer = await postMessage(meteo.id, malikId, ines, reply())
+
+      // Chacun ne reçoit que le message de l'autre.
+      expect(await cornerKeys(malik)).toEqual([`tester_message:${answer.id}`])
+      expect(await cornerKeys(ines)).toEqual([`tester_message:${sent.id}`])
+      // Zoé, autre testeuse, et Sam ne lisent pas ce fil : rien pour eux.
+      expect(await cornerOf(zoe)).toEqual([])
+      expect(await cornerOf(sam)).toEqual([])
+    })
+
+    it('removes the notification once the message is deleted, or removed by the moderation', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await openScreen(ines)
+      const deleted = await postMessage(meteo.id, malikId, malik, feedback('Envoyé par erreur'))
+      const removed = await postMessage(meteo.id, malikId, malik, feedback('Retiré'))
+      expect(await unread(ines)).toBe(2) // témoin
+
+      await deleteMessage(meteo.id, deleted.id, malik)
+      expect(await cornerKeys(ines)).toEqual([`tester_message:${removed.id}`])
+
+      await removeByModeration('message', removed.id, malikId)
+      expect(await cornerOf(ines)).toEqual([])
+      expect(await unread(ines)).toBe(0)
+    })
+
+    // Décision 2 de Louis : l'ancien testeur ne reçoit plus rien du coin. L'auteur garde le fil
+    // d'un ancien testeur en lecture (plan, « Notifications » : expéditeur = le testeur, sans
+    // condition d'inscription) : ses notifications restent.
+    it('stops telling a tester who quits or is removed about replies, the author still told', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await join(meteo.id, zoe)
+      const fromMalik = await postMessage(meteo.id, malikId, malik, feedback())
+      const fromZoe = await postMessage(meteo.id, zoeId, zoe, feedback())
+      const toMalik = await postMessage(meteo.id, malikId, ines, reply())
+      const toZoe = await postMessage(meteo.id, zoeId, ines, reply())
+      expect(await cornerKeys(malik)).toEqual([`tester_message:${toMalik.id}`]) // témoin
+      expect(await cornerKeys(zoe)).toEqual([`tester_message:${toZoe.id}`]) // témoin
+
+      await quit(meteo.id, malik)
+      await removeTester(meteo.id, zoeId)
+
+      expect(await cornerOf(malik), 'Malik quit').toEqual([])
+      expect(await cornerOf(zoe), 'Zoé was removed').toEqual([])
+      expect(await cornerKeys(ines)).toEqual([
+        `tester_message:${fromZoe.id}`,
+        `tester_message:${fromMalik.id}`,
+      ])
+    })
+
+    it.each([
+      ['Malik blocked Inès', 'malik'],
+      ['Inès blocked Malik', 'ines'],
+    ])('tells neither side of a thread once %s', async (_, who) => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const joinedAt = new Date()
+      await postMessage(meteo.id, malikId, malik, feedback())
+      await postMessage(meteo.id, malikId, ines, reply())
+      expect(await cornerOf(malik)).toHaveLength(1) // témoin
+      expect(await cornerOf(ines)).toHaveLength(1) // témoin
+
+      later()
+      if (who === 'malik') await act.block(inesId, malik)
+      else await act.block(malikId, ines)
+      // Le blocage efface l'inscription ; on la remet en base, datée d'avant, pour vérifier que la
+      // source filtre le blocage lui-même (aucune route ne fait tester pendant un blocage).
+      await testAgain(meteo.id, malikId, joinedAt)
+
+      expect(await cornerOf(malik), 'the tester').toEqual([])
+      expect(await cornerOf(ines), 'the author').toEqual([])
+    })
+  })
+
+  describe('« feedback_settled », to the tester', () => {
+    it('tells the tester when the author settles his feedback by hand, without an update', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+
+      const at = await settle(meteo.id, sent.id)
+
+      expect(await cornerOf(malik)).toEqual([
+        {
+          // Une clé par retour réglé.
+          id: `feedback_settled:${sent.id}`,
+          kind: 'feedback_settled',
+          at,
+          isNew: true,
+          project: { id: meteo.id, title: 'Météo' },
+          author: inesAuthor(),
+          update: null,
+        },
+      ])
+      // L'autrice a réglé elle-même : seul le retour de Malik lui est signalé.
+      expect(await cornerKeys(ines)).toEqual([`tester_message:${sent.id}`])
+    })
+
+    it('tells the tester when an update settles his feedback, with its version and date', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+
+      const update = await postSettlingUpdate(meteo.id, [sent.id], 'v1.3')
+
+      const settled = (await cornerOf(malik)).filter((n) => n.kind === 'feedback_settled')
+      expect(settled).toEqual([
+        {
+          id: `feedback_settled:${sent.id}`,
+          kind: 'feedback_settled',
+          at: update.createdAt,
+          isNew: true,
+          project: { id: meteo.id, title: 'Météo' },
+          author: inesAuthor(),
+          update: { id: update.id, version: 'v1.3', createdAt: update.createdAt },
+        },
+      ])
+    })
+
+    it('gives no version when the settling update has none', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+
+      const update = await postSettlingUpdate(meteo.id, [sent.id], null)
+
+      expect(await cornerOf(malik)).toMatchObject([
+        { kind: 'feedback_settled', update: { id: update.id, version: null } },
+      ])
+    })
+
+    // Décision 4 de Louis : « Remettre à traiter » ne prévient pas, la notification disparaît.
+    it('disappears when the author puts the feedback back to do, and comes back when settled again', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await openScreen(malik)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+      await settle(meteo.id, sent.id)
+      expect(await cornerKeys(malik)).toEqual([`feedback_settled:${sent.id}`]) // témoin
+      expect(await unread(malik)).toBe(1) // témoin
+
+      await unsettle(meteo.id, sent.id)
+
+      expect(await cornerOf(malik)).toEqual([])
+      expect(await unread(malik)).toBe(0)
+
+      const again = await settle(meteo.id, sent.id)
+      expect(await cornerOf(malik)).toMatchObject([
+        { id: `feedback_settled:${sent.id}`, at: again },
+      ])
+    })
+
+    it('disappears with the feedback deleted by the tester, and once he quits', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const deleted = await postMessage(meteo.id, malikId, malik, feedback('Le premier'))
+      const kept = await postMessage(meteo.id, malikId, malik, feedback('Le second'))
+      await settle(meteo.id, deleted.id)
+      await settle(meteo.id, kept.id)
+      expect(await cornerOf(malik)).toHaveLength(2) // témoin
+
+      await deleteMessage(meteo.id, deleted.id, malik)
+      expect(await cornerKeys(malik)).toEqual([`feedback_settled:${kept.id}`])
+
+      await quit(meteo.id, malik)
+      expect(await cornerOf(malik)).toEqual([])
+    })
+  })
+
+  describe('a closed corner', () => {
+    // Choix de la session et décision 1 de Louis : un coin fermé est introuvable pour les testeurs ;
+    // ce qui y est né ne les prévient plus, même ce qui précède la fermeture (le test « garder
+    // l'appel d'avant la suspension » a été écarté).
+    it.each([
+      ['the project becomes private', 'private'],
+      ['the moderation removes the project', 'removed'],
+      ['the author is suspended', 'suspended'],
+    ])('tells the testers nothing more once %s', async (_, how) => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await openScreen(malik)
+      await postCall(meteo.id)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+      await postMessage(meteo.id, malikId, ines, reply())
+      await settle(meteo.id, sent.id)
+      expect((await cornerOf(malik)).map((n) => n.kind)).toEqual([
+        'feedback_settled',
+        'tester_message',
+        'tester_call',
+      ]) // témoin
+      expect(await unread(malik)).toBe(3) // témoin
+
+      await closeCorner(how, meteo.id)
+
+      expect(await cornerOf(malik)).toEqual([])
+      expect(await unread(malik)).toBe(0)
+    })
+
+    it('tells a tester again once the project is public again', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const call = await postCall(meteo.id)
+      await setVisibility(meteo.id, ines, 'private')
+      expect(await cornerOf(malik)).toEqual([]) // témoin
+
+      await setVisibility(meteo.id, ines, 'public')
+
+      expect(await cornerKeys(malik)).toEqual([`tester_call:${call.id}`])
+    })
+
+    it.each([
+      ['Malik blocked Inès', 'malik'],
+      ['Inès blocked Malik', 'ines'],
+    ])('tells a tester about no call once %s', async (_, who) => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const joinedAt = new Date()
+      await postCall(meteo.id)
+      expect(await cornerOf(malik)).toHaveLength(1) // témoin
+
+      later()
+      if (who === 'malik') await act.block(inesId, malik)
+      else await act.block(malikId, ines)
+      await testAgain(meteo.id, malikId, joinedAt)
+
+      expect(await cornerOf(malik)).toEqual([])
+    })
+  })
+
+  describe('the bell', () => {
+    it('counts each new notification of the corner, for the tester and for the author', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      await openScreen(malik)
+      await openScreen(ines)
+      // Zoé aussi a déjà ouvert l'écran : sinon sa notification « pseudo » (la première de tout
+      // membre) compterait 1, hors du coin.
+      await openScreen(zoe)
+
+      await postCall(meteo.id)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback())
+      await postMessage(meteo.id, malikId, malik, reply('Et sur ordinateur aussi.'))
+      await postMessage(meteo.id, malikId, ines, reply())
+      await settle(meteo.id, sent.id)
+
+      // Malik : l'appel, la réponse d'Inès, le retour réglé. Inès : le retour et la réponse de Malik.
+      expect(await unread(malik)).toBe(3)
+      expect(await unread(ines)).toBe(2)
+      expect(await unread(zoe)).toBe(0)
+
+      await openScreen(malik)
+      expect(await unread(malik)).toBe(0)
+    })
+  })
+
+  describe('« removed », for a call or a message', () => {
+    it('tells the author of a removed call, with its excerpt, the ground and the explanation', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const call = await postCall(meteo.id, 'Un appel publicitaire')
+
+      const { decisionId, at } = await removeByModeration('call', call.id, inesId)
+
+      expect((await notifications(ines)).filter((n) => n.kind === 'removed')).toEqual([
+        {
+          id: `removed:${decisionId}`,
+          kind: 'removed',
+          at,
+          isNew: true,
+          targetKind: 'call',
+          project: { id: meteo.id, title: 'Météo' },
+          excerpt: 'Un appel publicitaire',
+          ground: 'rules',
+          explanation: REMOVAL_TEXT,
+          afterReport: false,
+          projectHidden: false,
+        },
+      ])
+      expect((await notifications(malik)).filter((n) => n.kind === 'removed')).toEqual([])
+    })
+
+    it('tells the sender of a removed message, tester or author, and nobody else', async () => {
+      const meteo = await publishTestable()
+      await join(meteo.id, malik)
+      const sent = await postMessage(meteo.id, malikId, malik, feedback('Un retour insultant'))
+      const answer = await postMessage(meteo.id, malikId, ines, reply('Une réponse insultante'))
+
+      await removeByModeration('message', sent.id, malikId)
+      await removeByModeration('message', answer.id, inesId)
+
+      const removedOf = async (cookie: string) =>
+        (await notifications(cookie)).filter((n) => n.kind === 'removed')
+      expect(await removedOf(malik)).toMatchObject([
+        {
+          targetKind: 'message',
+          project: { id: meteo.id, title: 'Météo' },
+          excerpt: 'Un retour insultant',
+          explanation: REMOVAL_TEXT,
+        },
+      ])
+      expect(await removedOf(ines)).toMatchObject([
+        { targetKind: 'message', project: { id: meteo.id }, excerpt: 'Une réponse insultante' },
+      ])
+      expect(await removedOf(malik)).toHaveLength(1)
+      expect(await removedOf(ines)).toHaveLength(1)
+    })
   })
 })

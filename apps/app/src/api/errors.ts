@@ -46,10 +46,26 @@ export type ApiErrorKey =
   | 'notTestable'
   | 'testersFull'
   | 'updatePhotosFull'
+  // Tranche R7b : le coin des testeurs (coin ou fil fermés, image ou retour qui ne sont plus
+  // disponibles, 100 images).
+  | 'cornerClosed'
+  | 'threadClosed'
+  | 'invalidPhoto'
+  | 'invalidFeedback'
+  | 'testerMediaFull'
   | 'internal'
   | 'network'
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiErrorKey }
+// `projectLimit` (R7b) : le refus est le quota du projet (code `project_calls_limited`, 6e appel du
+// jour). Son message reste « rateLimited » (même texte d'erreur que partout) : l'indicateur est à
+// part, pour ne pas ajouter une clé qui n'a pas de texte `errors.*` aux ~15 écrans qui lisent
+// `$.errors[error]`. Absent partout ailleurs.
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ApiErrorKey; projectLimit?: true }
+
+/** Le code d'API du quota des appels d'un projet (contrat : `project_calls_limited`). */
+export const PROJECT_CALLS_LIMITED_CODE = 'project_calls_limited' satisfies ErrorCode
 
 // Code HTTP → message. On se fie au code plutôt qu'au corps de la réponse : un « 413 fichier trop
 // gros » peut venir du serveur web placé devant l'API (Caddy), qui ne répond pas en JSON.
@@ -121,6 +137,15 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   not_testable: 'notTestable',
   testers_full: 'testersFull',
   update_photos_full: 'updatePhotosFull',
+  // Tranche R7b : trois 409 et deux 400 de plus.
+  corner_closed: 'cornerClosed',
+  thread_closed: 'threadClosed',
+  invalid_photo: 'invalidPhoto',
+  invalid_feedback: 'invalidFeedback',
+  tester_media_full: 'testerMediaFull',
+  // Tranche R7b : le quota des appels d'un projet (429) a le message de « trop de demandes » ; son
+  // code est lu à part (`projectLimit`).
+  project_calls_limited: 'rateLimited',
 }
 
 /**
@@ -136,7 +161,11 @@ export const errorKeyFor = (status: number, code?: string): ApiErrorKey =>
  * React Query attend qu'une lecture ratée « lève » une erreur pour afficher l'état d'échec.
  */
 export class ApiError extends Error {
-  constructor(readonly key: ApiErrorKey) {
+  constructor(
+    readonly key: ApiErrorKey,
+    /** Vrai pour le quota des appels d'un projet (voir `ApiResult`). */
+    readonly projectLimit = false,
+  ) {
     super(key)
   }
 }

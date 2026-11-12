@@ -70,6 +70,8 @@ const recap = (overrides: Partial<RecapData>): RecapData => ({
   last: false,
   updates: [],
   updatesMore: 0,
+  testers: [],
+  testersMore: 0,
   links: linksFor('recap'),
   ...overrides,
 })
@@ -87,6 +89,17 @@ const updatedProjects: RecapData['updates'] = [
   { title: 'Jardin', count: 2, url: updatesOf('c3e1a7f2-9b44-4d0e-8a6c-5f2b1d9e7a03') },
   { title: 'Météo', count: 1, url: updatesOf('e8a4b2c6-1d3f-4e5a-9b7c-0f1e2d3c4b05') },
   { title: 'Vélo', count: 1, url: updatesOf('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c06') },
+]
+
+// R7b, « Le coin des testeurs » : les mêmes projets, chacun avec son lien réel vers le coin
+// (/projects/<id>/testers, un caractère de plus que /updates), le titre le plus long compris.
+const cornerOf = (id: string) => `${APP_URL}/projects/${id}/testers`
+const testedProjects: RecapData['testers'] = [
+  { title: LONG_TITLE, count: 4, url: cornerOf('7d1c9e04-3b2a-4f68-8e15-a2c4d6b8f901') },
+  { title: 'Météo', count: 1, url: cornerOf('e8a4b2c6-1d3f-4e5a-9b7c-0f1e2d3c4b05') },
+  { title: 'Décollage !', count: 2, url: cornerOf('0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10') },
+  { title: 'Jardin', count: 1, url: cornerOf('c3e1a7f2-9b44-4d0e-8a6c-5f2b1d9e7a03') },
+  { title: 'Vélo', count: 3, url: cornerOf('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c06') },
 ]
 
 const mentions: MentionData = {
@@ -133,9 +146,10 @@ const LONG_EXPLANATION =
 const variants: [string, (language: Language) => EmailContent][] = [
   ['recap-short', (language) => recapEmail(language, recap({}))],
   // Le récap le plus long : cinq lignes et « Et 2 autres », les nombres, puis (R7a) les cinq
-  // projets suivis ou testés et « Et 2 autres projets ». La liste des variantes est fixée par
-  // preview.test.ts : la nouvelle partie entre dans celle-ci, et dans le premier récap (un seul
-  // projet, au singulier).
+  // projets suivis ou testés et « Et 2 autres projets », et (R7b) les cinq projets du coin des
+  // testeurs et « Et 3 autres projets ». La liste des variantes est fixée par preview.test.ts :
+  // chaque nouvelle partie entre dans celle-ci, et dans le premier récap (un seul projet, au
+  // singulier).
   [
     'recap-long',
     (language) =>
@@ -148,13 +162,22 @@ const variants: [string, (language: Language) => EmailContent][] = [
           follows: 2,
           updates: updatedProjects,
           updatesMore: 2,
+          testers: testedProjects,
+          testersMore: 3,
         }),
       ),
   ],
   [
     'recap-first',
     (language) =>
-      recapEmail(language, recap({ first: true, updates: updatedProjects.slice(3, 4) })),
+      recapEmail(
+        language,
+        recap({
+          first: true,
+          updates: updatedProjects.slice(3, 4),
+          testers: testedProjects.slice(1, 2),
+        }),
+      ),
   ],
   ['recap-third-without-visit', (language) => recapEmail(language, recap({ last: true }))],
   ['mentions', (language) => mentionEmail(language, mentions)],

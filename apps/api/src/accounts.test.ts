@@ -3,10 +3,21 @@
 // (`mailer.sent`) qui garde les e-mails au lieu de les envoyer. On suit les scénarios de
 // docs/scenarios/phase-1.md, tranche 1.
 import { appName } from '@ruche/brand'
-import { AccountExport, ErrorResponse, Me, Project, ProjectUpdate } from '@ruche/contracts'
+import {
+  AccountExport,
+  ErrorResponse,
+  Me,
+  Project,
+  ProjectUpdate,
+  TesterCall,
+  TesterMedia,
+  type TesterMediaKind,
+  TesterMessage,
+  TesterThreadPage,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
@@ -1128,6 +1139,512 @@ describe('reports and removals of an account', () => {
       expect(await ctx.db.select().from(schema.moderationDecision)).toEqual([
         expect.objectContaining({ action: 'dismiss', targetId: meteo.id, adminId: null }),
       ])
+    })
+  })
+})
+
+// ─── R7b : le coin des testeurs dans l'export et à la suppression du compte ────────────────────
+// Scénario : docs/scenarios/refonte.md, R7b, « Mes données » : l'export contient ses appels, ses
+// retours et ses réponses (textes, dates, captures) ; la suppression du compte les efface, et les
+// fils de ses testeurs disparaissent avec son projet. Décisions du plan (relecture juridique J11) :
+// l'export de l'auteur donne aussi les membres qu'il a retirés de ses testeurs, par pseudo, et
+// jusqu'où chacun a lu ses fils ; une image est donnée par son adresse, jamais par le fichier ;
+// jamais les messages de l'autre personne du fil, ni jusqu'où l'autre a lu.
+//
+// Léa est l'autrice de « Météo » ; Max et Zoé en sont testeurs. Les routes du coin (appels, fils,
+// images) sont testées par tester-*.test.ts : ici, elles montent la scène.
+describe('the testers corner of an account (R7b)', () => {
+  let act: ReturnType<typeof activity>
+  let leaCookie: string
+  let max: string
+  let zoe: string
+  let leaId: string
+  let maxId: string
+  let zoeId: string
+
+  const maxAccount = { name: 'Max', email: 'max@example.com', password: 'another-long-password' }
+  const zoeAccount = { name: 'Zoé', email: 'zoe@example.com', password: 'zoe-long-password' }
+
+  /** Un projet « Testable » avec une démo : on peut en rejoindre les testeurs. */
+  const TESTABLE = { status: 'testable', demoUrl: 'https://example.com/demo' }
+
+  beforeEach(async () => {
+    // Une fausse horloge (seule Date est remplacée), avancée d'une minute avant chaque geste :
+    // l'ordre des appels, des messages et des lectures est ainsi connu, et leurs dates diffèrent.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now())
+    act = activity(ctx)
+    leaCookie = await signUpAndVerify()
+    max = await ctx.verifiedMember(maxAccount)
+    zoe = await ctx.verifiedMember(zoeAccount)
+    leaId = (await act.me(leaCookie)).id
+    maxId = (await act.me(max)).id
+    zoeId = (await act.me(zoe)).id
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** Avance la fausse horloge d'une minute, et rend la nouvelle date (celle du geste qui suit). */
+  const later = () => {
+    vi.setSystemTime(Date.now() + 60 * 1000)
+    return new Date().toISOString()
+  }
+
+  const projectPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}`
+  const threadPath = (projectId: string, testerId: string) =>
+    `${projectPath(projectId)}/threads/${encodeURIComponent(testerId)}`
+
+  /** Envoie une demande, une minute après ce qui précède, et vérifie son statut. */
+  const sendExpecting = async (
+    status: number,
+    method: string,
+    path: string,
+    cookie: string,
+    body?: unknown,
+  ) => {
+    later()
+    const res = await act.send(method, path, cookie, body)
+    expect(res.status).toBe(status)
+    return res
+  }
+
+  const exportOf = async (cookie: string) => {
+    const res = await sendExpecting(200, 'GET', '/v1/me/export', cookie)
+    const raw = await res.text()
+    return { raw, data: AccountExport.parse(JSON.parse(raw)) }
+  }
+
+  const join = (projectId: string, cookie: string) =>
+    sendExpecting(204, 'POST', `${projectPath(projectId)}/testers`, cookie)
+
+  /** L'autrice retire un membre de ses testeurs ; rend la date du retrait. */
+  const removeTester = async (projectId: string, memberId: string) => {
+    const at = later()
+    const res = await act.send(
+      'DELETE',
+      `${projectPath(projectId)}/testers/${encodeURIComponent(memberId)}`,
+      leaCookie,
+    )
+    expect(res.status).toBe(204)
+    return at
+  }
+
+  /** Envoie une image du coin (photo d'appel ou capture) : elle reste en attente. */
+  const upload = async (projectId: string, cookie: string, kind: TesterMediaKind) => {
+    later()
+    const form = new FormData()
+    form.append(
+      'file',
+      new File([new Uint8Array(await jpegImage(800, 600))], 'photo.jpg', { type: 'image/jpeg' }),
+    )
+    form.append('kind', kind)
+    const res = await ctx.request(`${projectPath(projectId)}/testers/media`, {
+      method: 'POST',
+      headers: { cookie },
+      body: form,
+    })
+    expect(res.status).toBe(201)
+    return TesterMedia.parse(await res.json())
+  }
+
+  /** L'autrice lance un appel, avec ou sans photo. */
+  const launch = async (
+    projectId: string,
+    text: string,
+    photo: { id: string; description: string | null } | null = null,
+  ) =>
+    TesterCall.parse(
+      await (
+        await sendExpecting(201, 'POST', `${projectPath(projectId)}/calls`, leaCookie, {
+          text,
+          photoId: photo?.id ?? null,
+          photoDescription: photo?.description ?? null,
+        })
+      ).json(),
+    )
+
+  /** Un message dans le fil de ce testeur, écrit par `cookie` (le testeur ou l'autrice). */
+  const post = async (projectId: string, testerId: string, cookie: string, body: object) =>
+    TesterMessage.parse(
+      await (
+        await sendExpecting(
+          201,
+          'POST',
+          `${threadPath(projectId, testerId)}/messages`,
+          cookie,
+          body,
+        )
+      ).json(),
+    )
+
+  const feedback = (text: string, captureId: string | null = null) => ({
+    kind: 'feedback',
+    outcome: 'partly',
+    device: 'phone',
+    text,
+    captureId,
+  })
+
+  /** Marque un fil comme lu ; rend la date de lecture. */
+  const markRead = async (projectId: string, testerId: string, cookie: string) => {
+    const res = await sendExpecting(204, 'POST', `${threadPath(projectId, testerId)}/read`, cookie)
+    expect(await res.text()).toBe('')
+    return new Date().toISOString()
+  }
+
+  /** La modération retire un appel : la décision et le retrait, écrits en base. */
+  const removeCall = async (callId: string) => {
+    const at = new Date(later())
+    const decisionId = crypto.randomUUID()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id: decisionId,
+      targetKind: 'call',
+      targetId: callId,
+      action: 'remove',
+      ground: 'rules',
+      explanation: 'Un appel qui enfreint les règles.',
+      adminId: null,
+      createdAt: at,
+      targetMemberId: leaId,
+    })
+    await ctx.db
+      .update(schema.testerCall)
+      .set({ removedAt: at, removalId: decisionId })
+      .where(eq(schema.testerCall.id, callId))
+    return at.toISOString()
+  }
+
+  /** Les fichiers du coin dans le stockage du test (photos d'appel et captures). */
+  const testerFiles = () =>
+    [...ctx.storage.files.keys()].filter((key) => key.startsWith('testers/')).sort()
+  /** La clé de stockage d'une image du coin, tirée de son adresse (…/media/testers/<uuid>.webp). */
+  const keyOf = (media: TesterMedia) => new URL(media.url).pathname.replace(/^.*\/media\//, '')
+
+  /** Les lignes d'une table du coin pour ce projet (SQL brut : seule la présence compte). */
+  const rowsOf = async (table: string, projectId: string) =>
+    (
+      (await ctx.db.execute(
+        sql`select * from ${sql.raw(table)} where project_id = ${projectId}`,
+      )) as unknown as { rows: unknown[] }
+    ).rows
+
+  describe('in the export', () => {
+    it('exports the calls I launched, oldest first, with the address of their photo', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      const photo = await upload(meteo.id, leaCookie, 'call')
+      const first = await launch(meteo.id, 'Essayez le mode sombre ce soir.', {
+        id: photo.id,
+        description: 'Le bouton du mode sombre',
+      })
+      const second = await launch(meteo.id, 'Et la carte des pluies, sur téléphone.')
+      const removedAt = await removeCall(second.id)
+
+      const { raw, data } = await exportOf(leaCookie)
+
+      expect(data.testerCalls).toEqual([
+        {
+          projectId: meteo.id,
+          title: 'Météo',
+          id: first.id,
+          text: 'Essayez le mode sombre ce soir.',
+          photoUrl: photo.url,
+          photoDescription: 'Le bouton du mode sombre',
+          createdAt: first.createdAt,
+          removal: null,
+        },
+        {
+          projectId: meteo.id,
+          title: 'Météo',
+          id: second.id,
+          text: 'Et la carte des pluies, sur téléphone.',
+          photoUrl: null,
+          photoDescription: null,
+          createdAt: second.createdAt,
+          // Un appel retiré par la modération reste une donnée de son auteur, avec le retrait.
+          removal: expect.objectContaining({
+            ground: 'rules',
+            explanation: 'Un appel qui enfreint les règles.',
+            at: removedAt,
+          }),
+        },
+      ])
+      // L'adresse de la photo, jamais le fichier : l'export reste un texte.
+      expect(raw).toContain(photo.url)
+      // Les appels appartiennent à l'autrice : ils ne sont pas les données de ses testeurs.
+      expect((await exportOf(max)).data.testerCalls).toEqual([])
+    })
+
+    it('exports my messages of the testers corner, never those of the other person', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      const capture = await upload(meteo.id, max, 'capture')
+      const sent = await post(
+        meteo.id,
+        maxId,
+        max,
+        feedback('Le score repart à zéro au niveau 3.', capture.id),
+      )
+      const answer = await post(meteo.id, maxId, leaCookie, {
+        kind: 'reply',
+        text: 'Merci Max, je regarde ce soir.',
+      })
+      const thanks = await post(meteo.id, maxId, max, { kind: 'reply', text: 'Avec plaisir !' })
+      // L'autrice règle le retour à la main (« Marquer comme réglé ») : la date est à Max.
+      const settledAt = later()
+      expect(
+        (await act.send('POST', `${projectPath(meteo.id)}/messages/${sent.id}/settled`, leaCookie))
+          .status,
+      ).toBe(204)
+
+      const forMax = await exportOf(max)
+      expect(forMax.data.testerMessages).toEqual([
+        {
+          projectId: meteo.id,
+          title: 'Météo',
+          id: sent.id,
+          role: 'tester',
+          kind: 'feedback',
+          outcome: 'partly',
+          device: 'phone',
+          text: 'Le score repart à zéro au niveau 3.',
+          captureUrl: capture.url,
+          createdAt: sent.createdAt,
+          settledAt,
+          removal: null,
+        },
+        {
+          projectId: meteo.id,
+          title: 'Météo',
+          id: thanks.id,
+          role: 'tester',
+          kind: 'reply',
+          outcome: null,
+          device: null,
+          text: 'Avec plaisir !',
+          captureUrl: null,
+          createdAt: thanks.createdAt,
+          settledAt: null,
+          removal: null,
+        },
+      ])
+      // La réponse de l'autrice est à elle, pas à Max.
+      expect(forMax.raw).not.toContain('Merci Max, je regarde ce soir.')
+      expect(forMax.raw).not.toContain(answer.id)
+
+      const forLea = await exportOf(leaCookie)
+      expect(forLea.data.testerMessages).toEqual([
+        {
+          projectId: meteo.id,
+          title: 'Météo',
+          id: answer.id,
+          role: 'author',
+          kind: 'reply',
+          outcome: null,
+          device: null,
+          text: 'Merci Max, je regarde ce soir.',
+          captureUrl: null,
+          createdAt: answer.createdAt,
+          settledAt: null,
+          removal: null,
+        },
+      ])
+      // Ni le retour de Max, ni sa capture, ni sa réponse dans l'export de l'autrice.
+      expect(forLea.raw).not.toContain('Le score repart à zéro')
+      expect(forLea.raw).not.toContain(capture.url)
+      expect(forLea.raw).not.toContain('Avec plaisir')
+    })
+
+    it('exports the testers an author removed, by handle', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      await join(meteo.id, zoe)
+      const maxHandle = (await act.me(max)).handle
+      const zoeHandle = (await act.me(zoe)).handle
+      const maxAt = await removeTester(meteo.id, maxId)
+      const zoeAt = await removeTester(meteo.id, zoeId)
+
+      const forLea = await exportOf(leaCookie)
+      expect(forLea.data.testerRemovals).toEqual([
+        { projectId: meteo.id, title: 'Météo', memberId: maxId, handle: maxHandle, at: maxAt },
+        { projectId: meteo.id, title: 'Météo', memberId: zoeId, handle: zoeHandle, at: zoeAt },
+      ])
+      // Par identifiant et pseudo, comme les blocages (relecture de sécurité de R7b : sous un blocage,
+      // le pseudo part et l'identifiant reste).
+      // Le retrait est une donnée de l'autrice : le membre retiré ne la reçoit pas (comme un
+      // blocage : jamais qui l'a bloqué).
+      expect((await exportOf(max)).data.testerRemovals).toEqual([])
+    })
+
+    it('exports a removed tester who blocked the author without his handle, in both directions', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      await join(meteo.id, zoe)
+      const maxAt = await removeTester(meteo.id, maxId)
+      const zoeAt = await removeTester(meteo.id, zoeId)
+      // Max bloque l'autrice depuis son retrait ; l'autrice bloque Zoé. Dans les deux sens, la page
+      // de l'autre répond 404 : l'export ne donne plus leur pseudo, mais garde l'identifiant et la
+      // date (le retrait est un geste de l'autrice).
+      await act.block(leaId, max)
+      await act.block(zoeId, leaCookie)
+
+      const removals = (await exportOf(leaCookie)).data.testerRemovals
+      expect(removals).toEqual([
+        { projectId: meteo.id, title: 'Météo', memberId: maxId, handle: null, at: maxAt },
+        { projectId: meteo.id, title: 'Météo', memberId: zoeId, handle: null, at: zoeAt },
+      ])
+    })
+
+    it('exports how far I have read each of my threads, never how far the other has read', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      await join(meteo.id, zoe)
+      await post(meteo.id, maxId, max, feedback('Rien ne s’affiche sur la tablette.'))
+      await post(meteo.id, zoeId, zoe, feedback('Tout marche sur mon téléphone.'))
+      const leaReadMax = await markRead(meteo.id, maxId, leaCookie)
+      const leaReadZoe = await markRead(meteo.id, zoeId, leaCookie)
+      const maxRead = await markRead(meteo.id, maxId, max)
+
+      const forLea = await exportOf(leaCookie)
+      expect(forLea.data.testerThreadReads).toEqual([
+        { projectId: meteo.id, testerId: maxId, role: 'author', readAt: leaReadMax },
+        { projectId: meteo.id, testerId: zoeId, role: 'author', readAt: leaReadZoe },
+      ])
+      // Jamais d'accusé de lecture : la lecture de Max n'est pas dans l'export de l'autrice.
+      expect(forLea.raw).not.toContain(maxRead)
+
+      const forMax = await exportOf(max)
+      expect(forMax.data.testerThreadReads).toEqual([
+        { projectId: meteo.id, testerId: maxId, role: 'tester', readAt: maxRead },
+      ])
+      expect(forMax.raw).not.toContain(leaReadMax)
+    })
+
+    it('exports my messages without the title of a project I no longer see', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      const sent = await post(meteo.id, maxId, max, feedback('Le score repart à zéro.'))
+      await sendExpecting(200, 'PATCH', projectPath(meteo.id), leaCookie, { title: 'Secret' })
+      later()
+      await act.setVisibility(meteo.id, leaCookie, 'private')
+
+      const { raw, data } = await exportOf(max)
+
+      // Comme `testerOf` : le message reste à Max, mais le titre actuel appartient à l'autrice.
+      expect(data.testerMessages).toEqual([
+        expect.objectContaining({ projectId: meteo.id, title: null, id: sent.id }),
+      ])
+      expect(raw).not.toContain('Secret')
+    })
+  })
+
+  describe('when the account is deleted', () => {
+    // Relecture juridique (mot pour mot au plan) : le fil appartient au testeur ; quand il part,
+    // tout le fil part, réponses de l'autrice comprises, avec sa capture.
+    it('erases the whole thread, author replies included, when the tester deletes their account', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      const capture = await upload(meteo.id, max, 'capture')
+      await post(meteo.id, maxId, max, feedback('Le score repart à zéro.', capture.id))
+      await post(meteo.id, maxId, leaCookie, { kind: 'reply', text: 'Merci, je corrige.' })
+      await markRead(meteo.id, maxId, leaCookie)
+      // Témoins : le fil, ses deux messages et la capture existent avant la suppression.
+      expect(await rowsOf('tester_thread', meteo.id)).toHaveLength(1)
+      expect(await rowsOf('tester_message', meteo.id)).toHaveLength(2)
+      expect(ctx.storage.files.has(keyOf(capture))).toBe(true)
+
+      await act.deleteAccount(max, maxAccount.password)
+
+      expect(await rowsOf('tester_thread', meteo.id)).toEqual([])
+      expect(await rowsOf('tester_message', meteo.id)).toEqual([])
+      expect(await rowsOf('tester_media', meteo.id)).toEqual([])
+      expect(ctx.storage.files.has(keyOf(capture))).toBe(false)
+      // L'autrice ne voit plus aucun fil, ni à traiter ni réglé.
+      const page = TesterThreadPage.parse(
+        await (
+          await sendExpecting(200, 'GET', `${projectPath(meteo.id)}/threads`, leaCookie)
+        ).json(),
+      )
+      expect(page.items).toEqual([])
+      expect(page.counts).toEqual({ open: 0, settled: 0 })
+    })
+
+    it('erases my captures on the project of another member, pending ones included', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      const photo = await upload(meteo.id, leaCookie, 'call')
+      await launch(meteo.id, 'Essayez le mode sombre.', { id: photo.id, description: null })
+      const attached = await upload(meteo.id, max, 'capture')
+      await post(meteo.id, maxId, max, feedback('Le mode sombre est trop sombre.', attached.id))
+      const pending = await upload(meteo.id, max, 'capture')
+      // Témoin : les trois fichiers sont là avant la suppression.
+      expect(testerFiles()).toEqual([keyOf(photo), keyOf(attached), keyOf(pending)].sort())
+
+      await act.deleteAccount(max, maxAccount.password)
+
+      // Ses deux captures, rattachée et en attente, lignes et fichiers ; la photo de l'appel de
+      // l'autrice reste, avec son appel.
+      expect(testerFiles()).toEqual([keyOf(photo)])
+      expect(
+        (
+          (await ctx.db.execute(
+            sql`select id from tester_media where owner_id = ${maxId}`,
+          )) as unknown as { rows: unknown[] }
+        ).rows,
+      ).toEqual([])
+      expect(await rowsOf('tester_call', meteo.id)).toHaveLength(1)
+    })
+
+    it('erases my calls, the threads of my projects and all their images with my account', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      const photo = await upload(meteo.id, leaCookie, 'call')
+      await launch(meteo.id, 'Essayez le mode sombre.', { id: photo.id, description: null })
+      const pendingPhoto = await upload(meteo.id, leaCookie, 'call')
+      const capture = await upload(meteo.id, max, 'capture')
+      await post(meteo.id, maxId, max, feedback('Le mode sombre est trop sombre.', capture.id))
+      await post(meteo.id, maxId, leaCookie, { kind: 'reply', text: 'Je l’éclaircis.' })
+      // Témoin : trois fichiers du coin avant la suppression.
+      expect(testerFiles()).toEqual([keyOf(photo), keyOf(pendingPhoto), keyOf(capture)].sort())
+
+      await act.deleteAccount(leaCookie, lea.password)
+
+      // Le projet part, et avec lui ses appels, les fils de ses testeurs et toutes leurs images,
+      // la capture de Max comprise (elle n'avait de sens que dans ce fil).
+      for (const table of ['tester_call', 'tester_thread', 'tester_message', 'tester_media']) {
+        expect(await rowsOf(table, meteo.id)).toEqual([])
+      }
+      expect(testerFiles()).toEqual([])
+    })
+
+    // Relecture juridique (mot pour mot au plan) : la ligne de retrait nomme deux membres ; elle
+    // part avec le compte de l'un comme de l'autre.
+    it('erases the removal rows with the account of either member', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await join(meteo.id, max)
+      await join(meteo.id, zoe)
+      await removeTester(meteo.id, maxId)
+      await removeTester(meteo.id, zoeId)
+      const removals = async () =>
+        (
+          await ctx.db
+            .select({ memberId: schema.projectTesterRemoval.memberId })
+            .from(schema.projectTesterRemoval)
+        )
+          .map(({ memberId }) => memberId)
+          .sort()
+      // Témoin : les deux retraits sont écrits.
+      expect(await removals()).toEqual([maxId, zoeId].sort())
+
+      // Le membre retiré part : sa ligne part.
+      await act.deleteAccount(max, maxAccount.password)
+      expect(await removals()).toEqual([zoeId])
+
+      // L'autrice part : les lignes de ses projets partent.
+      await act.deleteAccount(leaCookie, lea.password)
+      expect(await removals()).toEqual([])
     })
   })
 })

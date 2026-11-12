@@ -597,3 +597,23 @@ describe('blocking the author after a report', () => {
     await act(async () => answer({ ok: true, data: null }))
   })
 })
+
+// R7b (relecture juridique, J3) : un fil de testeur se lit à deux, l'autre peut deviner qui signale.
+describe('the anonymity promise of a message of a testers thread', () => {
+  const messageId = '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d'
+  const messageTarget: ReportTarget = { kind: 'message', id: messageId }
+
+  it('names the other person of the thread, who may guess who reported', async () => {
+    jest
+      .mocked(getReportTarget)
+      .mockResolvedValue({ ...preview, target: messageTarget, text: 'Ça plante au lancement.' })
+    await renderWithProviders(<ReportScreen kind="message" id={messageId} />)
+
+    await screen.findByText('Ça plante au lancement.')
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.report.anonymityThread, { name: 'Sam Petit' })))
+        .length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByText(containing(fr.t(($) => $.report.anonymity)))).toBeNull()
+  })
+})
