@@ -269,39 +269,24 @@ export function CommentCard({
   const replyRef = useRef<View>(null)
   const cardRef = useRef<View>(null)
   const frameRef = useRef<View>(null)
-  // Le lien du nom : sur téléphone, c'est là que le lecteur d'écran se pose quand l'écran demande
-  // le commentaire lui-même (`focusSelf`). Le cadre de la carte n'est pas un élément qu'il sait
-  // atteindre (le rendre `accessible` cacherait ses liens et ses boutons à VoiceOver) ; depuis le
-  // nom, il lit la date puis le texte.
-  const authorRef = useRef<View>(null)
   // useImperativeHandle : ce que l'écran reçoit dans `handle`, à la place de la vue elle-même.
   useImperativeHandle(handle, () => ({
     focusMenu: () => focusOn(menuRef),
     focusReply: () => focusOn(replyRef),
     focusCard: () => focusOn(cardRef),
     view: () => frameRef.current,
-    focusSelf: () => {
-      if (Platform.OS !== 'web') {
-        if (!authorRef.current) return false
-        moveReaderTo(authorRef.current)
-        return true
-      }
-      // Sur le web, le cadre lui-même : focalisable sans devenir une étape de Tab (tabIndex -1,
-      // posé au rendu quand la carte est éclairée, ou ici si l'écran le demande sans l'éclairer).
-      // Le lecteur d'écran lit son nom, « Papi Jean : … » ; Tab repart de là, vers le nom.
-      const frame = frameRef.current as unknown as {
-        setAttribute?: (name: string, value: string) => void
-      } | null
-      if (!frame || !authorRef.current) return false
-      frame.setAttribute?.('tabindex', '-1')
-      return focusWithoutScroll(frame)
-    },
+    // Le cadre de la carte lui-même, jamais une de ses actions : on arrive sur le commentaire, pas
+    // sur « Répondre ». Sur le web, il est focalisable sans être une étape de Tab (tabIndex -1, au
+    // rendu) et Tab repart de lui, vers le nom ; sur téléphone, le lecteur d'écran est amené à lui
+    // et commence par son premier élément, le nom de l'auteur.
+    focusSelf: () => focusOn(frameRef),
   }))
 
   // L'éclat du commentaire visé (R8, `lit`) : 1 tout allumé, 0 éteint. Une « valeur partagée » de
-  // Reanimated, animée sur le fil des animations sans redessiner la carte à chaque image.
+  // Reanimated, animée sur le fil des animations sans redessiner la carte à chaque image. Elle part
+  // allumée si la carte arrive éclairée : le miel se voit dès la première image.
   const calm = useCalmMotion()
-  const glow = useSharedValue(0)
+  const glow = useSharedValue(lit ? 1 : 0)
   useEffect(() => {
     if (!lit) {
       glow.value = 0
@@ -552,10 +537,12 @@ export function CommentCard({
     // le surlignage arrive ou part, et il reste de l'air entre deux cartes grises (space.md − space.sm).
     <View
       ref={frameRef}
-      // Éclairée (R8), sur le web : un groupe nommé par l'auteur et le début du texte, que l'écran
-      // peut focaliser sans l'ajouter au parcours de Tab ; le lecteur d'écran dit d'abord lequel.
+      // Sur le web, l'écran peut y poser le focus (`focusSelf`, R8) sans l'ajouter au parcours de
+      // Tab. Éclairée, la carte devient un groupe nommé par l'auteur et le début du texte : en y
+      // arrivant, le lecteur d'écran dit d'abord de quel commentaire il s'agit.
+      {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
       {...(lit && Platform.OS === 'web'
-        ? { role: 'group' as const, 'aria-label': described, tabIndex: -1 as const }
+        ? { role: 'group' as const, 'aria-label': described }
         : null)}
       style={[
         { borderRadius: radii.small, paddingHorizontal: space.sm },
@@ -639,7 +626,6 @@ export function CommentCard({
             <View style={{ flexShrink: 1, maxWidth: '100%', marginVertical: -hang, zIndex: 1 }}>
               <View style={{ marginLeft: -overPhoto }}>
                 <Pressed
-                  ref={authorRef}
                   label={
                     isProjectAuthor
                       ? t(($) => $.project.comments.authorLink, { name: author.name })
