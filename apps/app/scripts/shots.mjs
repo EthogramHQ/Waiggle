@@ -3636,6 +3636,19 @@ const pages = [
   // Après un changement de statut, le formulaire ramène l'auteur sur son projet avec une note
   // toute prête dans le champ du journal.
   { name: 'projet-annonce', path: `${project}?announce=testable`, signedIn: true, fullPage: true },
+  // R8, « Voir en contexte » (planche R8-Contexte) : arrivé d'une notification, la feuille ouverte
+  // sur le fil du commentaire visé (en tête, éclairé), puis sur un commentaire disparu (« Ce
+  // commentaire n'est plus là. »). Sur ordinateur, la colonne déroulée amène le commentaire en vue.
+  {
+    name: 'contexte',
+    path: `/projects/${recipesProject.id}?comment=${contextCommentId}`,
+    signedIn: true,
+  },
+  {
+    name: 'contexte-parti',
+    path: `/projects/${recipesProject.id}?comment=${goneCommentId}`,
+    signedIn: true,
+  },
   { name: 'modifier', path: `${project}/edit`, signedIn: true, fullPage: true },
   // Le projet avec ses photos : couverture verticale sur téléphone, vignettes, éditeur des photos.
   { name: 'projet-photos', path: `/projects/${photosProject.id}`, signedIn: true, fullPage: true },

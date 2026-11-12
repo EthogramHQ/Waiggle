@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { useComments } from '../comments/api'
+import { type CommentContextState, useCommentContext, useComments } from '../comments/api'
 import { type PreviewLine, previewLines, previewThreads, threadLines } from '../comments/lines'
 import { useCommentDraft } from '../comments/useCommentDraft'
 import { useMentionable } from '../mentions/api'
@@ -36,7 +36,7 @@ import { CommentCard, plainCommentText } from '../ui/CommentCard'
 import { CommentComposer, useLowWindow } from '../ui/CommentComposer'
 import { CommentPreview, type CommentPreviewAction } from '../ui/CommentPreview'
 import { CommentThread } from '../ui/CommentThread'
-import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
 import { Sheet } from '../ui/Sheet'
@@ -45,6 +45,7 @@ import type { SheetReveal } from '../ui/sheetReveal'
 import { Text } from '../ui/Text'
 import type { TextFieldInput } from '../ui/TextField'
 import { useLayout } from '../ui/theme/layout'
+import { useCalmMotion } from '../ui/theme/motion'
 import {
   type CommentCards,
   CommentThreads,
@@ -57,18 +58,56 @@ const PREVIEW_LINES = { phone: 3, column: 5 } as const
 
 const nothing = () => {}
 
+/**
+ * Lit où se trouve le commentaire visé (R8, `useCommentContext`) et le remonte à l'écran par
+ * `onRead`. Un composant à part, sans rien à dessiner, monté seulement quand un commentaire est
+ * visé : la page ordinaire ne demande rien de plus à l'API des commentaires. `onRead` doit rester le
+ * même d'un dessin à l'autre (le `set…` d'un `useState`).
+ */
+function CommentContextReader({
+  commentId,
+  onRead,
+}: {
+  commentId: string
+  onRead: (context: CommentContextState) => void
+}) {
+  const read = useCommentContext(commentId)
+  const { status } = read
+  const thread = read.status === 'found' ? read.thread : null
+  const projectId = read.status === 'found' ? read.projectId : null
+  useEffect(() => {
+    onRead(
+      thread && projectId
+        ? { status: 'found', projectId, thread }
+        : { status: status === 'found' ? 'loading' : status },
+    )
+  }, [status, thread, projectId, onRead])
+  return null
+}
+
 export function Comments({
   project,
+  focusCommentId = null,
+  onFocusDone,
 }: {
   project: Project
-  /** R8 : le commentaire à montrer en contexte (adresse `?comment=`) ; `null` : aucun. Sans effet pour l'instant. */
+  /**
+   * R8, « Voir en contexte » : le commentaire visé par une notification (adresse `?comment=`) ;
+   * `null` : aucun. Sur téléphone, la feuille s'ouvre sur son fil ; sur ordinateur, la colonne se
+   * déroule et l'amène en vue.
+   */
   focusCommentId?: string | null
-  /** R8 : appelée à la fermeture de la feuille de contexte, pour retirer le paramètre de l'adresse. */
+  /**
+   * R8 : appelée une fois, quand l'arrivée est faite (le focus posé sur le commentaire, ou sur la
+   * phrase « n'est plus là »), sinon à la fermeture de la feuille : l'écran retire le paramètre de
+   * l'adresse, et recharger la page ne la rouvre pas.
+   */
   onFocusDone?: () => void
 }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const { columns } = useLayout()
+  const calm = useCalmMotion()
   const lowWindow = useLowWindow()
   const comments = useComments(project.id)
   const draft = useCommentDraft(project.id)
@@ -85,6 +124,32 @@ export function Comments({
   const readOnly = suspended || closed
   const threads: Comment[] = comments.data?.pages.flatMap((page) => page.items) ?? []
 
+  // R8, « Voir en contexte ». Le commentaire visé est recopié ici : l'écran retire le paramètre de
+  // l'adresse dès l'arrivée faite (`onFocusDone`), et la feuille garde pourtant son fil en tête
+  // jusqu'à sa fermeture. La lecture (`useCommentContext`) dit où il est.
+  const [contextId, setContextId] = useState<string | null>(null)
+  const [context, setContext] = useState<CommentContextState>({ status: 'idle' })
+  // Trouvé, mais sur un autre projet (une adresse fabriquée) : comme disparu, et rien de ce fil ici.
+  const arrived =
+    context.status === 'found' && context.projectId === project.id ? context.thread : null
+  const gone =
+    contextId !== null &&
+    (context.status === 'gone' || (context.status === 'found' && arrived === null))
+  // Une autre panne (`error`) ne dit rien : le commentaire existe peut-être encore. La feuille
+  // s'ouvre en haut, sans phrase.
+  // Le fil en tête : celui de la liste s'il y est, avec le commentaire visé (il suit alors les gestes
+  // faits depuis : réponse, modification), sinon celui que la lecture a rendu.
+  const pinned = arrived
+    ? (threads.find(
+        (thread) =>
+          thread.id === arrived.id &&
+          threadLines([thread]).some((comment) => comment.id === contextId),
+      ) ?? arrived)
+    : null
+  // L'arrivée (focus, puis `onFocusDone`) est faite pour ce commentaire-là : une seule fois.
+  const arrivedFor = useRef<string | null>(null)
+  const goneRef = useRef<Focusable>(null)
+
   // La feuille (téléphone) : ouverte ou non, et si elle s'ouvre le champ prêt.
   const [sheetOpen, setSheetOpen] = useState(false)
   const [openOnField, setOpenOnField] = useState(false)
@@ -96,7 +161,8 @@ export function Comments({
   const [unrolled, setUnrolled] = useState(false)
   const shownWhole = useRef(false)
   if (count <= PREVIEW_LINES.column) shownWhole.current = true
-  const whole = columns && (unrolled || shownWhole.current)
+  // Un commentaire visé déroule aussi la liste : il est peut-être au-delà des 5 premières lignes.
+  const whole = columns && (unrolled || shownWhole.current || contextId !== null)
   const focusAfterUnroll = useRef<{ shown: Set<string>; target: string | null } | null>(null)
 
   // Ce que la région annonce (seulement lu : décisions de Louis du 6/11), et ce qui refuse un texte
@@ -151,6 +217,57 @@ export function Comments({
   const closeSheet = () => {
     setSheetOpen(false)
     setAnnouncement('')
+    // Fermée avant l'arrivée (lecture en cours ou en panne) : le paramètre part quand même. Rouverte
+    // ensuite, la feuille montre la liste telle quelle.
+    if (contextId !== null && arrivedFor.current !== contextId) {
+      arrivedFor.current = contextId
+      onFocusDone?.()
+    }
+    setContextId(null)
+    setContext({ status: 'idle' })
+  }
+
+  // Un commentaire visé arrive par l'adresse : on le retient, et la feuille s'ouvre (sur ordinateur,
+  // la colonne se déroule, voir `whole`). En haut, sans le champ : on vient lire. Seule une nouvelle
+  // adresse ouvre la feuille : la largeur, lue à ce moment, ne la rouvre pas.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: voir ci-dessus
+  useEffect(() => {
+    if (!focusCommentId) return
+    setContextId(focusCommentId)
+    setContext({ status: 'loading' })
+    arrivedFor.current = null
+    if (!columns) openSheet(null, false)
+  }, [focusCommentId])
+
+  /**
+   * L'arrivée sur le commentaire visé, une seule fois, quand la liste qui le montre est dessinée
+   * (appelée après chaque dessin de la liste) : il est amené en vue, puis reçoit le focus du clavier
+   * (web) ou du lecteur d'écran (téléphone), plutôt que « Fermer » ; disparu, la phrase qui le dit.
+   * Puis l'écran retire le paramètre de l'adresse (`onFocusDone`).
+   */
+  const arrive = () => {
+    if (contextId === null || arrivedFor.current === contextId) return
+    if (!columns && !sheetOpen) return
+    if (arrived) {
+      const card = cards.current.get(contextId)
+      if (!card) return
+      arrivedFor.current = contextId
+      const view = card.view()
+      // Dans la feuille, elle le garde en vue même quand son pied grandit ; dans la colonne, la page
+      // défile jusqu'à lui (au milieu de l'écran, sans glisser avec « Réduire les animations »).
+      if (columns) {
+        card.focusSelf()
+        focusAndReveal(view, calm)
+      } else {
+        sheetReveal.current?.reveal(view)
+        card.focusSelf()
+      }
+    } else if (gone) {
+      arrivedFor.current = contextId
+      focusWithoutScroll(goneRef.current)
+      moveReaderTo(goneRef.current)
+    } else return
+    onFocusDone?.()
   }
 
   // La feuille vient de se fermer : le focus revient à ce qui l'a ouverte. Le bouton a pu changer de
@@ -228,9 +345,15 @@ export function Comments({
   // La carte visée par « Répondre » ou « Modifier » reste en vue : le bandeau du champ, puis le clavier,
   // réduisent la liste sous elle. Rien n'est visé (le geste a pris fin) : la feuille la laisse tranquille.
   // Aussi quand la feuille revient sur un geste en cours : sa liste vient de renaître.
+  // Rien de visé ni avant ni maintenant (la feuille qui s'ouvre) : rien à lâcher, et surtout pas le
+  // commentaire d'une notification qu'elle vient d'amener en vue (R8).
   const aimedAt = draft.highlightedId
+  const lastAimed = useRef<string | null>(null)
   useEffect(() => {
     if (!sheetOpen) return
+    const wasAimed = lastAimed.current
+    lastAimed.current = aimedAt
+    if (!aimedAt && !wasAimed) return
     sheetReveal.current?.reveal(aimedAt ? (cards.current.get(aimedAt)?.view() ?? null) : null)
   }, [aimedAt, sheetOpen])
 
@@ -436,6 +559,11 @@ export function Comments({
       onFocusLost={focusLost}
       leave={leave}
       emptyLabel={emptyLabel}
+      pinned={pinned}
+      litId={arrived ? contextId : null}
+      gone={gone}
+      goneRef={goneRef}
+      onShown={arrive}
     />
   )
 
@@ -497,6 +625,9 @@ export function Comments({
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
+      {contextId === null ? null : (
+        <CommentContextReader key={contextId} commentId={contextId} onRead={setContext} />
+      )}
       {/* En colonne, la région vit ici, toujours montée : la liste, repliée, ne l'est pas, et un envoi
           n'y serait jamais annoncé. Dans la feuille, c'est la liste qui la porte. */}
       {columns ? <LiveStatus message={announcement} visible={false} /> : null}
@@ -508,6 +639,7 @@ export function Comments({
         seeAllCount={count > 0 ? count : readable}
         openRef={openButton}
         titleRef={titleRef}
+        covered={sheetOpen && contextId !== null}
         onOpen={() => (columns ? unroll(null) : openSheet(null, action !== 'all'))}
       >
         {whole ? list : sheetOpen ? previewCardsNodes : (trouble ?? previewCardsNodes)}

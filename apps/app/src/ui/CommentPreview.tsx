@@ -47,6 +47,12 @@ type Props = {
   titleRef?: Ref<Focusable>
   /** Les premières lignes de la feuille (des `CommentCard compact`), dans l'ordre. */
   children?: ReactNode
+  /**
+   * R8 : la feuille est ouverte par-dessus. Ses lignes, qui la répètent, sont cachées aux lecteurs
+   * d'écran (elles restent dessinées : la page dessous ne bouge pas) ; un commentaire n'est lu
+   * qu'une fois, dans la feuille.
+   */
+  covered?: boolean
 }
 
 export function CommentPreview({
@@ -58,6 +64,7 @@ export function CommentPreview({
   openRef,
   titleRef,
   children,
+  covered = false,
 }: Props) {
   const { t } = useTranslation()
   // Children.toArray retire les « rien » : sans ligne à montrer, la phrase prend leur place, quoi que
@@ -78,7 +85,14 @@ export function CommentPreview({
         {...(titleRef ? { focusRef: titleRef } : null)}
       />
       {hasLines ? (
-        <View style={{ gap: space.md }}>{children}</View>
+        <View
+          style={{ gap: space.md }}
+          {...(covered
+            ? { 'aria-hidden': true, importantForAccessibility: 'no-hide-descendants' as const }
+            : null)}
+        >
+          {children}
+        </View>
       ) : count === 0 && seeAllCount === 0 ? (
         <Text tone="secondary">{emptyLabel ?? t(($) => $.project.comments.empty)}</Text>
       ) : null}

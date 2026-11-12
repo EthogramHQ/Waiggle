@@ -264,6 +264,7 @@ export function CatalogueScreen() {
         <Notice message={l.errorMessage} />
         <Notice tone="info" message={l.infoMessage} />
         <Notice tone="success" message={l.successMessage} />
+        <Notice tone="neutral" icon="chat-circle-slash" polite message={l.neutralMessage} />
         {/* Avec une action : un lien sous le message (« Me reconnecter », tranche 6c). */}
         <Notice message={l.expired} action={{ label: l.signInAgain, onPress: () => {} }} />
         {/* Une action faite sur place (« Réessayer ») : `role: 'button'`, annoncée comme un bouton et
