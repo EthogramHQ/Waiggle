@@ -24,7 +24,7 @@ export function NotificationExample() {
   const parts = splitMarks(t(($) => $.notificationSettings.exampleText))
 
   return (
-    <Surface variant="glass" radius="lg" padding="md">
+    <Surface variant="glass" radius="group" padding="md">
       <Stack direction="row" gap="md" align="center">
         {/* L'abeille de l'appli, comme l'icône d'une vraie notification : pure décoration. */}
         <View style={{ flexShrink: 0 }}>
