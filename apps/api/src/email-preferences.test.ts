@@ -327,6 +327,7 @@ describe('exporting my data', () => {
       recapSentAt: null,
       recapUnvisited: 0,
       instantSentAt: null,
+      recapV2At: null,
       updatedAt: null,
     })
     // La dernière utilisation de chaque session, qui sert désormais à décider du récap.
@@ -369,6 +370,8 @@ describe('exporting my data', () => {
       // Inès est venue depuis son inscription (sa session) : ce récap n'est pas « sans visite ».
       recapUnvisited: 0,
       instantSentAt: instantAt.toISOString(),
+      // R8 : ce récap est le premier habillé ; sa date reste toute la vie du compte, donc ici aussi.
+      recapV2At: recapAt.toISOString(),
       updatedAt: changedAt,
     })
     // Jamais de jeton de désinscription dans l'export, ni l'ancien interrupteur.

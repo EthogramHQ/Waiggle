@@ -211,6 +211,7 @@ export const exportEmailPreferences = async (
       recapSentAt: t.recapSentAt,
       recapUnvisited: t.recapUnvisited,
       instantSentAt: t.instantSentAt,
+      recapV2At: t.recapV2At,
       updatedAt: t.updatedAt,
     })
     .from(t)
@@ -220,6 +221,7 @@ export const exportEmailPreferences = async (
     recapSentAt: row?.recapSentAt?.toISOString() ?? null,
     recapUnvisited: row?.recapUnvisited ?? 0,
     instantSentAt: row?.instantSentAt?.toISOString() ?? null,
+    recapV2At: row?.recapV2At?.toISOString() ?? null,
     updatedAt: row?.updatedAt?.toISOString() ?? null,
   }
 }
