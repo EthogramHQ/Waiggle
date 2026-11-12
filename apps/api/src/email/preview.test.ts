@@ -8,6 +8,7 @@
 // joint ses vignettes : une image n'est permise que « en ligne » (src="cid:…"), avec sa pièce jointe.
 import { readFileSync } from 'node:fs'
 import { RECAP_IMAGES_MAX } from '@ruche/contracts'
+import { fill, resources } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
 import * as instant from './instant'
 import { emailPreviews } from './preview'
@@ -172,8 +173,11 @@ describe('the previews of R8', () => {
     const news = previewOf('recap-news.fr.html')
     const short = previewOf('recap-short.fr.html')
 
-    expect(news.text).toContain('Nouveau : ton récap arrive le dimanche')
-    expect(short.text).not.toContain('Nouveau : ton récap arrive le dimanche')
+    // La phrase lue dans fr.ts, telle qu'écrite : une copie en dur perdrait l'espace insécable
+    // avant le deux-points.
+    const sentence = fill(resources.fr.translation.email.recap.news)
+    expect(news.text).toContain(sentence)
+    expect(short.text).not.toContain(sentence)
   })
 
   it('renders the instant e-mail with one line, and with several', () => {
