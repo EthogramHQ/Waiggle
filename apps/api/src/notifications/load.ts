@@ -6,7 +6,10 @@
 // pseudo sont lus dans notification_state (state.ts). R7a : les mises à jour des projets qu'il suit
 // ou qu'il teste s'y ajoutent, et remplacent les notes du Journal dans les sources de la modération.
 // R7b : le coin des testeurs ajoute trois sortes (un appel à tester, un message d'un fil, un retour
-// réglé), et le retrait d'un appel ou d'un message par la modération.
+// réglé), et le retrait d'un appel ou d'un message par la modération. R8 : les deux notifications
+// du catalogue (projet rangé, outil rattaché), seules écrites dans une table (`catalogue_notice`) et
+// seules absentes des e-mails ; la miniature de chaque projet nommé ; le nombre des autres lignes
+// d'une mise à jour.
 import {
   EXCERPT_MAX,
   NOTIFICATION_DAYS,
@@ -112,6 +115,7 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  *      project_update_project_created_idx (project_id, created_at desc), voir projectUpdates.
  *  12 à 14. le coin des testeurs (R7b) : les appels des projets qu'il teste, les messages de l'autre
  *      personne d'un fil, ses retours réglés ; voir testerSources.
+ *  15 et 16. les notifications du catalogue (R8), sans `until` seulement : voir catalogueSources.
  * Les sources 7 à 11 ajoutent six colonnes : target_kind (la sorte de contenu), update_id (une mise
  * à jour retirée, ou celle qui est annoncée), decision_id (la décision de retrait, de suspension ou
  * de levée), outcome (l'issue d'un signalement), member_id (le membre visé par un signalement, pour
@@ -293,8 +297,45 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     from account_suspension s
     where s.user_id = ${me} and not ${activeSuspensionSql('s', now)}
       and ${during('coalesce(s.lifted_at, s.ends_at)')}
+
+    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during)}`}
   `
 }
+
+/**
+ * Les sources 15 et 16 (R8) : les notifications du catalogue, les seules qui s'écrivent
+ * (`catalogue_notice`, posées par catalogue/admin.ts dans la transaction de l'administrateur). Elles
+ * ne vont qu'à l'écran et à la cloche, jamais dans un e-mail : `sources` ne les ajoute que sans
+ * borne `until` (la liste et la cloche ; les e-mails, eux, passent toujours `until`). La colonne
+ * item_id porte la notice ; loadDetailedRows la relit par sa clé primaire.
+ *
+ * Index : catalogue_notice_member_idx (member_id, created_at desc), qui donne ses notices dans la
+ * fenêtre de dates ; puis la clé primaire du projet ou de l'outil. Ce qui reste montré se calcule
+ * encore à la lecture, comme ailleurs :
+ *   15. un projet rangé : encore à lui, public et pas retiré (listedProject) ; privé, il disparaît,
+ *       et revient s'il redevient public ; supprimé, la notice part avec lui (clé « cascade ») ;
+ *   16. un outil admis (`tool_added`) ou rattaché (`tool_merged`, la notice vise l'outil cible) :
+ *       encore au catalogue. Les deux sortes de la base n'en font qu'une pour l'appli (`merged`).
+ * Aucun filtre de blocage : la notification n'est le geste d'aucun membre (signée par l'équipe).
+ */
+const catalogueSources = (me: string, during: (column: string) => SQL): SQL => sql`
+    select 'project_category', 'project_category:' || cn.id, cn.created_at,
+      cn.project_id, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, cn.id
+    from catalogue_notice cn
+    join project on project.id = cn.project_id
+    where cn.member_id = ${me} and cn.kind = 'project_category' and ${during('cn.created_at')}
+      and project.author_id = ${me} and ${listedProject()}
+
+    union all
+
+    select 'tool_added', 'tool_added:' || cn.id, cn.created_at,
+      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, cn.id
+    from catalogue_notice cn
+    join tool on tool.id = cn.tool_id
+    where cn.member_id = ${me} and cn.kind in ('tool_added', 'tool_merged')
+      and ${during('cn.created_at')} and tool.status = 'catalogue'`
 
 /**
  * La source 11 (R7a) : une ligne par mise à jour d'un projet que `me` suit OU teste, avec les vingt
@@ -646,6 +687,8 @@ const ListRow = z.object({
     'tester_call',
     'tester_message',
     'feedback_settled',
+    'project_category',
+    'tool_added',
   ]),
   key: z.string(),
   at: z.string(),
@@ -697,6 +740,15 @@ const ListRow = z.object({
   message_kind: z.enum(['feedback', 'reply']).nullable(),
   message_tester_id: z.string().nullable(),
   message_text: z.string().nullable(),
+  // R8 : la miniature du projet nommé (la clé de son fichier et son ThumbHash) ; la notice du
+  // catalogue (la catégorie, ou l'outil et le nom tapé).
+  cover_key: z.string().nullable(),
+  cover_thumbhash: z.string().nullable(),
+  notice_category: z.string().nullable(),
+  notice_merged: z.boolean().nullable(),
+  notice_typed_name: z.string().nullable(),
+  tool_slug: z.string().nullable(),
+  tool_name: z.string().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -736,9 +788,15 @@ export const present = (
     at: row.at,
     isNew: seenAt === null || Date.parse(row.at) > seenAt.getTime(),
   }
+  // R8 : chaque notification qui nomme un projet porte sa miniature (choisie par loadDetailedRows),
+  // à la même adresse que les médias du projet ; null sans photo.
+  const cover =
+    row.cover_key !== null && row.cover_thumbhash !== null
+      ? { url: mediaUrl(publicApiUrl, row.cover_key), thumbhash: row.cover_thumbhash }
+      : null
   const project =
     row.project_id !== null && row.project_title !== null
-      ? { id: row.project_id, title: row.project_title }
+      ? { id: row.project_id, title: row.project_title, cover }
       : null
   const comment =
     row.comment_id !== null && row.body !== null
@@ -795,7 +853,8 @@ export const present = (
       // R7a : le projet, son auteur, puis la mise à jour (titre, version, première ligne). Rien ne
       // dit si le membre suit ou teste (A6). La source n'a gardé que des mises à jour qui ont une
       // ligne lisible ; si elle a changé entre-temps, rien n'est montré.
-      const firstLine = readLines(row.update_lines)[0]
+      const lines = readLines(row.update_lines)
+      const firstLine = lines[0]
       if (!project || !firstLine || row.update_id === null) return null
       if (row.author_id === null || row.author_name === null) return null
       return {
@@ -812,9 +871,29 @@ export const present = (
           title: row.update_title,
           version: row.update_version,
           firstLine,
+          // R8 : « et 2 autres changements » : les autres lignes lisibles, comptées comme la
+          // première (readLines écarte ce qui ne se lit pas).
+          moreLines: lines.length - 1,
         },
       }
     }
+    // R8, le catalogue : signées par l'équipe, elles ne nomment aucun membre. La catégorie, ou
+    // l'outil, disparus entre-temps : rien n'est montré.
+    case 'project_category':
+      if (!project || row.notice_category === null) return null
+      return { ...common, kind: 'project_category', project, category: row.notice_category }
+    case 'tool_added':
+      if (row.notice_typed_name === null || row.tool_slug === null || row.tool_name === null) {
+        return null
+      }
+      return {
+        ...common,
+        kind: 'tool_added',
+        merged: row.notice_merged === true,
+        typedName: row.notice_typed_name,
+        toolSlug: row.tool_slug,
+        toolName: row.tool_name,
+      }
     // R7b, le coin des testeurs. `author_id` est l'auteur du projet (un appel, un retour réglé) ou
     // l'expéditeur du message ; son compte supprimé entre-temps : rien n'est montré.
     case 'tester_call': {
@@ -1004,7 +1083,13 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       (pu.removed_at is not null) as update_removed,
       tc.id as call_id, tc.text as call_text,
       tm.id as message_id, tm.kind as message_kind, tm.tester_id as message_tester_id,
-      case when n.kind = 'removed' then tm.text end as message_text
+      case when n.kind = 'removed' then tm.text end as message_text,
+      -- R8 : la miniature du projet (« cover », plus bas) ; la notice du catalogue et son outil.
+      cover.storage_key as cover_key, cover.thumbhash as cover_thumbhash,
+      cn.category_code as notice_category,
+      case when cn.id is not null then cn.kind = 'tool_merged' end as notice_merged,
+      cn.typed_name as notice_typed_name,
+      notice_tool.slug as tool_slug, notice_tool.name as tool_name
     from (${chosen}) n
     left join project on project.id = n.project_id
     -- « lateral » : une sous-requête qui lit les colonnes des tables déjà jointes (ici, l'auteur du
@@ -1030,6 +1115,22 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       and (n.kind = 'tester_call' or n.target_kind = 'call')
     left join tester_message tm on tm.id = n.item_id
       and (n.kind in ('tester_message', 'feedback_settled') or n.target_kind = 'message')
+    -- R8 : la miniature du projet nommé : la première photo de sa galerie (l'ordre choisi par
+    -- l'auteur, comme selectMedia), sinon sa couverture verticale, sinon rien (« limit 1 » : une
+    -- seule ligne). L'index project_media_project_idx (project_id, slot, position) donne les
+    -- quelques photos du projet ; celles des mises à jour (slot 'update') ne comptent pas. Un projet
+    -- que la notification ne nomme plus (titre vidé par un blocage, « hid ») n'a pas de miniature.
+    left join lateral (
+      select m.storage_key, m.thumbhash from project_media m
+      where m.project_id = project.id and m.slot in ('gallery', 'portrait')
+        and not coalesce(hid.hidden, false)
+      order by m.slot = 'portrait', m.position, m.created_at
+      limit 1
+    ) cover on true
+    -- R8 : la notice du catalogue de item_id, puis l'outil qu'elle nomme (clés primaires).
+    left join catalogue_notice cn on cn.id = n.item_id
+      and n.kind in ('project_category', 'tool_added')
+    left join tool notice_tool on notice_tool.id = cn.tool_id
     order by n.at desc, n.key desc
   `
   return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows

@@ -13,6 +13,7 @@
 // - les « Autre » (noms d'outils tapés par des membres) que plus rien ne cite, et les lignes du
 //   journal du catalogue de plus d'un an (tranche R6b) ; les « Autre » laissés hors du catalogue
 //   depuis plus d'un an, quand plus rien ne les cite (relecture juridique jur-J5) ;
+// - les notifications du catalogue de plus de 90 jours (R8) ;
 // - les photos de mise à jour restées « en attente » plus de 24 heures (R7a), ligne et fichier ;
 // - les images du coin des testeurs restées « en attente » plus de 24 heures (R7b), de même.
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
@@ -27,7 +28,7 @@ import { and, eq, lt, sql } from 'drizzle-orm'
 import { AUTH_RATE_WINDOW_MAX_MS } from '../auth/auth'
 import { purgeExpiredHandles } from '../handles/claim'
 import type { FileStorage } from '../media/storage'
-import { utc } from '../notifications/load'
+import { notificationCutoff, utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
@@ -117,6 +118,15 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     .delete(schema.catalogueChange)
     .where(sql`${schema.catalogueChange.createdAt} < ${utc(new Date(now.getTime() - 365 * DAY))}`)
     .returning({ id: schema.catalogueChange.id })
+  // R8 : les notifications du catalogue (`catalogue_notice`), les seules qui s'écrivent, ne se
+  // gardent pas plus longtemps qu'elles ne se montrent : 90 jours, la limite de l'écran
+  // (notificationCutoff, « daté de cet instant ou d'avant : plus montré »). Une seule requête ; la
+  // table est petite (une ligne par geste et par auteur) : une lecture complète par nuit suffit,
+  // l'index `catalogue_notice_member_idx` commençant par le membre.
+  const catalogueNotices = await db
+    .delete(schema.catalogueNotice)
+    .where(sql`${schema.catalogueNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
+    .returning({ id: schema.catalogueNotice.id })
 
   // R7a (sécurité A5) : les photos « en attente » (slot 'update', jamais rattachées à une mise à
   // jour) de plus de 24 heures : téléversées, mais la mise à jour n'a pas été publiée. La ligne
@@ -176,6 +186,7 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     otherTools,
     dismissedTools,
     catalogueChanges: catalogueChanges.length,
+    catalogueNotices: catalogueNotices.length,
     ...moderation,
   }
   console.log('Nightly purge', purged)
