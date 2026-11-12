@@ -2251,7 +2251,9 @@ Hors de R7b, et où ça va :
 ## R8 — Les notifications
 
 Statut : **validé par Louis** le 12/11/2026 (conversation « plan » de R8), tel quel, avec les
-sept choix de la session. Décisions de Louis du 12/11 : « Dans le récap » par défaut pour tout ; le récap habillé reste dans R8 ; le
+sept choix de la session ; amendé le même jour après la relecture du plan (décisions de Louis :
+titre et nom seuls dans le récap, « Se désabonner » vers « Dans le récap », jours de Paris, trois
+textes du juridique). Décisions de Louis du 12/11 : « Dans le récap » par défaut pour tout ; le récap habillé reste dans R8 ; le
 miel s'éteint à la visite suivante ; trois planches nouvelles avant le plan.
 
 R8 redessine la page « Activité » (planches `R8-Activite`, `R8-Activite-Nuit`, `R8-Activite-Vide`,
@@ -2284,7 +2286,8 @@ Hors de R8, et où ça va :
 - Alors la page « Activité » s'ouvre par-dessus, sans barre d'onglets, avec Retour et la roue des
   réglages, qui mène à l'écran « Notifications »
 - Et la liste est rangée en « Aujourd'hui », « Cette semaine » et « Plus tôt », du plus récent au
-  plus ancien
+  plus ancien, en jours de Paris comme toutes les dates de l'appli (relecture du plan, Louis
+  12/11/2026)
 - Et chaque ligne, sans cadre, montre à gauche l'avatar de qui a agi (ou une icône quand on ne
   nomme personne : réactions, abonnés, mise à jour, modération), à droite la miniature du projet,
   les noms et titres en gras, et la date relative
@@ -2353,8 +2356,8 @@ icône rouge, et mènent à la raison et à la façon de contester, comme aujour
 
 - Étant donné Léa dans Réglages → Notifications
 - Alors l'écran montre en tête un exemple de notification sans nom (A3 : « 12 réactions sur
-  Raconte-moi un tableau ») et « Dans l'appli, tout arrive dans l'Activité, regroupé : combien,
-  jamais qui. »
+  Raconte-moi un tableau ») et « Dans l'appli, tout arrive dans l'Activité. Réactions et
+  abonnés : combien, jamais qui. »
 - Et une ligne « Sur ce téléphone » grisée, « Bientôt »
 - Et « Par e-mail », une ligne par type avec son choix actuel ; un toucher ouvre les choix sur
   place (boutons radio), un seul type ouvert à la fois ; chaque choix s'enregistre aussitôt
@@ -2390,7 +2393,10 @@ icône rouge, et mènent à la raison et à la façon de contester, comme aujour
 - Et chaque ligne mène à sa page dans l'appli (le commentaire en contexte, le bon fil du coin)
 - Et chaque e-mail dit pourquoi on le reçoit, et porte « Ne plus recevoir ces e-mails » : la page
   sans connexion propose de passer ces types à « Dans le récap » ou à « Jamais », confirmé par un
-  bouton ; l'en-tête List-Unsubscribe fait de même
+  bouton ; le « Se désabonner » de la messagerie (en-tête List-Unsubscribe, un clic, sans page)
+  les passe à « Dans le récap » (Louis, 12/11/2026) ; rien ne remonte jamais un type réglé sur
+  « Jamais »
+- Et l'objet de l'e-mail ne nomme jamais un retour du coin
 - Et un même événement ne part jamais deux fois par e-mail, tout de suite puis dans le récap
 
 ### Le récap de la semaine, habillé (planche `R8-Recap`, A5, B7)
@@ -2405,17 +2411,29 @@ icône rouge, et mènent à la raison et à la façon de contester, comme aujour
     « 4 commentaires », « 2 nouveaux abonnés ») et « Lire les commentaires » ; les réponses et
     mentions réglées « Dans le récap », avec le nom de qui a écrit, jamais le texte ;
   - **« Nouveaux projets de tes proches »** : les projets publiés dans la semaine par les membres
-    qu'elle suit (titre, nom, accroche, « Voir le projet »), trois au plus ;
-  - **« Ils cherchent des testeurs »** : un projet « Testable » d'un proche, avec « Tester la démo »,
-    qui passe par la page « Tu quittes {{appName}} » ;
+    qu'elle suit (titre et nom seuls, jamais l'accroche : la règle de 6c, Louis 12/11/2026 ;
+    « Voir le projet »), trois au plus ;
+  - **« Ils cherchent des testeurs »** : un projet d'un proche devenu « Testable » (à défaut,
+    publié) dans la semaine, dont elle n'est ni l'autrice, ni testeuse, ni retirée, avec « Tester
+    la démo », qui mène à la page du projet ;
   - **« Les projets que tu suis ou que tu testes »** et **« Le coin des testeurs »** : comme en R7a
     et R7b, des nombres et des liens
 - Et **quatre images au plus**, jointes à l'e-mail, jamais chargées à distance : deux pour « Tes
   projets », une pour les proches, une pour les testeurs ; de petites vignettes réduites,
   ré-encodées, sans métadonnées, le titre du projet en texte de remplacement ; un projet sans
-  image prend une tuile miel avec l'icône de sa catégorie
+  image prend une tuile miel avec l'icône de sa catégorie, comme un projet d'un autre membre qui
+  a un signalement ouvert : sa photo ne sort pas de {{appName}} tant que la modération n'a pas
+  décidé
 - Et le pied dit pourquoi elle le reçoit (« Tu reçois ce récap le dimanche, parce qu'il est activé
-  dans tes réglages… »), avec « Changer mes préférences » et « Ne plus recevoir ce récap »
+  dans tes réglages. Il ne parle que de projets visibles des membres. »), avec « Changer mes
+  préférences » et « Ne plus recevoir ce récap »
+- Et un membre qui recevait déjà le récap lit, une seule fois, dans son premier récap du
+  dimanche : « Nouveau : ton récap arrive le dimanche et montre aussi les projets publiés par les
+  membres que tu suis, et ceux qui cherchent des testeurs. Tu peux le régler ou le couper dans
+  tes réglages. » ; le premier récap d'un nouveau membre dit la même chose
+- Et l'aide du choix « Membres » à la publication et à la modification dit désormais : « Les
+  membres de {{appName}} verront ce projet ; tes abonnés le trouveront dans leur fil et dans leur
+  récap par e-mail, qui reste dans leur messagerie. »
 - Et jamais un projet privé, retiré, d'un membre bloqué dans un sens ou dans l'autre, ni d'un
   membre suspendu ; tout se calcule au moment de l'envoi
 - Et il reprend chaque type réglé « Dans le récap », et rien de ce qui est parti « tout de suite »
