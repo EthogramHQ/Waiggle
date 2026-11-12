@@ -68,9 +68,10 @@ const RadioSlotContext = createContext<RadioSlot | null>(null)
 /**
  * La largeur que garde le nom d'une ligne (en points) avant que le côté droit passe dessous : de quoi
  * lire quelques mots. Mesuré à 320 points et 200 % : « Membres bloqués » laissait 38 points à
- * « Sam Petit » (R4, M6).
+ * « Sam Petit » (R4, M6). Exportée : la ligne de choix des réglages (ChoiceRow, R8) range son nom et
+ * son choix actuel de la même façon.
  */
-const MIN_NAME = 120
+export const MIN_NAME = 120
 
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
 /** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
