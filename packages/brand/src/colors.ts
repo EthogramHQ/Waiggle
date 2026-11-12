@@ -37,6 +37,12 @@ const day = {
   // R5b : le miel pâle d'un commentaire visé par une réponse ou une modification (CommentCard,
   // `highlighted`). Plus pâle que la pastille d'une mention, qui doit encore s'y voir.
   highlightSoft: '#FFF7DB',
+  // R8 (relecture de design) : le liseré d'une ligne surlignée de miel pâle (une notification
+  // nouvelle, NotificationCard). Le miel pâle seul ne se détache pas de la lumière miel d'Activité
+  // (1,16:1 sur téléphone, 1,04:1 sur ordinateur) : aucun fond assez clair ou assez foncé pour s'en
+  // détacher ne garderait les textes gris à 4,5:1. Le bord, lui, se voit : 1,5:1 au moins contre la
+  // page, le miel pâle et la lumière miel jusqu'au miel vif (`honey`).
+  highlightEdge: '#D99A00',
   // R5b : le fond de la pastille d'une mention (« @Léa Moreau », MentionText), qui porte l'encre.
   // Assez soutenu pour se détacher d'une carte blanche, grise (les siens) ou surlignée.
   mentionPill: '#FFE58A',
@@ -180,6 +186,9 @@ const night = {
   highlight: '#5A4712',
   // De nuit, un brun miel à peine plus clair que la carte ; la pastille, nettement plus claire.
   highlightSoft: '#2A2313',
+  // De nuit, la lanterne d'Activité est tantôt plus claire que la ligne, tantôt plus sombre : un
+  // miel doré plus clair que l'une et l'autre (1,6:1 au moins contre l'arrêt le plus vif du halo).
+  highlightEdge: '#C8902A',
   mentionPill: '#4F4118',
   onHoney: '#1C1B19',
   honeyDisabled: '#4A3D1C',
@@ -451,6 +460,13 @@ export const contrastPairs: readonly ContrastPair[] = [
   // highlightSoft, comme une notification nouvelle.
   { text: 'controlBorder', on: 'highlightSoft', min: 3 },
   { text: 'controlChecked', on: 'highlightSoft', min: 3 },
+  // R8 (relecture de design) : le liseré d'une notification nouvelle (une forme qui dit un état
+  // déjà lu en mots, « Nouveau » : 1,5, comme un squelette). Contre son propre fond, contre la page
+  // où elle est posée, et contre une carte (catalogue). Contre la lumière miel, arrêt par arrêt :
+  // highlightEdge.test.ts.
+  { text: 'highlightEdge', on: 'highlightSoft', min: 1.5 },
+  { text: 'highlightEdge', on: 'background', min: 1.5 },
+  { text: 'highlightEdge', on: 'surface', min: 1.5 },
   // Le contour de la mascotte sur son disque (une forme, pas un texte : 3), sur la Cire, le noir
   // et le miel vif des écrans de marque, où le disque de verre de jour est posé.
   { text: 'mascotInk', on: 'mascotDisc', min: 3, base: onAnyBackdrop },

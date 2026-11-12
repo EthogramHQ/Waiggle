@@ -10,15 +10,15 @@
 //   pastille, ou une ligne de détail (la première ligne d'une mise à jour, « Voir la raison… »).
 // - À droite, de quoi elle parle : la vignette du projet (`ProjectThumb`) ou la tuile d'un outil
 //   (`InitialTile`).
-// - Nouvelle (arrivée depuis la dernière visite) : un fond de miel très pâle (`highlightSoft`). Le
-//   mot « Nouveau » ne se voit pas, mais il se lit : la couleur seule ne dirait rien à qui n'y voit
-//   pas.
+// - Nouvelle (arrivée depuis la dernière visite) : un fond de miel très pâle (`highlightSoft`) et un
+//   liseré miel (`highlightEdge`). Le mot « Nouveau » ne se voit pas, mais il se lit : la couleur
+//   seule ne dirait rien à qui n'y voit pas.
 //
 // Avec `onPress`, toute la ligne est un lien (vers le projet, le commentaire, l'outil) : les
 // lecteurs d'écran entendent son nom, qui reprend tout ce qu'elle écrit. Avec `onPress: null` (les
 // abonnés à son compte, sans nom), elle ne mène nulle part : ni lien ni bouton, ses textes se lisent
 // l'un après l'autre.
-import { radii, space } from '@ruche/brand'
+import { borders, radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
 import type { Ref } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -170,6 +170,12 @@ function Row({
         // Le miel pâle d'une nouvelle (relecture du plan : jamais `honeySoft`, trop proche du rond
         // miel posé dessus). Sans fond sinon : la ligne est posée sur la page.
         backgroundColor: isNew ? colors.highlightSoft : 'transparent',
+        // Et son liseré miel (relecture de design de R8) : sur la lumière miel d'Activité, le miel
+        // pâle seul ne se voyait presque pas (1,16:1 sur téléphone, 1,04:1 sur ordinateur). Une
+        // ligne vue garde un bord de même épaisseur, transparent : ses textes restent alignés sur
+        // ceux d'une nouvelle.
+        borderWidth: borders.strong,
+        borderColor: isNew ? colors.highlightEdge : 'transparent',
       }}
     >
       <Leading leading={leading} />
