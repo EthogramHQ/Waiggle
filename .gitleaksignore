@@ -17,3 +17,7 @@ f97b266a2935c0dc81c340f967a4d3813d1086ed:apps/app/src/testing/email.ts:generic-a
 30728a059ba90e664dd8854582cbb829e53c6488:apps/app/scripts/shots.mjs:generic-api-key:172
 30728a059ba90e664dd8854582cbb829e53c6488:apps/app/scripts/shots.mjs:generic-api-key:173
 e7c44434b3a6d135cad7b7c4287611b1dc1c9669:apps/api/src/email/preview.ts:generic-api-key:164
+
+# Un identifiant de projet d'exemple (UUID) des tests du récap habillé (R8, 12/11/2026), pris pour
+# une clé. La version suivante du fichier porte « gitleaks:allow » sur la ligne.
+7b07a3cd2b3e340b1e2acd0d8ea06e84251eabb2:apps/api/src/email/templates.test.ts:generic-api-key:493

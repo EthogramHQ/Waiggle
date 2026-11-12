@@ -3784,7 +3784,9 @@ const pages = [
     signedIn: false,
     prepare: async (page) => {
       await page.getByRole('button', { name: 'Confirmer' }).click()
-      await page.getByText(/Tu ne recevras plus d’e‑mail quand on te mentionne/).waitFor()
+      await page
+        .getByText(/Tu ne recevras plus d’e‑mail tout de suite quand on te mentionne/)
+        .waitFor()
       // « Tout couper » ignore les appuis des 600 ms qui suivent la confirmation (la seconde tape
       // d'une double tape) : on appuie comme un membre qui a lu le message.
       await page.waitForTimeout(700)

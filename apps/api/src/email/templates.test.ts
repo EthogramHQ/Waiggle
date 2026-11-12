@@ -490,7 +490,7 @@ describe('the testers corner part of the recap (R7b)', () => {
 describe('the dressed recap (R8)', () => {
   const METEO = '0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10'
   const DECOLLAGE = '5e7a1c3d-2b4f-4a6e-9c8d-0f1e2d3c4b5a'
-  const PAPILLON = '9a8b7c6d-5e4f-4321-8fed-cba987654321'
+  const PAPILLON = '9a8b7c6d-5e4f-4321-8fed-cba987654321' // gitleaks:allow (un UUID d'exemple)
   const projectUrl = (id: string) => `https://waiggle.com/projects/${id}`
 
   /** Une image jointe, aux octets quelconques : le modèle ne les lit pas, il les recopie. */
