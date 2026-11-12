@@ -9,7 +9,7 @@
 # apps/api/Dockerfile) ; l'étiquette n'est là que pour le lecteur.
 
 # --- Étape 1 : construction de l'appli web ---
-FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
+FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS build
 WORKDIR /repo
 RUN corepack enable
 
@@ -41,7 +41,7 @@ RUN pnpm --filter @ruche/app build
 RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
 
 # --- Étape 2 : Caddy et les fichiers de l'appli, rien d'autre ---
-FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+FROM caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
 COPY infra/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/app/dist /srv/app
 # La politique MTA-STS des e-mails (voir infra/Caddyfile, « MTA-STS »), servie à part.
