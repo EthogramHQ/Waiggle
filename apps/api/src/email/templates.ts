@@ -948,7 +948,12 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
                   ].join(''),
                 ),
               ),
-              accountFollows === null ? '' : `<div>${pill(accountFollows)}</div>`,
+              // Les abonnés au compte : une phrase à part, pas une pastille. Posée en pastille sous
+              // le dernier projet, elle se lisait comme les abonnés de ce projet (relecture de
+              // design de R8, Louis 12/11/2026).
+              accountFollows === null
+                ? ''
+                : `<p style="margin:12px 0 0;${body};color:${c.text}">${escapeHtml(accountFollows)}</p>`,
             ].join(''),
           ),
         ]

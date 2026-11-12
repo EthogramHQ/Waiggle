@@ -634,6 +634,21 @@ describe('the dressed recap (R8)', () => {
     expect(email.text).toContain(fill(fr.recap.pillFollows_one, { count: '1' }))
   })
 
+  // Relecture de design de R8 : en pastille sous le dernier projet, « 1 nouvel abonné » se lisait
+  // comme un abonné de ce projet. Les abonnés du compte ont leur phrase à part.
+  it('writes the new followers of my account as a sentence of its own, never as a pill under a project', () => {
+    const email = recapEmail('fr', dressed({ follows: 3 }))
+    const sentence = fill(fr.recap.follows_other, { count: '3' })
+
+    expect(sentence).toBe('3 personnes de plus te suivent')
+    expect(email.text).toContain(sentence)
+    const at = email.html.indexOf(`>${sentence}</`)
+    expect(at).toBeGreaterThan(-1)
+    // L'élément qui la porte est un paragraphe, pas une pastille (`span` au fond miel).
+    const tag = email.html.slice(email.html.lastIndexOf('<', at), at)
+    expect(tag.startsWith('<p ')).toBe(true)
+  })
+
   it('names who replied or mentioned, never what was written', () => {
     const email = recapEmail(
       'fr',
