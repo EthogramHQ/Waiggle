@@ -88,6 +88,9 @@ services:
       PUBLIC_API_URL: https://${API_DOMAIN:-api.localhost}
       APP_URL: https://${APP_DOMAIN:-localhost}
       MAIL_PROVIDER: ${MAIL_PROVIDER:-console}
+      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.tem.scaleway.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
       BREVO_API_KEY: ${BREVO_API_KEY:-}
       SCALEWAY_SECRET_KEY: ${SCALEWAY_SECRET_KEY:-}
       SCALEWAY_PROJECT_ID: ${SCALEWAY_PROJECT_ID:-}
