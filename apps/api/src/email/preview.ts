@@ -6,6 +6,8 @@
 // `pnpm --filter @ruche/api email:preview <dossier>` (scripts/email-preview.ts) écrit ces fichiers.
 import { REMOVAL_EXPLANATION_MAX } from '@ruche/contracts'
 import { type Language, supportedLanguages } from '@ruche/i18n'
+import { instantEmail, instantPreviewData } from './instant'
+import { categoryTile } from './recap-images'
 import {
   changeEmailConfirmationEmail,
   type EmailContent,
@@ -49,25 +51,49 @@ const malik = { name: 'Malik', handle: 'malik' }
 const zoe = { name: 'Zoé', handle: 'zoe' }
 const sam = { name: 'Sam', handle: 'sam' }
 
+// R8 : les réponses et mentions seulement (un commentaire sur son projet devient une pastille).
 // Sept éléments, comme le premier test du récap : cinq lignes, puis « Et 2 autres ».
 const manyLines: RecapLine[] = [
-  { kind: 'comment', ...zoe, title: 'Météo' },
+  { kind: 'reply', ...zoe, title: 'Météo' },
   { kind: 'mention', ...malik, title: 'Jardin' },
   { kind: 'mention', ...sam, title: 'Jardin' },
   { kind: 'reply', ...zoe, title: 'Météo' },
-  { kind: 'comment', ...malik, title: 'Météo' },
-  { kind: 'comment', ...malik, title: 'Météo' },
-  { kind: 'comment', ...malik, title: 'Météo' },
+  { kind: 'mention', ...malik, title: 'Vélo' },
+  { kind: 'mention', ...malik, title: 'Vélo' },
+  { kind: 'mention', ...malik, title: 'Vélo' },
 ]
+
+// R8 : les adresses réelles d'un projet, et ses vignettes. L'aperçu n'a pas de stockage : les
+// images sont les tuiles des catégories (de vrais PNG), nommées comme la tâche les nomme.
+const projectUrl = (id: string) => `${APP_URL}/projects/${id}`
+const image = (n: number, category: string) => ({
+  ...categoryTile(category),
+  cid: `thumb-${n}`,
+  filename: `projet-${n}.png`,
+})
+// Un nom d'auteur de 88 caractères sans espace : la carte doit le couper sans défiler (adresse-E1).
+const LONG_NAME = `Hugo${'o'.repeat(84)}`
 
 const recap = (overrides: Partial<RecapData>): RecapData => ({
   name: 'Inès Morel',
-  lines: [{ kind: 'comment', ...malik, title: 'Météo' }],
+  projects: [
+    {
+      title: 'Le ciel de ce soir',
+      reactions: 1,
+      comments: 1,
+      follows: 0,
+      url: projectUrl('0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10'),
+      image: image(1, 'science'),
+    },
+  ],
+  lines: [],
   more: 0,
-  reactions: 1,
   follows: 1,
   first: false,
+  news: false,
   last: false,
+  friends: [],
+  testersWanted: null,
   updates: [],
   updatesMore: 0,
   testers: [],
@@ -156,10 +182,58 @@ const variants: [string, (language: Language) => EmailContent][] = [
       recapEmail(
         language,
         recap({
+          // La planche R8-Recap : deux projets en tête avec leur vignette, un troisième sans, deux
+          // proches (le premier seul avec sa vignette), un projet qui cherche des testeurs ; 4
+          // images en tout (RECAP_IMAGES_MAX).
+          projects: [
+            {
+              title: 'Le ciel de ce soir',
+              reactions: 23,
+              comments: 4,
+              follows: 2,
+              url: projectUrl('0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10'),
+              image: image(1, 'science'),
+            },
+            {
+              title: LONG_TITLE,
+              reactions: 12,
+              comments: 0,
+              follows: 0,
+              url: projectUrl('7d1c9e04-3b2a-4f68-8e15-a2c4d6b8f901'),
+              image: image(2, 'art'),
+            },
+            {
+              title: 'Vélo',
+              reactions: 0,
+              comments: 1,
+              follows: 0,
+              url: projectUrl('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c06'),
+              image: null,
+            },
+          ],
           lines: manyLines.slice(0, 5),
           more: 2,
-          reactions: 3,
           follows: 2,
+          friends: [
+            {
+              title: 'Décollage !',
+              author: 'Papi Jean',
+              url: projectUrl('5e7a1c3d-2b4f-4a6e-9c8d-0f1e2d3c4b5a'),
+              image: image(3, 'science'),
+            },
+            {
+              title: 'Mon agent de recettes',
+              author: LONG_NAME,
+              url: projectUrl('6e7a1c3d-2b4f-4a6e-9c8d-0f1e2d3c4b5a'),
+              image: null,
+            },
+          ],
+          testersWanted: {
+            title: 'Quel papillon ?',
+            author: 'Hugo Lefèvre',
+            url: projectUrl('9a8b7c6d-5e4f-4321-8fed-cba987654321'),
+            image: image(4, 'animals'),
+          },
           updates: updatedProjects,
           updatesMore: 2,
           testers: testedProjects,
@@ -180,7 +254,19 @@ const variants: [string, (language: Language) => EmailContent][] = [
       ),
   ],
   ['recap-third-without-visit', (language) => recapEmail(language, recap({ last: true }))],
+  // R8 : la note unique du premier récap habillé, pour qui recevait déjà le récap.
+  ['recap-news', (language) => recapEmail(language, recap({ news: true }))],
   ['mentions', (language) => mentionEmail(language, mentions)],
+  // R8 : l'e-mail « tout de suite » (instant.ts), avec une seule nouveauté (un commentaire), puis
+  // avec une nouveauté de chaque sorte.
+  [
+    'instant-one',
+    (language) => {
+      const data = instantPreviewData()
+      return instantEmail({ ...data, lines: data.lines.slice(0, 1), types: ['comments'] }, language)
+    },
+  ],
+  ['instant-many', (language) => instantEmail(instantPreviewData(), language)],
   // Les trois e-mails de service du changement d'adresse : ni publicité ni désinscription.
   [
     'change-email',

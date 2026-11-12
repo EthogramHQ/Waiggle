@@ -16,6 +16,19 @@ mkdirSync(folder, { recursive: true })
 
 for (const { file, email } of emailPreviews()) {
   writeFileSync(join(folder, file), email.html, 'utf8')
+  // R8 : les vignettes jointes du récap. Un navigateur ne sait pas lire « cid: » (c'est la
+  // messagerie qui relie l'image à sa pièce jointe) : chaque image est écrite à côté, et une copie
+  // « .view.html » les montre par leur nom de fichier. Le fichier .html reste l'e-mail tel quel.
+  const attachments = email.attachments ?? []
+  if (attachments.length > 0) {
+    let view = email.html
+    for (const attachment of attachments) {
+      const name = file.replace(/\.html$/, `.${attachment.filename}`)
+      writeFileSync(join(folder, name), attachment.content)
+      view = view.replaceAll(`cid:${attachment.cid}"`, `${name}"`)
+    }
+    writeFileSync(join(folder, file.replace(/\.html$/, '.view.html')), view, 'utf8')
+  }
   const headers = Object.entries(email.headers ?? {}).map(([key, value]) => `${key}: ${value}`)
   const text = [...headers, `Subject: ${email.subject}`, '', email.text].join('\n')
   writeFileSync(join(folder, file.replace(/\.html$/, '.txt')), text, 'utf8')
