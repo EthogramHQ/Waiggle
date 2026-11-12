@@ -91,7 +91,7 @@ const { t: translate } = createI18n('fr')
 
 /**
  * R8 : les phrases portent des marques (`<b>…</b>` pour le gras, `<v>…</v>` pour une version) que
- * l'écran découpe (notifications/marks.ts). Ce qu'on lit à l'écran, c'est la phrase sans elles.
+ * l'écran découpe (ui/marks.ts). Ce qu'on lit à l'écran, c'est la phrase sans elles.
  */
 const plain = (text: string): string => text.replace(/<\/?[bv]>/g, '')
 const t = ((...args: Parameters<typeof translate>) =>
