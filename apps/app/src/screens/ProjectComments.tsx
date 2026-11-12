@@ -264,7 +264,9 @@ export function Comments({
       }
     } else if (gone) {
       arrivedFor.current = contextId
-      focusWithoutScroll(goneRef.current)
+      // Dans la colonne, la phrase est loin sous le haut de la page : elle vient au milieu.
+      if (columns) focusAndReveal(goneRef.current, calm)
+      else focusWithoutScroll(goneRef.current)
       moveReaderTo(goneRef.current)
     } else return
     onFocusDone?.()
