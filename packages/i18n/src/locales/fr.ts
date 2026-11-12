@@ -398,7 +398,7 @@ export const fr = {
     emails: {
       title: 'E‑mails',
       weeklyRecap: 'Le récap de la semaine',
-      weeklyRecapHint: 'Le lundi matin, seulement s’il y a du nouveau.',
+      weeklyRecapHint: 'Le dimanche à 10 h, seulement s’il y a du nouveau.',
       mentionEmails: 'Un e‑mail quand on me mentionne ou me répond',
       mentionEmailsHint: 'Un quart d’heure après, si tu ne l’as pas déjà vu. Un par heure au plus.',
       saved: 'Réglage enregistré.',
@@ -572,10 +572,11 @@ export const fr = {
       private: 'Privé',
       // juridique (jur-J6).
       privateHint: 'Un brouillon : aucun autre membre ne le voit.',
+      // R8 (juridique, relecture du plan) : le récap par e-mail en parle aussi.
       audienceMembers:
-        'Les membres de {{appName}} verront ce projet, et tes abonnés le trouveront dans leur fil.',
+        'Les membres de {{appName}} verront ce projet ; tes abonnés le trouveront dans leur fil et dans leur récap par e‑mail, qui reste dans leur messagerie.',
       audienceMembersEdit:
-        'Les membres de {{appName}} voient ce projet, et tes abonnés le retrouvent dans leur fil.',
+        'Les membres de {{appName}} voient ce projet ; tes abonnés le retrouvent dans leur fil et dans leur récap par e‑mail, qui reste dans leur messagerie.',
       // juridique (jur-J6) : un nouveau projet privé.
       audiencePrivateNew:
         'Aucun autre membre ne le verra. Tu pourras le montrer aux membres quand tu voudras.',
@@ -1022,6 +1023,8 @@ export const fr = {
       },
     },
     comments: {
+      // R8 (« Voir en contexte ») : le commentaire visé n'existe plus, ou ne se voit pas.
+      gone: 'Ce commentaire n’est plus là.',
       // R5b : le titre seul ; le nombre est dessiné à côté par `CountedTitle` et lu par `spokenCount`.
       title: 'Commentaires',
       spokenCount_one: '{{count}} commentaire',
@@ -1947,7 +1950,19 @@ export const fr = {
     confirm: 'Confirmer',
     keep: 'Garder mes e‑mails',
     doneRecap: 'Tu ne recevras plus le récap de la semaine.',
-    doneMentions: 'Tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.',
+    doneMentions: 'Tu ne recevras plus d’e‑mail tout de suite quand on te mentionne ou te répond.',
+    // R8 : le lien d'un e-mail « tout de suite » (planche R8-Email-TdS) : « Dans le récap » coché.
+    titleInstant: 'Tes e‑mails tout de suite',
+    askInstant:
+      'Les types que tu as réglés sur « Tout de suite » t’arrivent par e‑mail dès qu’il se passe quelque chose. Que deviennent-ils ?',
+    choiceDigest: 'Dans le récap',
+    choiceDigestHint: 'Le dimanche à 10 h, avec le reste de ta semaine.',
+    choiceNever: 'Jamais',
+    choiceNeverHint: 'Plus aucun e‑mail pour ces types. Tout reste dans l’Activité de l’appli.',
+    onlyConfirm: 'Ouvrir cette page ne change rien : seul « Confirmer » change tes choix.',
+    doneInstantDigest:
+      'C’est fait : ces types ne partent plus tout de suite, ils passent dans le récap.',
+    doneInstantNever: 'C’est fait : plus aucun e‑mail pour ces types. Tout reste dans l’Activité.',
     allOff: 'Tout couper',
     allDone: 'Tu ne recevras plus aucun e‑mail de notification.',
     accountEmails:
@@ -2024,10 +2039,28 @@ export const fr = {
     link: '[lien]',
     recap: {
       subject: 'Du nouveau sur {{appName}}',
-      heading: 'Du nouveau cette semaine',
-      intro: 'Voici ce que tu n’as pas encore vu sur {{appName}} cette semaine.',
+      // R8 (planche R8-Recap) : le récap habillé du dimanche.
+      heading: 'Ta semaine sur {{appName}}, {{name}}',
+      intro: 'Voici ce qui a bougé chez toi et chez tes proches.',
+      // Juridique (relecture du plan R8, décision de Louis du 12/11/2026), tel quel.
       first:
-        'C’est ton premier récap : chaque lundi, s’il y a du nouveau, {{appName}} te résume tes notifications. Il est activé par défaut ; tu peux le couper à tout moment.',
+        'C’est ton premier récap. Il arrive le dimanche et montre aussi les projets publiés par les membres que tu suis, et ceux qui cherchent des testeurs. Il est activé par défaut ; tu peux le régler ou le couper dans tes réglages.',
+      // Une seule fois, dans le premier récap de R8 d'un membre qui le recevait déjà.
+      news: 'Nouveau : ton récap arrive le dimanche et montre aussi les projets publiés par les membres que tu suis, et ceux qui cherchent des testeurs. Tu peux le régler ou le couper dans tes réglages.',
+      yourProjects: 'Tes projets',
+      pillReactions_one: '{{count}} réaction',
+      pillReactions_other: '{{count}} réactions',
+      pillComments_one: '{{count}} commentaire',
+      pillComments_other: '{{count}} commentaires',
+      pillFollows_one: '{{count}} nouvel abonné',
+      pillFollows_other: '{{count}} nouveaux abonnés',
+      readComments: 'Lire les commentaires',
+      // Titre et nom seuls, jamais l'accroche (décision de Louis du 12/11/2026).
+      friendsTitle: 'Nouveaux projets de tes proches',
+      viewProject: 'Voir le projet',
+      testersWanted: 'Ils cherchent des testeurs',
+      // Mène à la page du projet, jamais à la démo (relecture du plan sec-A4).
+      tryDemo: 'Tester la démo',
       comment: '{{name}} (@{{handle}}) a commenté « {{title}} »',
       reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} »',
       mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} »',
@@ -2053,8 +2086,10 @@ export const fr = {
       testersMore_other: 'Et {{count}} autres projets',
       button: 'Voir mes notifications',
       last: 'Ce récap est le dernier pour l’instant : le prochain partira après ta prochaine visite.',
-      reason: 'Tu reçois ce récap parce qu’il est activé dans tes réglages {{appName}}.',
-      unsubscribe: 'Ne plus recevoir le récap de la semaine',
+      // Juridique (relecture du plan R8), tel quel.
+      reason:
+        'Tu reçois ce récap le dimanche, parce qu’il est activé dans tes réglages. Il ne parle que de projets visibles des membres.',
+      unsubscribe: 'Ne plus recevoir ce récap',
     },
     mentions: {
       // Objet et titre vrais même quand l'e-mail ne contient que des réponses (relecture juridique).
@@ -2066,6 +2101,54 @@ export const fr = {
       reason: 'Tu reçois cet e‑mail parce que tu as activé les e‑mails de mentions et de réponses.',
       unsubscribe: 'Ne plus recevoir les e‑mails de mentions et de réponses',
     },
+    // R8 (planche R8-Email-TdS) : un seul e-mail regroupe tous les types réglés sur « Tout de
+    // suite ». L'objet ne nomme jamais un retour du coin ; un appel ou un message du coin ne donne
+    // aucun texte (le fil est privé, une messagerie le garderait).
+    instant: {
+      subjectComment: '{{name}} a commenté « {{title}} »',
+      subjectReply: '{{name}} a répondu à ton commentaire sur « {{title}} »',
+      subjectMention: '{{name}} parle de toi dans un commentaire sur « {{title}} »',
+      subjectTesterCall: '{{name}} lance un appel à tester « {{title}} »',
+      subjectMore_one: '{{first}} et {{count}} autre nouveauté',
+      subjectMore_other: '{{first}} et {{count}} autres nouveautés',
+      // Quand la première ligne est un message du coin : un objet sans nom ni titre.
+      subjectNews_one: 'Une nouveauté pour toi sur {{appName}}',
+      subjectNews_other: '{{count}} nouveautés pour toi sur {{appName}}',
+      heading_one: 'Une nouveauté pour toi',
+      heading_other: '{{count}} nouveautés pour toi',
+      intro: 'Bonjour {{name}}, voici ce qui vient d’arriver sur {{appName}}.',
+      labels: {
+        comment: 'Commentaire',
+        reply: 'Réponse',
+        mention: 'Mention',
+        testers: 'Coin des testeurs',
+      },
+      // « Commentaire · 18 h 02 » : l'heure de Paris.
+      when: '{{label}} · {{time}}',
+      comment: '{{name}} (@{{handle}}) a commenté « {{title}} » :',
+      reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} » :',
+      mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} » :',
+      testerCall: '{{name}} (@{{handle}}) lance un appel à tester « {{title}} ».',
+      testerFeedback: '{{name}} (@{{handle}}) t’a envoyé un retour sur « {{title}} ».',
+      testerReplyToTester: '{{name}} (@{{handle}}) a répondu à ton retour sur « {{title}} ».',
+      testerReplyToAuthor: '{{name}} (@{{handle}}) a répondu sur « {{title}} ».',
+      feedbackSettled: '{{name}} (@{{handle}}) a réglé ton retour sur « {{title}} ».',
+      private: 'Le fil du coin des testeurs est privé : son texte reste dans l’appli.',
+      callPrivate: 'L’appel reste dans le coin des testeurs : son texte ne sort pas de l’appli.',
+      seeInContext: 'Voir en contexte',
+      readFeedback: 'Lire le retour',
+      readReply: 'Lire la réponse',
+      readCall: 'Lire l’appel',
+      openCorner: 'Ouvrir le coin des testeurs',
+      // {{types}} : les noms des types entre guillemets, joints par l'API (« A », « B » et « C »).
+      reason_one:
+        'Tu reçois cet e‑mail parce que {{types}} est réglé sur « Tout de suite » dans tes réglages. Au plus un e‑mail par heure ; ce qu’il contient ne revient pas dans le récap.',
+      reason_other:
+        'Tu reçois cet e‑mail parce que {{types}} sont réglés sur « Tout de suite » dans tes réglages. Au plus un e‑mail par heure ; ce qu’il contient ne revient pas dans le récap.',
+      unsubscribe: 'Ne plus recevoir ces e‑mails',
+    },
+    // R8 : le lien vers les réglages, dans le récap et l'e-mail « tout de suite ».
+    changePreferences: 'Changer mes préférences',
     footer: '{{appName}}, le réseau des projets IA entre proches. Contact : {{contactEmail}}',
     moderationAlert: {
       // Sans aucun extrait : le nombre en attente et le lien, rien de plus ne part chez l'envoyeur.
@@ -2129,6 +2212,9 @@ export const fr = {
         'Tu reçois cet e‑mail parce qu’une demande a été faite sur {{appName}} avec ton adresse. Les e‑mails de sécurité du compte arrivent toujours.',
       // La version texte n'a pas de bouton : ce libellé, puis l'adresse du lien en dessous.
       textLink: 'Choisir un nouveau mot de passe :',
+      // R8 : la version texte ne parle pas d'un bouton.
+      textBody:
+        'Une demande vient d’arriver pour changer le mot de passe de ton compte {{appName}}. Pour en choisir un nouveau, ouvre le lien ci-dessous.',
     },
     // R2 : après tout changement de mot de passe (lien ou réglages), sans jamais le mot de passe.
     passwordChanged: {
@@ -2149,6 +2235,10 @@ export const fr = {
       body: 'Tu as demandé à remplacer l’adresse de ton compte par :',
       // Les conséquences d'abord, la consigne ensuite, juste avant la durée et le bouton (des-E5).
       next: 'Une fois l’adresse changée, ton adresse actuelle ne servira plus à te connecter et ne recevra plus rien de {{appName}}. Confirme avec le bouton ci-dessous : un second lien partira ensuite vers la nouvelle adresse.',
+      // R8 : la version texte ne parle pas d'un bouton.
+      textNext:
+        'Une fois l’adresse changée, ton adresse actuelle ne servira plus à te connecter et ne recevra plus rien de {{appName}}. Confirme avec le lien ci-dessous : un second lien partira ensuite vers la nouvelle adresse.',
+      textLink: 'Confirmer le changement :',
       button: 'Confirmer le changement',
       expires: 'Ce lien est valable une heure.',
       // Un paragraphe normal sous le bouton, l'adresse de contact en gras (des-E4, 26/10/2026).
@@ -2159,6 +2249,10 @@ export const fr = {
     // … puis le second vers la nouvelle adresse, pour la vérifier.
     newEmail: {
       subject: 'Confirme ta nouvelle adresse sur {{appName}}',
+      // R8 : l'e-mail a un titre.
+      heading: 'Confirme ta nouvelle adresse',
+      textBody:
+        'Ouvre le lien ci-dessous, sur un appareil où ta session {{appName}} est ouverte, pour que cette adresse devienne celle de ton compte.',
       // Ni nom ni ancienne adresse : avec une faute de frappe, cet e-mail part chez un inconnu (S6).
       greeting: 'Bonjour,',
       body: 'Clique sur le bouton ci-dessous, sur un appareil où ta session {{appName}} est ouverte, pour que cette adresse devienne celle de ton compte.',
@@ -2201,6 +2295,36 @@ export const fr = {
       // La salutation, sans le nom : l'e-mail ne cite que la décision (7c).
       greeting: 'Bonjour,',
     },
+  },
+  // R8 (planche R8-Reglages) : l'écran « Notifications » des réglages.
+  notificationSettings: {
+    title: 'Notifications',
+    // L'exemple en tête, sans nom (A3) ; « {{appName}} · maintenant » imite l'en-tête d'une
+    // notification du téléphone.
+    exampleSource: '{{appName}} · maintenant',
+    exampleText: '12 réactions sur <b>Raconte-moi un tableau</b>',
+    inApp: 'Dans l’appli, tout arrive dans l’Activité. Réactions et abonnés : combien, jamais qui.',
+    phone: 'Sur ce téléphone',
+    soon: 'Bientôt',
+    byEmail: 'Par e‑mail',
+    types: {
+      reactions: 'Réactions',
+      comments: 'Commentaires sur tes projets',
+      replies: 'Réponses et mentions',
+      follows: 'Nouveaux abonnés',
+      updates: 'Mises à jour suivies',
+      testers: 'Coin des testeurs',
+    },
+    choices: { now: 'Tout de suite', digest: 'Dans le récap', never: 'Jamais' },
+    // Le nom lu d'une ligne de choix : son libellé, puis son choix actuel.
+    rowName: '{{label}}, {{choice}}',
+    recap: 'Le récap',
+    recapHint: 'Le dimanche à 10 h, s’il y a du nouveau',
+    // Sous un type « Dans le récap » quand le récap est coupé ; son choix ne change pas.
+    recapOff: 'Le récap est coupé : rien ne part',
+    security: 'Les e‑mails de sécurité du compte arrivent toujours.',
+    saveError: 'Ce choix n’a pas pu s’enregistrer. Réessaie.',
+    loadError: 'Tes réglages d’e‑mail n’ont pas pu se charger.',
   },
   feed: {
     label: 'Le fil',
@@ -2315,7 +2439,8 @@ export const fr = {
   },
   // Tranche 6b : les notifications dans l'appli. Jamais le nom de qui a réagi ou suit.
   notifications: {
-    title: 'Notifications',
+    // R8 : la page s'appelle « Activité » ; la cloche garde son nom.
+    title: 'Activité',
     bell: 'Notifications',
     bellNew_one: 'Notifications, {{count}} nouvelle',
     bellNew_other: 'Notifications, {{count}} nouvelles',
@@ -2323,49 +2448,97 @@ export const fr = {
     new: 'Nouveau',
     emptyTitle: 'Pas encore de notification',
     empty:
-      'Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
+      'Les commentaires, les réactions et les mises à jour des projets que tu suis arriveront ici.',
     // Un compte suspendu ne publie pas : l'état vide propose de lire (7c).
     emptyActionSuspended: 'Explorer les projets',
     emptyAction: 'Publier un projet',
+    // R8 (planche R8-Activite-Vide) : le second bouton de l'état vide.
+    emptyExplore: 'Explorer des projets',
+    // R8 : les sections, en jours de Paris (décision de Louis du 12/11/2026).
+    sections: { today: 'Aujourd’hui', week: 'Cette semaine', earlier: 'Plus tôt' },
+    // Sur ordinateur : éteint tout de suite le miel de la page.
+    markAllRead: 'Tout marquer comme lu',
+    // La roue de la barre du haut (bouton à icône seule : ce texte est son nom).
+    settings: 'Régler les notifications',
+    // Sous une ligne de retrait par la modération.
+    removedDetail: 'Voir la raison et comment contester',
+    // R8 : chaque phrase est une seule clé ; <b>…</b> marque ce qui s'écrit en gras (noms, titres),
+    // <v>…</v> une version. L'appli découpe ces marques (notifications/marks.ts), qu'aucun texte de
+    // membre ne peut contenir : les noms et titres remplissent {{…}} après le découpage.
+    updateMore_one: '{{line}}, et {{count}} autre changement',
+    updateMore_other: '{{line}}, et {{count}} autres changements',
+    // R8 : les deux notifications du catalogue, signées par l'équipe, jamais par l'administrateur.
+    projectCategory:
+      'L’équipe de {{appName}} a rangé « <b>{{title}}</b> » dans <b>{{category}}</b>',
+    toolAdded: '« <b>{{name}}</b> » fait maintenant partie des outils de {{appName}}',
+    toolMerged: '« <b>{{name}}</b> » s’affiche maintenant comme « <b>{{tool}}</b> »',
+    // R8 : la colonne de droite sur ordinateur.
+    emailColumn: {
+      title: 'Ce que tu reçois par e‑mail',
+      settings: 'Régler les notifications',
+      counts: 'On ne voit nulle part qui a réagi ou qui te suit : seulement des nombres.',
+    },
+    // La phrase de la colonne (email/summary.ts) : {{types}} est une liste comme « les réponses et
+    // les mentions », dont l'appli met la première lettre en capitale.
+    summary: {
+      nowAndRest: '{{types}} tout de suite ; le reste dans le récap du dimanche, à 10 h.',
+      nowAndSome:
+        '{{types}} tout de suite ; une partie du reste dans le récap du dimanche, à 10 h.',
+      nowOnly: '{{types}} tout de suite ; le reste seulement dans l’Activité.',
+      recapAll: 'Tout dans le récap du dimanche, à 10 h.',
+      recapSome:
+        'Une partie dans le récap du dimanche, à 10 h ; le reste seulement dans l’Activité.',
+      nothing: 'Aucun e‑mail de notification : tout reste dans l’Activité.',
+      types: {
+        reactions: 'les réactions',
+        comments: 'les commentaires sur tes projets',
+        replies: 'les réponses et les mentions',
+        follows: 'les nouveaux abonnés',
+        updates: 'les mises à jour suivies',
+        testers: 'le coin des testeurs',
+      },
+    },
     more: 'Afficher la suite',
     moreError: 'La suite des notifications n’a pas pu se charger.',
     errorTitle: 'Les notifications n’ont pas pu se charger',
-    reactions_one: '{{count}} réaction sur « {{title}} »',
-    reactions_other: '{{count}} réactions sur « {{title}} »',
+    reactions_one: '{{count}} réaction sur <b>{{title}}</b>',
+    reactions_other: '{{count}} réactions sur <b>{{title}}</b>',
     reactionCount: '{{reaction}} ×{{count}}',
-    comment: '{{name}} a commenté « {{title}} »',
-    mention: '{{name}} parle de toi dans un commentaire sur « {{title}} »',
-    reply: '{{name}} a répondu à ton commentaire sur « {{title}} »',
+    comment: '<b>{{name}}</b> a commenté <b>{{title}}</b>',
+    mention: '<b>{{name}}</b> parle de toi dans un commentaire sur <b>{{title}}</b>',
+    reply: '<b>{{name}}</b> a répondu à ton commentaire sur <b>{{title}}</b>',
     // R7a : une mise à jour d'un projet qu'on suit ou qu'on teste ; sa première ligne en dessous.
-    projectUpdate: '{{name}} a publié une mise à jour de « {{title}} »',
-    projectUpdateVersion: '{{name}} a publié une mise à jour de « {{title}} » · {{version}}',
+    // R8 (planche R8-Activite) : une icône, le projet nommé, pas l'auteur.
+    projectUpdate: '<b>{{title}}</b> a une mise à jour',
+    projectUpdateVersion: '<b>{{title}}</b> a une mise à jour <v>{{version}}</v>',
     // R7b : le coin des testeurs.
-    testerCall: '{{name}} lance un appel à tester « {{title}} »',
-    testerFeedback: '{{name}} a envoyé un retour sur « {{title}} »',
-    testerReplyToTester: '{{name}} a répondu à ton retour sur « {{title}} »',
-    testerReplyToAuthor: '{{name}} a répondu sur « {{title}} »',
-    feedbackSettled: '{{name}} a réglé ton retour sur « {{title}} »',
-    feedbackSettledVersion: '{{name}} a réglé ton retour dans la {{version}} de « {{title}} »',
+    testerCall: '<b>{{name}}</b> lance un appel à tester <b>{{title}}</b>',
+    testerFeedback: '<b>{{name}}</b> t’a envoyé un retour sur <b>{{title}}</b>',
+    testerReplyToTester: '<b>{{name}}</b> a répondu à ton retour sur <b>{{title}}</b>',
+    testerReplyToAuthor: '<b>{{name}}</b> a répondu sur <b>{{title}}</b>',
+    feedbackSettled: '<b>{{name}}</b> a réglé ton retour sur <b>{{title}}</b>',
+    feedbackSettledVersion:
+      '<b>{{name}}</b> a réglé ton retour dans la <v>{{version}}</v> de <b>{{title}}</b>',
     feedbackSettledUpdate:
-      '{{name}} a réglé ton retour dans la mise à jour du {{date}} de « {{title}} »',
+      '<b>{{name}}</b> a réglé ton retour dans la mise à jour du {{date}} de <b>{{title}}</b>',
     memberFollows_one: '{{count}} personne de plus te suit',
     memberFollows_other: '{{count}} personnes de plus te suivent',
-    projectFollows_one: '{{count}} personne de plus suit « {{title}} »',
-    projectFollows_other: '{{count}} personnes de plus suivent « {{title}} »',
+    projectFollows_one: '{{count}} personne de plus suit <b>{{title}}</b>',
+    projectFollows_other: '{{count}} personnes de plus suivent <b>{{title}}</b>',
     hidden:
-      'Ton commentaire sur « {{title}} » a été masqué par la personne qui a publié le projet. Il reste visible pour toi et pour cette personne.',
+      'Ton commentaire sur <b>{{title}}</b> a été masqué par la personne qui a publié le projet. Il reste visible pour toi et pour cette personne.',
     handle: 'Ton pseudo est @{{handle}}, tiré de ton nom. Tu peux le changer dans Mon profil.',
     removed: {
-      project: 'Ton projet « {{title}} » a été retiré par la modération',
-      note: 'Ta note sur « {{title}} » a été retirée par la modération',
-      // juridique (T1 de R7a), mot pour mot.
-      update: 'Ta mise à jour de « {{title}} » a été retirée par la modération',
-      comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
+      project: 'Ton projet <b>{{title}}</b> a été retiré par la modération',
+      note: 'Ta note sur <b>{{title}}</b> a été retirée par la modération',
+      // juridique (T1 de R7a), mot pour mot (R8 : le titre en gras plutôt qu'entre guillemets).
+      update: 'Ta mise à jour de <b>{{title}}</b> a été retirée par la modération',
+      comment: 'Ton commentaire sur <b>{{title}}</b> a été retiré par la modération',
       // Tranche 7b, règle 9 : sur le projet d'un membre qui t'a bloqué, ni titre ni lien.
       commentElsewhere: 'Ton commentaire a été retiré par la modération',
       // R7b.
-      call: 'Ton appel à tester « {{title}} » a été retiré par la modération',
-      message: 'Ton message sur « {{title}} » a été retiré par la modération',
+      call: 'Ton appel à tester <b>{{title}}</b> a été retiré par la modération',
+      message: 'Ton message sur <b>{{title}}</b> a été retiré par la modération',
     },
     reportHandled: {
       // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).

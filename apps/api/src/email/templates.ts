@@ -30,6 +30,19 @@ export type Email = {
    * List-Unsubscribe-Post, RFC 8058). Le Mailer refuse tout autre en-tête (voir mailer.ts).
    */
   headers?: Record<string, string>
+  /**
+   * R8 : les vignettes du récap, jointes « en ligne » : le HTML les montre par `cid:<cid>`, jamais
+   * chargées à distance (A5). `cid` et `filename` sont fabriqués (`thumb-1`, `projet-1.jpg`), jamais
+   * tirés d'un texte de membre. Un transport qui ne sait pas les joindre refuse l'e-mail plutôt que
+   * de les perdre (voir mailer.ts).
+   */
+  attachments?: Attachment[]
+}
+export type Attachment = {
+  filename: string
+  contentType: 'image/jpeg' | 'image/png'
+  content: Uint8Array
+  cid: string
 }
 export type EmailContent = Omit<Email, 'to'>
 

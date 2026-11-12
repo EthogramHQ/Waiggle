@@ -447,6 +447,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'controlBorder', on: 'background', min: 3 },
   { text: 'controlChecked', on: 'surface', min: 3 },
   { text: 'controlChecked', on: 'background', min: 3 },
+  // R8 (relecture du plan ui-B3) : une ligne de choix ouverte (ChoiceRow) pose ses ronds sur
+  // highlightSoft, comme une notification nouvelle.
+  { text: 'controlBorder', on: 'highlightSoft', min: 3 },
+  { text: 'controlChecked', on: 'highlightSoft', min: 3 },
   // Le contour de la mascotte sur son disque (une forme, pas un texte : 3), sur la Cire, le noir
   // et le miel vif des écrans de marque, où le disque de verre de jour est posé.
   { text: 'mascotInk', on: 'mascotDisc', min: 3, base: onAnyBackdrop },

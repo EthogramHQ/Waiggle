@@ -54,9 +54,10 @@ const parisDay = (date: Date): { year: number; month: number; day: number } => {
  * Le nombre de jours du calendrier de Paris entre deux dates : 0 le même jour, 1 la veille. On
  * compte des jours du calendrier, pas des tranches de 24 h : 23 h 50 la veille, c'est « hier »,
  * même dix minutes plus tard. Date.UTC compte en jours entiers, sans heure d'été qui fausserait
- * la soustraction.
+ * la soustraction. Exportée en R8 : les sections d'Activité (`notifications/days.ts`) comptent les
+ * jours de la même façon.
  */
-const parisDaysBetween = (earlier: Date, later: Date): number => {
+export const parisDaysBetween = (earlier: Date, later: Date): number => {
   const dayNumber = (date: Date) => {
     const { year, month, day } = parisDay(date)
     return Date.UTC(year, month - 1, day) / (24 * HOUR)

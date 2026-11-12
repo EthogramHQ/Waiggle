@@ -1,9 +1,13 @@
 // Les notifications (tranche 6b). Elles ne sont pas recopiées : l'API les calcule à la lecture à
-// partir des réactions, abonnements et commentaires. Il ne reste à garder que deux choses : qui un
-// commentaire mentionne, et jusqu'où chaque membre a regardé ses notifications.
-import { index, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+// partir des réactions, abonnements et commentaires. Il ne reste à garder que qui un commentaire
+// mentionne, jusqu'où chaque membre a regardé ses notifications, et (R8) les gestes du catalogue.
+import { sql } from 'drizzle-orm'
+import { check, index, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { category } from './categories'
 import { projectComment } from './comments'
+import { project } from './projects'
+import { tool } from './tools'
 
 /**
  * Les membres mentionnés dans un commentaire (« @ines_morel »). La mention est gardée par
@@ -60,3 +64,42 @@ export const notificationState = pgTable('notification_state', {
   // serait plus vraie.
   handleChosenAt: timestamp('handle_chosen_at'),
 })
+
+/**
+ * R8 : les notifications du catalogue, les seules qui s'écrivent (les autres se calculent) : un
+ * administrateur range un projet dans une catégorie (`project_category`), ou fait entrer au
+ * catalogue un outil qu'un membre avait écrit en « Autre » (`tool_added`, ou `tool_merged` quand il
+ * le rattache à un outil existant). Rien d'autre ne garde la trace de ces gestes pour l'auteur : le
+ * journal `catalogue_change` est celui de l'administration, sans destinataire. Une ligne par membre
+ * et par outil (pas par projet). Écrite dans la même transaction que le geste ; jamais pour
+ * l'administrateur lui-même. Effacée avec le compte, le projet ou l'outil, et après 90 jours.
+ */
+export const catalogueNotice = pgTable(
+  'catalogue_notice',
+  {
+    id: uuid('id').primaryKey(),
+    memberId: text('member_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    // Le projet rangé ; null pour un outil.
+    projectId: uuid('project_id').references(() => project.id, { onDelete: 'cascade' }),
+    // L'outil du catalogue (pour `tool_merged`, l'outil cible du rattachement) ; null pour un projet.
+    toolId: uuid('tool_id').references(() => tool.id, { onDelete: 'cascade' }),
+    // Le nom tel que le membre l'avait tapé dans « Autre » (40 caractères au plus) ; null pour un projet.
+    typedName: text('typed_name'),
+    // La catégorie où le projet a été rangé ; null pour un outil.
+    categoryCode: text('category_code').references(() => category.code),
+    // Écrite par l'API (horloge que les tests remplacent), comme les autres dates.
+    createdAt: timestamp('created_at').notNull(),
+  },
+  (t) => [
+    // Les notifications d'un membre cherchent « ses notices, les plus récentes d'abord ».
+    index('catalogue_notice_member_idx').on(t.memberId, t.createdAt.desc()),
+    check(
+      'catalogue_notice_kind_check',
+      sql`(${t.kind} = 'project_category' and ${t.projectId} is not null and ${t.categoryCode} is not null and ${t.toolId} is null)
+        or (${t.kind} in ('tool_added', 'tool_merged') and ${t.toolId} is not null and ${t.typedName} is not null and ${t.projectId} is null)`,
+    ),
+  ],
+)

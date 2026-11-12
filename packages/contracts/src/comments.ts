@@ -6,7 +6,7 @@
 import { z } from 'zod'
 import { FeedCursor } from './feed'
 import { MENTIONS_MAX, Mention } from './mentions'
-import { ProjectAuthor } from './projects'
+import { ProjectAuthor, ProjectId } from './projects'
 import { Removal } from './removal'
 import { VisibleFreeText } from './text'
 
@@ -145,3 +145,14 @@ export const CommentPage = z
   })
   .meta({ id: 'CommentPage' })
 export type CommentPage = z.infer<typeof CommentPage>
+
+/**
+ * R8, « Voir en contexte » (GET /v1/comments/{commentId}/context) : le fil entier du commentaire
+ * visé (sa racine et ses réponses, mêmes règles de visibilité que la liste), et le projet où il est.
+ * L'appli compare `projectId` à la page ouverte : un commentaire d'un autre projet se traite comme
+ * un commentaire parti. Tout ce qui ne se voit pas ou n'existe plus répond le même 404.
+ */
+export const CommentContext = z
+  .object({ projectId: ProjectId, thread: Comment })
+  .meta({ id: 'CommentContext' })
+export type CommentContext = z.infer<typeof CommentContext>
