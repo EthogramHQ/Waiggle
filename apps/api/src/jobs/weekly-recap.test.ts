@@ -2,21 +2,35 @@
 // (tranche 6c) », « Le récap » ; règles détaillées : plan 6c, « Les tâches », et les relectures du
 // plan (sécurité S-B1, S-B2 ; juridique R1, R3, R4, R5).
 //
-// Le récap est une fonction ordinaire, weeklyRecap({ db, mailer, appUrl, apiUrl, secret }, now) :
-// l'ordonnanceur (pg-boss) l'appelle le lundi à 9 h, les tests l'appellent eux-mêmes, à l'heure
+// R8 (planche R8-Recap) : le récap habillé du dimanche, ses parties « Tes projets » (des nombres en
+// pastilles), « Nouveaux projets de tes proches » et « Ils cherchent des testeurs », ses vignettes
+// jointes, et les choix d'e-mail par type (seuls les types « Dans le récap », et ce qui n'est pas déjà
+// parti « tout de suite »). Les tests de R8 sont à la fin du fichier.
+//
+// Le récap est une fonction ordinaire, weeklyRecap({ db, mailer, storage, appUrl, apiUrl, secret },
+// now) : l'ordonnanceur (pg-boss) l'appelle le dimanche à 10 h, les tests l'appellent eux-mêmes, à l'heure
 // qu'ils choisissent, et lisent la fausse boîte d'envoi (ctx.mailer.sent). Les gestes des membres
 // passent par l'API, comme dans l'appli.
 //
 // Quatre membres : Inès (qui reçoit le récap), Malik, Zoé et Sam (qui commentent, répondent,
-// mentionnent, réagissent et suivent). La fausse horloge part d'un lundi fixe, loin d'aujourd'hui.
+// mentionnent, réagissent et suivent). La fausse horloge part d'un dimanche fixe, loin d'aujourd'hui.
 import { randomUUID } from 'node:crypto'
 import { appName } from '@ruche/brand'
-import { NotificationPage, TesterCall, TesterMessage } from '@ruche/contracts'
+import {
+  DEFAULT_EMAIL_PREFERENCES,
+  NotificationPage,
+  Project,
+  RECAP_FRIEND_PROJECTS_MAX,
+  RECAP_IMAGES_MAX,
+  TesterCall,
+  TesterMessage,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mailer } from '../email/mailer'
+import { categoryTile } from '../email/recap-images'
 import type { Email } from '../email/templates'
 import { createUnsubscribeToken, readUnsubscribeToken } from '../email/unsubscribe-token'
 import { activity } from '../testing/activity'
@@ -27,7 +41,8 @@ import {
   TEST_AUTH_SECRET,
   type TestContext,
 } from '../testing/context'
-import { mentionEmails } from './mention-emails'
+import { photoWithGps, visualForm } from '../testing/images'
+import { instantEmails } from './instant-emails'
 import { weeklyRecap } from './weekly-recap'
 
 let ctx: TestContext
@@ -44,7 +59,7 @@ const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 const WEEK = 7 * DAY
-const START = new Date('2026-06-15T08:00:00.000Z') // un lundi, 10 h à Paris
+const START = new Date('2026-06-14T08:00:00.000Z') // un dimanche, 10 h à Paris
 
 const inesAccount = {
   name: 'Inès Morel',
@@ -81,16 +96,20 @@ afterEach(async () => {
 /** Avance la fausse horloge (par défaut d'une seconde : deux gestes n'ont jamais la même date). */
 const later = (ms = SECOND) => vi.setSystemTime(Date.now() + ms)
 
-/** Ce que reçoit la tâche : la base, la boîte d'envoi, les adresses des liens, la clé des jetons. */
+/**
+ * Ce que reçoit la tâche : la base, la boîte d'envoi, le stockage (R8 : les photos des vignettes),
+ * les adresses des liens, la clé des jetons.
+ */
 const depsWith = (mailer: Mailer = ctx.mailer) => ({
   db: ctx.db,
   mailer,
+  storage: ctx.storage,
   appUrl: TEST_APP_URL,
   apiUrl: TEST_API_URL,
   secret: TEST_AUTH_SECRET,
 })
 
-/** Lance le récap à l'heure de la fausse horloge (comme pg-boss le lundi à 9 h). */
+/** Lance le récap à l'heure de la fausse horloge (comme pg-boss le dimanche à 10 h). */
 const runRecap = (mailer?: Mailer) => weeklyRecap(depsWith(mailer), new Date())
 
 const recapSubjects = [fill(fr.recap.subject), fill(en.recap.subject)]
@@ -121,6 +140,51 @@ const occurrences = (text: string, part: string) => text.split(part).length - 1
 /** Toutes les adresses des liens (href) d'un e-mail HTML. */
 const hrefsOf = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1])
 
+type PillKey = 'pillReactions' | 'pillComments' | 'pillFollows'
+/** R8 : une pastille d'un projet du membre, « 4 commentaires », « 1 réaction ». */
+const pill = (
+  key: PillKey,
+  count: number,
+  t: { recap: Record<`${PillKey}_${'one' | 'other'}`, string> } = fr,
+) => fill(count === 1 ? t.recap[`${key}_one`] : t.recap[`${key}_other`], { count: String(count) })
+
+/** Les nouveaux abonnés au compte du membre (ceux d'un projet sont dans sa pastille). */
+const accountFollows = (count: number) =>
+  fill(count === 1 ? fr.recap.follows_one : fr.recap.follows_other, { count: String(count) })
+
+/**
+ * Ce que tout récap peut contenir autour de ses parties : le bandeau, l'introduction, l'explication
+ * du premier récap, le pied et ses liens. Les tests « rien d'autre » (relecture juridique R1)
+ * retirent ces textes, puis ce qu'ils attendent ; il ne doit rester que de la ponctuation.
+ */
+const frameOf = (name: string) => [
+  fill(fr.recap.heading, { name }),
+  fill(fr.recap.intro),
+  fill(fr.recap.first),
+  fill(fr.recap.button),
+  fill(fr.recap.reason),
+  fr.recap.unsubscribe,
+  fr.changePreferences,
+  fr.manage,
+  fill(fr.footer),
+  fill(fr.greeting, { name }),
+  appName,
+]
+const expectOnly = (text: string, expected: string[]) => {
+  let rest = text.replace(/https?:\/\/\S+/g, ' ')
+  for (const part of [...expected].sort((a, b) => b.length - a.length)) {
+    rest = rest.replaceAll(part, ' ')
+  }
+  expect(rest).toMatch(/^[\s\p{P}\p{S}]*$/u)
+}
+
+/** Les sources des images du HTML (src="…"), et leur nombre de balises <img>. */
+const imageSources = (html: string) => {
+  const sources = [...html.matchAll(/<img\b[^>]*\bsrc="([^"]*)"/gi)].map((m) => m[1] ?? '')
+  expect(html.match(/<img\b/gi)?.length ?? 0).toBe(sources.length)
+  return sources
+}
+
 /** Une requête SQL brute ; on précise nous-mêmes la forme du résultat. */
 const rows = async <T>(query: SQL) =>
   ((await ctx.db.execute(query)) as unknown as { rows: T[] }).rows
@@ -132,7 +196,9 @@ const spyOnLogs = () =>
   )
 
 describe('the content of the recap', () => {
-  it('lists comments, replies and mentions, five at most, then « and N more », and the counts', async () => {
+  // R8 : les commentaires, réactions et abonnés d'un projet deviennent ses pastilles ; les réponses
+  // et mentions restent des lignes qui nomment qui a écrit, cinq au plus, puis « Et N autres ».
+  it('lists my projects with their numbers as pills, then replies and mentions, five at most, then « and N more »', async () => {
     const meteo = await act.publish(ines, 'Météo')
     later()
     const own = await act.comment(meteo.id, ines, 'Vos retours sont les bienvenus.')
@@ -146,21 +212,34 @@ describe('the content of the recap', () => {
       'Qu’en dit @ines_morel ?',
       '@ines_morel regarde ça.',
       'Très joli.',
+      '@ines_morel encore toi.',
+      '@ines_morel et la neige ?',
+      '@ines_morel une dernière.',
     ]
-    later()
-    await act.comment(meteo.id, malik, bodies[0] as string)
-    later()
-    await act.comment(meteo.id, malik, bodies[1] as string)
-    later()
-    await act.comment(meteo.id, malik, bodies[2] as string)
+    // Quatre commentaires sur Météo (trois de Malik, un de Zoé).
+    for (const [cookie, body] of [
+      [malik, bodies[0]],
+      [malik, bodies[1]],
+      [malik, bodies[2]],
+      [zoe, bodies[6]],
+    ] as const) {
+      later()
+      await act.comment(meteo.id, cookie, body as string)
+    }
+    // Sept lignes : une réponse de Zoé, six mentions sur le Jardin de Sam.
     later()
     await act.comment(meteo.id, zoe, bodies[3] as string, own.id)
-    later()
-    await act.comment(jardin.id, sam, bodies[4] as string)
-    later()
-    await act.comment(jardin.id, malik, bodies[5] as string)
-    later()
-    await act.comment(meteo.id, zoe, bodies[6] as string)
+    for (const [cookie, body] of [
+      [sam, bodies[4]],
+      [malik, bodies[5]],
+      [malik, bodies[7]],
+      [sam, bodies[8]],
+      [malik, bodies[9]],
+      [sam, bodies[4]],
+    ] as const) {
+      later()
+      await act.comment(jardin.id, cookie, body as string)
+    }
     for (const [cookie, kind] of [
       [malik, 'bravo'],
       [zoe, 'useful'],
@@ -169,8 +248,11 @@ describe('the content of the recap', () => {
       later()
       await act.react(meteo.id, kind, cookie)
     }
-    later()
-    await act.followMember(inesId, malik)
+    // Deux abonnés au projet, un au compte.
+    for (const cookie of [malik, sam]) {
+      later()
+      expect((await act.send('POST', `/v1/projects/${meteo.id}/follow`, cookie)).status).toBe(204)
+    }
     later()
     await act.followMember(inesId, zoe)
     later(HOUR)
@@ -179,25 +261,33 @@ describe('the content of the recap', () => {
 
     const recap = onlyRecapTo(inesAccount.email)
     expect(recap.subject).toBe(fill(fr.recap.subject))
-    expect(recap.text).toContain(fill(fr.recap.intro))
-    // Sept éléments : cinq lignes, puis « Et 2 autres ».
+    for (const part of [recap.text, recap.html]) {
+      expect(part).toContain(fill(fr.recap.heading, { name: inesAccount.name }))
+      expect(part).toContain(fill(fr.recap.intro))
+      expect(part).toContain(fr.recap.yourProjects)
+      // Les pastilles de Météo, sans aucun nom.
+      expect(part).toContain(pill('pillComments', 4))
+      expect(part).toContain(pill('pillReactions', 3))
+      expect(part).toContain(pill('pillFollows', 2))
+      expect(part).toContain(fr.recap.readComments)
+    }
+    expect(recap.text).toContain(accountFollows(1))
+    // « Lire les commentaires » mène à la page du projet, dans l'appli.
+    expect(
+      hrefsOf(recap.html).some((href) => href?.startsWith(`${TEST_APP_URL}/projects/${meteo.id}`)),
+    ).toBe(true)
+    // Un commentaire sur son projet ne fait plus de ligne : il est compté.
+    expect(recap.text).not.toContain(line('comment', 'Météo'))
+    expect(recap.text).not.toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+    // Sept lignes : cinq montrées, puis « Et 2 autres ».
     const lines = [
-      line('comment', 'Météo'),
       line('reply', 'Météo', 'Zoé', 'zoe'),
       line('mention', 'Jardin', 'Sam', 'sam'),
       line('mention', 'Jardin'),
-      line('comment', 'Météo', 'Zoé', 'zoe'),
     ]
     const shown = lines.reduce((sum, expected) => sum + occurrences(recap.text, expected), 0)
     expect(shown).toBe(5)
     expect(recap.text).toContain(fill(fr.recap.more_other, { count: '2' }))
-    // Puis les nombres : trois réactions, deux nouveaux abonnements, sans aucun nom.
-    expect(recap.text).toContain(fill(fr.recap.reactions_other, { count: '3' }))
-    expect(recap.text).toContain(fill(fr.recap.follows_other, { count: '2' }))
-    // Le bouton mène à ses notifications, dans l'appli.
-    expect(recap.text).toContain(fr.recap.button)
-    expect(recap.text).toContain(`${TEST_APP_URL}/notifications`)
-    expect(hrefsOf(recap.html)).toContain(`${TEST_APP_URL}/notifications`)
     // Pas d'extrait dans le récap (relecture juridique R5) : le texte des autres n'y est jamais.
     for (const body of bodies) {
       expect(recap.text).not.toContain(body.slice(0, 12))
@@ -221,25 +311,16 @@ describe('the content of the recap', () => {
     // liens) : il ne doit rester que de la ponctuation. Un mot de plus serait un ajout, par exemple
     // promotionnel, que le récap ne doit pas contenir (relecture juridique R1).
     const recap = onlyRecapTo(inesAccount.email)
-    const expected = [
-      fill(fr.recap.intro),
-      fill(fr.recap.first),
-      line('comment', 'Météo'),
-      fr.recap.alsoLabel,
-      fill(fr.recap.reactions_one, { count: '1' }),
-      fill(fr.recap.follows_one, { count: '1' }),
-      fill(fr.recap.button),
-      fill(fr.recap.reason),
-      fr.recap.unsubscribe,
-      fr.manage,
-      fill(fr.footer),
-      fill(fr.greeting, { name: inesAccount.name }),
-      appName,
-    ].sort((a, b) => b.length - a.length) // les plus longs d'abord : l'un peut contenir l'autre
-    let rest = recap.text.replace(/https?:\/\/\S+/g, ' ')
-    for (const part of expected) rest = rest.replaceAll(part, ' ')
-
-    expect(rest).toMatch(/^[\s\p{P}\p{S}]*$/u)
+    // R8 : le bandeau, « Tes projets », le titre de Météo et ses pastilles, l'abonné au compte.
+    expectOnly(recap.text, [
+      ...frameOf(inesAccount.name),
+      fr.recap.yourProjects,
+      'Météo',
+      pill('pillComments', 1),
+      pill('pillReactions', 1),
+      accountFollows(1),
+      fr.recap.readComments,
+    ])
   })
 
   it('sends nothing when there is nothing new', async () => {
@@ -273,8 +354,9 @@ describe('the content of the recap', () => {
     await runRecap()
 
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
-    expect(recap.text).not.toContain(line('comment', 'Météo'))
+    // Seul le commentaire de Zoé compte.
+    expect(recap.text).toContain(pill('pillComments', 1))
+    expect(recap.text).not.toContain(pill('pillComments', 2))
     // Sam a tout vu : rien ne part.
     expect(recapsTo(samAccount.email)).toEqual([])
   })
@@ -291,8 +373,8 @@ describe('the content of the recap', () => {
     await runRecap()
 
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
-    expect(recap.text).not.toContain(line('comment', 'Météo'))
+    expect(recap.text).toContain(pill('pillComments', 1))
+    expect(recap.text).not.toContain(pill('pillComments', 2))
   })
 
   it('leaves out a private project, a hidden comment and a deleted one', async () => {
@@ -327,23 +409,29 @@ describe('the content of the recap', () => {
     }
   })
 
-  it('never repeats what the mention e-mail already sent', async () => {
-    await act.setPreferences(ines, { mentionEmails: true })
-    const meteo = await act.publish(ines, 'Météo')
+  // R8 : le récap n'écarte que ce qui est déjà parti « tout de suite » (le type relu à la prise, une
+  // date au plus celle du dernier e-mail « tout de suite ») ; une mention pas encore partie y reste.
+  it('never repeats what the instant e-mail already sent, and keeps what has not gone out yet', async () => {
+    await act.setPreferences(ines, { replies: 'now' })
+    const jardin = await act.publish(sam, 'Jardin')
     later()
-    await act.comment(meteo.id, malik, 'Et @ines_morel, la neige ?')
+    await act.comment(jardin.id, malik, 'Et @ines_morel, la neige ?')
     later(16 * MINUTE)
-    await mentionEmails(depsWith(), new Date())
-    expect(ctx.mailer.sent.filter((email) => email.to === inesAccount.email).length).toBe(2)
+    const before = ctx.mailer.sent.length
+    await instantEmails(depsWith(), new Date())
+    expect(
+      ctx.mailer.sent.slice(before).filter((email) => email.to === inesAccount.email),
+    ).toHaveLength(1)
     later(MINUTE)
-    await act.comment(meteo.id, zoe, 'Joli projet.')
-    later(HOUR)
+    await act.comment(jardin.id, zoe, '@ines_morel et la grêle ?')
+    // Cinq minutes plus tard : l'e-mail « tout de suite » attend 15 minutes, rien n'est parti.
+    later(5 * MINUTE)
 
     await runRecap()
 
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
-    expect(recap.text).not.toContain(line('mention', 'Météo'))
+    expect(recap.text).toContain(line('mention', 'Jardin', 'Zoé', 'zoe'))
+    expect(recap.text).not.toContain(line('mention', 'Jardin'))
   })
 
   it('is written in the language of the member', async () => {
@@ -357,8 +445,10 @@ describe('the content of the recap', () => {
 
     const recap = onlyRecapTo(inesAccount.email)
     expect(recap.subject).toBe(fill(en.recap.subject))
+    expect(recap.text).toContain(fill(en.recap.heading, { name: inesAccount.name }))
     expect(recap.text).toContain(fill(en.recap.intro))
-    expect(recap.text).toContain(line('comment', 'Météo', 'Malik', 'malik', en))
+    expect(recap.text).toContain(en.recap.yourProjects)
+    expect(recap.text).toContain(pill('pillComments', 1, en))
     expect(recap.text).toContain(en.recap.unsubscribe)
     expect(recap.html).toContain('<html lang="en"')
   })
@@ -375,7 +465,7 @@ describe('the links of the recap', () => {
   }
 
   it('carries the one-click unsubscribe headers, whose link turns off the recap only', async () => {
-    await act.setPreferences(ines, { mentionEmails: true })
+    await act.setPreferences(ines, { replies: 'now' })
 
     const recap = await recapWithAComment()
 
@@ -402,10 +492,15 @@ describe('the links of the recap', () => {
       body: 'List-Unsubscribe=One-Click',
     })
     expect(res.status).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ weeklyRecap: false, mentionEmails: true })
+    expect(await act.preferences(ines)).toEqual({
+      ...DEFAULT_EMAIL_PREFERENCES,
+      weeklyRecap: false,
+      replies: 'now',
+    })
   })
 
-  it('has only links to the app or the API, no image, and the language of the page', async () => {
+  // R8 (A5) : des vignettes jointes, jamais chargées à distance.
+  it('has only links to the app or the API, images joined to the e-mail only, and the language of the page', async () => {
     const recap = await recapWithAComment()
 
     const hrefs = hrefsOf(recap.html)
@@ -416,15 +511,22 @@ describe('the links of the recap', () => {
         href,
       ).toBe(true)
     }
-    expect(recap.html).not.toMatch(/<img/i)
+    const cids = (recap.attachments ?? []).map((attachment) => attachment.cid)
+    for (const src of imageSources(recap.html)) {
+      expect(src).toMatch(/^cid:/)
+      expect(cids).toContain(src.slice('cid:'.length))
+    }
     expect(recap.html).toContain('<html lang="fr"')
   })
 
   it('shows no address written by a member: in a name or a title, it becomes « [lien] »', async () => {
     await act.updateProfile(malik, { name: 'support.example.com' })
     const meteo = await act.publish(ines, 'Météo sur www.evil.example')
+    const jardin = await act.publish(sam, 'Jardin sur jardin-pirate.example')
     later()
     await act.comment(meteo.id, malik, 'Super idée.')
+    later()
+    await act.comment(jardin.id, malik, '@ines_morel regarde.')
     later(HOUR)
 
     await runRecap()
@@ -433,6 +535,7 @@ describe('the links of the recap', () => {
     for (const part of [recap.subject, recap.text, recap.html]) {
       expect(part).not.toContain('support.example.com')
       expect(part).not.toContain('evil.example')
+      expect(part).not.toContain('jardin-pirate.example')
     }
     expect(recap.text).toContain('[lien]')
     // Le nom est suivi du pseudo, comme dans l'appli : on sait qui a écrit.
@@ -441,9 +544,9 @@ describe('the links of the recap', () => {
 
   it('escapes the HTML hidden in a name', async () => {
     await act.updateProfile(malik, { name: '<b onclick=alert(1)>Malik</b>' })
-    const meteo = await act.publish(ines, 'Météo')
+    const jardin = await act.publish(sam, 'Jardin')
     later()
-    await act.comment(meteo.id, malik, 'Super idée.')
+    await act.comment(jardin.id, malik, '@ines_morel regarde.')
     later(HOUR)
 
     await runRecap()
@@ -473,8 +576,8 @@ describe('the rhythm of the recap', () => {
     await runRecap()
     const recaps = recapsTo(inesAccount.email)
     expect(recaps).toHaveLength(2)
-    expect(recaps[1]?.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
-    expect(recaps[1]?.text).not.toContain(line('comment', 'Météo'))
+    expect(recaps[1]?.text).toContain(pill('pillComments', 1))
+    expect(recaps[1]?.text).not.toContain(pill('pillComments', 2))
   })
 
   // Ajouté avec les suites de la relecture de sécurité de e414e88 (A5) : un commentaire écrit
@@ -491,15 +594,15 @@ describe('the rhythm of the recap', () => {
 
     await weeklyRecap(depsWith(), now)
     const first = onlyRecapTo(inesAccount.email)
-    expect(first.text).toContain(line('comment', 'Météo'))
-    expect(first.text).not.toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+    expect(first.text).toContain(pill('pillComments', 1))
+    expect(first.text).not.toContain(pill('pillComments', 2))
 
     vi.setSystemTime(now.getTime() + 6 * DAY + MINUTE)
     await runRecap()
     const recaps = recapsTo(inesAccount.email)
     expect(recaps).toHaveLength(2)
-    expect(recaps[1]?.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
-    expect(recaps[1]?.text).not.toContain(line('comment', 'Météo'))
+    expect(recaps[1]?.text).toContain(pill('pillComments', 1))
+    expect(recaps[1]?.text).not.toContain(pill('pillComments', 2))
   })
 
   it('explains the first recap, once', async () => {
@@ -523,7 +626,7 @@ describe('the rhythm of the recap', () => {
 
   it('stops after 3 recaps without a visit, says it in the third, and starts again after a visit', async () => {
     // Inès publie au début (sa session sert) : le premier récap suit une visite. Puis elle ne
-    // revient plus ; Malik commente chaque semaine, et le récap part chaque lundi.
+    // revient plus ; Malik commente chaque semaine, et le récap part chaque dimanche.
     const meteo = await act.publish(ines, 'Météo')
     const week = async (n: number) => {
       vi.setSystemTime(START.getTime() + n * WEEK - HOUR)
@@ -700,8 +803,10 @@ describe('the new follows of the recap', () => {
 
     await runRecap()
 
+    // R8 : les deux abonnés du projet dans sa pastille, l'abonnée au compte à part.
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(fill(fr.recap.follows_other, { count: '3' }))
+    expect(recap.text).toContain(pill('pillFollows', 2))
+    expect(recap.text).toContain(accountFollows(1))
   })
 
   it('leaves out the follows of a project that became private', async () => {
@@ -719,22 +824,24 @@ describe('the new follows of the recap', () => {
     await runRecap()
 
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(fill(fr.recap.follows_one, { count: '1' }))
+    expect(recap.text).toContain(pill('pillFollows', 1))
+    expect(recap.text).not.toContain('Jardin')
   })
 })
 
-// Ajouté avec les corrections de la relecture de sécurité (A7) : le lundi à 9 h, le récap et
-// l'e-mail de mentions tournent en même temps. Chacun lit la date d'envoi de l'autre au début de son
-// lot ; si l'autre envoie entre-temps, la même mention partirait deux fois.
-describe('the recap and the mention e-mail at the same time', () => {
-  it('never sends a mention twice when the mention e-mail goes out during the recap', async () => {
-    await act.setPreferences(ines, { mentionEmails: true })
-    await act.setPreferences(zoe, { mentionEmails: true })
-    const meteo = await act.publish(ines, 'Météo')
+// Ajouté avec les corrections de la relecture de sécurité (A7) : le récap et l'e-mail « tout de
+// suite » (R8 ; avant, celui des mentions) peuvent tourner en même temps. Chacun lit la date d'envoi
+// de l'autre au début de son lot ; si l'autre envoie entre-temps, la même mention partirait deux fois.
+describe('the recap and the instant e-mail at the same time', () => {
+  it('never sends a mention twice when the instant e-mail goes out during the recap', async () => {
+    await act.setPreferences(ines, { replies: 'now' })
+    await act.setPreferences(zoe, { replies: 'now' })
+    const meteo = await act.publish(sam, 'Météo')
     later()
     await act.comment(meteo.id, malik, '@ines_morel et @zoe, regardez.')
     later(16 * MINUTE)
     const now = new Date()
+    const before = ctx.mailer.sent.length
     // Au premier récap envoyé, l'e-mail de mentions passe (même heure) : il sert l'autre membre,
     // que le récap n'a pas encore traité, mais dont il a déjà lu la date d'envoi des mentions.
     let ran = false
@@ -742,7 +849,7 @@ describe('the recap and the mention e-mail at the same time', () => {
       async send(email) {
         if (!ran) {
           ran = true
-          await mentionEmails(depsWith(), now)
+          await instantEmails(depsWith(), now)
         }
         await ctx.mailer.send(email)
       },
@@ -750,20 +857,16 @@ describe('the recap and the mention e-mail at the same time', () => {
 
     await weeklyRecap(depsWith(mailer), now)
 
-    const notificationSubjects = [...recapSubjects, fill(fr.mentions.subject)]
     for (const address of [inesAccount.email, zoeAccount.email]) {
-      const withTheMention = ctx.mailer.sent.filter(
-        (email) =>
-          email.to === address &&
-          notificationSubjects.includes(email.subject) &&
-          email.text.includes('Météo'),
-      )
+      const withTheMention = ctx.mailer.sent
+        .slice(before)
+        .filter((email) => email.to === address && email.text.includes('Météo'))
       expect(withTheMention, address).toHaveLength(1)
     }
   })
 })
 
-// Tranche 7a, règle 31 du plan : le récap du lundi ignore les deux notifications de la modération
+// Tranche 7a, règle 31 du plan : le récap du dimanche ignore les deux notifications de la modération
 // (« removed » pour l'auteur, « report_handled » pour qui a signalé) ; elles restent dans l'appli.
 describe('the notifications of the moderation', () => {
   it('are left out of the recap', async () => {
@@ -796,7 +899,8 @@ describe('the notifications of the moderation', () => {
     // Inès n'a rien d'autre de neuf : aucun récap.
     expect(recapsTo(inesAccount.email)).toEqual([])
     const recap = onlyRecapTo(malikAccount.email)
-    expect(recap.text).toContain(line('comment', 'Recettes', 'Zoé', 'zoe'))
+    expect(recap.text).toContain('Recettes')
+    expect(recap.text).toContain(pill('pillComments', 1))
     for (const part of [recap.text, recap.html]) {
       expect(part).not.toContain('Météo')
       expect(part).not.toContain('signalement')
@@ -808,7 +912,7 @@ describe('the notifications of the moderation', () => {
 // ─── Bloquer (tranche 7b) ────────────────────────────────────────────────────────────────────────
 
 // Scénario « Tranche 7b — Bloquer » : ce qui vient de l'autre (commentaire, réponse, mention,
-// réaction, abonnement) disparaît aussi du récap du lundi, dans les deux sens du blocage. Le récap
+// réaction, abonnement) disparaît aussi du récap du dimanche, dans les deux sens du blocage. Le récap
 // lit le même filtre que la liste des notifications (plan 7b, « Ce qu'un blocage cache »).
 describe('the recap and blocks', () => {
   it.each([
@@ -834,8 +938,10 @@ describe('the recap and blocks', () => {
     await runRecap()
 
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
-    expect(recap.text).not.toContain(line('comment', 'Météo'))
+    // Seul le commentaire de Zoé : ni celui de Malik, ni sa réaction, ni sa mention.
+    expect(recap.text).toContain(pill('pillComments', 1))
+    expect(recap.text).not.toContain(pill('pillComments', 2))
+    expect(recap.text).not.toContain(pill('pillReactions', 1))
     expect(recap.text).not.toContain(line('mention', 'Jardin'))
     expect(recap.text).not.toContain('Malik')
     expect(recap.html).not.toContain('Malik')
@@ -843,7 +949,7 @@ describe('the recap and blocks', () => {
 })
 
 // ─── Tranche R7a : « Les projets que tu suis ou que tu testes » ──────────────────────────────────
-// Scénario : docs/scenarios/refonte.md, « R7a », « Les notifications » : le récap du lundi ajoute
+// Scénario : docs/scenarios/refonte.md, « R7a », « Les notifications » : le récap du dimanche ajoute
 // chaque projet suivi ou testé mis à jour dans la semaine, son nombre de mises à jour et un lien
 // vers sa frise ; jamais le texte d'une mise à jour (relecture de sécurité A9, juridique P4). Les
 // 5 projets et « Et N autres projets » se comptent après le filtre de visibilité, relu à l'envoi.
@@ -925,23 +1031,12 @@ describe('the followed or tested projects of the recap (R7a)', () => {
     )
     // Rien d'autre que ce qui est prévu (comme le test R1 plus haut) : la partie, la salutation,
     // les textes du récap et du pied. C'est son premier récap : il est expliqué.
-    const expected = [
-      fill(fr.recap.intro),
-      fill(fr.recap.first),
+    expectOnly(recap.text, [
+      ...frameOf(malikAccount.name),
       fill(fr.recap.updatesTitle),
       updatesLine('Météo', 2),
       updatesLine('Jardin', 1),
-      fill(fr.recap.button),
-      fill(fr.recap.reason),
-      fr.recap.unsubscribe,
-      fr.manage,
-      fill(fr.footer),
-      fill(fr.greeting, { name: malikAccount.name }),
-      appName,
-    ].sort((a, b) => b.length - a.length)
-    let rest = recap.text.replace(/https?:\/\/\S+/g, ' ')
-    for (const part of expected) rest = rest.replaceAll(part, ' ')
-    expect(rest).toMatch(/^[\s\p{P}\p{S}]*$/u)
+    ])
   })
 
   it('shows five updated projects at most, then « and N more projects »', async () => {
@@ -1071,7 +1166,7 @@ describe('an old report on a journal note (R7a, security B1)', () => {
     await runRecap()
 
     // Son récap part (le commentaire de Malik), et aucune erreur n'est notée.
-    expect(onlyRecapTo(inesAccount.email).text).toContain(line('comment', 'Météo'))
+    expect(onlyRecapTo(inesAccount.email).text).toContain(pill('pillComments', 1))
     const [, , warn, error] = logs
     expect(error?.mock.calls).toEqual([])
     expect(warn?.mock.calls).toEqual([])
@@ -1080,7 +1175,7 @@ describe('an old report on a journal note (R7a, security B1)', () => {
 
 // ─── Tranche R7b : « Le coin des testeurs » ──────────────────────────────────────────────────────
 // Scénario : docs/scenarios/refonte.md, section R7b, « Les notifications » ; plan R7b, « API »,
-// partie « Notifications » ; relecture juridique J12 et de sécurité du plan. Le récap du lundi
+// partie « Notifications » ; relecture juridique J12 et de sécurité du plan. Le récap du dimanche
 // ajoute une partie « Le coin des testeurs » : par projet, le nombre de nouveautés du coin (appels,
 // messages de l'autre personne d'un fil, retours réglés) et un lien vers le coin
 // (/projects/<id>/testers), 5 projets au plus puis « Et N autres projets ». Jamais de texte : ni
@@ -1163,24 +1258,8 @@ describe('the testers corner of the recap (R7b)', () => {
   const cornerUrl = (projectId: string) => `${TEST_APP_URL}/projects/${projectId}/testers`
 
   /** Retire du texte tout ce qui est prévu ; il ne doit rester que de la ponctuation (test R1). */
-  const onlyExpected = (text: string, expected: string[]) => {
-    let rest = text.replace(/https?:\/\/\S+/g, ' ')
-    for (const part of [...expected].sort((a, b) => b.length - a.length)) {
-      rest = rest.replaceAll(part, ' ')
-    }
-    expect(rest).toMatch(/^[\s\p{P}\p{S}]*$/u)
-  }
-  const frame = (name: string) => [
-    fill(fr.recap.intro),
-    fill(fr.recap.first),
-    fill(fr.recap.button),
-    fill(fr.recap.reason),
-    fr.recap.unsubscribe,
-    fr.manage,
-    fill(fr.footer),
-    fill(fr.greeting, { name }),
-    appName,
-  ]
+  const onlyExpected = expectOnly
+  const frame = frameOf
 
   it('counts the news of the corner by project, for the tester and for the author, with a link', async () => {
     const meteo = await publishTestable('Météo')
@@ -1340,12 +1419,537 @@ describe('the testers corner of the recap (R7b)', () => {
 
     // L'appel de Météo est retiré : rien du coin pour Inès, et pour Malik seulement Jardin.
     const recap = onlyRecapTo(inesAccount.email)
-    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+    expect(recap.text).toContain(pill('pillComments', 1))
     for (const part of [recap.text, recap.html]) {
       expect(part).not.toContain(fill(fr.recap.testersTitle))
     }
     const forMalik = onlyRecapTo(malikAccount.email)
     expect(forMalik.text).toContain(testersLine('Jardin', 1)) // témoin : la partie est là
     expect(forMalik.text).not.toContain('Météo')
+  })
+})
+
+// ─── Tranche R8 : le récap habillé du dimanche ──────────────────────────────────────────────────
+// Scénario : docs/scenarios/refonte.md, « R8 », « Le récap de la semaine, habillé » ; plan R8, « Le
+// récap habillé (BE-D) », « Ce qui change au plan » (BE-D) et les tests demandés par les relecteurs
+// (noms repris mot pour mot). Les deux parties neuves se calculent à l'envoi, depuis les projets
+// visibles du membre (listedVerifiedProjectFor) : jamais un projet privé, retiré, d'un membre bloqué
+// dans un sens ou dans l'autre, ni d'un membre suspendu. Titre et nom seuls, jamais l'accroche
+// (décision de Louis du 12/11/2026) ; « Tester la démo » mène à la page du projet, jamais à la démo.
+//
+// Ici Inès reçoit le récap ; elle suit Malik (et parfois Zoé, Sam, Hugo), qui publient.
+describe('the dressed recap (R8)', () => {
+  let malikId: string
+  let samId: string
+
+  beforeEach(async () => {
+    malikId = (await act.me(malik)).id
+    samId = (await act.me(sam)).id
+  })
+
+  const TESTABLE = { status: 'testable', demoUrl: 'https://papillon-demo.example.com/app?niveau=3' }
+
+  /** Publie un projet une seconde plus tard (deux projets n'ont jamais la même date). */
+  const publish = async (cookie: string, title: string, body: object = {}) => {
+    later()
+    return act.publish(cookie, title, body)
+  }
+
+  const follow = async (memberId: string, cookie = ines) => {
+    later()
+    await act.followMember(memberId, cookie)
+  }
+
+  /** Ajoute une photo à la galerie du projet (une vraie photo de téléphone, avec sa position). */
+  const addPhoto = async (projectId: string, cookie: string) => {
+    later()
+    const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
+      method: 'POST',
+      headers: { cookie },
+      body: visualForm(await photoWithGps()),
+    })
+    expect(res.status).toBe(201)
+    return Project.parse(await res.json())
+  }
+
+  /** Le texte d'une partie : de son titre jusqu'au pied de l'e-mail. */
+  const partOf = (text: string, title: string) => {
+    const start = text.indexOf(title)
+    expect(start, title).toBeGreaterThanOrEqual(0)
+    return text.slice(start, text.indexOf(fill(fr.recap.reason)))
+  }
+  /** La partie « Nouveaux projets de tes proches », sans celle des testeurs qui peut la suivre. */
+  const friendsPartOf = (text: string) => {
+    const part = partOf(text, fr.recap.friendsTitle)
+    const testers = part.indexOf(fr.recap.testersWanted)
+    return testers < 0 ? part : part.slice(0, testers)
+  }
+
+  const projectUrl = (id: string) => `${TEST_APP_URL}/projects/${id}`
+  const JPEG = [0xff, 0xd8, 0xff]
+  const isJpeg = (bytes: Uint8Array) => JPEG.every((byte, i) => bytes[i] === byte)
+  const sameBytes = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b))
+
+  // ─── Les types réglés un par un ───
+
+  it('leaves out of the recap a type set to never, and sends nothing when only that type has news', async () => {
+    await act.setPreferences(ines, { comments: 'never' })
+    await act.setPreferences(sam, { comments: 'never' })
+    const meteo = await publish(ines, 'Météo')
+    const jardin = await publish(sam, 'Jardin')
+    later()
+    await act.comment(meteo.id, malik, 'Super idée.')
+    later()
+    await act.react(meteo.id, 'bravo', zoe)
+    later()
+    await act.comment(jardin.id, malik, 'Joli jardin.')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(pill('pillReactions', 1)) // témoin : la réaction part
+    expect(recap.text).not.toContain(pill('pillComments', 1))
+    expect(recap.text).not.toContain(fr.recap.readComments)
+    // Sam n'a que des commentaires, réglés sur « Jamais » : aucun récap.
+    expect(recapsTo(samAccount.email)).toEqual([])
+  })
+
+  // ─── « Nouveaux projets de tes proches » ───
+
+  it('shows the new projects of the members I follow, three at most, with their title and author and a link', async () => {
+    await follow(malikId)
+    await follow(zoeId)
+    const titles = ['Décollage !', 'Mon agent de recettes', 'Quel papillon ?', 'Le ciel de ce soir']
+    const projects = [
+      await publish(malik, titles[0] as string),
+      await publish(zoe, titles[1] as string),
+      await publish(malik, titles[2] as string),
+      await publish(zoe, titles[3] as string),
+    ]
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    const part = friendsPartOf(recap.text)
+    // Les trois plus récents, et pas le quatrième.
+    expect(RECAP_FRIEND_PROJECTS_MAX).toBe(3)
+    expect(titles.filter((title) => part.includes(title))).toEqual(titles.slice(1))
+    expect(part).toContain(malikAccount.name)
+    expect(part).toContain(zoeAccount.name)
+    expect(part).toContain(fr.recap.viewProject)
+    // Chaque projet montré mène à sa page, une adresse fabriquée par le serveur.
+    const hrefs = hrefsOf(recap.html)
+    for (const project of projects.slice(1)) {
+      expect(hrefs.some((href) => href?.startsWith(projectUrl(project.id)))).toBe(true)
+    }
+    expect(hrefs.some((href) => href?.startsWith(projectUrl(projects[0]?.id ?? '')))).toBe(false)
+  })
+
+  // Choix 7 du scénario : du nouveau dans une partie, quelle qu'elle soit, fait partir le récap.
+  it('sends a recap when the only news is a new project of a member I follow', async () => {
+    await follow(malikId)
+    later(DAY)
+    await publish(malik, 'Décollage !')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(fr.recap.friendsTitle)
+    expect(recap.text).toContain('Décollage !')
+    // Rien d'autre que ce qui est prévu : la partie, le titre, le nom, le lien (relecture R1).
+    expectOnly(recap.text, [
+      ...frameOf(inesAccount.name),
+      fr.recap.friendsTitle,
+      'Décollage !',
+      malikAccount.name,
+      fr.recap.viewProject,
+    ])
+  })
+
+  it('sends no recap when nothing in it is new this week', async () => {
+    await follow(malikId)
+    await follow(samId, zoe)
+    await publish(malik, 'Décollage !')
+    await publish(malik, 'Quel papillon ?', TESTABLE)
+    // Huit jours plus tard : les projets de Malik sont plus vieux que la fenêtre du récap.
+    later(8 * DAY)
+    const samAgain = await act.signInAgain(samAccount)
+    // Témoin : Zoé suit Sam, qui publie cette semaine.
+    await publish(samAgain, 'Jardin')
+    later(HOUR)
+
+    await runRecap()
+
+    expect(recapsTo(inesAccount.email)).toEqual([])
+    expect(onlyRecapTo(zoeAccount.email).text).toContain('Jardin')
+  })
+
+  // ─── « Ils cherchent des testeurs » ───
+
+  it('offers the most recent testable project of a member I follow, unless I wrote it or test it, and leads to its page', async () => {
+    await follow(malikId)
+    await follow(zoeId)
+    await publish(malik, 'Fusée', TESTABLE)
+    const papillon = await publish(zoe, 'Papillon', TESTABLE)
+    const tested = await publish(malik, 'Le plus récent', TESTABLE)
+    // Inès est déjà testeuse du plus récent : il ne lui est pas proposé.
+    later()
+    expect((await act.send('POST', `/v1/projects/${tested.id}/testers`, ines)).status).toBe(204)
+    // Son propre projet testable non plus.
+    await publish(ines, 'Mon projet à tester', TESTABLE)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    const part = partOf(recap.text, fr.recap.testersWanted)
+    expect(part).toContain('Papillon')
+    expect(part).toContain(zoeAccount.name)
+    expect(part).toContain(fr.recap.tryDemo)
+    // Un seul projet proposé.
+    for (const title of ['Fusée', 'Le plus récent', 'Mon projet à tester']) {
+      expect(part, title).not.toContain(title)
+    }
+    // « Tester la démo » mène à la page du projet, jamais à la démo ni à la page de sortie.
+    const at = recap.html.indexOf(`>${fr.recap.tryDemo}</a>`)
+    const anchor = recap.html.slice(recap.html.lastIndexOf('<a', at), at)
+    expect(/href="([^"]*)"/.exec(anchor)?.[1]?.startsWith(projectUrl(papillon.id))).toBe(true)
+  })
+
+  it('never offers in "they look for testers" a project whose author removed the recipient', async () => {
+    await follow(malikId)
+    await publish(malik, 'Fusée', TESTABLE)
+    const papillon = await publish(malik, 'Papillon', TESTABLE)
+    // Malik a retiré Inès des testeurs du Papillon (posé en base, comme l'écrit la route du coin).
+    await ctx.db.insert(schema.projectTesterRemoval).values({
+      projectId: papillon.id,
+      memberId: inesId,
+      createdAt: new Date(),
+    })
+    later(HOUR)
+
+    await runRecap()
+
+    const part = partOf(onlyRecapTo(inesAccount.email).text, fr.recap.testersWanted)
+    expect(part).toContain('Fusée') // témoin : l'autre projet testable de Malik est proposé
+    expect(part).not.toContain('Papillon')
+  })
+
+  it('leaves out a testable project older than the recap window', async () => {
+    await follow(malikId)
+    await publish(malik, 'Vieux papillon', TESTABLE)
+    const meteo = await publish(ines, 'Météo')
+    later(8 * DAY)
+    // Témoin : un commentaire de cette semaine fait partir le récap.
+    const zoeAgain = await act.signInAgain(zoeAccount)
+    await act.comment(meteo.id, zoeAgain, 'Joli.')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(pill('pillComments', 1))
+    for (const part of [recap.text, recap.html]) {
+      expect(part).not.toContain(fr.recap.testersWanted)
+      expect(part).not.toContain('Vieux papillon')
+    }
+  })
+
+  it('never puts a demo address in the recap, even encoded in a link', async () => {
+    await follow(malikId)
+    await publish(malik, 'Papillon', TESTABLE)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(fr.recap.tryDemo) // témoin : la partie est là
+    const encoded = encodeURIComponent('https://papillon-demo.example')
+    for (const part of [recap.subject, recap.text, recap.html]) {
+      expect(part).not.toContain('papillon-demo')
+      expect(part).not.toContain(encoded)
+      expect(part).not.toContain(encodeURIComponent(encoded))
+    }
+    for (const href of hrefsOf(recap.html)) {
+      expect(
+        href?.startsWith(`${TEST_APP_URL}/`) || href?.startsWith(`${TEST_API_URL}/`),
+        href,
+      ).toBe(true)
+      expect(href, href).not.toMatch(/\/out\b/)
+    }
+  })
+
+  // ─── Ce qui ne sort jamais ───
+
+  it('leaves out of both parts a project blocked either way, suspended, made private or removed before the send', async () => {
+    const hugo = await ctx.verifiedMember({
+      name: 'Hugo',
+      email: 'hugo@example.com',
+      password: 'hugo-long-password',
+    })
+    const hugoId = (await act.me(hugo)).id
+    for (const id of [malikId, zoeId, samId, hugoId]) await follow(id)
+    // Le témoin d'abord (le plus ancien) : seul projet permis, il est aussi le seul à tester.
+    await publish(hugo, 'Témoin', TESTABLE)
+    await publish(malik, 'Bloqué par Inès', TESTABLE)
+    await publish(zoe, 'Bloque Inès', TESTABLE)
+    await publish(sam, 'Suspendu', TESTABLE)
+    const hidden = await publish(hugo, 'Devenu privé', TESTABLE)
+    const removed = await publish(hugo, 'Retiré', TESTABLE)
+    later()
+    await act.block(malikId, ines)
+    later()
+    await act.block(inesId, zoe)
+    // Un blocage efface les abonnements ; on les remet en base (un état qu'aucune route ne permet) :
+    // sans eux, le test passerait sans le filtre des blocages.
+    for (const memberId of [malikId, zoeId]) {
+      await ctx.db
+        .insert(schema.memberFollow)
+        .values({ followerId: inesId, memberId, createdAt: new Date() })
+        .onConflictDoNothing()
+    }
+    // Sam est suspendu, posé en base comme le ferait la modération.
+    await ctx.db.insert(schema.accountSuspension).values({
+      id: randomUUID(),
+      userId: samId,
+      decisionId: null,
+      startsAt: new Date(),
+      endsAt: null,
+    })
+    later()
+    await act.setVisibility(hidden.id, hugo, 'private')
+    // « Retiré » par la modération, posé en base (la décision, puis le projet).
+    const decisionId = randomUUID()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id: decisionId,
+      targetKind: 'project',
+      targetId: removed.id,
+      action: 'remove',
+      ground: 'rules',
+      explanation: 'Publicité déguisée.',
+      adminId: inesId,
+      createdAt: new Date(),
+      targetMemberId: hugoId,
+    })
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: new Date(), removalId: decisionId })
+      .where(eq(schema.project.id, removed.id))
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(friendsPartOf(recap.text)).toContain('Témoin')
+    expect(partOf(recap.text, fr.recap.testersWanted)).toContain('Témoin')
+    for (const part of [recap.text, recap.html]) {
+      for (const title of [
+        'Bloqué par Inès',
+        'Bloque Inès',
+        'Suspendu',
+        'Devenu privé',
+        'Retiré',
+      ]) {
+        expect(part, title).not.toContain(title)
+      }
+    }
+  })
+
+  it('turns a domain in a tagline, a name and an alt text into [lien]', async () => {
+    await follow(malikId)
+    await act.updateProfile(malik, { name: 'Malik de malik-site.example' })
+    const papillon = await publish(malik, 'Papillon sur papillon-titre.example', {
+      ...TESTABLE,
+      pitch: 'Mon accroche sur accroche-pirate.example',
+    })
+    await addPhoto(papillon.id, malik)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    for (const part of [recap.subject, recap.text, recap.html]) {
+      for (const domain of ['malik-site.example', 'papillon-titre.example', 'accroche-pirate']) {
+        expect(part, domain).not.toContain(domain)
+      }
+      // L'accroche n'est pas dans le récap du tout (décision 1 de Louis).
+      expect(part).not.toContain('Mon accroche')
+    }
+    expect(recap.text).toContain('[lien]')
+    // Le texte de remplacement de la vignette est le titre, désarmé lui aussi.
+    const alts = [...recap.html.matchAll(/<img\b[^>]*\balt="([^"]*)"/gi)].map((m) => m[1] ?? '')
+    expect(alts.length).toBeGreaterThan(0)
+    expect(alts.some((alt) => alt.includes('[lien]'))).toBe(true)
+  })
+
+  it("never puts the pitch of another member's project in the recap", async () => {
+    await follow(malikId)
+    await publish(malik, 'Décollage !', { pitch: 'ZZACCROCHE un quiz sur l’espace' })
+    await publish(malik, 'Papillon', { ...TESTABLE, pitch: 'ZZACCROCHE tu photographies' })
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain('Décollage !') // témoin : les parties sont là
+    expect(recap.text).toContain(fr.recap.testersWanted)
+    for (const part of [recap.subject, recap.text, recap.html]) {
+      expect(part).not.toContain('ZZACCROCHE')
+    }
+  })
+
+  // ─── La note unique ───
+
+  it('tells once a member who got recaps before R8 what the recap now shows', async () => {
+    // Inès recevait le récap avant R8 : sa date de récap est posée, pas celle du premier de R8.
+    await ctx.db
+      .insert(schema.emailPreference)
+      .values({ userId: inesId, recapSentAt: new Date(Date.now() - 8 * DAY) })
+    const meteo = await publish(ines, 'Météo')
+    const velo = await publish(zoe, 'Vélo')
+    later()
+    await act.comment(meteo.id, malik, 'Super.')
+    later()
+    await act.comment(velo.id, malik, 'Joli vélo.')
+    later(HOUR)
+
+    await runRecap()
+
+    const first = onlyRecapTo(inesAccount.email)
+    expect(first.text).toContain(fill(fr.recap.news))
+    expect(first.text).not.toContain(fill(fr.recap.first))
+    // Zoé, nouvelle, a l'explication du premier récap, qui dit la même chose : une seule phrase.
+    const forZoe = onlyRecapTo(zoeAccount.email)
+    expect(forZoe.text).toContain(fill(fr.recap.first))
+    expect(forZoe.text).not.toContain(fill(fr.recap.news))
+    const [row] = await rows<{ recap_v2_at: unknown }>(
+      sql`select recap_v2_at from email_preference where user_id = ${inesId}`,
+    )
+    expect(row?.recap_v2_at).not.toBeNull()
+
+    // La semaine suivante : plus de note.
+    later(WEEK)
+    const malikAgain = await act.signInAgain(malikAccount)
+    await act.comment(meteo.id, malikAgain, 'Encore.')
+    later(HOUR)
+    await runRecap()
+    const recaps = recapsTo(inesAccount.email)
+    expect(recaps).toHaveLength(2)
+    expect(recaps[1]?.text).not.toContain(fill(fr.recap.news))
+  })
+
+  // ─── Les vignettes ───
+
+  it('joins four images at most: two for my projects, one for the people I follow, one for testers', async () => {
+    await follow(malikId)
+    const own = [
+      await publish(ines, 'Météo'),
+      await publish(ines, 'Jardin', { primaryCategory: 'animals' }),
+      await publish(ines, 'Vélo'),
+    ]
+    await addPhoto(own[0]?.id ?? '', ines)
+    // Le plus récent en tête de « Tes projets » : Météo, puis Jardin, puis Vélo.
+    for (const project of [...own].reverse()) {
+      later()
+      await act.comment(project.id, zoe, 'Bravo.')
+    }
+    // Papillon d'abord : le proche le plus récent (Fusée) prend la vignette des proches.
+    await publish(malik, 'Papillon', TESTABLE)
+    await publish(malik, 'Décollage !')
+    await publish(malik, 'Fusée')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    const attachments = recap.attachments ?? []
+    expect(attachments).toHaveLength(RECAP_IMAGES_MAX)
+    // Des noms fabriqués, uniques : rien d'un texte de membre.
+    expect(new Set(attachments.map((a) => a.cid)).size).toBe(attachments.length)
+    for (const attachment of attachments) {
+      expect(attachment.cid).toMatch(/^[a-z]+-\d+$/)
+      expect(attachment.filename).toMatch(/^[a-z]+-\d+\.(jpg|png)$/)
+      expect(['image/jpeg', 'image/png']).toContain(attachment.contentType)
+    }
+    // Chaque image est montrée une fois, par son cid, avec le titre du projet pour texte.
+    const tags = [...recap.html.matchAll(/<img\b[^>]*>/gi)].map((m) => m[0])
+    expect(tags).toHaveLength(RECAP_IMAGES_MAX)
+    const imageOf = (title: string) => {
+      const tag = tags.find((t) => t.includes(`alt="${title}"`))
+      const cid = /src="cid:([^"]*)"/.exec(tag ?? '')?.[1]
+      return attachments.find((a) => a.cid === cid)
+    }
+    // La photo de Météo, réduite en JPEG ; Jardin, sans photo, prend la tuile de sa catégorie.
+    const meteo = imageOf('Météo')
+    expect(meteo?.contentType).toBe('image/jpeg')
+    expect(isJpeg(meteo?.content ?? new Uint8Array())).toBe(true)
+    expect(meteo?.content.byteLength ?? 0).toBeLessThan(30_000)
+    const jardin = imageOf('Jardin')
+    expect(jardin?.contentType).toBe('image/png')
+    expect(sameBytes(jardin?.content ?? new Uint8Array(), categoryTile('animals').content)).toBe(
+      true,
+    )
+    // Le troisième projet n'a pas de vignette (deux pour « Tes projets ») ; un proche, un à tester.
+    expect(imageOf('Vélo')).toBeUndefined()
+    expect(imageOf('Papillon')).toBeDefined()
+    expect(['Décollage !', 'Fusée'].filter((title) => imageOf(title) !== undefined)).toHaveLength(1)
+  })
+
+  it('uses the category tile instead of the photo of a project with an open report', async () => {
+    await follow(malikId)
+    await follow(zoeId)
+    // Le Papillon de Zoé (avec photo) cherche des testeurs : sa photo est le témoin.
+    const papillon = await publish(zoe, 'Papillon', TESTABLE)
+    await addPhoto(papillon.id, zoe)
+    // Le projet de Malik, le plus récent des proches, a une photo et un signalement ouvert.
+    const signale = await publish(malik, 'Signalé', { primaryCategory: 'animals' })
+    await addPhoto(signale.id, malik)
+    later()
+    await act.report(sam, { kind: 'project', id: signale.id }, 'scam_spam')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    const attachments = recap.attachments ?? []
+    // La tuile « Animaux » pour le projet signalé ; une seule photo, celle du Papillon.
+    expect(attachments.some((a) => sameBytes(a.content, categoryTile('animals').content))).toBe(
+      true,
+    )
+    expect(attachments.filter((a) => a.contentType === 'image/jpeg')).toHaveLength(1)
+  })
+
+  // Relecture du plan (sécurité, écarté autrement) : un transport qui ne sait pas joindre d'images
+  // refuse l'e-mail ; le récap part alors sans vignettes plutôt que pas du tout.
+  it('sends the recap without images when the transport refuses attachments', async () => {
+    const meteo = await publish(ines, 'Météo')
+    await addPhoto(meteo.id, ines)
+    later()
+    await act.comment(meteo.id, malik, 'Super.')
+    later(HOUR)
+    // Le transport refuse tout e-mail qui porte des pièces jointes, et compte ses refus.
+    let refused = 0
+    const mailer: Mailer = {
+      async send(email) {
+        if ((email.attachments ?? []).length > 0) {
+          refused++
+          throw new Error('attachments are not supported')
+        }
+        await ctx.mailer.send(email)
+      },
+    }
+    spyOnLogs()
+
+    await runRecap(mailer)
+
+    // Témoin : le récap a d'abord essayé avec sa vignette (une fois), puis il est parti sans.
+    expect(refused).toBe(1)
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain('Météo')
+    expect(recap.attachments ?? []).toEqual([])
+    expect(recap.html).not.toMatch(/<img/i)
   })
 })

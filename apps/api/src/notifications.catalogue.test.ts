@@ -35,7 +35,7 @@ import {
   TEST_AUTH_SECRET,
   type TestContext,
 } from './testing/context'
-import { photoWithGps, visualForm } from './testing/images'
+import { jpegImage, photoWithGps, visualForm } from './testing/images'
 import { addCatalogueTool, clearCatalogue } from './testing/tool-catalogue'
 
 let ctx: TestContext
@@ -249,6 +249,27 @@ describe('a project sorted by an administrator', () => {
     for (const cookie of [zoe, sam, louis]) expect(await catalogueOf(cookie)).toEqual([])
   })
 
+  // Choix de BE-A : le geste vient de « L'équipe », pas d'un membre ; un blocage de l'administrateur
+  // n'efface donc pas la notification du rangement : l'autrice doit savoir où est son projet.
+  it('still tells an author who blocked the administrator that a project was filed', async () => {
+    const papillon = await publish(ines, 'Quel papillon ?')
+    later()
+    await act.block(louisId, ines)
+
+    await sort(papillon.id, 'animals')
+
+    expect(await catalogueOf(ines)).toEqual([
+      expect.objectContaining({
+        kind: 'project_category',
+        project: expect.objectContaining({ id: papillon.id }),
+        category: 'animals',
+      }),
+    ])
+    expect(await noticesInBase(inesId)).toEqual([
+      { kind: 'project_category', toolId: null, projectId: papillon.id },
+    ])
+  })
+
   it('dates the notification from the gesture of the administrator', async () => {
     const papillon = await publish(ines, 'Quel papillon ?')
     later(HOUR)
@@ -386,6 +407,26 @@ describe('an « other » tool admitted into the catalogue', () => {
     expect(await catalogueOf(louis)).toEqual([])
     expect(await noticesInBase(louisId)).toEqual([])
     expect(await catalogueOf(malik)).toHaveLength(1)
+  })
+
+  // Choix de BE-A (plan R8, « Ce qui change au plan ») : un projet privé ou retiré ne prévient pas
+  // son auteur. Ni notification à la lecture, ni ligne écrite en base.
+  it('sends no catalogue notice for a tool cited only by a private or removed project', async () => {
+    const hidden = await publish(malik, 'Mes listes', { tools: ['Glide'] })
+    later()
+    await act.setVisibility(hidden.id, malik, 'private')
+    const removed = await publish(ines, 'Quel papillon ?', { tools: ['Glide'] })
+    await removeProject(removed.id)
+    // Témoin : le projet public de Zoé cite le même « Autre ».
+    await publish(zoe, 'Mes recettes', { tools: ['Glide'] })
+
+    await admit('Glide')
+
+    expect(await catalogueOf(malik)).toEqual([])
+    expect(await catalogueOf(ines)).toEqual([])
+    expect(await noticesInBase(malikId)).toEqual([])
+    expect(await noticesInBase(inesId)).toEqual([])
+    expect(await catalogueOf(zoe)).toEqual([expect.objectContaining({ kind: 'tool_added' })])
   })
 })
 
@@ -683,6 +724,33 @@ describe('the thumbnail of a notified project', () => {
     const forMalik = covers(await notifications(malik))
     expect(forMalik.map((n) => n.kind).sort()).toEqual(['hidden', 'project_update'])
     for (const n of forMalik) expect(n.cover, n.kind).toEqual(cover)
+  })
+
+  // Choix de BE-A : la couverture d'un projet est sa première photo de galerie, sinon sa couverture
+  // verticale (slot « portrait »).
+  it('uses the portrait cover when the project has no gallery photo', async () => {
+    const papillon = await publish(ines, 'Quel papillon ?')
+    later()
+    const res = await ctx.request(`/v1/projects/${papillon.id}/visuals`, {
+      method: 'POST',
+      headers: { cookie: ines },
+      body: visualForm(await jpegImage(900, 1600), 'portrait'),
+    })
+    expect(res.status).toBe(201)
+    const portrait = Project.parse(await res.json()).portraitCover
+    if (portrait === null || portrait.kind !== 'image') throw new Error('no portrait cover')
+
+    await sort(papillon.id, 'animals')
+
+    expect(await catalogueOf(ines)).toEqual([
+      expect.objectContaining({
+        project: {
+          id: papillon.id,
+          title: 'Quel papillon ?',
+          cover: { url: portrait.url, thumbhash: portrait.thumbhash },
+        },
+      }),
+    ])
   })
 
   it('takes the cover away once the photo is deleted', async () => {
