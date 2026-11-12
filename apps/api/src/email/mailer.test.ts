@@ -393,6 +393,15 @@ describe('createSmtpMailer', () => {
   })
 })
 
+describe('the SMTP transport without encryption', () => {
+  it('refuses to exist on a port that does not encrypt', () => {
+    for (const port of [25, 2525, 80]) {
+      expect(() => smtpWith(port), String(port)).toThrow()
+    }
+    expect(smtp.options).toEqual([])
+  })
+})
+
 describe('the thumbnails on the other transports', () => {
   it('refuses an e-mail with attachments rather than lose them, and sends nothing', async () => {
     const scaleway = recordingFetch(new Response('{}', { status: 200 }))
