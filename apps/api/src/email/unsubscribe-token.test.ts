@@ -1,4 +1,5 @@
-// Tests du jeton des liens de désinscription (tranche 6c). Le jeton dit « le membre X peut couper
+// Tests du jeton des liens de désinscription (tranche 6c ; R8 : la sorte `instant`, l'e-mail « tout
+// de suite », à côté de `recap` et de l'ancienne `mentions`, qui reste valable). Le jeton dit « le membre X peut couper
 // telle sorte d'e-mail » et porte une signature : une empreinte HMAC-SHA256 (un calcul qui mêle le
 // texte et une clé secrète ; sans la clé, impossible de fabriquer l'empreinte d'un autre texte).
 // Forme fixe : `v1.<id en base64url>.<sorte>.<signature en 43 caractères>`.
@@ -24,7 +25,7 @@ const partsOf = (token: string) => {
 
 describe('createUnsubscribeToken', () => {
   it('writes the fixed form « v1.<id>.<kind>.<signature> », as the contract expects', () => {
-    for (const kind of ['recap', 'mentions'] as const) {
+    for (const kind of ['recap', 'mentions', 'instant'] as const) {
       const token = createUnsubscribeToken(secret, userId, kind)
 
       expect(UnsubscribeToken.safeParse(token).success).toBe(true)
@@ -49,11 +50,12 @@ describe('createUnsubscribeToken', () => {
     const tokens = new Set([
       createUnsubscribeToken(secret, userId, 'recap'),
       createUnsubscribeToken(secret, userId, 'mentions'),
+      createUnsubscribeToken(secret, userId, 'instant'),
       createUnsubscribeToken(secret, 'another-member-id', 'recap'),
       createUnsubscribeToken(`${secret}-rotated`, userId, 'recap'),
     ])
 
-    expect(tokens.size).toBe(4)
+    expect(tokens.size).toBe(5)
   })
 })
 
@@ -66,6 +68,9 @@ describe('readUnsubscribeToken', () => {
     expect(
       readUnsubscribeToken(secret, createUnsubscribeToken(secret, userId, 'mentions')),
     ).toEqual({ userId, kind: 'mentions' })
+    expect(readUnsubscribeToken(secret, createUnsubscribeToken(secret, userId, 'instant'))).toEqual(
+      { userId, kind: 'instant' },
+    )
   })
 
   it('refuses a token signed with another secret', () => {
@@ -84,6 +89,8 @@ describe('readUnsubscribeToken', () => {
     for (const forged of [
       `v1.${otherId}.recap.${signature}`,
       `v1.${id}.mentions.${signature}`,
+      // La signature d'un lien du récap ne vaut pas pour l'e-mail « tout de suite ».
+      `v1.${id}.instant.${signature}`,
       `v1.${id}.recap.${flipped}`,
       `v2.${id}.recap.${signature}`,
     ]) {
@@ -102,6 +109,7 @@ describe('readUnsubscribeToken', () => {
       'v1',
       `v1.${id}.recap`,
       `v1.${id}.weekly.${signature}`,
+      `v1.${id}.Instant.${signature}`,
       `v1.${id}.recap.${signature?.slice(0, 1)}`,
       `v1.${id}.recap.${signature}A`,
       `v1.${id}.recap.${signature}.extra`,

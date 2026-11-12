@@ -1,6 +1,7 @@
 // La section « Carte d'un commentaire » du catalogue (R5b, planches `R5b-Commentaires` et
 // `R5b-Menu-Etats`) : la carte (ui/CommentCard.tsx) dans tous ses états. Le commentaire d'un autre
-// membre, celui de l'auteur du projet (badge), le sien (fond gris), le visé (miel pâle), une
+// membre, celui de l'auteur du projet (badge), le sien (fond gris), le visé (miel pâle),
+// l'éclairé par « Voir en contexte » (R8, `lit` : miel pâle et anneau, rallumable), une
 // réponse, une mention ; masqué (vu par l'auteur du projet, puis par celui qui l'a écrit), retiré
 // pour son auteur ; les emplacements (supprimé, retiré, masqué, bloqué, indisponible) ; la carte
 // compacte de l'aperçu ; une action en échec, avec ou sans lien ; les trois menus ouverts ; puis
@@ -9,12 +10,13 @@
 // travaillent en même temps. Ses libellés d'exemple (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais ; les textes de la carte sont ceux de l'appli.
 import type { CommentReply, CommentState } from '@ruche/contracts'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type ActionMenuItem, ActionMenuList } from '../ui/ActionMenu'
+import { Button } from '../ui/Button'
 import { CommentCard } from '../ui/CommentCard'
 import type { RemovedBanner } from '../ui/RemovalNotice'
-import { Stack } from '../ui/Stack'
+import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
@@ -30,6 +32,8 @@ const fr = {
   tester: 'Un testeur du projet : le badge « Testeur », lu « Hugo Lefèvre, Testeur »',
   bodyTester: 'Testé ce matin sur tablette : tout marche, bravo.',
   highlighted: 'Visé par une réponse : miel pâle',
+  lit: 'Éclairé par « Voir en contexte » (R8) : miel pâle et anneau, qui s’éteignent en 1,5 s ; avec « Réduire les animations », la teinte reste puis part d’un coup',
+  relight: 'Rallumer',
   reply: 'Une réponse : photo plus petite',
   mention: 'Avec une mention',
   hiddenByYou: 'Masqué, vu par l’auteur du projet : « Démasquer »',
@@ -71,6 +75,8 @@ const en: typeof fr = {
   bodyTester: 'Tested this morning on a tablet: it all works, well done.',
   mine: 'One’s own: grey, read “Your comment”',
   highlighted: 'Targeted by a reply: pale honey',
+  lit: 'Lit by “See in context” (R8): pale honey and a ring, fading out in 1.5 s; with “Reduce motion”, the tint stays, then goes at once',
+  relight: 'Light it again',
   reply: 'A reply: a smaller photo',
   mention: 'With a mention',
   hiddenByYou: 'Hidden, seen by the project’s author: “Unhide”',
@@ -162,6 +168,36 @@ function Example({ caption, children }: { caption: string; children: ReactNode }
   )
 }
 
+/**
+ * La carte éclairée (`lit`, R8) : son miel s'éteint en 1,5 s après son arrivée, il serait déjà
+ * parti quand on fait défiler jusqu'ici. « Rallumer » la refait arriver : une nouvelle `key` monte
+ * une carte neuve, qui part allumée (comme celle que « Voir en contexte » ouvre).
+ */
+function LitExample({ l }: { l: Labels }) {
+  const [round, setRound] = useState(0)
+  return (
+    <Example caption={l.lit}>
+      <CommentCard
+        key={round}
+        {...base}
+        comment={sample({ id: 'lit', author: LEA, body: l.bodyOther })}
+        lit
+        menu={[{ label: l.report, icon: 'flag', onPress: noop }]}
+        onReply={noop}
+      />
+      <Row>
+        <Button
+          label={l.relight}
+          variant="secondary"
+          size="small"
+          icon="arrows-clockwise"
+          onPress={() => setRound((n) => n + 1)}
+        />
+      </Row>
+    </Example>
+  )
+}
+
 /** Les trois menus d'une carte, selon qui regarde (scénario R5b, « Le menu « … » »). */
 const menus = (l: Labels) => ({
   mine: [
@@ -217,6 +253,7 @@ function Cards({ l, only }: { l: Labels; only?: 'night' }) {
       <>
         {mine}
         {highlighted}
+        <LitExample l={l} />
         {hiddenByYou}
       </>
     )
@@ -266,6 +303,7 @@ function Cards({ l, only }: { l: Labels; only?: 'night' }) {
     </Example>,
     <Stack key="mine">{mine}</Stack>,
     <Stack key="highlighted">{highlighted}</Stack>,
+    <LitExample key="lit" l={l} />,
     <Example key="reply" caption={l.reply}>
       <CommentCard
         {...base}

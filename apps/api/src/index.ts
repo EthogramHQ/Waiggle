@@ -9,6 +9,7 @@ import {
   createBrevoMailer,
   createConsoleMailer,
   createScalewayMailer,
+  createSmtpMailer,
   type Mailer,
 } from './email/mailer'
 import { loadEnv } from './env'
@@ -36,6 +37,8 @@ const openDatabase = async (): Promise<DatabaseHandle> => {
 // développement. Le reste du code ne voit que l'interface Mailer.
 const createMailer = (): Mailer => {
   switch (env.mail.provider) {
+    case 'scaleway-smtp':
+      return createSmtpMailer(env.mail)
     case 'scaleway':
       return createScalewayMailer(env.mail)
     case 'brevo':
@@ -50,7 +53,7 @@ const mailer = createMailer()
 // connectent au compte. env.ts ne le permet que pour les essais (ALLOW_CONSOLE_MAIL=true) : on le
 // rappelle dans les logs, pour ne pas l'oublier.
 if (env.nodeEnv === 'production' && env.mail.provider === 'console') {
-  console.warn('MAIL_PROVIDER=console in production: emails (and their links) go to the logs.')
+  console.warn('EMAIL_TRANSPORT=console in production: emails (and their links) go to the logs.')
 }
 
 // 3. Le stockage des fichiers (avatars) : un dossier du disque.

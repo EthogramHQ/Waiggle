@@ -120,11 +120,17 @@ export function ReactionIcon({
   filled = false,
   onHoney = false,
   size = ICON_SIZE,
+  amber = false,
 }: {
   kind: ReactionKind
   filled?: boolean
   onHoney?: boolean
   size?: number
+  /**
+   * R8 : les icônes Phosphor en ambre (la pastille des réactions d'une ligne d'Activité, planche
+   * R8-Activite) ; l'abeille garde ses couleurs.
+   */
+  amber?: boolean
 }) {
   const { colors } = useTheme()
   if (kind !== 'bravo') {
@@ -133,7 +139,7 @@ export function ReactionIcon({
       <Icon
         name={filled ? icon.filled : icon.outline}
         size={size}
-        tone={onHoney ? 'onHoney' : 'default'}
+        tone={onHoney ? 'onHoney' : amber ? 'amber' : 'default'}
       />
     )
   }

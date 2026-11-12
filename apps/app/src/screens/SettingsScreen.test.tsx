@@ -10,7 +10,7 @@
 // Relecture juridique du plan (jur-11) : rien de ce que l'on règle aujourd'hui ne disparaît. Chaque
 // entrée de « Mon compte » est retrouvée ici, dans sa rubrique, avec son aide.
 import { contactEmail, sourceUrl } from '@ruche/brand'
-import type { EmailPreferences } from '@ruche/contracts'
+import { type EmailPreferences, EmailType } from '@ruche/contracts'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Linking } from 'react-native'
 import { downloadMyData, signOut } from '../accounts/api'
@@ -407,36 +407,51 @@ describe('the « À propos » section', () => {
 })
 
 describe('the « Notifications » section', () => {
-  it('shows the two e-mail switches with their help, saved by the member', async () => {
+  // R8 : la rubrique montre l'écran « Notifications » (EmailSettings, testé en détail dans
+  // settings/EmailSettings.test.tsx) : une ligne par type avec son choix, l'interrupteur du récap,
+  // la phrase des e-mails de sécurité. Ici, seulement qu'elle s'affiche et enregistre un choix.
+  const choice = (type: EmailType) =>
+    fr.t(($) => $.notificationSettings.rowName, {
+      label: fr.t(($) => $.notificationSettings.types[type]),
+      choice: fr.t(($) => $.notificationSettings.choices.digest),
+    })
+
+  it('shows the e-mail choice of each type, the recap switch and the security sentence', async () => {
     await renderWithI18n(<SettingsScreen section="notifications" />)
 
     const recap = await screen.findByRole('switch', {
-      name: fr.t(($) => $.profile.emails.weeklyRecap),
+      name: fr.t(($) => $.notificationSettings.recap),
     })
     expect(recap).toBeChecked()
-    expect(
-      screen.getByRole('switch', { name: fr.t(($) => $.profile.emails.mentionEmails) }),
-    ).not.toBeChecked()
-    expect(screen.getByText(fr.t(($) => $.profile.emails.weeklyRecapHint))).toBeTruthy()
-    expect(screen.getByText(fr.t(($) => $.profile.emails.mentionEmailsHint))).toBeTruthy()
-    // Les e-mails du compte ne dépendent pas de ces réglages : la rubrique le dit toujours.
-    expect(screen.getByText(fr.t(($) => $.profile.emails.accountEmails))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.notificationSettings.recapHint))).toBeTruthy()
+    // Les réglages de Léa sont ceux par défaut : chaque type « Dans le récap ».
+    for (const type of EmailType.options) {
+      expect(screen.getByRole('button', { name: choice(type) })).toBeTruthy()
+    }
+    // Les e-mails de sécurité ne dépendent pas de ces réglages : la rubrique le dit toujours.
+    expect(screen.getByText(fr.t(($) => $.notificationSettings.security))).toBeTruthy()
   })
 
-  it('saves a setting as soon as it is touched', async () => {
+  it('saves a choice as soon as it is touched', async () => {
     await renderWithI18n(<SettingsScreen section="notifications" />)
-    const recap = await screen.findByRole('switch', {
-      name: fr.t(($) => $.profile.emails.weeklyRecap),
-    })
 
-    await fireEvent.press(recap)
+    await fireEvent.press(await screen.findByRole('button', { name: choice('comments') }))
+    await fireEvent.press(
+      screen.getByRole('radio', { name: fr.t(($) => $.notificationSettings.choices.now) }),
+    )
 
     const patches = () =>
       jest
         .mocked(request)
         .mock.calls.filter(([to, init]) => to === emailPath && init?.method === 'PATCH')
         .map(([, init]) => JSON.parse(String(init?.body)) as unknown)
-    await waitFor(() => expect(patches()).toEqual([{ weeklyRecap: false }]))
-    expect(await screen.findByText(fr.t(($) => $.profile.emails.saved))).toBeTruthy()
+    // Un seul champ par enregistrement : celui qu'on vient de toucher.
+    await waitFor(() => expect(patches()).toEqual([{ comments: 'now' }]))
+    expect(
+      screen.getByRole('radio', {
+        name: fr.t(($) => $.notificationSettings.choices.now),
+        checked: true,
+      }),
+    ).toBeTruthy()
   })
 })

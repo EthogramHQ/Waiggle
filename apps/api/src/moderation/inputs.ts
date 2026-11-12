@@ -471,6 +471,15 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     recap_unvisited: 'nombre',
     mention_sent_at: 'date',
     updated_at: 'date',
+    // R8 : un choix par type, dans une liste fermée par Zod et par le `check` de la table.
+    email_reactions: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    email_comments: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    email_replies: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    email_follows: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    email_updates: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    email_testers: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    recap_v2_at: 'date',
+    instant_sent_at: 'date',
   },
   notification_state: {
     user_id: 'identifiant',
@@ -530,6 +539,21 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     category_code: 'un code de la table category',
     project_id: 'identifiant',
     from_category: 'un code de la table category',
+    created_at: 'date',
+  },
+  // R8 : les notifications du catalogue, écrites par l'API au geste d'un administrateur.
+  catalogue_notice: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    // Pas une saisie à modérer : une copie, faite par l'API, de project_tool.label (au registre)
+    // au moment où le rattachement l'efface, montrée à son seul auteur dans sa notification. Aucun
+    // autre membre ne la lit : rien à signaler, rien à cacher par un blocage ; effacée à 90 jours.
+    typed_name:
+      'copie par l’API de project_tool.label (au registre), montrée à son seul auteur, 90 jours',
+    kind: 'une sorte d’une liste fermée (project_category, tool_added, tool_merged), écrite par l’API',
+    project_id: 'identifiant',
+    tool_id: 'identifiant',
+    category_code: 'un code de la table category, choisi par un administrateur',
     created_at: 'date',
   },
   content_report: {

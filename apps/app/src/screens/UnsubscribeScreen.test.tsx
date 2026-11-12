@@ -11,6 +11,7 @@ import { unsubscribe } from '../email/api'
 import { malformedToken, mentionsToken, recapToken } from '../testing/email'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
 import { focusWithoutScroll } from '../ui/focus'
 import { useHydrated } from '../ui/theme/hydration'
 import { UnsubscribeScreen } from './UnsubscribeScreen'
@@ -141,7 +142,9 @@ describe('UnsubscribeScreen', () => {
     await confirm()
 
     expect(
-      await screen.findByText('Tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.'),
+      // R8 : le lien d'un ancien e-mail de mentions passe « Réponses et mentions » de « Tout de
+      // suite » à « Dans le récap » ; la phrase dit qu'il n'y a plus d'e-mail tout de suite.
+      await screen.findByText(fr.t(($) => $.unsubscribe.doneMentions)),
     ).toBeTruthy()
   })
 
@@ -464,3 +467,137 @@ describe('UnsubscribeScreen, its heading', () => {
     expect(screen.queryByRole('header', { name: /Ne plus recevoir/ })).toBeNull()
   })
 })
+
+// R8 (planche `R8-Email-TdS`) : le lien « Ne plus recevoir ces e-mails » d'un e-mail « tout de
+// suite » (jeton de sorte `instant`). La page ne sait pas quels types sont réglés sur « Tout de
+// suite » (elle sert sans connexion) : elle demande ce qu'ils deviennent, « Dans le récap » (coché
+// d'avance) ou « Jamais », et seul « Confirmer » envoie le choix (`unsubscribe(jeton, undefined,
+// choix)`). Ni nom ni adresse. Les liens du récap et des anciens e-mails de mentions ne changent pas.
+describe('UnsubscribeScreen, from an e-mail sent at once (R8)', () => {
+  // Le jeton d'un e-mail « tout de suite », de la même forme que ceux de testing/email.ts.
+  const instantToken = `v1.dTE.instant.${recapToken.split('.')[3]}`
+  const TEXT = {
+    title: fr.t(($) => $.unsubscribe.titleInstant),
+    ask: fr.t(($) => $.unsubscribe.askInstant),
+    digest: fr.t(($) => $.unsubscribe.choiceDigest),
+    digestHint: fr.t(($) => $.unsubscribe.choiceDigestHint),
+    never: fr.t(($) => $.unsubscribe.choiceNever),
+    neverHint: fr.t(($) => $.unsubscribe.choiceNeverHint),
+    onlyConfirm: fr.t(($) => $.unsubscribe.onlyConfirm),
+    doneDigest: fr.t(($) => $.unsubscribe.doneInstantDigest),
+    doneNever: fr.t(($) => $.unsubscribe.doneInstantNever),
+  }
+
+  it('asks what the « now » types become, « Dans le récap » checked, and sends nothing when the page opens', async () => {
+    await open({ token: instantToken })
+
+    expect(screen.getByRole('header', { name: TEXT.title })).toBeTruthy()
+    expect(screen.getByText(TEXT.ask)).toBeTruthy()
+    expect(
+      screen.getByRole('radio', { name: containingText(TEXT.digest), checked: true }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('radio', { name: containingText(TEXT.never), checked: false }),
+    ).toBeTruthy()
+    expect(screen.getByText(TEXT.digestHint)).toBeTruthy()
+    expect(screen.getByText(TEXT.neverHint)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Garder mes e‑mails' })).toBeTruthy()
+    expect(screen.getByText(TEXT.onlyConfirm)).toBeTruthy()
+    // Ni la question du récap, ni celle des mentions.
+    expect(screen.queryByText('Ne plus recevoir le récap de la semaine ?')).toBeNull()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing when a choice is touched, only on « Confirmer »', async () => {
+    await open({ token: instantToken })
+
+    await fireEvent.press(screen.getByRole('radio', { name: containingText(TEXT.never) }))
+
+    expect(
+      screen.getByRole('radio', { name: containingText(TEXT.never), checked: true }),
+    ).toBeTruthy()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('moves the « now » types to the recap with « Confirmer », and says so', async () => {
+    await open({ token: instantToken })
+
+    await confirm()
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([instantToken, undefined, 'digest'])
+    expect(await screen.findByText(TEXT.doneDigest)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+  })
+
+  it('stops them with « Jamais » then « Confirmer », and says so', async () => {
+    await open({ token: instantToken })
+
+    await fireEvent.press(screen.getByRole('radio', { name: containingText(TEXT.never) }))
+    await confirm()
+
+    expect(jest.mocked(unsubscribe).mock.calls).toEqual([[instantToken, undefined, 'never']])
+    expect(await screen.findByText(TEXT.doneNever)).toBeTruthy()
+  })
+
+  it('keeps the e-mails with « Garder mes e-mails »', async () => {
+    await open({ token: instantToken })
+    expect(screen.getByText(TEXT.ask)).toBeTruthy()
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Garder mes e‑mails' }))
+
+    expect(visited(mockPush, mockReplace)).toEqual(['/'])
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('sends a single request when « Confirmer » is touched twice', async () => {
+    jest.mocked(unsubscribe).mockImplementation(() => new Promise(() => {}))
+    await open({ token: instantToken })
+    expect(screen.getByText(TEXT.ask)).toBeTruthy()
+
+    await confirm()
+    await confirm()
+
+    expect(jest.mocked(unsubscribe).mock.calls).toEqual([[instantToken, undefined, 'digest']])
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeBusy()
+  })
+
+  it('says the link is invalid when the API refuses it', async () => {
+    jest.mocked(unsubscribe).mockResolvedValue({ ok: false, error: 'validation' })
+    await open({ token: instantToken })
+    expect(screen.getByText(TEXT.ask)).toBeTruthy()
+
+    await confirm()
+
+    expect(await screen.findByText('Lien invalide')).toBeTruthy()
+    expect(screen.queryByText(TEXT.doneDigest)).toBeNull()
+  })
+
+  it('shows neither the name nor the address of the member, even signed in', async () => {
+    mockSession({ user: { id: 'u1', name: 'Léa', email: 'lea@example.com' } })
+    await open({ token: instantToken })
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeTruthy()
+    expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
+
+    await confirm()
+
+    await screen.findByText(TEXT.doneDigest)
+    expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
+  })
+
+  it('offers no choice on the recap and mention links, as before R8', async () => {
+    await open({ token: recapToken })
+    expect(screen.getByText('Ne plus recevoir le récap de la semaine ?')).toBeTruthy() // témoin
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+
+    await confirm()
+
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([recapToken, undefined])
+  })
+})
+
+/** Un nom de bouton radio qui commence par ce libellé (son aide peut le suivre dans le nom lu). */
+const containingText = (label: string) =>
+  new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)

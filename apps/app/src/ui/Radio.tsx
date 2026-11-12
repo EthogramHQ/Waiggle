@@ -88,6 +88,12 @@ type GroupProps<T extends string> = {
   /** Le choix coché ; null : aucun encore (une question à laquelle il faut répondre soi-même). */
   value: T | null
   onChange: (value: T) => void
+  /**
+   * La question n'est pas affichée (R8, ChoiceRow) : elle reste le nom lu du groupe, mais l'œil la
+   * lit déjà sur la ligne qui a ouvert les choix, juste au-dessus. L'afficher une seconde fois
+   * ferait un titre en double.
+   */
+  labelHidden?: boolean
 }
 
 type KeyEvent = { key: string; preventDefault: () => void }
@@ -100,7 +106,13 @@ const arrowStep = (key: string): number =>
       ? -1
       : 0
 
-export function RadioGroup<T extends string>({ label, options, value, onChange }: GroupProps<T>) {
+export function RadioGroup<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  labelHidden = false,
+}: GroupProps<T>) {
   const { colors } = useTheme()
   // Les choix, pour y poser le focus quand une flèche passe au voisin.
   const refs = useRef<(View | null)[]>([])
@@ -147,9 +159,11 @@ export function RadioGroup<T extends string>({ label, options, value, onChange }
 
   return (
     <View style={{ gap: space.xs }}>
-      <Text variant="caption" weight={600} tone="muted">
-        {label}
-      </Text>
+      {labelHidden ? null : (
+        <Text variant="caption" weight={600} tone="muted">
+          {label}
+        </Text>
+      )}
       <View accessibilityRole="radiogroup" accessibilityLabel={label}>
         {options.map((option, index) => {
           const checked = option.value === value

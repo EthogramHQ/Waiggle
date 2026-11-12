@@ -8,6 +8,7 @@ import {
   COMMENT_REPLIES_SHOWN,
   type Comment,
   type CommentAuthor,
+  CommentId,
   type CommentPage,
   type CommentReply,
   type Mention,
@@ -23,6 +24,8 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
+  lte,
   ne,
   not,
   or,
@@ -30,11 +33,11 @@ import {
   sql,
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { type Blocks, notBlockedWith } from '../blocks/visibility'
+import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
 import { mediaUrl } from '../profile/me'
-import { listedProject } from '../projects/visibility'
+import { listedProject, projectVisibleTo } from '../projects/visibility'
 import { removalsOf } from '../removals/load'
 
 type Reader = Pick<Database, 'select'>
@@ -380,6 +383,14 @@ const mentioningViewer = async (
 }
 
 /**
+ * « Voir en contexte » (R8) : au lieu d'une page, le seul fil de la racine `rootId`. Si la réponse
+ * visée (`reply`, déjà vérifiée visible par l'appelant) n'est pas parmi les 50 premières, le fil
+ * porte les 50 réponses qui finissent par elle : le contrat borne les réponses à 50, et la réponse
+ * demandée doit y être.
+ */
+export type ThreadFocus = { rootId: string; reply?: { id: string; createdAt: Date } | undefined }
+
+/**
  * Une page de commentaires d'un projet, telle que la voit `viewer` : 20 racines au plus, de la plus
  * récente à la plus ancienne, après le curseur s'il y en a un ; sous chacune, ses réponses montrées
  * à ce membre, de la plus ancienne à la plus récente (50 au plus). Toujours six requêtes au
@@ -395,6 +406,7 @@ export const loadCommentPage = async (
   viewer: Viewer,
   cursor: CursorContent | null,
   publicApiUrl: string,
+  focus?: ThreadFocus,
 ): Promise<CommentPage> => {
   // 1. Les racines. En SQL :
   //   select … from project_comment
@@ -431,6 +443,8 @@ export const loadCommentPage = async (
         eq(c.projectId, projectId),
         isNull(c.rootId),
         cursor ? after(cursor, c.createdAt, c.id) : undefined,
+        // « Voir en contexte » : cette seule racine, trouvée par la clé primaire.
+        focus ? eq(c.id, focus.rootId) : undefined,
         or(rootShown, sql`${firstShownReply} is not null`),
       ),
     )
@@ -497,6 +511,44 @@ export const loadCommentPage = async (
       thread.push(row)
       repliesByRoot.set(rootId, thread)
     }
+  }
+
+  // 2b. « Voir en contexte » seulement : la réponse visée est au-delà des 50 premières. Les 50 qui
+  // finissent par elle, lues à rebours (de la visée vers les plus anciennes), puis remises dans
+  // l'ordre. En SQL :
+  //   select … from project_comment reply where reply.root_id = $racine and <la réponse se montre>
+  //     and (created_at < $date or (created_at = $date and id <= $id))
+  //   order by created_at desc, id desc limit 50
+  // L'index project_comment_root_created_idx (root_id, created_at) se lit à l'envers depuis la
+  // visée et s'arrête à la 50e ligne.
+  const target = focus?.reply
+  if (focus && target && !repliesByRoot.get(focus.rootId)?.some((row) => row.id === target.id)) {
+    const window = await db
+      .select({
+        id: reply.id,
+        authorId: reply.authorId,
+        body: reply.body,
+        createdAt: reply.createdAt,
+        editedAt: reply.editedAt,
+        hiddenAt: reply.hiddenAt,
+        deletedAt: reply.deletedAt,
+        removedAt: reply.removedAt,
+        removalId: reply.removalId,
+      })
+      .from(reply)
+      .where(
+        and(
+          eq(reply.rootId, focus.rootId),
+          seesSql(reply, viewer),
+          or(
+            lt(reply.createdAt, target.createdAt),
+            and(eq(reply.createdAt, target.createdAt), lte(reply.id, target.id)),
+          ),
+        ),
+      )
+      .orderBy(desc(reply.createdAt), desc(reply.id))
+      .limit(COMMENT_REPLIES_SHOWN)
+    repliesByRoot.set(focus.rootId, window.reverse())
   }
 
   // 3a. (Tranche 7b, règle 2.) Parmi les commentaires d'un membre qui l'a bloqué, ceux qui le
@@ -569,6 +621,54 @@ export const loadCommentPage = async (
         ? encodeCursor({ at: last.createdAt.toISOString(), id: last.id })
         : null,
   }
+}
+
+/**
+ * « Voir en contexte » (R8) : le fil du commentaire `commentId` et le projet où il se trouve, tels
+ * que les voit ce membre ; null pour tout le reste (identifiant inconnu ou mal formé, commentaire
+ * supprimé, masqué ou retiré qu'il ne lit pas, d'un membre bloqué avec lui, projet qu'il ne voit
+ * pas) : la route répond alors le même 404, et rien ne dit lequel de ces cas est le bon.
+ *
+ * Ordre (relecture de sécurité du plan, sec-B2) : le commentaire visé d'abord (`sees`, avec
+ * `mentionsViewer`, puis `deletedAt`), puis son projet (`projectVisibleTo`), puis le fil, chargé par
+ * `loadCommentPage` elle-même (pas une copie : la liste et le contexte ne peuvent pas diverger).
+ * Requêtes : le commentaire (clé primaire), son projet (clé primaire), les blocages du membre
+ * (`blocksOf`, ses deux index), et celles de `loadCommentPage` (racine par clé primaire, réponses
+ * par `project_comment_root_created_idx`) : un nombre fixe, quelle que soit la longueur du fil.
+ */
+export const loadCommentContext = async (
+  db: Reader,
+  viewerId: string,
+  commentId: string,
+  publicApiUrl: string,
+): Promise<{ projectId: string; thread: Comment } | null> => {
+  // Un identifiant mal formé ne désigne rien (et ferait échouer la requête SQL, uuid oblige).
+  if (!CommentId.safeParse(commentId).success) return null
+  const [target] = await db
+    .select({ ...rowColumns, projectId: c.projectId, rootId: c.rootId })
+    .from(c)
+    .where(eq(c.id, commentId))
+  if (!target || target.deletedAt !== null) return null
+  const [project] = await db
+    .select({
+      authorId: schema.project.authorId,
+      visibility: schema.project.visibility,
+      removedAt: schema.project.removedAt,
+    })
+    .from(schema.project)
+    .where(and(eq(schema.project.id, target.projectId), projectVisibleTo(viewerId)))
+  if (!project) return null
+  const viewer = viewerOf(viewerId, project, await blocksOf(db, viewerId))
+  const mentioning = await mentioningViewer(db, [target], viewer)
+  if (!sees({ ...target, mentionsViewer: mentioning.has(target.id) }, viewer)) return null
+  // Une réponse mène à sa racine ; une racine, à elle-même.
+  const rootId = target.rootId ?? target.id
+  const page = await loadCommentPage(db, target.projectId, viewer, null, publicApiUrl, {
+    rootId,
+    reply: target.rootId === null ? undefined : { id: target.id, createdAt: target.createdAt },
+  })
+  const thread = page.items[0]
+  return thread ? { projectId: target.projectId, thread } : null
 }
 
 /**

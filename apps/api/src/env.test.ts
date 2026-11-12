@@ -137,6 +137,45 @@ describe('loadEnv', () => {
     expect(() => loadEnv({ ...production, EMAIL_JOBS: 'OFF ' })).toThrow(/EMAIL_JOBS/)
   })
 
+  // R8 : le SMTP de Scaleway. Sans TLS, l'identification (le projet et la clé secrète) partirait en
+  // clair : seuls les ports 465 (TLS dès la connexion) et 587 (STARTTLS exigé) sont permis.
+  it('refuses an SMTP configuration without TLS', () => {
+    const smtp = {
+      ...production,
+      EMAIL_TRANSPORT: 'scaleway-smtp',
+      BREVO_API_KEY: undefined,
+      SCALEWAY_SECRET_KEY: 'secret',
+      SCALEWAY_PROJECT_ID: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
+    }
+    // Témoin : par défaut, le serveur de Scaleway sur le port 465.
+    expect(loadEnv(smtp).mail).toEqual({
+      provider: 'scaleway-smtp',
+      host: 'smtp.tem.scaleway.com',
+      port: 465,
+      user: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
+      password: 'secret',
+      from: { email: 'no-reply@waiggle.com', name: appName },
+    })
+    expect(loadEnv({ ...smtp, SMTP_PORT: '587' }).mail).toMatchObject({ port: 587 })
+    // Les ports sans chiffrement, et un port qui n'en est pas un, arrêtent le serveur.
+    for (const port of ['25', '2525', '80', 'abc']) {
+      expect(() => loadEnv({ ...smtp, SMTP_PORT: port }), port).toThrow(/SMTP_PORT/)
+    }
+    // Un hôte qui n'est pas un nom de machine (adresse, identifiant, espace) est refusé.
+    for (const host of ['smtp.example.com:25', 'user@smtp.example.com', 'smtp .example.com', 'x']) {
+      expect(() => loadEnv({ ...smtp, SMTP_HOST: host }), host).toThrow(/SMTP_HOST/)
+    }
+    // Comme l'API, le SMTP veut la clé et le projet ; et EMAIL_TRANSPORT refuse une autre valeur.
+    expect(() => loadEnv({ ...smtp, SCALEWAY_SECRET_KEY: undefined })).toThrow(
+      /SCALEWAY_SECRET_KEY/,
+    )
+    expect(() => loadEnv({ ...smtp, EMAIL_TRANSPORT: 'smtp' })).toThrow(/EMAIL_TRANSPORT/)
+    // Le retour à l'API HTTP se fait par la variable, sans toucher au reste.
+    expect(loadEnv({ ...smtp, EMAIL_TRANSPORT: 'scaleway-api' }).mail).toMatchObject({
+      provider: 'scaleway',
+    })
+  })
+
   it('refuses to write emails in the logs in production, unless allowed for a trial', () => {
     const consoleMail = { ...production, MAIL_PROVIDER: 'console', BREVO_API_KEY: undefined }
     expect(() => loadEnv(consoleMail)).toThrow(/MAIL_PROVIDER/)

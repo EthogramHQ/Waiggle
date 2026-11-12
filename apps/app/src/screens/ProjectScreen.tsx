@@ -26,7 +26,7 @@
 // Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre et
 // retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
 import { type Project, REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
@@ -34,6 +34,7 @@ import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo, useOpenOutside } from '../navigation/links'
+import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -71,6 +72,7 @@ import { shareUrl } from '../ui/share'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
+import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
 import { Comments } from './ProjectComments'
@@ -119,9 +121,31 @@ export function ProjectScreen({ id }: { id: string }) {
   return <ProjectView project={project.data} />
 }
 
+/**
+ * Hook : le paramètre `comment` de l'adresse (« /projects/<id>?comment=<id> », posé par une
+ * notification). Hors d'un navigateur (un test qui remplace expo-router par un faux sans cette
+ * fonction), il n'y en a pas : l'appel lève, et la réponse est « rien ». Même raisonnement que
+ * `useFocusParam` (projects/ProjectActions.tsx) : l'issue du try est la même à chaque rendu.
+ */
+const useCommentParam = (): string | undefined => {
+  try {
+    // biome-ignore lint/correctness/useHookAtTopLevel: l'issue du try est la même à chaque rendu (voir ci-dessus)
+    return firstParam(useLocalSearchParams<{ comment?: string | string[] }>().comment)
+  } catch {
+    return undefined
+  }
+}
+
 function ProjectView({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
+  // L'adresse n'est connue que dans le navigateur : on attend l'hydratation (sinon écart de rendu).
+  const hydrated = useHydrated()
+  const commentParam = useCommentParam()
+  const focusCommentId = hydrated && commentParam ? commentParam : null
+  // Fermer la feuille retire le paramètre (`setParams` remplace l'adresse sans page de plus dans
+  // l'historique) ; `?.` : un faux routeur de test n'a pas toujours cette méthode.
+  const closeCommentContext = () => router.setParams?.({ comment: undefined })
   const toast = useToast()
   // La carte qui devient la page : le titre reçoit le focus quand la photo est posée, et « Retour »
   // replie d'abord la page dans sa carte. `faded` enveloppe chacun des autres morceaux, qui
@@ -490,7 +514,17 @@ function ProjectView({ project }: { project: Project }) {
       <ProjectUpdatesSection project={project} canPublish={canPublish} sheet={updateSheet} />
     ) : null
   // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
-  const comments = <Comments project={project} />
+  // « Voir en contexte » (R8) : venu d'une notification (`?comment=<id>`), la feuille des commentaires
+  // s'ouvre sur ce commentaire. Ouverte, le paramètre reste (recharger la page la rouvre au même
+  // endroit) ; fermée, elle le retire : recharger ne la rouvre plus. Rien ne change l'adresse à
+  // l'arrivée : le focus posé sur le commentaire n'a pas à attendre un nouveau dessin de la page.
+  const comments = (
+    <Comments
+      project={project}
+      focusCommentId={focusCommentId}
+      onContextClosed={closeCommentContext}
+    />
+  )
 
   // « Signaler ce projet », un lien gris en bas de la page, en plus du menu « … » (F-Pr12). Jamais
   // sur son propre projet. Dans une rangée : le lien garde la largeur de son texte.

@@ -1,6 +1,7 @@
-import { appName, contactEmail } from '@ruche/brand'
+import { appName, contactEmail, palettes } from '@ruche/brand'
 import { fill, resources } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
+import { instantEmail, instantPreviewData } from './instant'
 import {
   changeEmailConfirmationEmail,
   emailChangedEmail,
@@ -71,14 +72,24 @@ const links: NotificationLinks = {
   oneClick: 'https://api.waiggle.com/v1/email/unsubscribe?token=t',
 }
 
+// R8 (récap habillé) : les commentaires, réactions et abonnés d'un projet du membre deviennent les
+// pastilles de « Tes projets » (`projects`) ; `lines` ne garde que les réponses et les mentions, avec
+// qui a écrit ; `follows` compte les nouveaux abonnés au compte (ceux d'un projet sont dans sa
+// pastille). Puis les deux parties neuves : `friends` (« Nouveaux projets de tes proches », 3 au
+// plus) et `testersWanted` (« Ils cherchent des testeurs », un projet ou null). Chaque projet porte
+// son image, déjà jointe (`Attachment`, fabriquée par recap-images.ts) ou null.
 const recapData = (overrides: Partial<RecapData> = {}): RecapData => ({
   name: 'Inès Morel',
-  lines: [{ kind: 'comment', name: 'Malik', handle: 'malik', title: 'Météo' }],
+  projects: [],
+  lines: [{ kind: 'mention', name: 'Malik', handle: 'malik', title: 'Météo' }],
   more: 0,
-  reactions: 0,
   follows: 0,
   first: false,
+  // La note unique du premier récap de R8, pour qui recevait déjà le récap avant.
+  news: false,
   last: false,
+  friends: [],
+  testersWanted: null,
   // R7a : la partie « Les projets que tu suis ou que tu testes », vide par défaut.
   updates: [],
   updatesMore: 0,
@@ -130,7 +141,7 @@ describe('the addresses written by members in a notification e-mail', () => {
       recapData({
         lines: [
           {
-            kind: 'comment',
+            kind: 'mention',
             name: 'Support -waiggle-login.com',
             handle: 'mallory',
             title: 'Météo',
@@ -149,7 +160,7 @@ describe('the addresses written by members in a notification e-mail', () => {
     const recap = recapEmail(
       'en',
       recapData({
-        lines: [{ kind: 'comment', name: 'evil.com', handle: 'mallory', title: 'www.evil.com' }],
+        lines: [{ kind: 'reply', name: 'evil.com', handle: 'mallory', title: 'www.evil.com' }],
       }),
     )
     const mention = mentionEmail(
@@ -170,14 +181,12 @@ describe('the addresses written by members in a notification e-mail', () => {
 })
 
 describe('the layout of a notification e-mail', () => {
+  // R8 : le récap habillé a son propre bandeau (plus bas, « the dressed recap ») ; l'e-mail de
+  // mentions garde cette mise en page.
   it('starts with the name of the app, then the heading in bold, then the greeting', () => {
-    const recap = recapEmail('fr', recapData())
     const mention = mentionEmail('fr', mentionData())
 
-    for (const [email, heading] of [
-      [recap, fill(fr.recap.heading)],
-      [mention, fill(fr.mentions.heading)],
-    ] as const) {
+    for (const [email, heading] of [[mention, fill(fr.mentions.heading)]] as const) {
       const name = email.html.indexOf(`>${appName}</p>`)
       const title = email.html.indexOf(`>${heading}</p>`)
       const greeting = email.html.indexOf('Bonjour Inès Morel')
@@ -195,7 +204,8 @@ describe('the layout of a notification e-mail', () => {
     const email = recapEmail('fr', recapData())
 
     expect(email.html).not.toContain(' · ')
-    for (const label of [fr.recap.unsubscribe, fr.manage]) {
+    // R8 : « Changer mes préférences » remplace « Gérer mes e-mails » dans le récap.
+    for (const label of [fr.recap.unsubscribe, fr.changePreferences]) {
       const at = email.html.indexOf(`>${label}</a>`)
       expect(at, label).toBeGreaterThan(0)
       // Chaque lien a son propre paragraphe, en 14 px au moins, avec du jeu autour.
@@ -207,16 +217,19 @@ describe('the layout of a notification e-mail', () => {
     }
   })
 
-  it('says it is the last recap for now right under the introduction, before the button', () => {
+  // R8 : le récap habillé n'a plus de bouton « Voir mes notifications » ; la phrase vient avant la
+  // première partie.
+  it('says it is the last recap for now right under the introduction, before the first part', () => {
     const email = recapEmail('fr', recapData({ last: true }))
     const last = fill(fr.recap.last)
+    const firstLine = fill(fr.recap.mention, { name: 'Malik', handle: 'malik', title: 'Météo' })
 
     const at = email.html.indexOf(last)
     expect(at).toBeGreaterThan(email.html.indexOf(fill(fr.recap.intro)))
-    expect(at).toBeLessThan(email.html.indexOf(fr.recap.button))
+    expect(at).toBeLessThan(email.html.indexOf(firstLine))
     // Au corps normal, pas en petites lettres grises.
     expect(email.html.slice(email.html.lastIndexOf('<p', at), at)).toContain('font-size:16px')
-    expect(email.text.indexOf(last)).toBeLessThan(email.text.indexOf(fr.recap.button))
+    expect(email.text.indexOf(last)).toBeLessThan(email.text.indexOf(firstLine))
   })
 
   it('tightens its margins on a narrow screen', () => {
@@ -468,6 +481,415 @@ describe('the testers corner part of the recap (R7b)', () => {
     }
   })
 })
+
+// ─── Tranche R8 : le récap habillé (planche R8-Recap) ────────────────────────────────────────────
+// Scénario : docs/scenarios/refonte.md, « Le récap de la semaine, habillé » ; plan R8, « Le récap
+// habillé (BE-D) » et les tests demandés par les relecteurs. Le modèle reçoit tout prêt : les
+// projets du membre et leurs nombres, les projets des proches (titre et nom seuls, jamais
+// l'accroche), le projet qui cherche des testeurs, et l'image de chacun, déjà réduite et jointe
+// (une pièce jointe « en ligne » : le HTML la montre par `cid:`, jamais chargée à distance).
+describe('the dressed recap (R8)', () => {
+  const METEO = '0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10'
+  const DECOLLAGE = '5e7a1c3d-2b4f-4a6e-9c8d-0f1e2d3c4b5a'
+  const PAPILLON = '9a8b7c6d-5e4f-4321-8fed-cba987654321' // gitleaks:allow (un UUID d'exemple)
+  const projectUrl = (id: string) => `https://waiggle.com/projects/${id}`
+
+  /** Une image jointe, aux octets quelconques : le modèle ne les lit pas, il les recopie. */
+  const image = (n: number, contentType: 'image/jpeg' | 'image/png' = 'image/jpeg') => ({
+    filename: `projet-${n}.jpg`,
+    contentType,
+    content: new Uint8Array([n, n, n]),
+    cid: `thumb-${n}`,
+  })
+
+  const ownProject = (overrides: Partial<RecapData['projects'][number]> = {}) => ({
+    title: 'Le ciel de ce soir',
+    reactions: 23,
+    comments: 4,
+    follows: 2,
+    url: projectUrl(METEO),
+    image: image(1),
+    ...overrides,
+  })
+  const friend = (overrides: Partial<RecapData['friends'][number]> = {}) => ({
+    title: 'Décollage !',
+    author: 'Papi Jean',
+    url: projectUrl(DECOLLAGE),
+    image: image(3),
+    ...overrides,
+  })
+  const wanted = (overrides: Partial<NonNullable<RecapData['testersWanted']>> = {}) => ({
+    title: 'Quel papillon ?',
+    author: 'Hugo Lefèvre',
+    url: projectUrl(PAPILLON),
+    image: image(4),
+    ...overrides,
+  })
+
+  /** Le récap de la planche : deux projets, deux proches, un projet qui cherche des testeurs. */
+  const dressed = (overrides: Partial<RecapData> = {}) =>
+    recapData({
+      lines: [],
+      projects: [
+        ownProject(),
+        ownProject({
+          title: 'Raconte-moi un tableau',
+          reactions: 12,
+          comments: 0,
+          follows: 0,
+          url: projectUrl(PAPILLON.replace('9a8b', '1a8b')),
+          image: image(2),
+        }),
+      ],
+      friends: [
+        friend(),
+        friend({
+          title: 'Mon agent de recettes',
+          author: 'Nora Benali',
+          url: projectUrl(DECOLLAGE.replace('5e7a', '6e7a')),
+          image: null,
+        }),
+      ],
+      testersWanted: wanted(),
+      ...overrides,
+    })
+
+  const hrefsOf = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1])
+  const imgTags = (html: string) => [...html.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0])
+
+  // R8 (relecture de design) : l'ordre de la planche. Les parties de lecture rapide (tes projets,
+  // les proches, les testeurs) passent avant les listes de liens, sinon le bouton « Tester la
+  // démo » tombait aux trois quarts de la page à 320 px.
+  it('puts the parts in the order of the mock-up, in the HTML and in the text', () => {
+    const email = recapEmail(
+      'fr',
+      dressed({
+        lines: [{ kind: 'mention', name: 'Malik', handle: 'malik', title: 'Météo' }],
+        updates: [{ title: 'Météo', count: 1, url: projectUrl(METEO) }],
+        testers: [{ title: 'Météo', count: 1, url: projectUrl(METEO) }],
+      }),
+    )
+    const titles = [
+      fr.recap.yourProjects,
+      fr.recap.friendsTitle,
+      fr.recap.testersWanted,
+      fill(fr.mentions.heading),
+      fr.recap.updatesTitle,
+      fr.recap.testersTitle,
+    ]
+
+    for (const part of [email.html, email.text]) {
+      const places = titles.map((title) => part.indexOf(title))
+      expect(places.every((place) => place > 0)).toBe(true)
+      expect(places).toEqual([...places].sort((a, b) => a - b))
+    }
+  })
+
+  it('greets the member by name in the heading, with the introduction under it', () => {
+    const email = recapEmail('fr', dressed())
+    const heading = fill(fr.recap.heading, { name: 'Inès Morel' })
+
+    expect(email.subject).toBe(fill(fr.recap.subject))
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(heading)
+      expect(part.indexOf(fill(fr.recap.intro))).toBeGreaterThan(part.indexOf(heading))
+    }
+    // Le titre est en gras, et il ne contient aucun « {{ » laissé vide.
+    const at = email.html.indexOf(heading)
+    expect(email.html.slice(email.html.lastIndexOf('<', at - 1), at)).toMatch(
+      /font-weight:(bold|[6-9]00)|<h1/,
+    )
+    expect(email.text).not.toContain('{{')
+    expect(email.html).not.toContain('{{')
+  })
+
+  it('lists each of my projects with its numbers as pills, and « read the comments » when there are some', () => {
+    const email = recapEmail('fr', dressed())
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fr.recap.yourProjects)
+      expect(part).toContain('Le ciel de ce soir')
+      expect(part).toContain(fill(fr.recap.pillReactions_other, { count: '23' }))
+      expect(part).toContain(fill(fr.recap.pillComments_other, { count: '4' }))
+      expect(part).toContain(fill(fr.recap.pillFollows_other, { count: '2' }))
+      expect(part).toContain('Raconte-moi un tableau')
+      expect(part).toContain(fill(fr.recap.pillReactions_other, { count: '12' }))
+      // Pas de pastille à zéro.
+      expect(part).not.toContain(fill(fr.recap.pillComments_other, { count: '0' }))
+      expect(part).not.toContain(fill(fr.recap.pillFollows_other, { count: '0' }))
+    }
+    // « Lire les commentaires » une seule fois : seul « Le ciel de ce soir » en a.
+    expect(email.html.split(`>${fr.recap.readComments}</a>`)).toHaveLength(2)
+    expect(hrefsOf(email.html)).toContain(projectUrl(METEO))
+  })
+
+  it('writes a pill in the singular for one', () => {
+    const email = recapEmail(
+      'fr',
+      dressed({ projects: [ownProject({ reactions: 1, comments: 1, follows: 1 })] }),
+    )
+
+    expect(email.text).toContain(fill(fr.recap.pillReactions_one, { count: '1' }))
+    expect(email.text).toContain(fill(fr.recap.pillComments_one, { count: '1' }))
+    expect(email.text).toContain(fill(fr.recap.pillFollows_one, { count: '1' }))
+  })
+
+  // Relecture de design de R8 : en pastille sous le dernier projet, « 1 nouvel abonné » se lisait
+  // comme un abonné de ce projet. Les abonnés du compte ont leur phrase à part.
+  it('writes the new followers of my account as a sentence of its own, never as a pill under a project', () => {
+    const email = recapEmail('fr', dressed({ follows: 3 }))
+    const sentence = fill(fr.recap.follows_other, { count: '3' })
+
+    expect(sentence).toBe('3 personnes de plus te suivent')
+    expect(email.text).toContain(sentence)
+    const at = email.html.indexOf(`>${sentence}</`)
+    expect(at).toBeGreaterThan(-1)
+    // L'élément qui la porte est un paragraphe, pas une pastille (`span` au fond miel).
+    const tag = email.html.slice(email.html.lastIndexOf('<', at), at)
+    expect(tag.startsWith('<p ')).toBe(true)
+  })
+
+  it('names who replied or mentioned, never what was written', () => {
+    const email = recapEmail(
+      'fr',
+      dressed({ lines: [{ kind: 'reply', name: 'Zoé', handle: 'zoe', title: 'Vélo' }] }),
+    )
+
+    expect(email.text).toContain(
+      fill(fr.recap.reply, { name: 'Zoé', handle: 'zoe', title: 'Vélo' }),
+    )
+  })
+
+  it('lists the new projects of the people I follow with their title and author, and a link to each', () => {
+    const email = recapEmail('fr', dressed())
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fr.recap.friendsTitle)
+      expect(part).toContain('Papi Jean')
+      expect(part).toContain('Nora Benali')
+      expect(part).toContain(fr.recap.viewProject)
+    }
+    expect(email.html).toContain(escapeForHtml('Décollage !'))
+    expect(hrefsOf(email.html)).toEqual(
+      expect.arrayContaining([
+        projectUrl(DECOLLAGE),
+        projectUrl(DECOLLAGE.replace('5e7a', '6e7a')),
+      ]),
+    )
+  })
+
+  it('offers one project looking for testers, whose button leads to its page', () => {
+    const email = recapEmail('fr', dressed())
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fr.recap.testersWanted)
+      expect(part).toContain('Quel papillon ?')
+      expect(part).toContain('Hugo Lefèvre')
+      expect(part).toContain(fr.recap.tryDemo)
+    }
+    const at = email.html.indexOf(`>${fr.recap.tryDemo}</a>`)
+    const anchor = email.html.slice(email.html.lastIndexOf('<a', at), at)
+    expect(anchor).toContain(`href="${projectUrl(PAPILLON)}"`)
+  })
+
+  it('writes no part that has nothing to say', () => {
+    const email = recapEmail('fr', recapData())
+
+    for (const part of [email.text, email.html]) {
+      expect(part).not.toContain(fr.recap.friendsTitle)
+      expect(part).not.toContain(fr.recap.testersWanted)
+      expect(part).not.toContain(fr.recap.viewProject)
+      expect(part).not.toContain(fr.recap.tryDemo)
+      expect(part).not.toContain(fr.recap.readComments)
+    }
+    // Témoin : la ligne de la mention est bien là.
+    expect(email.text).toContain(
+      fill(fr.recap.mention, { name: 'Malik', handle: 'malik', title: 'Météo' }),
+    )
+  })
+
+  it('joins each image to the e-mail and shows it by its content id, with the title as its text', () => {
+    const email = recapEmail('fr', dressed())
+
+    // Quatre images : deux projets du membre, un proche (l'autre n'a pas d'image), un projet à tester.
+    expect(email.attachments?.map((a) => a.cid)).toEqual([
+      'thumb-1',
+      'thumb-2',
+      'thumb-3',
+      'thumb-4',
+    ])
+    expect(email.attachments?.[0]?.content).toEqual(new Uint8Array([1, 1, 1]))
+    const tags = imgTags(email.html)
+    expect(tags).toHaveLength(4)
+    for (const [cid, title] of [
+      ['thumb-1', 'Le ciel de ce soir'],
+      ['thumb-2', 'Raconte-moi un tableau'],
+      ['thumb-3', 'Décollage !'],
+      ['thumb-4', 'Quel papillon ?'],
+    ] as const) {
+      const tag = tags.find((t) => t.includes(`src="cid:${cid}"`))
+      expect(tag, cid).toBeDefined()
+      expect(tag, cid).toContain(`alt="${escapeForHtml(title)}"`)
+    }
+    // Aucune image chargée à distance, et la version texte n'en parle pas.
+    for (const tag of tags) expect(tag).toMatch(/src="cid:/)
+    expect(email.text).not.toContain('cid:')
+  })
+
+  it('joins no image and draws no img tag when no project has one', () => {
+    const email = recapEmail(
+      'fr',
+      dressed({
+        projects: [ownProject({ image: null })],
+        friends: [friend({ image: null })],
+        testersWanted: wanted({ image: null }),
+      }),
+    )
+
+    expect(email.attachments ?? []).toEqual([])
+    expect(imgTags(email.html)).toEqual([])
+  })
+
+  it('turns a domain in a name, a title and an alt text into « [lien] », and escapes them', () => {
+    const email = recapEmail(
+      'fr',
+      dressed({
+        projects: [ownProject({ title: 'Voir ciel-pirate.example ce soir' })],
+        friends: [
+          friend({ title: '<b>Décollage</b> sur fusee.example', author: 'Jean de jean.example' }),
+        ],
+        testersWanted: wanted({ title: 'Papillon www.papillon-demo.example' }),
+      }),
+    )
+
+    for (const part of [email.subject, email.text, email.html]) {
+      for (const domain of [
+        'ciel-pirate.example',
+        'fusee.example',
+        'jean.example',
+        'papillon-demo',
+      ]) {
+        expect(part, domain).not.toContain(domain)
+      }
+    }
+    expect(email.text).toContain('[lien]')
+    // Le texte de remplacement des images est désarmé et échappé, lui aussi.
+    const alts = imgTags(email.html).map((tag) => /alt="([^"]*)"/.exec(tag)?.[1] ?? '')
+    expect(alts.some((alt) => alt.includes('[lien]'))).toBe(true)
+    expect(email.html).not.toContain('<b>Décollage')
+    expect(email.html).toContain('&lt;b&gt;Décollage')
+  })
+
+  it('tells once what the recap now shows, and explains a first recap instead', () => {
+    const news = recapEmail('fr', dressed({ news: true }))
+    const first = recapEmail('fr', dressed({ first: true, news: true }))
+    const plain = recapEmail('fr', dressed())
+
+    expect(news.text).toContain(fill(fr.recap.news))
+    expect(news.text).not.toContain(fill(fr.recap.first))
+    // Un premier récap le dit déjà : une seule des deux phrases.
+    expect(first.text).toContain(fill(fr.recap.first))
+    expect(first.text).not.toContain(fill(fr.recap.news))
+    expect(plain.text).not.toContain(fill(fr.recap.news))
+    expect(plain.text).not.toContain(fill(fr.recap.first))
+  })
+
+  it('says why it arrives, with « change my preferences » and « stop this recap » in the footer', () => {
+    const email = recapEmail('fr', dressed())
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(fr.recap.reason))
+      expect(part).toContain(fr.changePreferences)
+      expect(part).toContain(fr.recap.unsubscribe)
+    }
+    const linkOf = (label: string) => {
+      const at = email.html.indexOf(`>${label}</a>`)
+      return /href="([^"]*)"/.exec(email.html.slice(email.html.lastIndexOf('<a', at), at))?.[1]
+    }
+    expect(linkOf(fr.changePreferences)).toBe(links.manage)
+    expect(linkOf(fr.recap.unsubscribe)).toBe(links.unsubscribe)
+    expect(email.headers?.['List-Unsubscribe']).toBe(`<${links.oneClick}>`)
+  })
+
+  it('is written in English for an English-speaking member', () => {
+    const email = recapEmail('en', dressed({ news: true }))
+
+    expect(email.subject).toBe(fill(en.recap.subject))
+    for (const text of [
+      fill(en.recap.heading, { name: 'Inès Morel' }),
+      en.recap.yourProjects,
+      fill(en.recap.pillReactions_other, { count: '23' }),
+      en.recap.friendsTitle,
+      en.recap.testersWanted,
+      en.recap.tryDemo,
+      fill(en.recap.news),
+      fill(en.recap.reason),
+      en.changePreferences,
+    ]) {
+      expect(email.text, text).toContain(text)
+    }
+    expect(email.html).toContain('<html lang="en"')
+  })
+})
+
+// R8 (« Repris des listes ») : les versions texte des e-mails de compte ne parlent plus d'un
+// « bouton ci-dessous », et l'e-mail vers la nouvelle adresse a un titre.
+describe('the text version of the account e-mails (R8)', () => {
+  const url = 'https://waiggle.com/reset?token=abc'
+
+  it('speaks of the link below, never of a button, in the text of a password reset', () => {
+    for (const [language, t] of [
+      ['fr', fr],
+      ['en', en],
+    ] as const) {
+      const email = resetPasswordEmail(language, { url, hours: 1 })
+      expect(email.text).toContain(fill(t.resetPassword.textBody))
+      expect(email.text).not.toContain(fill(t.resetPassword.body))
+      // Le HTML, lui, a son bouton et garde sa phrase.
+      expect(email.html).toContain(escapeForHtml(fill(t.resetPassword.body)))
+    }
+  })
+
+  it('speaks of the link below in the text of an address change, and gives the label above the link', () => {
+    for (const [language, t] of [
+      ['fr', fr],
+      ['en', en],
+    ] as const) {
+      const email = changeEmailConfirmationEmail(language, {
+        name: 'Léa',
+        newEmail: 'lea@example.com',
+        url,
+      })
+      expect(email.text).toContain(fill(t.changeEmail.textNext))
+      expect(email.text).not.toContain(fill(t.changeEmail.next))
+      const lines = email.text.split('\n')
+      expect(lines[lines.indexOf(url) - 1]).toBe(fill(t.changeEmail.textLink))
+    }
+  })
+
+  it('gives a heading to the e-mail sent to the new address, and a text that names no button', () => {
+    for (const [language, t] of [
+      ['fr', fr],
+      ['en', en],
+    ] as const) {
+      const email = newEmailVerificationEmail(language, { url })
+      expect(email.html).toContain(escapeForHtml(fill(t.newEmail.heading)))
+      expect(email.text).toContain(fill(t.newEmail.heading))
+      expect(email.text).toContain(fill(t.newEmail.textBody))
+      expect(email.text).not.toContain(fill(t.newEmail.body))
+    }
+  })
+})
+
+/** Ce que l'échappement du HTML fait d'un texte (render() échappe aussi l'apostrophe). */
+function escapeForHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
 
 // ─── Tranche 7a ──────────────────────────────────────────────────────────────────────────────────
 
@@ -801,7 +1223,8 @@ describe('changeEmailConfirmationEmail', () => {
     expect(email.text).toContain(fill(fr.greeting, { name: 'Inès' }))
     for (const sentence of [
       fr.changeEmail.body,
-      fr.changeEmail.next,
+      // R8 : la version texte n'a pas de bouton ; sa consigne parle du lien ci-dessous.
+      fr.changeEmail.textNext,
       fr.changeEmail.expires,
       fr.changeEmail.ignore,
     ]) {
@@ -828,7 +1251,8 @@ describe('newEmailVerificationEmail', () => {
     const email = newEmailVerificationEmail('fr', { url })
 
     expect(email.subject).toBe(fill(fr.newEmail.subject))
-    for (const sentence of [fr.newEmail.body, fr.newEmail.expires, fr.newEmail.ignore]) {
+    // R8 : la version texte parle du lien ci-dessous (`textBody`), le HTML de son bouton.
+    for (const sentence of [fr.newEmail.textBody, fr.newEmail.expires, fr.newEmail.ignore]) {
       expect(email.text).toContain(fill(sentence))
     }
     expect(email.text).toContain(url)
@@ -845,7 +1269,10 @@ describe('newEmailVerificationEmail', () => {
       const t = resources[language].translation.email
 
       expect(email.subject).toBe(fill(t.newEmail.subject))
-      expect(email.text.split('\n')[0]).toBe(fill(t.newEmail.greeting))
+      // R8 : le titre ouvre maintenant le texte ; la salutation, neutre, le suit.
+      const lines = email.text.split('\n')
+      expect(lines[0]).toBe(fill(t.newEmail.heading))
+      expect(lines).toContain(fill(t.newEmail.greeting))
       const addresses = (email.text.match(/[^\s@]+@[^\s@]+/g) ?? []).map((found: string) =>
         found.replace(/[.,;:!?)]+$/, ''),
       )
@@ -978,11 +1405,13 @@ describe('the order of the e-mails of an address change', () => {
       url: 'https://api.waiggle.com/v',
     })
     const lines = email.text.split('\n').filter((line) => line !== '')
-    const next = lines.indexOf(fill(fr.changeEmail.next))
+    // R8 : la version texte n'a pas de bouton ; la consigne parle du lien, et le libellé du lien
+    // remplace le texte du bouton.
+    const next = lines.indexOf(fill(fr.changeEmail.textNext))
     expect(lines.slice(next, next + 4)).toEqual([
-      fill(fr.changeEmail.next),
+      fill(fr.changeEmail.textNext),
       fill(fr.changeEmail.expires),
-      fill(fr.changeEmail.button),
+      fill(fr.changeEmail.textLink),
       'https://api.waiggle.com/v',
     ])
   })
@@ -999,6 +1428,31 @@ describe('the order of the e-mails of an address change', () => {
       expect(lines[lines.indexOf(url) - 1]).toBe(fill(label))
     }
     expect(fill(en.newEmail.textLink)).toBe('Confirm this address:')
+  })
+})
+
+// R8 (relecture de design) : dans l'e-mail « tout de suite » de plusieurs nouveautés, huit boutons
+// miel l'un sous l'autre : la planche les dessine blancs (style secondaire du récap). Un seul
+// bouton garde le miel : c'est l'action de l'e-mail.
+describe('the buttons of the instant e-mail', () => {
+  const honeyOf = (html: string) => html.match(/background:#[0-9a-f]{6};color:#[0-9a-f]{6}/gi)
+
+  it('draws no honey button when the e-mail carries several news, and keeps one for a single news', () => {
+    const many = instantPreviewData()
+    expect(many.lines.length).toBeGreaterThan(1)
+    const email = instantEmail(many, 'fr')
+    const secondary = (email.html.match(/border:1px solid/g) ?? []).length
+
+    // Un bouton blanc (fond `surface`, bordure `outline`) par nouveauté.
+    expect(email.html).not.toContain(
+      `background:${palettes.day.honey};color:${palettes.day.onHoney}`,
+    )
+    expect(secondary).toBeGreaterThanOrEqual(many.lines.length)
+
+    // Témoin : une seule nouveauté garde le bouton miel.
+    const one = instantEmail({ ...many, lines: many.lines.slice(0, 1) }, 'fr')
+    expect(one.html).toContain(`background:${palettes.day.honey};color:${palettes.day.onHoney}`)
+    expect(honeyOf(one.html)).not.toBeNull()
   })
 })
 
@@ -1094,7 +1548,8 @@ describe('resetPasswordEmail', () => {
     const t = fr.resetPassword
 
     expect(email.subject).toBe(fill(t.subject))
-    for (const sentence of [t.body, t.ignore, t.reason]) {
+    // R8 : la version texte parle du lien ci-dessous (`textBody`), le HTML de son bouton.
+    for (const sentence of [t.textBody, t.ignore, t.reason]) {
       expect(email.text).toContain(fill(sentence))
     }
     expect(email.text).toContain(expiresIn(fr, 1))

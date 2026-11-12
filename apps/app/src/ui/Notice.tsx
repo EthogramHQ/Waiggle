@@ -134,7 +134,16 @@ const useIosAnnouncement = (active: boolean, message: string) => {
 
 type Props = {
   message: string
-  tone?: 'error' | 'info' | 'success'
+  /**
+   * `neutral` (R8, planche `R8-Contexte`) : un constat sans faute ni réussite, en gris (« Ce
+   * commentaire n'est plus là. », la feuille ouverte depuis une notification).
+   */
+  tone?: 'error' | 'info' | 'success' | 'neutral'
+  /**
+   * Une autre icône que celle du ton, quand elle dit mieux de quoi il s'agit (`chat-circle-slash` :
+   * un commentaire qui manque, R8). Toujours décorative : seul le message est lu.
+   */
+  icon?: IconName
   /**
    * Une simple confirmation (« Note supprimée. ») : role « status », lu par les lecteurs d'écran
    * sans couper ce qu'ils disaient, là où une alerte les interrompt.
@@ -153,7 +162,7 @@ type Props = {
   ref?: Ref<View>
 }
 
-export function Notice({ message, tone = 'error', polite = false, action, ref }: Props) {
+export function Notice({ message, tone = 'error', icon, polite = false, action, ref }: Props) {
   const { colors } = useTheme()
   const { hidden, alertKey } = useSingle(action?.single)
   useIosAnnouncement(polite && !hidden, message)
@@ -175,6 +184,14 @@ export function Notice({ message, tone = 'error', polite = false, action, ref }:
     success: {
       icon: 'check-circle',
       iconTone: 'success',
+      text: 'default',
+      background: colors.surfaceGrouped,
+    },
+    // Le gris des cartes de commentaire écrites par soi (même fond, mêmes couples de contraste) ;
+    // l'écran peut donner une icône qui dit de quoi il s'agit (`icon`).
+    neutral: {
+      icon: 'info',
+      iconTone: 'muted',
       text: 'default',
       background: colors.surfaceGrouped,
     },
@@ -209,7 +226,7 @@ export function Notice({ message, tone = 'error', polite = false, action, ref }:
         action ? null : frame,
       ]}
     >
-      <Icon name={look.icon} size={ICON_SIZE} tone={look.iconTone} />
+      <Icon name={icon ?? look.icon} size={ICON_SIZE} tone={look.iconTone} />
       <View style={{ flex: 1 }}>
         <Text variant="callout" tone={look.text}>
           {message}

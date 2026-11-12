@@ -40,6 +40,12 @@ type GroupProps = {
   /** Annoncé comme un groupe de boutons radio (une liste de choix). */
   radio?: boolean
   /**
+   * R8 : le nom lu d'un groupe de choix sans titre affiché, quand la question est déjà écrite
+   * au-dessus en phrase (la page de désinscription « Tes e-mails tout de suite »). Avec `title`,
+   * c'est le titre qui nomme le groupe.
+   */
+  label?: string
+  /**
    * R7b : annoncé comme une liste (« liste, 4 éléments »), pour une liste de personnes plutôt que
    * de réglages (les testeurs d'un projet). Le groupe pose lui-même chaque ligne dans un élément de
    * liste, son trait de séparation compris : sur le web, une liste (`<ul>`) ne contient que des
@@ -68,15 +74,23 @@ const RadioSlotContext = createContext<RadioSlot | null>(null)
 /**
  * La largeur que garde le nom d'une ligne (en points) avant que le côté droit passe dessous : de quoi
  * lire quelques mots. Mesuré à 320 points et 200 % : « Membres bloqués » laissait 38 points à
- * « Sam Petit » (R4, M6).
+ * « Sam Petit » (R4, M6). Exportée : la ligne de choix des réglages (ChoiceRow, R8) range son nom et
+ * son choix actuel de la même façon.
  */
-const MIN_NAME = 120
+export const MIN_NAME = 120
 
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
 /** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
 export type PressEvent = { preventDefault?: () => void }
 
-export function ListGroup({ title, footer, children, radio = false, list = false }: GroupProps) {
+export function ListGroup({
+  title,
+  footer,
+  children,
+  radio = false,
+  list = false,
+  label,
+}: GroupProps) {
   const { colors, shadows } = useTheme()
   const rows = Children.toArray(children)
   // Les éléments des choix, par rang de ligne, pour y poser le focus quand une flèche passe au
@@ -128,7 +142,7 @@ export function ListGroup({ title, footer, children, radio = false, list = false
       ) : null}
       <View
         {...(radio ? { accessibilityRole: 'radiogroup' as const } : null)}
-        {...(radio && title ? { accessibilityLabel: title } : null)}
+        {...(radio && (title ?? label) ? { accessibilityLabel: title ?? label } : null)}
         {...(asList ? { role: 'list' as const } : null)}
         style={{
           backgroundColor: colors.surface,

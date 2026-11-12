@@ -14,7 +14,7 @@
 import {
   AccountExport,
   type AccountExport as AccountExportType,
-  MENTION_EMAIL_DELAY_MINUTES,
+  INSTANT_EMAIL_DELAY_MINUTES,
   MentionableList,
   type Notification,
   NotificationPage,
@@ -22,10 +22,10 @@ import {
   UnreadCount,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { fill, resources } from '@ruche/i18n'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mentionEmails } from './jobs/mention-emails'
+import { readUnsubscribeToken } from './email/unsubscribe-token'
+import { instantEmails } from './jobs/instant-emails'
 import { activity } from './testing/activity'
 import {
   createTestContext,
@@ -395,7 +395,8 @@ describe.each(DIRECTIONS)('the notifications, when %s', (_, blockNow) => {
   // projet qu'elle ne peut plus ouvrir, et en citerait un extrait. Zoé n'est bloquée avec personne ;
   // ses mêmes gestes sur son propre projet servent de témoin.
   it('drops what a third member does on a project of the other one, and keeps the rest', async () => {
-    await act.setPreferences(ines, { mentionEmails: true })
+    // R8 : « Réponses et mentions » réglé sur « Tout de suite » remplace l'interrupteur de 6c.
+    await act.setPreferences(ines, { replies: 'now' })
     const { handle } = await act.me(ines)
     const velo = await act.publish(malik, 'Vélo')
     const recettes = await act.publish(zoe, 'Recettes')
@@ -424,9 +425,9 @@ describe.each(DIRECTIONS)('the notifications, when %s', (_, blockNow) => {
     expect(text).not.toContain('chez Malik')
     expect(await unread(ines)).toBe(unreadBefore - 2)
 
-    // L'e-mail de mentions, une fois le délai passé : seuls les gestes chez Zoé y sont.
-    later((MENTION_EMAIL_DELAY_MINUTES + 1) * MINUTE)
-    await mentionEmails(
+    // L'e-mail « tout de suite », une fois le délai passé : seuls les gestes chez Zoé y sont.
+    later((INSTANT_EMAIL_DELAY_MINUTES + 1) * MINUTE)
+    await instantEmails(
       {
         db: ctx.db,
         mailer: ctx.mailer,
@@ -436,13 +437,18 @@ describe.each(DIRECTIONS)('the notifications, when %s', (_, blockNow) => {
       },
       new Date(),
     )
-    const mentionSubjects = [
-      fill(resources.fr.translation.email.mentions.subject),
-      fill(resources.en.translation.email.mentions.subject),
-    ]
-    const emails = ctx.mailer.sent.filter(
-      (email) => email.to === inesAccount.email && mentionSubjects.includes(email.subject),
-    )
+    // L'objet de l'e-mail « tout de suite » change avec son contenu : on le reconnaît à son lien de
+    // désinscription en un clic, de la sorte `instant`.
+    const emails = ctx.mailer.sent.filter((email) => {
+      const header = email.headers?.['List-Unsubscribe'] ?? '<>'
+      const token = URL.canParse(header.slice(1, -1))
+        ? (new URL(header.slice(1, -1)).searchParams.get('token') ?? '')
+        : ''
+      return (
+        email.to === inesAccount.email &&
+        readUnsubscribeToken(TEST_AUTH_SECRET, token)?.kind === 'instant'
+      )
+    })
     expect(emails).toHaveLength(1)
     expect(emails[0]?.text).toContain('chez Zoé')
     expect(`${emails[0]?.text}${emails[0]?.html}`).not.toContain('chez Malik')

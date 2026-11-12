@@ -2,12 +2,14 @@
 // - GET et POST /v1/projects/{id}/comments : lire la page de commentaires, commenter ou répondre ;
 // - PATCH et DELETE /v1/projects/{id}/comments/{commentId} : modifier ou supprimer le sien ;
 // - PUT et DELETE /v1/projects/{id}/comments/{commentId}/hide : masquer ou démasquer, pour
-//   l'auteur du projet.
+//   l'auteur du projet ;
+// - GET /v1/comments/{commentId}/context : le fil d'un commentaire (« Voir en contexte »).
 // Réservé aux membres connectés, sur un projet qu'ils voient (public, ou le leur, même privé). Ce
 // que chacun voit d'un commentaire masqué ou supprimé est décidé dans comments/load.ts.
 import { createRoute, z } from '@hono/zod-openapi'
 import {
   Comment,
+  CommentContext,
   CommentId,
   CommentPage,
   CommentReply,
@@ -25,6 +27,7 @@ import { blockedWith, blocksOf } from '../blocks/visibility'
 import {
   authorsOf,
   type CommentRow,
+  loadCommentContext,
   loadCommentPage,
   presentComment,
   sees,
@@ -169,6 +172,28 @@ const unhideRoute = createRoute({
   },
 })
 
+const contextRoute = createRoute({
+  method: 'get',
+  path: '/v1/comments/{commentId}/context',
+  summary: 'The thread of a comment, to see it in context',
+  description:
+    'The project of the comment and its whole thread (the root and its replies, as the list shows ' +
+    'them to this member). A targeted reply beyond the first 50 comes with the 50 replies that ' +
+    'end with it. Used by the notifications.',
+  request: { params: z.object({ commentId: z.string() }) },
+  responses: {
+    200: {
+      description: 'The project and the thread.',
+      content: { 'application/json': { schema: CommentContext } },
+    },
+    401: errorResponse('Not signed in.'),
+    404: errorResponse(
+      'Unknown or malformed identifier, deleted comment, comment hidden, removed or written by a ' +
+        'member blocked with me, project not visible: the same answer for all.',
+    ),
+  },
+})
+
 type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
 
 const c = schema.projectComment
@@ -179,6 +204,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   // Connecté obligatoire, avant tout le reste.
   app.use('/v1/projects/:id/comments', requireUser)
   app.use('/v1/projects/:id/comments/*', requireUser)
+  app.use('/v1/comments/:commentId/context', requireUser)
 
   const unauthorized = (ctx: Context<AppEnv>) =>
     ctx.json(errorBody(languageOf(ctx), 'unauthorized'), 401)
@@ -299,6 +325,18 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const page = await loadCommentPage(db, id, project.viewer, cursor, publicApiUrl)
     // .parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
     return ctx.json(CommentPage.parse(page), 200)
+  })
+
+  // « Voir en contexte » : pas de quota, comme la liste des commentaires (lecture seule). Tout ce
+  // qui ne se voit pas répond le même 404 (comments/load.ts, loadCommentContext).
+  app.openapi(contextRoute, async (ctx) => {
+    const user = ctx.get('user')
+    if (!user) return unauthorized(ctx)
+    const { commentId } = ctx.req.valid('param')
+    const context = await loadCommentContext(db, user.id, commentId, publicApiUrl)
+    if (!context) return notFound(ctx)
+    // .parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
+    return ctx.json(CommentContext.parse(context), 200)
   })
 
   // Publier et modifier : le quota et les droits sont vérifiés AVANT de lire le texte. Le corps

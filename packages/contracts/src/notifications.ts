@@ -4,6 +4,7 @@
 // disparaître la notification d'eux-mêmes. Réactions et abonnés sont groupés et sans nom : une
 // notification ne révèle jamais ce que l'écran cache (on ne voit nulle part qui a réagi ou suit).
 import { z } from 'zod'
+import { CategoryCode } from './categories'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
 import { ProjectAuthor, ProjectId } from './projects'
@@ -11,7 +12,9 @@ import { ReactionCounts } from './reactions'
 import { RemovalGround } from './removal'
 import { StoredReportTargetKind } from './reports'
 import { SettledUpdate, TESTER_EXCERPT_MAX, TesterMessageKind, TesterRole } from './testers'
+import { TOOL_NAME_MAX, ToolSlug } from './tools'
 import { UpdateId, UpdateLineOut } from './updates'
+import { ProjectVisual } from './visuals'
 
 /** L'écran charge les notifications 20 par 20, de la plus récente à la plus ancienne. */
 export const NOTIFICATION_PAGE_SIZE = 20
@@ -22,8 +25,20 @@ export const EXCERPT_MAX = 80
 /** Le nombre de la cloche s'arrête à 10 : l'appli affiche « 9+ » au-delà de 9. */
 export const UNREAD_COUNT_MAX = 10
 
-/** Le projet dont parle une notification : de quoi écrire son titre et y mener. */
-const NotifiedProject = z.object({ id: ProjectId, title: z.string() })
+/**
+ * La miniature d'un projet dans une notification (R8, relecture du plan ui-B1) : l'adresse et le
+ * ThumbHash de sa couverture, mêmes règles que les médias du projet (l'adresse ne s'ouvre que pour
+ * un membre qui voit le projet) ; null s'il n'a pas de photo, l'appli montre alors sa tuile.
+ */
+export const NotifiedCover = ProjectVisual.pick({ url: true, thumbhash: true })
+export type NotifiedCover = z.infer<typeof NotifiedCover>
+
+/** Le projet dont parle une notification : de quoi écrire son titre, montrer sa miniature et y mener. */
+const NotifiedProject = z.object({
+  id: ProjectId,
+  title: z.string(),
+  cover: NotifiedCover.nullable(),
+})
 /** Le commentaire dont parle une notification : son texte actuel, raccourci. */
 const NotifiedComment = z.object({ id: CommentId, excerpt: z.string().max(EXCERPT_MAX + 1) })
 /** Un jour, en heure de Paris (« 2026-10-20 ») : les groupes vont par jour. */
@@ -106,6 +121,8 @@ export const ProjectUpdateNotification = z.object({
     title: z.string().nullable(),
     version: z.string().nullable(),
     firstLine: UpdateLineOut,
+    /** R8 : le nombre des autres lignes (« et 2 autres changements ») ; 0 s'il n'y en a qu'une. */
+    moreLines: z.int().min(0),
   }),
 })
 
@@ -147,6 +164,37 @@ export const FeedbackSettledNotification = z.object({
   project: NotifiedProject,
   author: ProjectAuthor,
   update: SettledUpdate.nullable(),
+})
+
+/**
+ * R8 : un administrateur a rangé un de ses projets dans une catégorie (il était dans « Autre »).
+ * Signée « L'équipe de {{appName}} », jamais le nom de l'administrateur ; un administrateur n'est pas
+ * prévenu de ses propres gestes. Un projet devenu privé, retiré ou supprimé la fait disparaître.
+ * Jamais par e-mail.
+ */
+export const ProjectCategoryNotification = z.object({
+  ...Common,
+  kind: z.literal('project_category'),
+  project: NotifiedProject,
+  /** Le code de la catégorie : l'appli écrit son nom dans la langue du membre. */
+  category: CategoryCode,
+})
+
+/**
+ * R8 : un outil qu'il avait écrit en « Autre » sur un ou plusieurs de ses projets est entré au
+ * catalogue (`merged` faux), ou a été rattaché à un outil existant (`merged` vrai). Une seule par
+ * membre et par outil, quel que soit le nombre de projets. « Laisser hors du catalogue » ne prévient
+ * personne. Jamais par e-mail.
+ */
+export const ToolAddedNotification = z.object({
+  ...Common,
+  kind: z.literal('tool_added'),
+  merged: z.boolean(),
+  /** Le nom tel qu'il l'avait tapé (40 caractères au plus). */
+  typedName: z.string().max(TOOL_NAME_MAX),
+  /** L'outil du catalogue, sa page (`/tags/<slug>`) et son nom. */
+  toolSlug: ToolSlug,
+  toolName: z.string(),
 })
 
 /** Son commentaire a été masqué par l'auteur du projet ; démasqué, la notification disparaît. */
@@ -259,6 +307,8 @@ export const Notification = z
     TesterCallNotification,
     TesterMessageNotification,
     FeedbackSettledNotification,
+    ProjectCategoryNotification,
+    ToolAddedNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

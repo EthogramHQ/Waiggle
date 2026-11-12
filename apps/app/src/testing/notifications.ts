@@ -7,7 +7,12 @@ import type { Notification, NotificationPage, ReactionCounts } from '@ruche/cont
 export type Of<Kind extends Notification['kind']> = Extract<Notification, { kind: Kind }>
 
 /** Le projet d'Inès dont parlent la plupart des notifications. */
-export const meteoProject = { id: '6e7f8091-a2b3-4dc4-9ed5-e6f708192a3b', title: 'Météo' }
+export const meteoProject = {
+  id: '6e7f8091-a2b3-4dc4-9ed5-e6f708192a3b',
+  title: 'Météo',
+  // R8 : sa miniature. « Météo » n'a pas de photo : l'appli montre sa tuile.
+  cover: null,
+}
 
 /** Malik, qui commente le projet d'Inès (son nom est déjà visible sous son commentaire). */
 export const malikAuthor = { id: 'u4', name: 'Malik', avatarUrl: null, handle: 'malik' }
@@ -257,3 +262,118 @@ export const notificationPageOf = (
   nextCursor: string | null = null,
   asOf = notificationsAsOf,
 ): NotificationPage => ({ items, nextCursor, asOf })
+
+// --- R8 : les lignes de la page « Activité » (planches R8-Activite et R8-Activite-Plus) ---
+// À part de `allNotifications`, comme celles de 7a : les tests d'avant comptent ses éléments.
+
+/**
+ * « Décollage ! », le projet de Papi Jean, avec une photo : la miniature de la ligne. L'adresse est
+ * celle d'un média de l'API (elle ne s'ouvre qu'avec la session du membre).
+ */
+export const decollageProject = {
+  id: '7f8091a2-b3c4-4dd5-8e6f-708192a3b4c5',
+  title: 'Décollage !',
+  cover: {
+    url: 'http://localhost:3000/media/projects/7f8091a2-b3c4-4dd5-8e6f-708192a3b4c5/cover.webp',
+    thumbhash: '3OcRJYB4d3h/iIeHeEh3eIhw+j3A', // gitleaks:allow (un résumé d'image, pas une clé)
+  },
+}
+
+/** Papi Jean, qui publie « Décollage ! » ; sa photo de profil est un média de l'API. */
+export const papiJeanAuthor = {
+  id: 'u7',
+  name: 'Papi Jean',
+  avatarUrl: 'http://localhost:3000/media/avatars/u7.webp',
+}
+
+/** Une mise à jour v1.2 de « Décollage ! », avec deux autres changements que sa première ligne. */
+export const updateNotification: Of<'project_update'> = {
+  kind: 'project_update',
+  id: 'project_update:5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+  at: '2026-10-20T09:00:00.000Z',
+  isNew: false,
+  project: decollageProject,
+  author: papiJeanAuthor,
+  update: {
+    id: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+    title: 'Le décompte de la fusée',
+    version: 'v1.2',
+    firstLine: { family: 'new', text: 'Un compte à rebours avant chaque question' },
+    moreLines: 2,
+  },
+}
+
+/** Papi Jean a répondu à Inès en la mentionnant, sur « Décollage ! » : avatar et miniature. */
+export const papiJeanReplyNotification: Of<'comment'> = {
+  kind: 'comment',
+  reason: 'reply',
+  id: 'comment:a1b2c3d4-e5f6-4a07-8b18-c2d3e4f5a6b7',
+  at: '2026-10-20T11:48:00.000Z',
+  isNew: true,
+  project: decollageProject,
+  comment: { id: 'a1b2c3d4-e5f6-4a07-8b18-c2d3e4f5a6b7', excerpt: 'On le regarde ce soir !' },
+  author: { ...papiJeanAuthor, handle: 'papi_jean' },
+}
+
+/** Papi Jean appelle ses testeurs sur « Décollage ! » : le début de l'appel en citation. */
+export const testerCallNotification: Of<'tester_call'> = {
+  kind: 'tester_call',
+  id: 'tester_call:1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+  at: '2026-10-20T11:40:00.000Z',
+  isNew: true,
+  project: decollageProject,
+  author: papiJeanAuthor,
+  call: {
+    id: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+    excerpt: 'Nouveau niveau caché sur Saturne ! Essayez-le ce week-end…',
+  },
+}
+
+/** Papi Jean a réglé le retour d'Inès dans la v1.3 de « Décollage ! ». */
+export const feedbackSettledNotification: Of<'feedback_settled'> = {
+  kind: 'feedback_settled',
+  id: 'feedback_settled:3c4d5e6f-7a8b-4c9d-8e1f-2a3b4c5d6e7f',
+  at: '2026-10-19T09:00:00.000Z',
+  isNew: false,
+  project: decollageProject,
+  author: papiJeanAuthor,
+  update: {
+    id: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8c',
+    version: 'v1.3',
+    createdAt: '2026-10-19T09:00:00.000Z',
+  },
+}
+
+/** L'équipe a rangé « Météo » dans « Animaux » (il était dans « Autre ») : jamais qui l'a fait. */
+export const projectCategoryNotification: Of<'project_category'> = {
+  kind: 'project_category',
+  id: `project_category:${meteoProject.id}`,
+  at: '2026-10-18T10:00:00.000Z',
+  isNew: false,
+  project: meteoProject,
+  category: 'animals',
+}
+
+/** « Glide », qu'Inès avait écrit en « Autre », fait maintenant partie du catalogue. */
+export const toolAddedNotification: Of<'tool_added'> = {
+  kind: 'tool_added',
+  id: 'tool_added:glide',
+  at: '2026-10-17T10:00:00.000Z',
+  isNew: false,
+  merged: false,
+  typedName: 'Glide',
+  toolSlug: 'glide',
+  toolName: 'Glide',
+}
+
+/** « Glide », qu'Inès avait écrit en « Autre », s'affiche maintenant comme « Glide Apps ». */
+export const toolMergedNotification: Of<'tool_added'> = {
+  kind: 'tool_added',
+  id: 'tool_added:glide-apps:merged',
+  at: '2026-10-16T10:00:00.000Z',
+  isNew: false,
+  merged: true,
+  typedName: 'Glide',
+  toolSlug: 'glide-apps',
+  toolName: 'Glide Apps',
+}

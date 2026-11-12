@@ -2245,3 +2245,252 @@ Hors de R7b, et où ça va :
 2. Un fil privé par testeur, pas de discussion de groupe (gardée pour plus tard).
 3. Un membre retiré par l'auteur ne peut pas se réinscrire.
 4. Badge « Testeur » dans les commentaires du projet.
+
+---
+
+## R8 — Les notifications
+
+Statut : **validé par Louis** le 12/11/2026 (conversation « plan » de R8), tel quel, avec les
+sept choix de la session ; amendé le même jour après la relecture du plan (décisions de Louis :
+titre et nom seuls dans le récap, « Se désabonner » vers « Dans le récap », jours de Paris, trois
+textes du juridique). Décisions de Louis du 12/11 : « Dans le récap » par défaut pour tout ; le récap habillé reste dans R8 ; le
+miel s'éteint à la visite suivante ; trois planches nouvelles avant le plan.
+
+R8 redessine la page « Activité » (planches `R8-Activite`, `R8-Activite-Nuit`, `R8-Activite-Vide`,
+`R8-Activite-Desktop` ; décisions B7, A2, A3, A16) et l'écran « Notifications » des réglages
+(planche `R8-Reglages`, F-N2) : des sections par jour, des lignes sans cadre, le fond miel pour ce
+qui est nouveau, « Voir en contexte » sur un commentaire, des réglages d'e-mail par type, et un
+e-mail « tout de suite » pour chaque type qui le permet, et le récap habillé du dimanche (planche
+`R8-Recap`, A5). Elle ajoute deux notifications que R6b avait laissées de côté : le projet rangé
+par un administrateur et l'outil rattaché au catalogue.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : les notifications
+se calculent au moment où on les lit (droits, blocages, projet privé, contenu retiré), elles
+durent 90 jours, les réactions et les abonnés restent comptés sans noms (A2), et un e-mail ne
+contient aucun lien ni domaine venu d'un membre.
+
+Hors de R8, et où ça va :
+- les notifications sur le téléphone (push) : après la refonte ; l'écran montre seulement leur
+  place, « Bientôt » (A16) ;
+- la ligne « Ruches » des réglages et la partie « Dans tes ruches » du récap : R10 ;
+- répondre à un retour de testeur depuis sa messagerie (un e-mail qui revient dans le coin) : plus
+  tard, s'il le faut (l'e-mail reçu devrait être vérifié, assaini, relié au bon fil) ;
+- une notification « rétabli » quand la modération revient sur un retrait : R9, avec la
+  modération ;
+- supprimer une notification à la main : non (elle part d'elle-même au bout de 90 jours).
+
+### La page « Activité » (planches `R8-Activite`, `R8-Activite-Nuit`, `R8-Activite-Desktop`)
+
+- Étant donné Léa, connectée, avec trois nouveautés depuis sa dernière visite
+- Quand elle touche la cloche (sa pastille dit « 3 »)
+- Alors la page « Activité » s'ouvre par-dessus, sans barre d'onglets, avec Retour et la roue des
+  réglages, qui mène à l'écran « Notifications »
+- Et la liste est rangée en « Aujourd'hui », « Cette semaine » et « Plus tôt », du plus récent au
+  plus ancien, en jours de Paris comme toutes les dates de l'appli (relecture du plan, Louis
+  12/11/2026)
+- Et chaque ligne, sans cadre, montre à gauche l'avatar de qui a agi (ou une icône quand on ne
+  nomme personne : réactions, abonnés, mise à jour, modération), à droite la miniature du projet,
+  les noms et titres en gras, et la date relative
+- Et un commentaire, une réponse ou une mention montre son début dans une bulle ; des réactions,
+  leurs icônes ; une mise à jour, sa version et sa première ligne (« et 2 autres changements »)
+- Et les trois nouveautés ont un fond miel ; les autres, aucun fond
+- Et la pastille de la cloche s'éteint dès l'ouverture
+- Et sur ordinateur, la page garde la barre du haut ; à droite, « Ce que tu reçois par e-mail »
+  résume ses réglages avec « Régler les notifications », et rappelle qu'on ne voit nulle part qui
+  a réagi ou qui suit, seulement des nombres
+- Et la nuit, les mêmes rôles de couleur (planche `R8-Activite-Nuit`)
+
+**Le fond miel** (décision de Louis, 12/11/2026) : une ligne est en miel si elle est arrivée depuis la
+visite précédente ; elle le reste pendant toute la visite, puis plus jamais. Sur ordinateur,
+« Tout marquer comme lu » éteint tout de suite le miel de la page.
+
+**Les modérations** (retrait, suspension, signalement traité) restent dans la même liste, avec une
+icône rouge, et mènent à la raison et à la façon de contester, comme aujourd'hui.
+
+### Où mène chaque ligne
+
+| Ligne | Mène à |
+| --- | --- |
+| Commentaire, réponse, mention | la page du projet, feuille des commentaires ouverte sur ce commentaire (« Voir en contexte ») |
+| Réactions, abonnés au projet | la page du projet |
+| Mise à jour | la frise des mises à jour du projet |
+| Appel à tester, retour, réponse, « Réglé » | le coin des testeurs, au bon onglet et au bon fil (comme en R7b) |
+| Projet rangé | la page du projet |
+| Outil rattaché | la page de l'outil |
+| Nouveaux abonnés à son profil, suspension | rien : la ligne n'est pas un bouton |
+| Modération (retrait, signalement traité) | comme aujourd'hui |
+
+### « Voir en contexte » (renvoyé de R5b)
+
+- Étant donné Léa, mentionnée par Papi Jean dans une réponse sur « Le ciel de ce soir »
+- Quand elle touche la notification
+- Alors la page du projet s'ouvre, la feuille des commentaires ouverte, le fil de la réponse
+  déplié, et la feuille amène ce commentaire en vue
+- Et le commentaire visé est éclairé de miel un court instant (sans mouvement si « Réduire les
+  animations » est actif : la teinte reste, puis s'efface)
+- Et le lecteur d'écran se pose sur ce commentaire
+- Et l'adresse porte le commentaire visé (`/projects/<id>?comment=<id>`) : la recharger rouvre la
+  feuille au même endroit ; fermer la feuille retire le paramètre
+- Mais si le commentaire a disparu entre-temps (supprimé, masqué, retiré), la feuille s'ouvre en
+  haut et dit « Ce commentaire n'est plus là. »
+- Et un paramètre qui vise un commentaire d'un autre projet, ou que Léa ne peut pas voir, se
+  comporte de même : rien n'en laisse deviner l'existence
+
+### Deux notifications nouvelles (renvoyées de R6b)
+
+- Étant donné Inès, autrice de « Quel papillon ? », rangé dans « Autre »
+- Quand un administrateur le range dans « Animaux »
+- Alors Inès lit dans Activité « L'équipe de {{appName}} a rangé « Quel papillon ? » dans
+  Animaux », avec la miniature du projet ; la toucher ouvre le projet
+- Étant donné Malik, qui a écrit l'outil « Glide » en « Autre » sur deux projets
+- Quand un administrateur l'ajoute au catalogue, ou le rattache à un outil existant
+- Alors Malik lit, une seule fois pour ses deux projets, « « Glide » fait maintenant partie des
+  outils de {{appName}} » (ou « … s'affiche maintenant comme « Glide Apps » »), et la toucher ouvre
+  la page de l'outil
+- Et « Laisser hors du catalogue » ne prévient personne : rien ne change pour le projet
+- Et un administrateur n'est jamais prévenu de ses propres gestes ; un projet privé, retiré ou
+  supprimé depuis ne laisse plus la notification apparaître
+- Et ces deux notifications ne partent jamais par e-mail : Activité seulement
+
+### L'écran « Notifications » des réglages (planche `R8-Reglages`)
+
+- Étant donné Léa dans Réglages → Notifications
+- Alors l'écran montre en tête un exemple de notification sans nom (A3 : « 12 réactions sur
+  Raconte-moi un tableau ») et « Dans l'appli, tout arrive dans l'Activité. Réactions et
+  abonnés : combien, jamais qui. »
+- Et une ligne « Sur ce téléphone » grisée, « Bientôt »
+- Et « Par e-mail », une ligne par type avec son choix actuel ; un toucher ouvre les choix sur
+  place (boutons radio), un seul type ouvert à la fois ; chaque choix s'enregistre aussitôt
+
+| Type | Choix | Par défaut |
+| --- | --- | --- |
+| Réactions | Dans le récap · Jamais | Dans le récap |
+| Commentaires sur tes projets | Tout de suite · Dans le récap · Jamais | Dans le récap |
+| Réponses et mentions | Tout de suite · Dans le récap · Jamais | Dans le récap (Louis, 12/11 : la règle de 6c, aucun e-mail immédiat sans l'avoir demandé, l'emporte sur B7) |
+| Nouveaux abonnés | Dans le récap · Jamais | Dans le récap |
+| Mises à jour suivies | Dans le récap · Jamais | Dans le récap |
+| Coin des testeurs (appels, retours, réponses, « Réglé ») | Tout de suite · Dans le récap · Jamais | Dans le récap |
+| Le récap | Activé · Désactivé | Activé, le dimanche à 10 h (B7) |
+
+- Et en bas, « Les e-mails de sécurité du compte arrivent toujours. »
+- Et quand le récap est désactivé, les types réglés « Dans le récap » le disent (« Le récap est
+  coupé : rien ne part ») sans changer leur choix
+- Et les choix d'aujourd'hui sont repris : le récap reste activé ou coupé ; « Un e-mail quand on
+  me mentionne ou me répond » activé devient « Réponses et mentions : Tout de suite », coupé
+  devient « Dans le récap »
+
+### Les e-mails « tout de suite »
+
+- Étant donné Papi Jean, qui a réglé « Commentaires sur tes projets » sur « Tout de suite »
+- Quand Léa commente « Décollage ! »
+- Alors 15 minutes plus tard, un e-mail court le prévient, avec ce qui est arrivé entre-temps
+  pour tous ses types « Tout de suite », regroupé dans un seul e-mail ; au plus un par heure
+- Mais rien ne part s'il a ouvert Activité entre-temps, ou si le contenu a disparu pour lui ; ce
+  qui part se calcule au moment de l'envoi (comme aujourd'hui pour les mentions)
+- Et un commentaire, une réponse ou une mention donnent leur début (80 caractères, liens
+  désarmés) ; **un appel ou un retour de testeur ne donne aucun texte** (« Inès t'a envoyé un
+  retour sur Décollage ! ») : le fil est privé, et une messagerie le garderait
+- Et chaque ligne mène à sa page dans l'appli (le commentaire en contexte, le bon fil du coin)
+- Et chaque e-mail dit pourquoi on le reçoit, et porte « Ne plus recevoir ces e-mails » : la page
+  sans connexion propose de passer ces types à « Dans le récap » ou à « Jamais », confirmé par un
+  bouton ; le « Se désabonner » de la messagerie (en-tête List-Unsubscribe, un clic, sans page)
+  les passe à « Dans le récap » (Louis, 12/11/2026) ; rien ne remonte jamais un type réglé sur
+  « Jamais »
+- Et l'objet de l'e-mail ne nomme jamais un retour du coin
+- Et un même événement ne part jamais deux fois par e-mail, tout de suite puis dans le récap
+
+### Le récap de la semaine, habillé (planche `R8-Recap`, A5, B7)
+
+- Étant donné Inès, récap activé, avec du nouveau cette semaine
+- Quand arrive **le dimanche à 10 h** (heure de Paris ; aujourd'hui le lundi à 9 h, B7)
+- Alors elle reçoit « Ta semaine sur {{appName}}, Inès » : un bandeau miel avec le logo de jour,
+  une carte de 600 px, Funnel Display si la messagerie l'affiche, Arial sinon, et une version
+  texte envoyée avec
+- Et les parties, chacune seulement si elle a quelque chose à dire :
+  - **« Tes projets »** : chaque projet avec ses nombres en pastilles (« 23 réactions »,
+    « 4 commentaires », « 2 nouveaux abonnés ») et « Lire les commentaires » ; les réponses et
+    mentions réglées « Dans le récap », avec le nom de qui a écrit, jamais le texte ;
+  - **« Nouveaux projets de tes proches »** : les projets publiés dans la semaine par les membres
+    qu'elle suit (titre et nom seuls, jamais l'accroche : la règle de 6c, Louis 12/11/2026 ;
+    « Voir le projet »), trois au plus ;
+  - **« Ils cherchent des testeurs »** : un projet d'un proche devenu « Testable » (à défaut,
+    publié) dans la semaine, dont elle n'est ni l'autrice, ni testeuse, ni retirée, avec « Tester
+    la démo », qui mène à la page du projet ;
+  - **« Les projets que tu suis ou que tu testes »** et **« Le coin des testeurs »** : comme en R7a
+    et R7b, des nombres et des liens
+- Et **quatre images au plus**, jointes à l'e-mail, jamais chargées à distance : deux pour « Tes
+  projets », une pour les proches, une pour les testeurs ; de petites vignettes réduites,
+  ré-encodées, sans métadonnées, le titre du projet en texte de remplacement ; un projet sans
+  image prend une tuile miel avec l'icône de sa catégorie, comme un projet d'un autre membre qui
+  a un signalement ouvert : sa photo ne sort pas de {{appName}} tant que la modération n'a pas
+  décidé
+- Et le pied dit pourquoi elle le reçoit (« Tu reçois ce récap le dimanche, parce qu'il est activé
+  dans tes réglages. Il ne parle que de projets visibles des membres. »), avec « Changer mes
+  préférences » et « Ne plus recevoir ce récap »
+- Et un membre qui recevait déjà le récap lit, une seule fois, dans son premier récap du
+  dimanche : « Nouveau : ton récap arrive le dimanche et montre aussi les projets publiés par les
+  membres que tu suis, et ceux qui cherchent des testeurs. Tu peux le régler ou le couper dans
+  tes réglages. » ; le premier récap d'un nouveau membre dit la même chose
+- Et l'aide du choix « Membres » à la publication et à la modification dit désormais : « Les
+  membres de {{appName}} verront ce projet ; tes abonnés le trouveront dans leur fil et dans leur
+  récap par e-mail, qui reste dans leur messagerie. »
+- Et jamais un projet privé, retiré, d'un membre bloqué dans un sens ou dans l'autre, ni d'un
+  membre suspendu ; tout se calcule au moment de l'envoi
+- Et il reprend chaque type réglé « Dans le récap », et rien de ce qui est parti « tout de suite »
+- Et le reste ne change pas : rien s'il n'y a rien, arrêt après 3 récaps sans visite (le 3e le
+  dit), le premier récap explique pourquoi il arrive, aucun lien ni domaine écrit par un membre
+- Et le récap des « Autre » aux administrateurs garde le lundi à 8 h
+- **Règle qui change** (phase 1, 6c) : « aucune image dans un e-mail » devient « quatre vignettes
+  jointes au récap, jamais chargées à distance » (A5)
+- La partie « Dans tes ruches » : R10
+
+### Repris des listes « À reprendre » et « À surveiller »
+
+- Les textes des e-mails de compte (design, « R8 ») : la version texte de la réinitialisation et
+  du changement d'adresse ne parle plus d'un « bouton ci-dessous » ; « Ton mot de passe a changé »
+  dit quoi faire si ce n'était pas toi (« Mot de passe oublié ») ; l'e-mail du changement
+  d'adresse a un titre
+- Les appels à tester, sans plafond tous projets confondus (sécurité, R7b sec-S4) : 20 appels par
+  jour et par membre au plus, en plus des 5 par projet
+
+### Mes données
+
+- L'export contient ses choix par type et la date du dernier e-mail « tout de suite »
+- La suppression du compte les efface ; les notifications des autres qui venaient de ses gestes
+  disparaissent avec eux, comme aujourd'hui
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) : Papi Jean répond à Léa sur « Le ciel de ce soir » en la mentionnant ;
+  Léa voit la cloche s'allumer, ouvre Activité (la ligne en miel sous « Aujourd'hui »), touche la
+  notification et arrive sur la réponse, éclairée, dans la feuille des commentaires ; elle ouvre
+  la roue, règle « Commentaires sur tes projets » sur « Tout de suite », revient, et la page
+  « Activité » n'a plus de miel
+
+### Les choix de la session (12/11/2026), à valider avec ce scénario
+
+1. **« Retours par e-mail »** (renvoi de R7b) veut dire : être prévenu par e-mail d'un nouveau
+   message du coin, sans son texte. Répondre depuis sa messagerie vient plus tard.
+2. **Le coin des testeurs a sa ligne** dans les réglages (« Tout de suite » possible, « Dans le
+   récap » par défaut), absente des planches du 28/10 qui précèdent R7b.
+3. **Projet rangé et outil rattaché** : Activité seulement, signés « L'équipe de {{appName}} »,
+   jamais le nom de l'administrateur.
+4. **« Ne plus recevoir ces e-mails »** depuis un e-mail « tout de suite » propose « Dans le
+   récap » ou « Jamais », au lieu de tout couper.
+5. **Pas de nouveau regroupement** : les commentaires restent un par ligne, comme sur la planche.
+6. **Le récap ne montre pas le domaine de la démo** (la planche l'écrit sous « Tester la démo ») :
+   un e-mail ne porte aucun domaine venu d'un membre ; la page « Tu quittes {{appName}} » le montre.
+7. **Les nouveaux projets des proches suffisent à faire partir un récap** : « du nouveau » veut
+   dire du nouveau dans une partie, quelle qu'elle soit.
+
+### Les planches (décision de Louis, 12/11/2026 : les visuels d'abord)
+
+Dessinées et validées par Louis avant la relecture du plan :
+- `R8-Activite-Plus` : les lignes absentes des planches du 28/10 (appel à tester, retour, réponse,
+  « Réglé dans la v1.3 », projet rangé, outil rattaché), de jour, téléphone ;
+- `R8-Contexte` : la feuille des commentaires ouverte sur une réponse éclairée, et l'état « Ce
+  commentaire n'est plus là. » ;
+- `R8-Email-TdS` : l'e-mail « tout de suite » qui regroupe un commentaire, une mention et un retour
+  de testeur (sans texte), et sa page « Ne plus recevoir ces e-mails » ;
+- `R8-Reglages`, complétée : la ligne « Coin des testeurs », et un type « Dans le récap » quand le
+  récap est coupé ; `R8-Recap`, corrigée : sans le domaine de la démo.

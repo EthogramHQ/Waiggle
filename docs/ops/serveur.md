@@ -294,19 +294,47 @@ Les lignes à modifier (tant qu'aucun prestataire n'est branché, l'API refuse d
 production : sans lui, les liens des e-mails, qui connectent au compte, finiraient dans les logs) :
 
 ```text
-MAIL_PROVIDER=scaleway
+EMAIL_TRANSPORT=scaleway-smtp
 SCALEWAY_SECRET_KEY=<la clé secrète de l'application IAM>
 SCALEWAY_PROJECT_ID=<l'identifiant du projet>
 MAIL_FROM_EMAIL=no-reply@waiggle.com
 ```
+
+`EMAIL_TRANSPORT` choisit le transport (depuis la tranche R8) :
+
+| Valeur | Ce qui part, et par où |
+| --- | --- |
+| `scaleway-smtp` | tous les e-mails, par le SMTP de Scaleway : le seul qui joint les vignettes du récap. L'identifiant SMTP est `SCALEWAY_PROJECT_ID`, le mot de passe `SCALEWAY_SECRET_KEY` |
+| `scaleway-api` | l'ancien envoi, par l'API HTTP de Scaleway, sans vignettes : le retour en arrière, sans déployer (modifier `secrets.env`, puis `compose up -d api`) |
+| `brevo` | par l'API de Brevo (réservé au marketing), sans vignettes |
+| `console` | dans les journaux : refusé en production, sauf `ALLOW_CONSOLE_MAIL=true` |
+
+L'ancienne variable `MAIL_PROVIDER` (`scaleway` pour l'API HTTP) marche encore quand
+`EMAIL_TRANSPORT` est vide. Le serveur SMTP (`SMTP_HOST`, `smtp.tem.scaleway.com` par défaut) et
+son port (`SMTP_PORT`) ne se changent pas d'ordinaire : le port est 465 (TLS dès la connexion, par
+défaut) ou 587 (STARTTLS exigé), aucun autre, et l'API refuse de démarrer sans l'un des deux.
 
 **À vérifier** (l'assistant de code peut le faire : ces commandes comptent les lignes remplies, sans rien
 afficher) :
 
 ```bash
 ssh waiggle "grep -c -E '^(POSTGRES_PASSWORD|BETTER_AUTH_SECRET|SIGNUP_INVITE_CODE|SCALEWAY_SECRET_KEY|SCALEWAY_PROJECT_ID)=.' /srv/ruche/secrets.env"   # 5
-ssh waiggle "grep -c '^MAIL_PROVIDER=scaleway$' /srv/ruche/secrets.env"                                                                            # 1
+ssh waiggle "grep -c '^EMAIL_TRANSPORT=scaleway-smtp$' /srv/ruche/secrets.env"                                                                     # 1
 ```
+
+**L'essai d'envoi se fait depuis le serveur**, jamais depuis un PC : c'est de là que partiront les
+e-mails, et seul son pare-feu compte. D'abord, le port du SMTP est-il joignable (ne montre rien de
+secret) :
+
+```bash
+ssh waiggle 'timeout 5 bash -c "</dev/tcp/smtp.tem.scaleway.com/465" && echo ouvert || echo ferme'   # ouvert
+```
+
+Puis un vrai e-mail, avec l'accord de Louis et à une adresse à lui : après le déploiement, il crée
+un compte d'essai (ou demande « mot de passe oublié ») avec cette adresse ; l'e-mail doit arriver, et
+`ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --since 10m api'`
+ne doit montrer aucune ligne `SMTP server refused the email`. L'erreur ne cite ni l'adresse ni la
+réponse du serveur : la cause se lit dans l'activité de la console Scaleway (Transactional Email).
 
 ### Étape 6 : premier déploiement
 
@@ -446,6 +474,18 @@ pas** : on prévient Louis.
   Un commit fusionné avant le renommage du dépôt en « Waiggle » (octobre 2026) est refusé : ses
   images sont signées sous l'ancien nom, « ruche ». C'est voulu, et on ne contourne pas ce refus.
 
+- **Revenir sous `380d1ca` (avant la tranche R8, notifications)** : sans restaurer la base, car la
+  migration de R8 n'efface rien (l'ancienne colonne `mention_emails` est gardée et reste à jour).
+  Mais :
+  - les liens de désinscription `instant` des e-mails « tout de suite » déjà envoyés **ne marchent
+    plus** (l'ancienne version ne connaît pas cette sorte : la page répond « lien non valable ») ;
+    les liens `recap` et `mentions` marchent toujours. Prévenir Louis, qui coupe à la main
+    (requêtes de « Les e-mails de notification pendant une restauration », ligne `instant`) ceux
+    qui le demandent ;
+  - les choix par type de notification (« dans le récap », « jamais ») ne sont plus lus : seuls
+    restent le récap et les e-mails de mentions ;
+  - `EMAIL_TRANSPORT=scaleway-smtp` n'est pas connu de cette version : le remplacer par
+    `MAIL_PROVIDER=scaleway` dans `secrets.env` (et retirer `EMAIL_TRANSPORT`) avant de redéployer.
 - **Si la version ratée a modifié la base** (une nouvelle migration dans `packages/db/migrations`),
   il faut aussi restaurer la sauvegarde faite juste avant elle. **Avec l'accord explicite de
   Louis**, car tout ce qui a été écrit depuis est perdu. Suivre aussi « Les e-mails de
@@ -479,9 +519,15 @@ pas** : on prévient Louis.
   l'ordre :
   0. **avant tout le reste**, mettre de côté les refus faits depuis la sauvegarde. Chacun a laissé
      une ligne dans les journaux de l'API, avec l'identifiant du membre, jamais son adresse :
-     - `Unsubscribe <identifiant> recap` (ou `mentions`, ou `all` pour les deux) : un e-mail coupé,
-       par le lien d'un e-mail, par le bouton « Se désabonner » de la messagerie, ou dans l'appli
-       (Mon profil) ;
+     - `Unsubscribe <identifiant> recap` (ou `mentions`, l'ancien lien des e-mails de mentions, ou
+       `all` pour tout) : un e-mail coupé, par le lien d'un e-mail, par le bouton « Se désabonner »
+       de la messagerie, ou dans l'appli (Mon profil) ;
+     - `Unsubscribe <identifiant> <type> <digest|never>`, avec `<type>` parmi `reactions`,
+       `comments`, `replies`, `follows`, `updates`, `testers` : un choix baissé pour ce type
+       (« dans le récap » ou « jamais ») ;
+     - `Unsubscribe <identifiant> instant <digest|never>` : le lien « tout de suite » d'un e-mail
+       ou son bouton « Se désabonner » : tous les types qui étaient « tout de suite » passent au
+       choix donné ;
      - `Account deleted <identifiant>` : un compte supprimé par son membre ;
      - `Email changed <identifiant>` : une adresse changée par son membre (tranche « adresse ») ;
        la sauvegarde ramènerait l'ancienne, peut-être rendue depuis à quelqu'un d'autre.
@@ -494,11 +540,12 @@ pas** : on prévient Louis.
      un refus réappliqué deux fois ne change rien.
 
      ```bash
-     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all)|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all|instant (digest|never)|(reactions|comments|replies|follows|updates|testers) (digest|never))|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
      ```
 
-     `grep -E` ne garde que les lignes exactement de cette forme, avec un identifiant fait de
-     lettres et de chiffres. Les journaux sont des données : une ligne d'une autre forme n'est
+     `grep -E` ne garde que les lignes exactement de ces formes (celles de l'appli d'avant la
+     tranche R8 comprises : `recap`, `mentions`, `all`), avec un identifiant fait de lettres et de
+     chiffres. Les journaux sont des données : une ligne d'une autre forme n'est
      jamais recopiée dans une requête. Le nombre affiché à la fin est celui des refus trouvés.
 
      Puis, toujours **avant de restaurer**, vérifier sur la base en service que chaque compte noté
@@ -528,24 +575,81 @@ pas** : on prévient Louis.
   3. réappliquer les refus du fichier de l'étape 0, dans l'ordre, avec l'accord de Louis (ce sont
      des écritures dans la base), ainsi que ceux reçus autrement (une demande écrite à Louis). Les
      requêtes passent par `db_query` (`infra/lib.sh`), qui lit le SQL sur l'entrée standard :
-     - pour chaque `Unsubscribe <identifiant> <quoi>` : la requête ci-dessous, avec `R` remplacé
-       par `false` si `<quoi>` vaut `recap` ou `all` (sinon `true`), et `M` par `false` s'il vaut
-       `mentions` ou `all` (sinon `true`). C'est celle de l'API (`email/preferences.ts`) : un
-       « et » logique avec l'ancienne valeur ne peut que couper, jamais rallumer, et un compte qui
-       n'existe pas ne reçoit rien. `now() at time zone 'UTC'` : les colonnes de dates sont des
-       `timestamp` sans fuseau qui contiennent l'heure UTC (voir « Les heures du serveur et de la
-       base », plus bas) ; `now()` seul y serait écrit à l'heure du fuseau de la connexion ;
+     - pour chaque `Unsubscribe <identifiant> <quoi>` : les requêtes ci-dessous, selon `<quoi>`.
+       Ce sont celles de l'API (`email/preferences.ts`) : une valeur ne fait que baisser
+       (« tout de suite » puis « dans le récap » puis « jamais »), jamais monter, et un compte
+       qui n'existe pas ne reçoit rien. `now() at time zone 'UTC'` : les colonnes de dates sont
+       des `timestamp` sans fuseau qui contiennent l'heure UTC (voir « Les heures du serveur et de
+       la base », plus bas) ; `now()` seul y serait écrit à l'heure du fuseau de la connexion ;
+       - `recap`, `mentions` ou `all` : la première, avec `R` remplacé par `false` si `<quoi>`
+         vaut `recap` ou `all` (sinon `true`), et `M` par `false` s'il vaut `mentions` ou `all`
+         (sinon `true`) ; `mention_emails` est l'ancienne colonne, gardée jusqu'à R9 ;
 
-       ```bash
-       ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
-       insert into email_preference (user_id, weekly_recap, mention_emails, updated_at)
-       select id, R, false, now() at time zone 'UTC' from "user" where id = '<identifiant>'
-       on conflict (user_id) do update set
-         weekly_recap = email_preference.weekly_recap and R,
-         mention_emails = email_preference.mention_emails and M,
-         updated_at = excluded.updated_at;
-       SQL
-       ```
+         ```bash
+         ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id, weekly_recap, mention_emails, updated_at)
+         select id, R, M, now() at time zone 'UTC' from "user" where id = '<identifiant>'
+         on conflict (user_id) do update set
+           weekly_recap = email_preference.weekly_recap and R,
+           mention_emails = email_preference.mention_emails and M,
+           updated_at = excluded.updated_at;
+         SQL
+         ```
+
+       - `mentions` ou `all` : en plus, « Réponses et mentions » ne reste pas « tout de suite »
+         (`C` vaut `digest` pour `mentions`, `never` pour `all`) ; `all` coupe aussi les autres
+         types « tout de suite » (la ligne ne dit pas le choix : on prend le plus prudent) ;
+
+         ```bash
+         ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id)
+           select id from "user" where id = '<identifiant>'
+           on conflict (user_id) do nothing;
+         update email_preference set
+           email_replies = case when email_replies = 'now' then 'C' else email_replies end,
+           updated_at = now() at time zone 'UTC'
+         where user_id = '<identifiant>';
+         SQL
+         ```
+
+       - `instant <digest|never>` (et `all`, avec `never`) : tous les types « tout de suite »
+         passent au choix `C` donné par la ligne ; un type qui n'y était pas ne bouge pas ;
+
+         ```bash
+         ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id)
+           select id from "user" where id = '<identifiant>'
+           on conflict (user_id) do nothing;
+         update email_preference set
+           email_comments = case when email_comments = 'now' then 'C' else email_comments end,
+           email_replies = case when email_replies = 'now' then 'C' else email_replies end,
+           email_testers = case when email_testers = 'now' then 'C' else email_testers end,
+           updated_at = now() at time zone 'UTC'
+         where user_id = '<identifiant>';
+         SQL
+         ```
+
+       - `<type> <digest|never>` : seule la colonne du type change, et seulement si elle baisse
+         (`email_reactions`, `email_comments`, `email_replies`, `email_follows`,
+         `email_updates` ou `email_testers` à la place de `email_T`, `C` le choix de la ligne) ;
+
+         ```bash
+         ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id)
+           select id from "user" where id = '<identifiant>'
+           on conflict (user_id) do nothing;
+         update email_preference set
+           email_T = case when 'C' = 'never' or email_T = 'now' then 'C' else email_T end,
+           updated_at = now() at time zone 'UTC'
+         where user_id = '<identifiant>';
+         SQL
+         ```
+
+       Un membre sans ligne dans `email_preference` (par exemple, sa ligne est née après la
+       sauvegarde) : l'`insert` de chacune des trois dernières requêtes la crée d'abord avec les
+       valeurs par défaut (« dans le récap »), sinon l'`update` ne trouverait rien et un « Jamais »
+       serait perdu ; la première requête crée sa ligne elle-même. Le nom de la colonne (`email_T`) et le choix (`C`) viennent de la liste fermée ci-dessus,
+       jamais d'un texte recopié du journal ;
 
      - pour chaque `Account deleted <identifiant>` que la vérification de l'étape 0 a trouvé absent
        de la base en service : `delete from "user" where id = '<identifiant>';` (même chemin). Tout ce qui est rattaché au compte par une clé « cascade » part avec lui
@@ -554,8 +658,9 @@ pas** : on prévient Louis.
        auteur, jusqu'à la prochaine suppression d'un compte par un membre, qui les balaie ; son
        avatar et ses photos restent dans le volume des fichiers. Un outil qui rejoue la suppression
        complète reste à écrire ;
-     - pour chaque `Email changed <identifiant>` : la requête des désinscriptions ci-dessus, avec
-       `R` et `M` à `false`, pour qu'aucun e-mail ne parte vers l'ancienne adresse ; puis Louis
+     - pour chaque `Email changed <identifiant>` : les requêtes des désinscriptions ci-dessus comme
+       pour une ligne `all` (la première avec `R` et `M` à `false`, puis les deux suivantes avec `C`
+       à `never`), pour qu'aucun e-mail ne parte vers l'ancienne adresse ; puis Louis
        prévient le membre (sa nouvelle adresse est dans la sauvegarde `avant-restauration`), qui
        refait le changement dans l'appli et rallume ses e-mails dans Mon profil. Si ce compte est
        celui d'un administrateur, les alertes de modération (`moderation-alert.ts`) partent vers

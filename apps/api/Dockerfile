@@ -50,6 +50,9 @@ ENV MIGRATIONS_DIR=/app/migrations
 # mais pas le modifier. Même en cas de faille, il ne pourrait pas réécrire son propre code.
 COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/packages/db/migrations ./migrations
+# R8 : les tuiles des catégories du récap du dimanche (des PNG fixes, lus par
+# src/email/recap-images.ts depuis dist/../assets).
+COPY --from=build /repo/apps/api/assets ./assets
 # package.json dit aussi à Node que dist/index.js utilise la syntaxe moderne des modules (ESM).
 COPY --from=build /runtime/package.json ./package.json
 COPY --from=build /runtime/node_modules ./node_modules
