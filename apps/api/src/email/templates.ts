@@ -87,8 +87,16 @@ type Section = { title: string; items: Item[]; after: Paragraph[] }
 
 /** Un morceau de paragraphe : du texte, en gras s'il faut le retenir (l'adresse de contact). */
 type Run = { text: string; bold?: boolean }
-/** Un paragraphe : un texte simple, ou une suite de morceaux dont certains sont en gras. */
-type Paragraph = string | Run[]
+/**
+ * R8 : un paragraphe écrit deux fois, l'une pour le HTML, l'autre pour la version texte. Le HTML a
+ * un bouton, la version texte n'a qu'un lien : elle ne doit pas parler d'un « bouton ci-dessous ».
+ */
+type Twin = { html: string; text: string }
+/**
+ * Un paragraphe : un texte simple, une suite de morceaux dont certains sont en gras, ou un texte
+ * propre à chaque version.
+ */
+type Paragraph = string | Run[] | Twin
 
 /**
  * Remplit un texte et met en gras la valeur d'un de ses paramètres : on coupe le modèle à
@@ -106,17 +114,23 @@ const withBold = (template: string, name: string, value: string): Run[] =>
 
 /** Le paragraphe en texte brut : les morceaux recollés, sans marque de gras. */
 const plain = (paragraph: Paragraph) =>
-  typeof paragraph === 'string' ? paragraph : paragraph.map((run) => run.text).join('')
+  typeof paragraph === 'string'
+    ? paragraph
+    : Array.isArray(paragraph)
+      ? paragraph.map((run) => run.text).join('')
+      : paragraph.text
 
 /** Le paragraphe en HTML : chaque morceau échappé, les morceaux en gras dans un <strong>. */
 const richHtml = (paragraph: Paragraph) =>
   typeof paragraph === 'string'
     ? escapeHtml(paragraph)
-    : paragraph
-        .map((run) =>
-          run.bold ? `<strong>${escapeHtml(run.text)}</strong>` : escapeHtml(run.text),
-        )
-        .join('')
+    : Array.isArray(paragraph)
+      ? paragraph
+          .map((run) =>
+            run.bold ? `<strong>${escapeHtml(run.text)}</strong>` : escapeHtml(run.text),
+          )
+          .join('')
+      : escapeHtml(paragraph.html)
 
 /**
  * Un paragraphe du corps : un texte, ou un texte libre écrit par quelqu'un (l'explication d'une
@@ -126,16 +140,25 @@ const richHtml = (paragraph: Paragraph) =>
  * caractères faisait défiler l'e-mail de 431 px à l'horizontale sur un écran de 320 px (relecture
  * de design de 7c). Les autres paragraphes, écrits par nous, gardent les coupures ordinaires.
  */
-type BodyParagraph = string | { freeText: string }
+type BodyParagraph = string | Twin | { freeText: string }
 
 const paragraphText = (paragraph: BodyParagraph) =>
-  typeof paragraph === 'string' ? paragraph : paragraph.freeText
+  typeof paragraph === 'string'
+    ? paragraph
+    : 'freeText' in paragraph
+      ? paragraph.freeText
+      : paragraph.text
 
 type Layout = {
   /** La langue de l'e-mail, annoncée dans `<html lang>` (lecteurs d'écran, traduction). */
   language: Language
   /** La phrase titre, en gras sous le nom de l'appli (« Du nouveau cette semaine »). */
   heading?: string
+  /**
+   * R8 : le titre aussi en tête de la version texte, quand l'objet ne dit pas la même chose (l'e-mail
+   * vers la nouvelle adresse). Sans ce réglage, la version texte commence par la salutation.
+   */
+  headingInText?: boolean
   greeting: string
   paragraphs: BodyParagraph[]
   /**
@@ -182,6 +205,7 @@ const narrowScreenStyle = `@media (max-width:480px){.page{padding:12px 8px !impo
 const render = ({
   language,
   heading,
+  headingInText = false,
   greeting,
   paragraphs,
   highlight,
@@ -214,8 +238,9 @@ const render = ({
     ...section.after.flatMap((p) => [plain(p), '']),
   ])
   // Le titre (heading) n'y est pas : il sert la hiérarchie visuelle du HTML, et l'objet de l'e-mail
-  // dit déjà la même chose en tête du texte brut.
+  // dit déjà la même chose en tête du texte brut (sauf `headingInText`).
   const text = [
+    ...(headingInText && heading !== undefined ? [heading, ''] : []),
     greeting,
     '',
     ...paragraphs.flatMap((p) => [paragraphText(p), '']),
@@ -324,7 +349,7 @@ const render = ({
     ${p(greeting, 'font-size:16px;overflow-wrap:anywhere;word-break:break-word')}
     ${paragraphs
       .map((value) =>
-        typeof value === 'string'
+        typeof value === 'string' || !('freeText' in value)
           ? p(value)
           : p(value.freeText, `${body};overflow-wrap:anywhere;word-break:break-word`),
       )
@@ -419,7 +444,8 @@ export const resetPasswordEmail = (
       heading: fill(t.resetPassword.heading),
       greeting: fill(t.resetPassword.greeting),
       paragraphs: [
-        fill(t.resetPassword.body),
+        // R8 : la version texte n'a pas de bouton, elle parle du lien ci-dessous.
+        { html: fill(t.resetPassword.body), text: fill(t.resetPassword.textBody) },
         // La durée s'écrit en toutes lettres : « une heure », puis « 2 heures » (décision du
         // 30/10/2026). Le nombre vient toujours du réglage du serveur (jur-4).
         fill(t.resetPassword.expires, {
@@ -499,8 +525,17 @@ export const changeEmailConfirmationEmail = (
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
       paragraphs: [fill(t.changeEmail.body)],
       highlight: newEmail,
-      after: [fill(t.changeEmail.next), fill(t.changeEmail.expires)],
-      button: { label: fill(t.changeEmail.button), url },
+      // R8 : la version texte parle du lien ci-dessous, et le libellé qui précède ce lien finit par
+      // « : » (« Confirmer le changement : »), comme les autres e-mails de compte.
+      after: [
+        { html: fill(t.changeEmail.next), text: fill(t.changeEmail.textNext) },
+        fill(t.changeEmail.expires),
+      ],
+      button: {
+        label: fill(t.changeEmail.button),
+        textLabel: fill(t.changeEmail.textLink),
+        url,
+      },
       closing: [withBold(t.changeEmail.ignore, 'contactEmail', contactEmail)],
       notes: [],
       footer: fill(t.footer),
@@ -523,8 +558,14 @@ export const newEmailVerificationEmail = (
     subject: fill(t.newEmail.subject),
     ...render({
       language,
+      // R8 : un titre, en tête du HTML comme de la version texte.
+      heading: fill(t.newEmail.heading),
+      headingInText: true,
       greeting: fill(t.newEmail.greeting),
-      paragraphs: [fill(t.newEmail.body), fill(t.newEmail.expires)],
+      paragraphs: [
+        { html: fill(t.newEmail.body), text: fill(t.newEmail.textBody) },
+        fill(t.newEmail.expires),
+      ],
       button: { label: fill(t.newEmail.button), textLabel: fill(t.newEmail.textLink), url },
       notes: [fill(t.newEmail.ignore)],
       footer: fill(t.footer),
@@ -615,19 +656,52 @@ const lineParams = (
 const counted = (one: string, other: string, count: number) =>
   fill(count === 1 ? one : other, { count: String(count) })
 
-export type RecapData = {
-  /** Le nom du membre qui reçoit le récap (la salutation). */
-  name: string
-  /** Les lignes montrées, 5 au plus, de la plus récente à la plus ancienne. */
-  lines: RecapLine[]
-  /** Combien d'autres commentaires, réponses ou mentions ne sont pas montrés (« Et 2 autres »). */
-  more: number
+/** R8 : un projet du membre dans « Tes projets », avec ses nombres de la semaine en pastilles. */
+export type RecapProject = {
+  title: string
+  /** Les réactions, les commentaires et les nouveaux abonnés du projet ; 0 : pas de pastille. */
   reactions: number
+  comments: number
+  follows: number
+  /** La page du projet dans l'appli (« Lire les commentaires »), fabriquée par la tâche. */
+  url: string
+  /** Sa vignette, déjà réduite et nommée par la tâche (recap-images.ts), ou aucune. */
+  image: Attachment | null
+}
+
+/**
+ * R8 : le projet d'un membre suivi (« Nouveaux projets de tes proches ») ou qui cherche des
+ * testeurs. Son titre et le nom de son auteur seulement, jamais l'accroche (décision de Louis du
+ * 12/11/2026) ; le lien mène à sa page dans l'appli, jamais à la démo (sec-A4).
+ */
+export type RecapFriendProject = {
+  title: string
+  author: string
+  url: string
+  image: Attachment | null
+}
+
+export type RecapData = {
+  /** Le nom du membre qui reçoit le récap (le titre du bandeau). */
+  name: string
+  /** R8 : « Tes projets », le plus récemment actif en tête. */
+  projects: RecapProject[]
+  /** Les réponses et mentions montrées, 5 au plus, de la plus récente à la plus ancienne. */
+  lines: RecapLine[]
+  /** Combien d'autres réponses ou mentions ne sont pas montrées (« Et 2 autres »). */
+  more: number
+  /** Les nouveaux abonnés au compte du membre (ceux d'un projet sont dans sa pastille). */
   follows: number
   /** Son premier récap : on explique ce que c'est (relecture juridique R3). */
   first: boolean
+  /** R8 : le premier récap habillé de qui recevait déjà le récap : la note unique. */
+  news: boolean
   /** Le 3e récap de suite sans visite : on dit que c'est le dernier pour l'instant (R4). */
   last: boolean
+  /** R8 : « Nouveaux projets de tes proches », 3 au plus (RECAP_FRIEND_PROJECTS_MAX). */
+  friends: RecapFriendProject[]
+  /** R8 : « Ils cherchent des testeurs », un projet ou aucun. */
+  testersWanted: RecapFriendProject | null
   /**
    * R7a, « Les projets que tu suis ou que tu testes » : 5 projets au plus, le plus récemment mis à
    * jour en tête ; leur titre, leur nombre de mises à jour de la semaine, et le lien vers leur
@@ -650,113 +724,326 @@ export type RecapData = {
 }
 
 /**
- * Une partie du récap qui va par projet (R7a, R7b) : un titre, une ligne par projet (« « Météo » :
- * 3 nouveautés… ») qui mène à sa page, puis « Et N autres projets ». Vide : pas de partie du tout.
- * Le titre du projet passe par defangLinks (une adresse écrite par un membre devient « [lien] »),
- * puis par l'échappement de render ; le lien vient de la tâche, jamais d'un champ de membre.
+ * La feuille de style du récap habillé : comme `narrowScreenStyle`, elle resserre les marges sur un
+ * écran de moins de 480 px (chaque partie du récap porte la classe « part »).
  */
-const projectSection = (
-  title: string,
-  texts: { one: string; other: string; moreOne: string; moreOther: string },
-  projects: { title: string; count: number; url: string }[],
-  more: number,
-  link: string,
-): Section[] =>
-  projects.length === 0
-    ? []
-    : [
-        {
-          title,
-          items: projects.map((project) => ({
-            line: fill(project.count === 1 ? texts.one : texts.other, {
-              title: defangLinks(project.title, link),
-              count: String(project.count),
-            }),
-            url: project.url,
-          })),
-          after: more > 0 ? [counted(texts.moreOne, texts.moreOther, more)] : [],
-        },
-      ]
+const recapNarrowStyle = `@media (max-width:480px){.page{padding:8px 4px !important}.part{padding:20px 16px !important}}`
+
+/** Une pièce jointe « en ligne », montrée par son `cid`, avec le titre désarmé pour texte. */
+const imageTag = (image: Attachment, alt: string, size: number) =>
+  `<img src="cid:${escapeHtml(image.cid)}" alt="${escapeHtml(alt)}" width="${size}" style="display:block;width:${size}px;max-width:${size}px;height:auto;border:0">`
 
 /**
- * Le récap de la semaine. Pas d'extrait : seulement qui, quoi, sur quel projet (relecture
- * juridique R5), puis les nombres de réactions et d'abonnements, sans aucun nom.
+ * La place d'une vignette : un carré arrondi au fond miel pâle, qui montre l'image si le projet en
+ * a une (une photo en hauteur est coupée en bas, une photo en largeur laisse voir le fond), et reste
+ * vide sinon : les titres restent alignés d'un projet à l'autre.
+ */
+const thumbBox = (image: Attachment | null, alt: string, size: number) =>
+  `<div style="width:${size}px;height:${size}px;overflow:hidden;border-radius:${size >= 80 ? radii.small : 14}px;background:${c.honeySoft}">${image === null ? '' : imageTag(image, alt, size)}</div>`
+
+/**
+ * Une ligne à deux colonnes : la vignette à gauche, le texte à droite. Un tableau plutôt que des
+ * blocs flottants : c'est la seule mise en page côte à côte que toutes les messageries respectent
+ * (Outlook compris). `role="presentation"` dit aux lecteurs d'écran que ce n'est pas un tableau de
+ * données.
+ */
+const thumbRow = (thumb: string, size: number, content: string) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0 0 16px"><tr><td style="width:${size}px;padding:0 14px 0 0;vertical-align:top">${thumb}</td><td style="vertical-align:top;overflow-wrap:anywhere;word-break:break-word">${content}</td></tr></table>`
+
+/**
+ * Le récap de la semaine, habillé (R8, planche R8-Recap) : un bandeau miel avec le titre, puis une
+ * partie par sorte de nouveauté (aucune partie vide), puis le pied. Pas d'extrait : seulement qui,
+ * quoi, sur quel projet (relecture juridique R5) ; les nombres de ses projets en pastilles, sans
+ * aucun nom. Les images sont jointes (`attachments`) et montrées par `cid:` ; aucune autre image, et
+ * rien n'est chargé à distance (A5). Le texte d'un membre (nom, titre, texte de remplacement d'une
+ * image) passe par defangLinks, puis par l'échappement du HTML.
  */
 export const recapEmail = (language: Language, data: RecapData): EmailContent => {
   const t = resources[language].translation.email
+  const r = t.recap
   const link = linkPlaceholder(language)
-  const counts = [
-    ...(data.reactions > 0
-      ? [counted(t.recap.reactions_one, t.recap.reactions_other, data.reactions)]
-      : []),
-    ...(data.follows > 0
-      ? [counted(t.recap.follows_one, t.recap.follows_other, data.follows)]
-      : []),
+  const clean = (value: string) => defangLinks(value, link)
+  const heading = fill(r.heading, { name: clean(data.name) })
+  // Ce qui est propre à cet e-mail : le premier récap l'emporte sur la note unique, qui dit la même
+  // chose ; puis « le dernier pour l'instant ».
+  const notes = [
+    ...(data.first ? [fill(r.first)] : data.news ? [fill(r.news)] : []),
+    ...(data.last ? [fill(r.last)] : []),
   ]
+  const pillsOf = (project: RecapProject) =>
+    [
+      project.reactions > 0
+        ? counted(r.pillReactions_one, r.pillReactions_other, project.reactions)
+        : null,
+      project.comments > 0
+        ? counted(r.pillComments_one, r.pillComments_other, project.comments)
+        : null,
+      project.follows > 0 ? counted(r.pillFollows_one, r.pillFollows_other, project.follows) : null,
+    ].filter((pill) => pill !== null)
+  const accountFollows =
+    data.follows > 0 ? counted(r.follows_one, r.follows_other, data.follows) : null
+  const lines = data.lines.map((line) => fill(r[line.kind], lineParams(line, link)))
+  const moreLines = data.more > 0 ? counted(r.more_one, r.more_other, data.more) : null
+  const byProject = [
+    {
+      title: fill(r.updatesTitle),
+      texts: [r.updates_one, r.updates_other, r.updatesMore_one, r.updatesMore_other] as const,
+      projects: data.updates,
+      more: data.updatesMore,
+    },
+    {
+      title: fill(r.testersTitle),
+      texts: [r.testers_one, r.testers_other, r.testersMore_one, r.testersMore_other] as const,
+      projects: data.testers,
+      more: data.testersMore,
+    },
+  ]
+    .filter((part) => part.projects.length > 0)
+    .map(({ title, texts: [one, other, moreOne, moreOther], projects, more }) => ({
+      title,
+      items: projects.map((project) => ({
+        line: fill(project.count === 1 ? one : other, {
+          title: clean(project.title),
+          count: String(project.count),
+        }),
+        url: project.url,
+      })),
+      more: more > 0 ? counted(moreOne, moreOther, more) : null,
+    }))
+  const wanted = data.testersWanted
+  // Les images, dans l'ordre où l'e-mail les montre ; chacune une seule fois.
+  const attachments = [
+    ...data.projects.map((project) => project.image),
+    ...data.friends.map((friend) => friend.image),
+    wanted?.image ?? null,
+  ].filter((image) => image !== null)
+
+  // ─── La version texte : chaque lien écrit en entier sous son libellé, sans image. ───
+  const text = [
+    heading,
+    '',
+    fill(r.intro),
+    '',
+    ...notes.flatMap((note) => [note, '']),
+    ...(data.projects.length > 0 || accountFollows !== null
+      ? [
+          r.yourProjects,
+          '',
+          ...data.projects.flatMap((project) => [
+            clean(project.title),
+            pillsOf(project).join(' · '),
+            ...(project.comments > 0 ? [r.readComments, project.url] : []),
+            '',
+          ]),
+          ...(accountFollows === null ? [] : [accountFollows, '']),
+        ]
+      : []),
+    ...(lines.length > 0
+      ? [
+          fill(t.mentions.heading),
+          '',
+          ...lines.map((line) => `• ${line}`),
+          '',
+          ...(moreLines === null ? [] : [moreLines, '']),
+        ]
+      : []),
+    ...byProject.flatMap((part) => [
+      part.title,
+      '',
+      ...part.items.flatMap((item) => [`• ${item.line}`, `  ${item.url}`]),
+      '',
+      ...(part.more === null ? [] : [part.more, '']),
+    ]),
+    ...(data.friends.length > 0
+      ? [
+          r.friendsTitle,
+          '',
+          ...data.friends.flatMap((friend) => [
+            clean(friend.title),
+            clean(friend.author),
+            r.viewProject,
+            friend.url,
+            '',
+          ]),
+        ]
+      : []),
+    ...(wanted === null
+      ? []
+      : [
+          r.testersWanted,
+          '',
+          clean(wanted.title),
+          clean(wanted.author),
+          r.tryDemo,
+          wanted.url,
+          '',
+        ]),
+    '—',
+    fill(r.reason),
+    '',
+    t.changePreferences,
+    data.links.manage,
+    '',
+    r.unsubscribe,
+    data.links.unsubscribe,
+    '',
+    fill(t.footer),
+  ].join('\n')
+
+  // ─── Le HTML ───
+  const body = 'font-size:16px;line-height:1.5'
+  const wrap = 'overflow-wrap:anywhere;word-break:break-word'
+  const h2 = (title: string) =>
+    `<h2 style="margin:0 0 16px;font-size:20px;line-height:1.3;font-weight:bold;color:${c.text}">${escapeHtml(title)}</h2>`
+  const part = (content: string) =>
+    `<div class="part" style="padding:24px 28px;border-top:1px solid ${c.line}">${content}</div>`
+  const projectTitle = (title: string, size = 17) =>
+    `<p style="margin:0 0 6px;font-size:${size}px;line-height:1.3;font-weight:bold;color:${c.text};${wrap}">${escapeHtml(clean(title))}</p>`
+  const pill = (label: string) =>
+    `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:${radii.pill}px;background:${c.honeySoft};color:${c.statusText};font-size:13px;line-height:1.3;font-weight:bold">${escapeHtml(label)}</span>`
+  const textLink = (label: string, url: string) =>
+    `<a href="${escapeHtml(url)}" style="color:${c.amberText};font-weight:bold;text-decoration:underline">${escapeHtml(label)}</a>`
+  // Un bouton est un lien en `inline-block`, comme dans les autres e-mails : sur deux lignes à
+  // 320 px, son fond entoure les deux lignes.
+  const button = (label: string, url: string, honey: boolean) =>
+    `<a href="${escapeHtml(url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;padding:${honey ? '12px 20px' : '9px 16px'};border-radius:${radii.pill}px;font-weight:bold;font-size:15px;text-decoration:none;${honey ? `background:${c.honey};color:${c.onHoney}` : `background:${c.surface};color:${c.text};border:1px solid ${c.outline}`}">${escapeHtml(label)}</a>`
+  const author = (name: string) =>
+    `<p style="margin:0 0 10px;font-size:15px;line-height:1.4;color:${c.textSecondary};${wrap}">${escapeHtml(clean(name))}</p>`
+  const list = (items: { line: string; url?: string }[]) =>
+    `<ul style="padding-left:20px;margin:0 0 12px">${items
+      .map(
+        ({ line, url }) =>
+          `<li style="${body};margin:0 0 10px;${wrap}">${
+            url === undefined
+              ? escapeHtml(line)
+              : `<a href="${escapeHtml(url)}" style="color:${c.text};text-decoration:underline">${escapeHtml(line)}</a>`
+          }</li>`,
+      )
+      .join('')}</ul>`
+  const paragraph = (value: string, style = body) =>
+    `<p style="margin:0 0 12px;${style}">${escapeHtml(value)}</p>`
+
+  const parts = [
+    ...(data.projects.length > 0 || accountFollows !== null
+      ? [
+          part(
+            [
+              h2(r.yourProjects),
+              ...data.projects.map((project) =>
+                thumbRow(
+                  thumbBox(project.image, clean(project.title), 88),
+                  88,
+                  [
+                    projectTitle(project.title),
+                    `<div>${pillsOf(project).map(pill).join('')}</div>`,
+                    project.comments > 0
+                      ? `<p style="margin:4px 0 0;font-size:15px">${textLink(r.readComments, project.url)}</p>`
+                      : '',
+                  ].join(''),
+                ),
+              ),
+              accountFollows === null ? '' : `<div>${pill(accountFollows)}</div>`,
+            ].join(''),
+          ),
+        ]
+      : []),
+    ...(lines.length > 0
+      ? [
+          part(
+            [
+              h2(fill(t.mentions.heading)),
+              list(lines.map((line) => ({ line }))),
+              moreLines === null ? '' : paragraph(moreLines),
+            ].join(''),
+          ),
+        ]
+      : []),
+    ...byProject.map((section) =>
+      part(
+        [
+          h2(section.title),
+          list(section.items),
+          section.more === null ? '' : paragraph(section.more),
+        ].join(''),
+      ),
+    ),
+    ...(data.friends.length > 0
+      ? [
+          part(
+            [
+              h2(r.friendsTitle),
+              // Le bouton sous le nom, et non à droite comme sur la planche : à 320 px, trois
+              // colonnes ne laissaient au titre que la largeur d'un mot.
+              ...data.friends.map((friend) =>
+                thumbRow(
+                  thumbBox(friend.image, clean(friend.title), 56),
+                  56,
+                  [
+                    projectTitle(friend.title, 16),
+                    author(friend.author),
+                    button(r.viewProject, friend.url, false),
+                  ].join(''),
+                ),
+              ),
+            ].join(''),
+          ),
+        ]
+      : []),
+    ...(wanted === null
+      ? []
+      : [
+          part(
+            [
+              h2(r.testersWanted),
+              thumbRow(
+                thumbBox(wanted.image, clean(wanted.title), 88),
+                88,
+                [
+                  projectTitle(wanted.title),
+                  author(wanted.author),
+                  button(r.tryDemo, wanted.url, true),
+                ].join(''),
+              ),
+            ].join(''),
+          ),
+        ]),
+  ]
+  // Le pied : pourquoi on le reçoit, puis les deux liens l'un sous l'autre (relecture de design de
+  // 6c : chacun se touche du doigt sans toucher l'autre), puis le contact, en texte.
+  const small = `font-size:13px;line-height:1.5;color:${c.textMuted}`
+  const footerLink = (label: string, url: string) =>
+    `<p style="margin:0;font-size:14px;line-height:1.4"><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 4px 10px 0;color:${c.text};font-weight:bold">${escapeHtml(label)}</a></p>`
+  const html = `<!doctype html>
+<html lang="${language}"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${recapNarrowStyle}</style>
+</head><body style="margin:0;background:${c.background}">
+<div class="page" style="padding:24px;background:${c.background};font-family:Arial,sans-serif;color:${c.text}">
+  <div class="card" style="max-width:600px;margin:0 auto;background:${c.surface};border:1px solid ${c.surfaceBorder};border-radius:${radii.tile}px;overflow:hidden">
+    <div class="part" style="padding:28px;background:${c.honey};background-image:linear-gradient(180deg,${c.honeyLight},${c.honey});color:${c.onHoney}">
+      <p style="margin:0 0 16px;font-size:22px;line-height:1.2;font-weight:bold;color:${c.onHoney}">${escapeHtml(appName)}</p>
+      <h1 style="margin:0 0 10px;font-size:28px;line-height:1.2;font-weight:bold;color:${c.onHoney};${wrap}">${escapeHtml(heading)}</h1>
+      <p style="margin:0;${body};color:${c.onHoney}">${escapeHtml(fill(r.intro))}</p>
+    </div>
+    ${notes.length > 0 ? `<div class="part" style="padding:20px 28px 8px">${notes.map((note) => paragraph(note, `font-size:16px;line-height:1.5`)).join('')}</div>` : ''}
+    ${parts.join('\n    ')}
+    <div class="part" style="padding:24px 28px;background:${c.surfaceGrouped};border-top:1px solid ${c.line}">
+      <p style="margin:0 0 10px;font-size:18px;font-weight:bold;color:${c.text}">${escapeHtml(appName)}</p>
+      <p style="margin:0 0 6px;${small}">${escapeHtml(fill(r.reason))}</p>
+      ${footerLink(t.changePreferences, data.links.manage)}
+      ${footerLink(r.unsubscribe, data.links.unsubscribe)}
+      <p style="margin:6px 0 0;${small}">${escapeHtml(fill(t.footer))}</p>
+    </div>
+  </div>
+</div>
+</body></html>`
   return {
-    subject: fill(t.recap.subject),
+    subject: fill(r.subject),
     headers: unsubscribeHeaders(data.links.oneClick),
-    ...render({
-      language,
-      heading: fill(t.recap.heading),
-      greeting: fill(t.greeting, { name: defangLinks(data.name, link) }),
-      // Ce qui est propre à cet e-mail (le premier, le dernier pour l'instant) vient juste sous
-      // l'introduction, au corps normal, avant la liste et le bouton (relecture de design, 6c).
-      paragraphs: [
-        fill(t.recap.intro),
-        ...(data.first ? [fill(t.recap.first)] : []),
-        ...(data.last ? [fill(t.recap.last)] : []),
-      ],
-      items: data.lines.map((line) => ({ line: fill(t.recap[line.kind], lineParams(line, link)) })),
-      after: [
-        ...(data.more > 0 ? [counted(t.recap.more_one, t.recap.more_other, data.more)] : []),
-        // « Et aussi : 3 réactions à tes projets, 2 nouveaux abonnements » ; sans liste au-dessus,
-        // les nombres seuls.
-        ...(counts.length > 0
-          ? [
-              data.lines.length > 0
-                ? `${t.recap.alsoLabel} ${counts.join(', ')}`
-                : counts.join(', '),
-            ]
-          : []),
-      ],
-      // R7a : la partie des projets suivis ou testés ; R7b : celle du coin des testeurs, après.
-      // Chacune seulement si elle a un projet (projectSection).
-      sections: [
-        ...projectSection(
-          fill(t.recap.updatesTitle),
-          {
-            one: t.recap.updates_one,
-            other: t.recap.updates_other,
-            moreOne: t.recap.updatesMore_one,
-            moreOther: t.recap.updatesMore_other,
-          },
-          data.updates,
-          data.updatesMore,
-          link,
-        ),
-        ...projectSection(
-          fill(t.recap.testersTitle),
-          {
-            one: t.recap.testers_one,
-            other: t.recap.testers_other,
-            moreOne: t.recap.testersMore_one,
-            moreOther: t.recap.testersMore_other,
-          },
-          data.testers,
-          data.testersMore,
-          link,
-        ),
-      ],
-      button: { label: fill(t.recap.button), url: data.links.button },
-      notes: [],
-      reason: fill(t.recap.reason),
-      links: [
-        { label: t.recap.unsubscribe, url: data.links.unsubscribe },
-        { label: t.manage, url: data.links.manage },
-      ],
-      footer: fill(t.footer),
-    }),
+    text,
+    html,
+    attachments,
   }
 }
 
