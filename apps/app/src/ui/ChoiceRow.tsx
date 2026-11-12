@@ -47,6 +47,11 @@ type Props<T extends string> = {
   /** Ni la ligne ni ses choix ne répondent : tout pâlit. */
   disabled?: boolean
   /**
+   * Pourquoi le dernier choix de cette ligne n'a pas été enregistré (« Pas enregistré : l'ancien
+   * choix est revenu »), posé sous la ligne et ses choix, en alerte ; null : rien.
+   */
+  error?: string | null
+  /**
    * La ligne touchable, pour y poser le focus du clavier quand l'élément qui l'avait disparaît
    * (« Réessayer » a marché, R8 ; voir focus.ts).
    */
@@ -62,6 +67,7 @@ export function ChoiceRow<T extends string>({
   onChange,
   note = null,
   disabled = false,
+  error = null,
   ref,
 }: Props<T>) {
   const { t } = useTranslation()
@@ -167,6 +173,31 @@ export function ChoiceRow<T extends string>({
             value={value}
             onChange={onChange}
           />
+        </View>
+      ) : null}
+      {error ? (
+        // L'erreur de CE choix, sous la ligne (et sous ses boutons radio quand elle est ouverte) :
+        // ce qui est au-dessus ne bouge pas quand elle paraît ou disparaît. Une alerte, lue dès
+        // qu'elle paraît ; la même allure que l'erreur d'une ListRow (icône et texte rouges).
+        <View
+          accessible
+          accessibilityRole="alert"
+          style={{
+            flexDirection: 'row',
+            gap: space.xs,
+            alignItems: 'center',
+            paddingHorizontal: space.lg,
+            paddingBottom: space.md,
+          }}
+        >
+          <View style={{ flexShrink: 0 }}>
+            <Icon name="warning-circle" size={16} tone="danger" />
+          </View>
+          <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
+            <Text variant="caption" tone="danger">
+              {error}
+            </Text>
+          </View>
         </View>
       ) : null}
     </View>

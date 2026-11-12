@@ -13,7 +13,7 @@ import {
   type UnsubscribeQuery,
 } from '@ruche/contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { request } from '../api/client'
 import { ApiError, type ApiErrorKey, type ApiResult, errorKey, errorKeyFor } from '../api/errors'
 import { apiUrl } from '../config'
@@ -54,44 +54,63 @@ export const updateEmailPreferences = async (
 export const useEmailPreferences = (enabled = true) =>
   useQuery({ queryKey: emailPreferencesQueryKey, queryFn: getEmailPreferences, enabled })
 
-// Un changement, et les réglages d'avant pour revenir en arrière si l'API refuse.
-type Change = { changes: EmailPreferencesPatch; previous: EmailPreferences | undefined }
+type Field = keyof EmailPreferences
+
+/** Le champ qu'un changement porte (un seul, EmailPreferencesPatch). */
+const fieldOf = (changes: EmailPreferencesPatch) => Object.keys(changes)[0] as Field | undefined
 
 const mutationKey = ['email-preferences', 'update']
 
 /**
  * Hook : `update` change un réglage ; `saved` dit que le dernier changement est enregistré ;
- * `error` qu'il a échoué, `failure` pourquoi (la clé du message `errors.*`), et `expired` si
- * c'est parce que la session a expiré (réessayer ne servirait à rien : il faut se reconnecter).
+ * `error` qu'il a échoué, `failure` pourquoi (la clé du message `errors.*`), `failedField` quel
+ * réglage (la ligne qui montre l'erreur), et `expired` si c'est parce que la session a expiré
+ * (réessayer ne servirait à rien : il faut se reconnecter).
  */
 export const useUpdateEmailPreferences = () => {
   const queryClient = useQueryClient()
+  // Par champ, la dernière valeur que le serveur a confirmée : la lecture d'origine, puis la
+  // réponse de chaque PATCH réussi. C'est à elle qu'un échec remet le champ, jamais à « ce qu'il
+  // y avait au toucher » : après deux changements rapides, cet instantané est déjà le premier
+  // changement, pas la valeur du serveur. Et, par champ, combien de changements sont partis ou
+  // attendent : tant qu'il en reste un, ce qu'on voit est le choix du dernier, et c'est lui qui
+  // dira si le champ revient en arrière. Un seul objet, gardé d'un dessin à l'autre (le premier
+  // `useState`) et modifié sur place : changer ce carnet ne redessine rien.
+  const [confirmed] = useState<Record<string, unknown>>({})
+  const [pending] = useState<Record<string, number>>({})
+  const settle = (field: Field) => {
+    pending[field] = Math.max(0, (pending[field] ?? 1) - 1)
+    return pending[field] === 0
+  }
   const mutation = useMutation({
     mutationKey,
-    mutationFn: ({ changes }: Change) => updateEmailPreferences(changes),
+    mutationFn: (changes: EmailPreferencesPatch) => updateEmailPreferences(changes),
     // Une « portée » : les changements partent l'un après l'autre, jamais en même temps. Sinon le
     // serveur pourrait recevoir « coupé » puis « activé » dans le désordre.
     scope: { id: mutationKey.join(':') },
     // cancelQueries : une lecture déjà en route ne doit pas écraser le changement affiché.
     onMutate: () => queryClient.cancelQueries({ queryKey: emailPreferencesQueryKey }),
-    // Refusé : seul le champ de ce toucher revient à ce qu'il était. Remettre tout l'état d'avant
-    // effacerait un autre choix pris entre-temps, encore en route (deux types changés vite).
-    onError: (_error, { changes, previous }) => {
-      if (!previous) return
-      const field = Object.keys(changes)[0] as keyof EmailPreferences | undefined
-      if (!field) return
+    // Refusé : seul le champ de ce toucher revient, à sa dernière valeur confirmée, et seulement
+    // s'il n'a plus de changement derrière lui (il déciderait lui-même ; sinon le choix du second
+    // toucher clignoterait). Un autre champ, pris entre-temps, n'est pas touché.
+    onError: (_error, changes) => {
+      const field = fieldOf(changes)
+      if (!field || !settle(field)) return
+      const back = confirmed[field]
+      if (back === undefined) return
       queryClient.setQueryData<EmailPreferences>(emailPreferencesQueryKey, (current) =>
-        current ? { ...current, [field]: previous[field] } : previous,
+        current ? { ...current, [field]: back } : current,
       )
     },
     // Accepté : la réponse confirme le champ envoyé, et lui seul. R8 : on ne relit plus tout l'état
     // (ni la réponse entière, ni une nouvelle lecture) : deux types changés vite partent l'un après
     // l'autre, et la réponse du premier, écrite avant le second, remettrait le second à son ancien
-    // choix sous les yeux du membre. Chaque champ a déjà sa valeur depuis le toucher ; la page
-    // relira tout à sa prochaine ouverture.
-    onSuccess: (saved, { changes }) => {
-      const field = Object.keys(changes)[0] as keyof EmailPreferences | undefined
+    // choix sous les yeux du membre. La page relira tout à sa prochaine ouverture.
+    onSuccess: (saved, changes) => {
+      const field = fieldOf(changes)
       if (!field) return
+      confirmed[field] = saved[field]
+      if (!settle(field)) return
       queryClient.setQueryData<EmailPreferences>(emailPreferencesQueryKey, (current) =>
         current ? { ...current, [field]: saved[field] } : saved,
       )
@@ -100,18 +119,22 @@ export const useUpdateEmailPreferences = () => {
   const { mutate } = mutation
   const update = useCallback(
     (changes: EmailPreferencesPatch) => {
+      const field = fieldOf(changes)
+      const current = queryClient.getQueryData<EmailPreferences>(emailPreferencesQueryKey)
       // Le choix change ici même, au toucher, avant tout envoi : un second toucher, même très
-      // rapide, lit déjà le nouvel état. On garde l'ancien pour revenir en arrière.
-      const previous = queryClient.getQueryData<EmailPreferences>(emailPreferencesQueryKey)
-      if (previous) {
+      // rapide, lit déjà le nouvel état. Avant de le changer, on retient la valeur du champ si
+      // personne ne l'a encore touché : c'est celle du serveur.
+      if (field && current && confirmed[field] === undefined) confirmed[field] = current[field]
+      if (current) {
         queryClient.setQueryData<EmailPreferences>(emailPreferencesQueryKey, {
-          ...previous,
+          ...current,
           ...changes,
         })
       }
-      mutate({ changes, previous })
+      if (field) pending[field] = (pending[field] ?? 0) + 1
+      mutate(changes)
     },
-    [queryClient, mutate],
+    [queryClient, mutate, confirmed, pending],
   )
   const failure: ApiErrorKey | null = mutation.isError ? errorKey(mutation.error) : null
   return {
@@ -119,6 +142,8 @@ export const useUpdateEmailPreferences = () => {
     saved: mutation.isSuccess,
     error: mutation.isError,
     failure,
+    failedField:
+      mutation.isError && mutation.variables ? (fieldOf(mutation.variables) ?? null) : null,
     expired: failure === 'unauthorized',
   }
 }
