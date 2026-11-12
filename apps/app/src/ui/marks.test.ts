@@ -1,4 +1,4 @@
-// Tests du découpage des marques d'une phrase d'Activité (notifications/marks.ts, R8). Chaque phrase
+// Tests du découpage des marques d'une phrase d'Activité (ui/marks.ts, R8). Chaque phrase
 // est une seule clé de traduction (« <b>{{name}}</b> a commenté <b>{{title}}</b> ») : `<b>…</b>`
 // marque ce qui s'écrit en gras (noms, titres), `<v>…</v>` une version. La fonction coupe la phrase
 // en morceaux, chacun avec son style, puis remplit les `{{…}}` **après** le découpage : un nom ou un

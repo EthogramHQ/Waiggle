@@ -68,7 +68,7 @@ export type NotificationThumb =
 
 type Props = {
   leading: NotificationLeading
-  /** La phrase, déjà traduite et découpée (`notifications/marks.ts`). */
+  /** La phrase, déjà traduite et découpée (`ui/marks.ts`). */
   parts: NotificationPart[]
   /**
    * Quand. Une date ISO (`{ date }`) se dit par rapport à maintenant (« il y a 2 h », « hier ») et

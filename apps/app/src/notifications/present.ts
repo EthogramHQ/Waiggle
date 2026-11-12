@@ -19,8 +19,8 @@ import {
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
 import type { IconName } from '../ui/Icon'
+import { type Part, splitMarks } from '../ui/marks'
 import { parisDateTime } from '../ui/parisTime'
-import { type Part, splitMarks } from './marks'
 
 type T = ReturnType<typeof useTranslation>['t']
 
