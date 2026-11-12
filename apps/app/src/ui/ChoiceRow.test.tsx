@@ -15,9 +15,12 @@ import { labelOf } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { ChoiceRow } from './ChoiceRow'
+import { revealWithoutJump } from './focus'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// Le défilement vers l'erreur : on note l'appel, le navigateur fait le reste (contre-visite de R8).
+jest.mock('./focus', () => ({ ...jest.requireActual('./focus'), revealWithoutJump: jest.fn() }))
 
 afterEach(() => {
   jest.restoreAllMocks()
@@ -271,6 +274,41 @@ describe('ChoiceRow, open', () => {
     await renderWithProviders(<Row startOpen />)
 
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  // Contre-visite de design de R8 : sur la dernière ligne, ouverte en bas de l'écran, l'erreur
+  // tombait sous le bord (852 à 881 px sur 844). Elle vient dans l'écran quand elle paraît.
+  it('brings its error into view when it appears, and only then', async () => {
+    const reveal = jest.mocked(revealWithoutJump)
+    reveal.mockClear()
+    const message = fr.t(($) => $.notificationSettings.saveError)
+    function Failing() {
+      const [error, setError] = useState<string | null>(null)
+      return (
+        <View>
+          <ChoiceRow
+            label={LABEL}
+            value="digest"
+            choices={choices}
+            open
+            onToggle={() => {}}
+            onChange={() => setError(message)}
+            error={error}
+          />
+        </View>
+      )
+    }
+    await renderWithProviders(<Failing />)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    // Témoin : sans erreur, rien ne défile.
+    expect(reveal).not.toHaveBeenCalled()
+
+    await fireEvent.press(screen.getByRole('radio', { name: NEVER }))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(reveal).toHaveBeenCalledTimes(1)
+    // Le nœud passé est celui de l'alerte.
+    expect(reveal.mock.calls[0]?.[0]).toBeTruthy()
   })
 })
 

@@ -14,15 +14,17 @@
 // Elle se pose dans un ListGroup, comme une ListRow : mêmes marges, même hauteur, même anneau de
 // focus dessiné à l'intérieur (le groupe rogne ce qui dépasse).
 import { layout, space } from '@ruche/brand'
-import { type Ref, useId } from 'react'
+import { type Ref, useEffect, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View } from 'react-native'
 import { describedBy } from './aria'
+import { revealWithoutJump } from './focus'
 import { Icon } from './Icon'
 import { MIN_NAME } from './ListGroup'
 import { RadioGroup } from './Radio'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
+import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 export type ChoiceRowChoice<T extends string> = { value: T; label: string }
@@ -75,6 +77,19 @@ export function ChoiceRow<T extends string>({
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie la
   // ligne au texte de sa note.
   const noteId = useId()
+  // L'erreur paraît sous la ligne touchée : sur la dernière ligne, ouverte en bas de l'écran, elle
+  // tombait sous le bord, et le membre voyait seulement son ancien choix revenir, sans un mot. Elle
+  // vient donc dans l'écran quand elle paraît, au dessin suivant (requestAnimationFrame, sa place
+  // connue) ; la page ne défile que si elle en sort (contre-visite de design de R8, charte l. 80).
+  const errorView = useRef<View>(null)
+  const calm = useCalmMotion()
+  const calmNow = useRef(calm)
+  calmNow.current = calm
+  useEffect(() => {
+    if (!error) return
+    const frame = requestAnimationFrame(() => revealWithoutJump(errorView.current, calmNow.current))
+    return () => cancelAnimationFrame(frame)
+  }, [error])
   const current = choices.find((choice) => choice.value === value)?.label ?? ''
   const name = t(($) => $.notificationSettings.rowName, { label, choice: current })
 
@@ -180,6 +195,7 @@ export function ChoiceRow<T extends string>({
         // ce qui est au-dessus ne bouge pas quand elle paraît ou disparaît. Une alerte, lue dès
         // qu'elle paraît ; la même allure que l'erreur d'une ListRow (icône et texte rouges).
         <View
+          ref={errorView}
           accessible
           accessibilityRole="alert"
           style={{
