@@ -2,7 +2,7 @@
 // PostgreSQL (son propre schéma, « pgboss »), qui lance chaque tâche à son heure, sur le fuseau de
 // Paris, une seule à la fois, même si l'API tournait un jour sur plusieurs serveurs.
 //
-// Il ne fait qu'appeler les tâches (weekly-recap.ts, mention-emails.ts, moderation-alert.ts,
+// Il ne fait qu'appeler les tâches (weekly-recap.ts, instant-emails.ts, moderation-alert.ts,
 // nightly-purge.ts, other-recap.ts), qui
 // contiennent toutes les règles et se testent sans lui. Il ne démarre qu'avec un vrai PostgreSQL
 // (DATABASE_URL) : en développement, en test et pendant le parcours local (PGlite), aucune tâche
@@ -20,7 +20,7 @@
 //   et n'arrête jamais l'API.
 import { PgBoss } from 'pg-boss'
 import { describeError } from '../log'
-import { mentionEmails } from './mention-emails'
+import { instantEmails } from './instant-emails'
 import { moderationAlert } from './moderation-alert'
 import { nightlyPurge } from './nightly-purge'
 import { otherRecap } from './other-recap'
@@ -31,7 +31,7 @@ const TIME_ZONE = 'Europe/Paris'
 const SEVEN_DAYS = 7 * 24 * 60 * 60
 
 type Task = {
-  name: 'weekly-recap' | 'mention-emails' | 'moderation-alert' | 'nightly-purge' | 'other-recap'
+  name: 'weekly-recap' | 'instant-emails' | 'moderation-alert' | 'nightly-purge' | 'other-recap'
   /** Quand : une expression « cron » (minute, heure, jour du mois, mois, jour de la semaine). */
   cron: string
   /** Combien de secondes une exécution peut durer avant d'être déclarée perdue. */
@@ -45,23 +45,24 @@ type Task = {
 
 const tasks: Task[] = [
   {
-    // Le lundi à 9 h. Un récap manqué (déploiement à 9 h) part une fois au redémarrage ; le délai
-    // de 6 jours entre deux récaps empêche tout doublon.
+    // Le dimanche à 10 h (R8 ; le lundi à 9 h avant). Un récap manqué (déploiement à 10 h) part
+    // une fois au redémarrage ; le délai de 6 jours entre deux récaps empêche tout doublon.
     name: 'weekly-recap',
-    cron: '0 9 * * 1',
+    cron: '0 10 * * 0',
     expireInSeconds: 2 * 60 * 60,
     missed: 'once',
     sendsEmails: true,
     run: weeklyRecap,
   },
   {
-    // Toutes les 5 minutes : un passage manqué est simplement fait au suivant.
-    name: 'mention-emails',
+    // L'e-mail « tout de suite » (R8, à la place de celui des mentions), toutes les 5 minutes : un
+    // passage manqué est simplement fait au suivant.
+    name: 'instant-emails',
     cron: '*/5 * * * *',
     expireInSeconds: 15 * 60,
     missed: 'skip',
     sendsEmails: true,
-    run: mentionEmails,
+    run: instantEmails,
   },
   {
     // Toutes les 10 minutes (tranche 7a) : l'alerte aux administrateurs, au plus une par heure et
@@ -106,7 +107,7 @@ type SchedulerOptions = {
   /** L'adresse du vrai PostgreSQL (DATABASE_URL). */
   databaseUrl: string
   deps: JobDeps
-  /** EMAIL_JOBS : à false, ni récap, ni e-mails de mentions, ni alerte de modération (la purge continue). */
+  /** EMAIL_JOBS : à false, ni récap, ni e-mails « tout de suite », ni alerte de modération (la purge continue). */
   emailJobs: boolean
 }
 
@@ -158,16 +159,33 @@ export const startScheduler = async ({
   }
 }
 
+/**
+ * Les tâches retirées, dont la planification peut encore être en base (R8 : « mention-emails »,
+ * remplacée par « instant-emails »). Les planifications de pg-boss sont gardées dans PostgreSQL :
+ * sans `unschedule`, pg-boss continuerait de créer leurs exécutions, que personne ne prendrait. La
+ * version d'avant R8, si l'on y revenait, la replanifie d'elle-même. À effacer en R9.
+ */
+const RETIRED_TASKS = ['mention-emails'] as const
+
+const queueOptions = (expireInSeconds: number) => ({
+  policy: 'exclusive' as const,
+  retryLimit: 0,
+  expireInSeconds,
+  deleteAfterSeconds: SEVEN_DAYS,
+})
+
 /** Crée les files, puis planifie chaque tâche (ou la retire, si EMAIL_JOBS=off). */
 const planTasks = async (boss: PgBoss, deps: JobDeps, emailJobs: boolean) => {
+  for (const name of RETIRED_TASKS) {
+    // La file est créée si elle manque (une installation neuve) : deleteQueuedJobs refuse une file
+    // inconnue. Puis plus de planification, plus rien en attente.
+    await boss.createQueue(name, queueOptions(15 * 60))
+    await boss.unschedule(name)
+    await boss.deleteQueuedJobs(name)
+  }
   for (const task of tasks) {
     // createQueue ne change rien à une file qui existe déjà (« on conflict do nothing »).
-    await boss.createQueue(task.name, {
-      policy: 'exclusive',
-      retryLimit: 0,
-      expireInSeconds: task.expireInSeconds,
-      deleteAfterSeconds: SEVEN_DAYS,
-    })
+    await boss.createQueue(task.name, queueOptions(task.expireInSeconds))
     if (task.sendsEmails && !emailJobs) {
       // Les planifications sont gardées en base : il faut les retirer, sinon une planification
       // d'avant la coupure continuerait de créer des tâches. Aucun travailleur ne les prendrait,

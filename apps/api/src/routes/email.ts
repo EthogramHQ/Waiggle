@@ -1,8 +1,10 @@
-// Les routes des e-mails de notification (tranche 6c) :
-// - GET et PATCH /v1/me/email-preferences : les deux réglages du membre connecté (Mon profil) ;
-// - POST /v1/email/unsubscribe?token=…[&scope=all] : la désinscription depuis un e-mail, sans
-//   connexion. Deux chemins y mènent : le bouton « Confirmer » de la page de désinscription de
-//   l'appli, et le bouton « Se désabonner » de la messagerie (en-tête List-Unsubscribe, RFC 8058) ;
+// Les routes des e-mails de notification (tranche 6c, R8) :
+// - GET et PATCH /v1/me/email-preferences : les réglages du membre connecté (Réglages →
+//   Notifications) : le récap, et un choix par type (R8), un seul changé à la fois ;
+// - POST /v1/email/unsubscribe?token=…[&scope=all][&choice=digest|never] : la désinscription depuis
+//   un e-mail, sans connexion. Deux chemins y mènent : le bouton « Confirmer » de la page de
+//   désinscription de l'appli, et le bouton « Se désabonner » de la messagerie (en-tête
+//   List-Unsubscribe, RFC 8058) ;
 // - GET /v1/email/unsubscribe : un lien seulement ouvert (antivirus, aperçu) ne change rien et mène
 //   à la page de l'appli, qui demande confirmation.
 //
@@ -11,8 +13,7 @@
 import { createRoute } from '@hono/zod-openapi'
 import {
   EmailPreferences,
-  EmailPreferencesUpdate,
-  type UnsubscribeKind,
+  EmailPreferencesPatch,
   UnsubscribeQuery,
   UnsubscribeToken,
 } from '@ruche/contracts'
@@ -20,6 +21,7 @@ import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import {
+  type Lowered,
   readEmailPreferences,
   unsubscribeMember,
   updateEmailPreferences,
@@ -35,7 +37,7 @@ import { createRouter, errorResponse } from './router'
 export const UNSUBSCRIBE_PATH = '/v1/email/unsubscribe'
 
 const preferencesResponse = {
-  description: 'My two e-mail settings.',
+  description: 'My e-mail settings: the weekly recap and one choice per type.',
   content: { 'application/json': { schema: EmailPreferences } },
 }
 
@@ -50,13 +52,15 @@ const updateRoute = createRoute({
   method: 'patch',
   path: '/v1/me/email-preferences',
   summary: 'Change my e-mail settings',
-  description: 'One setting or both; the answer gives both.',
+  description: 'Exactly one setting; the answer gives all of them.',
   request: {
-    body: { required: true, content: { 'application/json': { schema: EmailPreferencesUpdate } } },
+    body: { required: true, content: { 'application/json': { schema: EmailPreferencesPatch } } },
   },
   responses: {
     200: preferencesResponse,
-    400: errorResponse('Empty body, unknown field or wrong value.'),
+    400: errorResponse(
+      'Empty body, several settings, unknown field, wrong value, or « now » on a type without it.',
+    ),
     401: errorResponse('Not signed in.'),
     429: errorResponse('Too many changes.'),
   },
@@ -67,8 +71,10 @@ const unsubscribeRoute = createRoute({
   path: UNSUBSCRIBE_PATH,
   summary: 'Unsubscribe from an e-mail link (no session)',
   description:
-    'Turns off the kind of e-mail of the signed token (or both with scope=all). Never turns ' +
-    'anything on. The body is never read (RFC 8058 sends « List-Unsubscribe=One-Click »).',
+    'Lowers what the signed token names: the recap, the « now » types (to choice, digest by ' +
+    'default), or replies for an old mentions link; scope=all lowers the recap and the « now » ' +
+    'types. Never turns anything on. The body is never read (RFC 8058 sends ' +
+    '« List-Unsubscribe=One-Click »).',
   request: { query: UnsubscribeQuery },
   responses: {
     204: { description: 'Done (no content).' },
@@ -97,14 +103,20 @@ const unsubscribeIpRule: RateRule = { windowMs: HOUR, max: 300 }
 const unsubscribeMemberRule: RateRule = { windowMs: HOUR, max: 10 }
 
 /**
- * Une ligne de journal par refus : « Unsubscribe <identifiant> <recap|mentions|all> ». Une
- * sauvegarde restaurée ramènerait les réglages d'avant ; ces lignes disent quels refus réappliquer
- * (docs/ops/serveur.md, « Sauvegardes »). Seulement l'identifiant du membre : ni adresse, ni nom, ni
- * jeton (les journaux sont gardés et lus par d'autres outils). L'identifiant vient de la session ou
- * d'un jeton signé par nous : jamais d'un texte tapé, qui pourrait imiter une ligne.
+ * Une ligne de journal par baisse (R8, relecture du plan jur-2b) : « Unsubscribe <identifiant>
+ * recap » pour le récap coupé, « Unsubscribe <identifiant> <type> <digest|never> » pour un type
+ * baissé (réglages, ou l'ancien lien de mentions), « Unsubscribe <identifiant> instant
+ * <digest|never> » quand un lien passe d'un coup tous les types « Tout de suite » au choix donné.
+ * Une sauvegarde restaurée ramènerait les réglages d'avant ; ces lignes disent quelles baisses
+ * réappliquer (docs/ops/serveur.md, « Sauvegardes »). Monter un choix n'écrit rien. Seulement
+ * l'identifiant du membre : ni adresse, ni nom, ni jeton (les journaux sont gardés et lus par
+ * d'autres outils). L'identifiant vient de la session ou d'un jeton signé par nous, et le reste de
+ * valeurs fixes : jamais d'un texte tapé, qui pourrait imiter une ligne.
  */
-const logUnsubscribe = (userId: string, what: UnsubscribeKind | 'all') => {
-  console.log(`Unsubscribe ${userId} ${what}`)
+const logLowered = (userId: string, lowered: Lowered[]) => {
+  for (const item of lowered) {
+    console.log(`Unsubscribe ${userId} ${item.what}${'to' in item ? ` ${item.to}` : ''}`)
+  }
 }
 
 type Deps = {
@@ -161,30 +173,27 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
   app.openapi(updateRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
-    const update = c.req.valid('json')
-    const preferences = await updateEmailPreferences(db, user.id, update, new Date())
-    // Couper un réglage dans l'appli est aussi un refus : il laisse la même ligne de journal
-    // qu'une désinscription par le lien (voir logUnsubscribe).
-    const recapOff = update.weeklyRecap === false
-    const mentionsOff = update.mentionEmails === false
-    if (recapOff || mentionsOff) {
-      logUnsubscribe(user.id, recapOff && mentionsOff ? 'all' : recapOff ? 'recap' : 'mentions')
-    }
+    const patch = c.req.valid('json')
+    const { preferences, lowered } = await updateEmailPreferences(db, user.id, patch, new Date())
+    // Baisser un réglage dans l'appli est aussi un refus : il laisse la même ligne de journal
+    // qu'une désinscription par le lien (voir logLowered).
+    logLowered(user.id, lowered)
     return c.json(EmailPreferences.parse(preferences), 200)
   })
 
   app.openapi(
     unsubscribeRoute,
     async (c) => {
-      // Le jeton et la portée viennent de l'adresse, jamais du corps (qui n'est pas lu). Un
-      // paramètre répété (deux jetons) est refusé : on ne choisit pas lequel croire.
+      // Le jeton, la portée et le choix viennent de l'adresse, jamais du corps (qui n'est pas lu).
+      // Un paramètre répété (deux jetons, deux choix) est refusé : on ne choisit pas lequel croire.
       if (
         (c.req.queries('token') ?? []).length !== 1 ||
-        (c.req.queries('scope') ?? []).length > 1
+        (c.req.queries('scope') ?? []).length > 1 ||
+        (c.req.queries('choice') ?? []).length > 1
       ) {
         return invalidLink(c)
       }
-      const { token, scope } = c.req.valid('query')
+      const { token, scope, choice } = c.req.valid('query')
       const link = readUnsubscribeToken(secret, token)
       if (!link) return invalidLink(c)
 
@@ -194,9 +203,17 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
       const decision = await limiter.hit(key, unsubscribeMemberRule)
       if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
 
-      const done = await unsubscribeMember(db, link.userId, link.kind, scope === 'all', new Date())
-      if (!done) return invalidLink(c)
-      logUnsubscribe(link.userId, scope === 'all' ? 'all' : link.kind)
+      // Sans `choice` (le « Se désabonner » d'une messagerie ne lit pas de page), les types
+      // « Tout de suite » passent « Dans le récap » (décision de Louis du 12/11/2026). `now` est
+      // déjà refusé par le schéma du contrat : un lien ne rallume rien.
+      const lowered = await unsubscribeMember(
+        db,
+        link.userId,
+        { kind: link.kind, all: scope === 'all', choice: choice ?? 'digest' },
+        new Date(),
+      )
+      if (!lowered) return invalidLink(c)
+      logLowered(link.userId, lowered)
       return c.body(null, 204)
     },
     // Une adresse mal formée (jeton absent, de mauvaise forme, portée inconnue) : la même réponse

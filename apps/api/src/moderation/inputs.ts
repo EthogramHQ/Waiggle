@@ -471,6 +471,15 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     recap_unvisited: 'nombre',
     mention_sent_at: 'date',
     updated_at: 'date',
+    // R8 : un choix par type, dans une liste fermée par Zod et par le `check` de la table.
+    email_reactions: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    email_comments: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    email_replies: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    email_follows: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    email_updates: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    email_testers: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    recap_v2_at: 'date',
+    instant_sent_at: 'date',
   },
   notification_state: {
     user_id: 'identifiant',
