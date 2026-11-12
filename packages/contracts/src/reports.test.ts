@@ -267,7 +267,8 @@ describe('the two notifications of moderation', () => {
     isNew: true,
     kind: 'removed',
     targetKind: 'project',
-    project: { id: projectId, title: 'Météo' },
+    // R8 : la miniature du projet, null sans photo.
+    project: { id: projectId, title: 'Météo', cover: null },
     excerpt: null,
     ground: 'rules',
     explanation: 'Publicité déguisée.',
