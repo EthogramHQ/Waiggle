@@ -86,6 +86,9 @@ const icons = [
   'key',
   'fingerprint',
   'shield-check',
+  // R8 : une décision de la modération dans Activité (rond rouge), et un outil ajouté au catalogue.
+  'shield-warning',
+  'puzzle-piece',
   'flag',
   'prohibit',
   'bell-slash',

@@ -16,14 +16,25 @@ import { useTheme } from './theme/ThemeProvider'
 type Props = {
   /** La première photo du projet ; null : la lumière miel d'un projet sans photo. */
   image: CoverImage | null
-  /** Le badge du coin : la corbeille de la fenêtre de suppression (le seul pour l'instant). */
-  badge: 'trash'
+  /**
+   * Le badge du coin : la corbeille de la fenêtre de suppression. Sans badge (R8), la vignette
+   * seule : celle d'une ligne d'Activité, qui montre de quel projet elle parle.
+   */
+  badge?: 'trash'
+  /**
+   * `row` (R8) : la petite vignette d'une ligne de liste (48 points, coins plus serrés) ; `dialog`
+   * par défaut : celle d'une fenêtre (84 points).
+   */
+  size?: 'dialog' | 'row'
 }
 
-const { size, badge: badgeSize } = layout.thumb
+const { size: dialogSize, badge: badgeSize } = layout.thumb
+/** La vignette d'une ligne : celle de la planche R8-Activite. */
+const ROW_SIZE = 48
 
-export function ProjectThumb({ image, badge }: Props) {
+export function ProjectThumb({ image, badge, size: kind = 'dialog' }: Props) {
   const { colors } = useTheme()
+  const size = kind === 'row' ? ROW_SIZE : dialogSize
   return (
     <View
       // Caché aux lecteurs d'écran, partout : `aria-hidden` (web et RNTL), et ses équivalents
@@ -36,26 +47,28 @@ export function ProjectThumb({ image, badge }: Props) {
       style={{ width: size, height: size, alignSelf: 'flex-start' }}
     >
       {/* La photo, ou la lumière miel sans elle : la couverture d'un projet, en petit. */}
-      <ProjectCover height={size} radius="small" image={image} />
+      <ProjectCover height={size} radius={kind === 'row' ? 'code' : 'small'} image={image} />
       {/* Le badge, à cheval sur le coin bas droit ; le liseré couleur du fond le détache de la photo
           (le même que la pastille des nouveautés sur une icône). */}
-      <View
-        style={{
-          position: 'absolute',
-          right: -space.sm,
-          bottom: -space.sm,
-          width: badgeSize,
-          height: badgeSize,
-          borderRadius: badgeSize / 2,
-          borderWidth: borders.badge,
-          borderColor: colors.background,
-          backgroundColor: colors.danger,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {badge === 'trash' ? <Icon name="trash" size={16} tone="onDanger" /> : null}
-      </View>
+      {badge ? (
+        <View
+          style={{
+            position: 'absolute',
+            right: -space.sm,
+            bottom: -space.sm,
+            width: badgeSize,
+            height: badgeSize,
+            borderRadius: badgeSize / 2,
+            borderWidth: borders.badge,
+            borderColor: colors.background,
+            backgroundColor: colors.danger,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {badge === 'trash' ? <Icon name="trash" size={16} tone="onDanger" /> : null}
+        </View>
+      ) : null}
     </View>
   )
 }

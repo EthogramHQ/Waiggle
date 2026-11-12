@@ -40,7 +40,6 @@ import { MemberHeader } from '../ui/MemberHeader'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { NoteComposer } from '../ui/NoteComposer'
 import { Notice } from '../ui/Notice'
-import { NotificationCard } from '../ui/NotificationCard'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ProjectGrid } from '../ui/ProjectGrid'
@@ -104,6 +103,7 @@ import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
+import { NotificationsCatalogue } from './notifications'
 import { ToolsCatalogue } from './outils'
 import { AdminCardsCatalogue } from './outils-administration'
 import { ToolFieldCatalogue } from './outils-champ'
@@ -726,55 +726,9 @@ export function CatalogueScreen() {
           <CountBadge count={1} />
           <CountBadge count={42} max={99} />
         </Stack>
-        {/* Les cartes : nouvelle avec un détail, nouvelle avec l'extrait en citation (qui finit par
-            « … » : le nom lu n'y ajoute pas de point), déjà vue avec une citation, sans destination
-            (les abonnés au compte), et un titre très long. Une liste annoncée, comme à l'écran. */}
-        <Stack gap="sm" accessibilityRole="list">
-          <NotificationCard
-            icon="heart"
-            text={l.notifReactions}
-            detail={l.notifReactionsDetail}
-            when={l.notifToday}
-            isNew
-            newLabel={l.notifNew}
-            onPress={() => {}}
-          />
-          <NotificationCard
-            icon="chat-circle"
-            text={l.notifComment}
-            quote={l.notifCommentQuote}
-            when={l.notifToday}
-            isNew
-            newLabel={l.notifNew}
-            onPress={() => {}}
-          />
-          <NotificationCard
-            icon="at"
-            text={l.notifMention}
-            quote={l.notifMentionQuote}
-            when={l.notifToday}
-            isNew={false}
-            newLabel={l.notifNew}
-            onPress={() => {}}
-          />
-          <NotificationCard
-            icon="user-plus"
-            text={l.notifFollows}
-            when={l.notifYesterday}
-            isNew={false}
-            newLabel={l.notifNew}
-          />
-          <NotificationCard
-            icon="heart"
-            text={l.notifLongTitle}
-            detail={l.notifReactionsDetail}
-            when={l.notifYesterday}
-            isNew={false}
-            newLabel={l.notifNew}
-            onPress={() => {}}
-          />
-        </Stack>
       </Section>
+      {/* Tranche R8, les lignes de la page Activité, jour et nuit (notifications.tsx). */}
+      <NotificationsCatalogue />
 
       {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions, le champ. */}
       <CommentCardCatalogue />

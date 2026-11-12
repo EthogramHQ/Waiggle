@@ -12,6 +12,8 @@ import { useTheme } from './theme/ThemeProvider'
 
 /** La taille de la tuile, en points : celle de la pastille d'icône d'une ligne (ListRow). */
 const SIZE = 40
+/** R8 : la tuile à droite d'une ligne d'Activité, de la taille de la vignette d'un projet. */
+const ROW_SIZE = 48
 
 /** La seule teinte d'une tuile : le miel pâle, initiale à l'encre. */
 export type TileVariant = 'cream'
@@ -25,6 +27,11 @@ type Props = {
    * @deprecated une seule teinte depuis R4 ; ne plus le passer.
    */
   variant?: 'honey' | 'cream'
+  /**
+   * `icon` par défaut (40 points, la pastille d'une ligne de liste) ; `row` (R8, 48 points) : à
+   * droite d'une ligne d'Activité, à la place de la vignette d'un projet.
+   */
+  size?: 'icon' | 'row'
 }
 
 /**
@@ -42,16 +49,17 @@ export const initialOf = (name: string): string =>
  */
 export const tileVariantOf = (_slug: string): TileVariant => 'cream'
 
-export function InitialTile({ name }: Props) {
+export function InitialTile({ name, size = 'icon' }: Props) {
   const { colors } = useTheme()
+  const side = size === 'row' ? ROW_SIZE : SIZE
   return (
     <View
       aria-hidden
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{
-        width: SIZE,
-        height: SIZE,
+        width: side,
+        height: side,
         borderRadius: radii.code,
         alignItems: 'center',
         justifyContent: 'center',
