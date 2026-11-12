@@ -5,13 +5,13 @@
 // aucune prop, car ses deux textes sont toujours les mêmes (`notificationSettings.exampleSource` et
 // `exampleText`).
 //
-// Le titre en gras est marqué <b>…</b> dans le texte traduit ; `splitMarks` (notifications/marks.ts)
+// Le titre en gras est marqué <b>…</b> dans le texte traduit ; `splitMarks` (ui/marks.ts)
 // découpe la phrase en morceaux, et ce composant ne dessine jamais de HTML.
 import { appName } from '@ruche/brand'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { splitMarks } from '../notifications/marks'
 import { Logo } from './Logo'
+import { splitMarks } from './marks'
 import { Stack } from './Stack'
 import { Surface } from './Surface'
 import { Text } from './Text'
