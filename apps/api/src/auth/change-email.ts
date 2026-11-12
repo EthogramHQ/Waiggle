@@ -320,10 +320,10 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
      * dernier e-mail à l'ancienne adresse ; répond true. Sinon (une inscription) répond false.
      * Better Auth vient de vérifier le jeton de la requête : on le relit sans le revérifier, après
      * l'avoir déchiffré (l'adresse de la requête garde le jeton chiffré du second lien).
-     * `user` peut manquer (relecture de sécurité A2) : si deux seconds liens du même membre sont
-     * ouverts en même temps, chacun change « le compte de l'ancienne adresse » ; le premier l'a
-     * déjà changée, le second ne trouve plus de compte et nous passe null. Le premier a prévenu
-     * l'ancienne adresse ; rien à faire ici.
+     * `user` pouvait manquer jusqu'à 1.7.13 (relecture de sécurité A2) : deux seconds liens ouverts
+     * en même temps changeaient chacun « le compte de l'ancienne adresse », et le second, ne le
+     * trouvant plus, nous passait null. Depuis 1.7.16, Better Auth change le compte par son id et
+     * nous le passe toujours (montées du 12/11/2026) ; le garde reste, au cas où.
      */
     afterEmailChanged: async (
       user: { id: string; name: string; email: string } | null | undefined,
