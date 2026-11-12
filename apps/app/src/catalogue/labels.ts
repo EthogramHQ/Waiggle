@@ -154,7 +154,7 @@ const fr = {
   signInAgain: 'Me reconnecter',
   emailsTitle: 'E-mails',
   emailsRecap: 'Le récap de la semaine',
-  emailsRecapHint: 'Le lundi matin, seulement s’il y a du nouveau.',
+  emailsRecapHint: 'Le dimanche à 10 h, s’il y a du nouveau',
   emailsMentions: 'Un e-mail quand on me mentionne ou me répond',
   emailsMentionsHint: 'Un quart d’heure après, si tu ne l’as pas déjà vu. Un par heure au plus.',
   emailsAccount:
@@ -328,7 +328,7 @@ const en: typeof fr = {
   signInAgain: 'Sign in again',
   emailsTitle: 'Emails',
   emailsRecap: 'The weekly recap',
-  emailsRecapHint: 'On Monday morning, only when there is something new.',
+  emailsRecapHint: 'On Sunday at 10 am, when there is something new',
   emailsMentions: 'An email when someone mentions or replies to me',
   emailsMentionsHint:
     'A quarter of an hour later, if you have not seen it yet. At most one per hour.',
