@@ -235,6 +235,43 @@ describe('ChoiceRow, open', () => {
     const row = screen.getByRole('button', { name: rowName(DIGEST) }) as unknown as Node
     expect(backgroundsAbove(row)).not.toContain(palettes.day.highlightSoft)
   })
+
+  it('says why the choice was not saved, in an alert under the choices', async () => {
+    const message = fr.t(($) => $.notificationSettings.saveError)
+    function Failed() {
+      return (
+        <ChoiceRow
+          label={LABEL}
+          value="digest"
+          choices={choices}
+          open
+          onToggle={() => {}}
+          onChange={() => {}}
+          error={message}
+        />
+      )
+    }
+    await renderWithProviders(<Failed />)
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(message)
+    // Sous les boutons radio, jamais au-dessus : ce qui précède ne bouge pas quand elle paraît.
+    const all: unknown[] = []
+    const walk = (node: { children: unknown[] }) => {
+      all.push(node)
+      for (const child of node.children) if (typeof child !== 'string') walk(child as typeof node)
+    }
+    walk(screen.root as unknown as { children: unknown[] })
+    expect(all.indexOf(alert)).toBeGreaterThan(
+      all.indexOf(screen.getByRole('radio', { name: NEVER })),
+    )
+  })
+
+  it('shows no alert without an error', async () => {
+    await renderWithProviders(<Row startOpen />)
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 })
 
 describe('ChoiceRow, on the web, with the keyboard', () => {

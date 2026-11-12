@@ -192,6 +192,22 @@ describe('EmailSettings, what the screen shows', () => {
   })
 })
 
+/**
+ * Les réponses du serveur sont retenues : le second toucher part pendant que le premier attend,
+ * comme un doigt rapide. `release()` fait échouer les deux d'un coup (500).
+ */
+const failAfterBoth = () => {
+  let release: () => void = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  nextEmailPatch = async () => {
+    await held
+    return { ok: false, error: 'internal' }
+  }
+  return release
+}
+
 describe('EmailSettings, choosing', () => {
   it('opens the choices of a type in place, its current choice checked', async () => {
     await renderWithProviders(<EmailSettings />)
@@ -307,6 +323,76 @@ describe('EmailSettings, choosing', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: rowName('comments', 'digest') })).toBeTruthy(),
     )
+  })
+
+  it('shows the saved choice after two quick changes of the same type both fail', async () => {
+    const release = failAfterBoth()
+    await renderWithProviders(<EmailSettings />)
+
+    await fireEvent.press(
+      await screen.findByRole('button', { name: rowName('comments', 'digest') }),
+    )
+    await fireEvent.press(screen.getByRole('radio', { name: CHOICE.now }))
+    await fireEvent.press(screen.getByRole('radio', { name: CHOICE.never }))
+
+    release()
+    await waitFor(() =>
+      expect(emailPatches()).toEqual([{ comments: 'now' }, { comments: 'never' }]),
+    )
+    // Le serveur n'a rien enregistré : la ligne finit sur son choix d'origine, pas sur « Tout de suite ».
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: rowName('comments', 'digest') })).toBeTruthy(),
+    )
+    expect(screen.getByRole('radio', { name: CHOICE.digest, checked: true })).toBeTruthy()
+  })
+
+  it('shows the saved recap after two quick changes of the recap both fail', async () => {
+    const release = failAfterBoth()
+    await renderWithProviders(<EmailSettings />)
+
+    await fireEvent.press(await recapSwitch())
+    await fireEvent.press(await recapSwitch())
+
+    release()
+    await waitFor(() =>
+      expect(emailPatches()).toEqual([{ weeklyRecap: false }, { weeklyRecap: true }]),
+    )
+    await screen.findByRole('alert')
+    // Le serveur garde « activé » : l'interrupteur ne reste pas coupé.
+    await waitFor(async () => expect(await recapSwitch()).toBeChecked())
+    expect(screen.queryAllByText(TEXT.recapOff)).toHaveLength(0)
+  })
+
+  it('keeps the rows in place when a change succeeds after a failed one', async () => {
+    let calls = 0
+    nextEmailPatch = async () => {
+      calls += 1
+      if (calls === 1) return { ok: false, error: 'internal' }
+      storedEmails = { ...storedEmails, testers: 'never' }
+      return { ok: true, data: storedEmails }
+    }
+    await renderWithProviders(<EmailSettings />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: rowName('testers', 'digest') }))
+    await fireEvent.press(screen.getByRole('radio', { name: CHOICE.now }))
+
+    // L'erreur est posée sous la ligne touchée (et sous ses choix), jamais au-dessus des lignes :
+    // celles du dessus ne bougent pas, et la ligne ouverte garde sa place.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(containing(TEXT.saveError))
+    const [testersRow, failed, recap] = readingOrder(
+      row('testers'),
+      alert,
+      screen.getByRole('switch'),
+    )
+    expect(failed).toBeGreaterThan(testersRow as number)
+    expect(failed).toBeLessThan(recap as number)
+    const [firstRow] = readingOrder(row('reactions'))
+    expect(failed).toBeGreaterThan(firstRow as number)
+
+    await fireEvent.press(screen.getByRole('radio', { name: CHOICE.never }))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(row('testers')).toBeExpanded()
   })
 
   it('says to sign in again, with a link back to this page, when the session expired', async () => {

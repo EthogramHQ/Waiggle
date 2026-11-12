@@ -15,7 +15,7 @@ import {
 } from '@ruche/contracts'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { errorKey } from '../../api/errors'
+import { type ApiErrorKey, errorKey } from '../../api/errors'
 import { useEmailPreferences, useUpdateEmailPreferences } from '../../email/api'
 import { useSignInAgain } from '../../navigation/signInAgain'
 import { Button } from '../../ui/Button'
@@ -94,24 +94,35 @@ export function EmailSettings() {
   if (readFailure !== null && readFailure !== failedRead) setFailedRead(readFailure)
   const loadFailure = data ? null : (readFailure ?? (retrying ? failedRead : null))
 
-  // Le dernier échec d'un changement. Pendant l'envoi du suivant, le hook ne dit plus rien : on
-  // garde le message d'avant jusqu'à sa réponse (`shown`), sinon il disparaîtrait le temps de
-  // l'envoi et les lignes, posées sous lui, sauteraient deux fois sous le doigt. Une réussite
-  // l'efface. (Changer un état pendant le dessin est permis à un composant pour lui-même : React le
+  // Le dernier échec d'un changement : pourquoi, et quel réglage (`field`). Pendant l'envoi du
+  // suivant, le hook ne dit plus rien : on garde l'échec d'avant jusqu'à la réponse, sinon le
+  // message disparaîtrait le temps de l'envoi puis reviendrait. Une réussite l'efface.
+  // (Changer un état pendant le dessin est permis à un composant pour lui-même : React le
   // redessine aussitôt.)
-  const outcome = save.failure ?? (save.saved ? 'saved' : null)
-  const [shown, setShown] = useState(outcome)
-  if (outcome !== null && outcome !== shown) setShown(outcome)
-  const saveFailure = (outcome ?? shown) === 'saved' ? null : (outcome ?? shown)
+  const [lastFailure, setLastFailure] = useState<{
+    failure: ApiErrorKey
+    field: string | null
+  } | null>(null)
+  if (
+    save.failure &&
+    (lastFailure?.failure !== save.failure || lastFailure.field !== save.failedField)
+  ) {
+    setLastFailure({ failure: save.failure, field: save.failedField })
+  } else if (save.saved && lastFailure) {
+    setLastFailure(null)
+  }
+  const saveFailure = lastFailure?.failure ?? null
 
-  // Le message au-dessus du groupe « Par e-mail ». Une session expirée (à la lecture ou au
-  // changement) : le lien mène à la connexion. Une autre panne de lecture : rien ici, la ligne du
-  // groupe dit tout (ce qui manque, pourquoi, « Réessayer »). Un changement refusé : la phrase dit
-  // que ce choix n'est pas enregistré, et l'ancien est revenu.
+  // Le message au-dessus du groupe « Par e-mail » : seulement une session expirée (à la lecture ou
+  // au changement : le lien mène à la connexion) ou l'échec de l'interrupteur du récap, qui n'a pas
+  // de ligne de choix où le dire. Une autre panne de lecture : rien ici, la ligne du groupe dit
+  // tout (ce qui manque, pourquoi, « Réessayer »). Un choix refusé, lui, le dit sous sa propre
+  // ligne (`ChoiceRow error`) : une notice posée au-dessus ferait descendre toutes les lignes sous
+  // le doigt.
   const expired = loadFailure === 'unauthorized' || saveFailure === 'unauthorized'
   const notice = expired ? (
     <Notice message={t(($) => $.states.expired)} action={signInAgain()} />
-  ) : !loadFailure && saveFailure ? (
+  ) : !loadFailure && saveFailure && lastFailure?.field === 'weeklyRecap' ? (
     <Notice message={t(($) => $.notificationSettings.saveError)} />
   ) : null
 
@@ -166,6 +177,11 @@ export function EmailSettings() {
           onToggle={() => setOpen(open === type ? null : type)}
           onChange={(choice) => choose(type, choice)}
           note={!current.weeklyRecap && current[type] === 'digest' ? recapOff : null}
+          error={
+            !expired && saveFailure && lastFailure?.field === type
+              ? t(($) => $.notificationSettings.saveError)
+              : null
+          }
         />
       )),
       <Switch
