@@ -110,6 +110,8 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'DELETE /v1/projects/:id/comments/:commentId': ['own', 'allowed'],
   'PUT /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed'],
   'DELETE /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed'],
+  // R8 : « Voir en contexte » depuis une notification, le fil du commentaire visé.
+  'GET /v1/comments/:commentId/context': ['hidesBlocked', 'allowed'],
   // Suivre.
   'POST /v1/members/:id/follow': ['hidesBlocked', 'refused'],
   'DELETE /v1/members/:id/follow': ['own', 'allowed'],
@@ -238,6 +240,10 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'DELETE /v1/projects/:id/comments/:commentId/hide': {
     file: 'blocks-visibility.test.ts',
     test: 'answers « unknown » to who hides, or shows again, a comment of the other one',
+  },
+  'GET /v1/comments/:commentId/context': {
+    file: 'comments-context.test.ts',
+    test: 'answers the same 404 for a comment of a member blocked either way',
   },
   'POST /v1/members/:id/follow': {
     file: 'blocks.test.ts',
