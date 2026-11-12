@@ -388,13 +388,21 @@ try {
   expectEqual('pseudo de Léa', renamed.handle, handle)
 
   // Tranche 6c : un réglage d'e-mail s'enregistre dès qu'on le touche, sans « Enregistrer ».
-  // R2 : les réglages d'e-mail sont la rubrique « Notifications ».
-  step('Léa coupe le récap de la semaine ; la page rechargée le montre coupé')
+  // R2 : les réglages d'e-mail sont la rubrique « Notifications ». R8 : « Le récap » est un
+  // interrupteur parmi les lignes de choix, et plus aucune phrase ne confirme l'enregistrement : la
+  // page rechargée et l'API disent si le réglage est parti.
+  step('Léa coupe le récap ; la page rechargée le montre coupé')
   await openSettings(lea, 'Notifications', '/settings/notifications')
-  await byRole(lea.page, 'switch', 'Le récap de la semaine', { checked: true }).click()
-  await lea.page.getByText('Réglage enregistré.').waitFor()
+  await byRole(lea.page, 'switch', 'Le récap', { checked: true }).click()
+  await byRole(lea.page, 'switch', 'Le récap', { checked: false }).waitFor()
+  await waitFor(
+    'récap coupé enregistré',
+    async () =>
+      (await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()).weeklyRecap ===
+      false,
+  )
   await open(lea.page, `${appUrl}/settings/notifications`)
-  await byRole(lea.page, 'switch', 'Le récap de la semaine', { checked: false }).waitFor()
+  await byRole(lea.page, 'switch', 'Le récap', { checked: false }).waitFor()
   const emails = await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()
   expectEqual('récap de Léa', emails.weeklyRecap, false)
 
@@ -766,11 +774,8 @@ try {
   await byRole(sam.page, 'button', /^Notifications, \d+ nouvelles?$/)
     .first()
     .click()
-  await byRole(
-    sam.page,
-    'link',
-    /a publié une mise à jour de « Mon agent de recettes » · v1\.3/,
-  ).click()
+  // R8 : la ligne d'Activité nomme le projet, pas l'auteur (« … a une mise à jour v1.3 »).
+  await byRole(sam.page, 'link', /Mon agent de recettes a une mise à jour v1\.3/).click()
   await sam.page.waitForURL(`**/projects/${projectId}/updates`)
   // Le curseur « Avant / après » : 50 au départ ; la flèche droite ajoute 10, Fin va au bout.
   const compare = byRole(sam.page, 'slider', 'Comparer avant et après')
@@ -848,18 +853,71 @@ try {
   await byRole(sam.page, 'button', 'Fermer').click()
   await asDesktop(sam.page)
 
-  step('Léa voit la cloche, puis la notification de la mention, qui mène au projet')
+  // R8 : Léa est sur son téléphone. La ligne d'Activité (en miel : elle est nouvelle) mène à la page du
+  // projet, dont l'adresse porte `?comment=<id>` : la feuille des commentaires s'ouvre sur la mention,
+  // éclairée (sur le web, la carte éclairée est un groupe nommé « auteur : début du texte »).
+  // Recharger la page rouvre la feuille sur le même commentaire ; la fermer retire le paramètre.
+  step(
+    'Léa voit la cloche, ouvre Activité : la mention mène à la réponse éclairée, dans la feuille',
+  )
+  await asPhone(lea.page)
   // Le nombre n'est relu que chaque minute : on recharge l'accueil pour le lire tout de suite.
   await open(lea.page, `${appUrl}/`)
   await byRole(lea.page, 'button', /^Notifications, \d+ nouvelles?$/)
     .first()
     .click()
-  await byRole(lea.page, 'link', /Sam parle de toi dans un commentaire/).click()
-  await lea.page.waitForURL(`**/projects/${projectId}`)
-  // Dans le texte publié, la mention est une pastille : un lien vers la page de Léa, lu par son nom.
-  await byRole(lea.page, 'link', 'Lea, ouvre son profil').waitFor()
+  const mentionName = 'Sam parle de toi dans un commentaire sur Mon agent de recettes'
+  // Le nom de la ligne finit par « Nouveau. » tant qu'elle est en miel ; la phrase, la date et
+  // l'extrait passent avant (d'où l'expression régulière).
+  await byRole(lea.page, 'link', new RegExp(`${mentionName}.*Nouveau\\.$`)).click()
+  await lea.page.waitForURL(
+    (url) => url.pathname === `/projects/${projectId}` && url.searchParams.has('comment'),
+  )
+  const contextUrl = lea.page.url()
+  const litComment = byRole(lea.page, 'group', /^Sam : Testé ce soir/)
+  await litComment.first().waitFor()
+  console.log('  ok : la mention arrive éclairée dans la feuille des commentaires')
+  // Le paramètre reste dans l'adresse tant que la feuille est ouverte : recharger la rouvre, sur le
+  // même commentaire.
+  await open(lea.page, contextUrl)
+  await litComment.first().waitFor()
+  expectEqual('adresse après rechargement', lea.page.url(), contextUrl)
+  // Fermer la feuille retire le paramètre : la page redevient celle du projet.
+  await byRole(lea.page, 'button', 'Fermer').click()
+  await lea.page.waitForURL(
+    (url) => url.pathname === `/projects/${projectId}` && !url.searchParams.has('comment'),
+  )
+  console.log('  ok : fermer la feuille retire ?comment= de l’adresse')
+  await asDesktop(lea.page)
+
+  step(
+    'Léa règle « Commentaires sur tes projets » sur « Tout de suite » ; la mention n’est plus en miel',
+  )
+  await openSettings(lea, 'Notifications', '/settings/notifications')
+  // Un seul type ouvert à la fois ; le nom de la ligne dit son choix actuel (« libellé, choix »).
+  await byRole(lea.page, 'button', /^Commentaires sur tes projets, /).click()
+  await byRole(lea.page, 'radio', 'Tout de suite').click()
+  await byRole(lea.page, 'radio', 'Tout de suite', { checked: true }).waitFor()
+  await waitFor(
+    'réglage des commentaires enregistré',
+    async () =>
+      (await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()).comments ===
+      'now',
+  )
+  // De retour dans Activité : la même ligne, mais sans « Nouveau » (plus en miel). On attend d'abord
+  // la ligne lue (elle prouve que la liste est arrivée), puis on compte celles encore nouvelles.
+  await open(lea.page, `${appUrl}/notifications`)
+  await byRole(lea.page, 'link', new RegExp(`${mentionName}(?!.*Nouveau)`)).waitFor()
+  expectEqual(
+    'lignes de mention encore en miel',
+    await byRole(lea.page, 'link', new RegExp(`${mentionName}.*Nouveau\\.$`)).count(),
+    0,
+  )
   const unread = await (await lea.request.get(`${apiUrl}/v1/notifications/unread`)).json()
   expectEqual('nouveautés après la visite', unread.count, 0)
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
+  // Dans le texte publié, la mention est une pastille : un lien vers la page de Léa, lu par son nom.
+  await byRole(lea.page, 'link', 'Lea, ouvre son profil').waitFor()
   await byRole(lea.page, 'button', 'Répondre').click()
   await lea.page.getByText(/Réponse à\s*Sam/).waitFor()
   await lea.page
