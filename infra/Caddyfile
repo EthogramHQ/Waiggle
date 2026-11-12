@@ -74,7 +74,9 @@
 		#    sont des outils de développement, construits avec l'appli : en ligne, ils sont
 		#    « introuvables » (audit de sécurité du 7/11/2026 : /catalogue répondait 200).
 		#    infra/web/check-web.mjs fait échouer la construction si l'un d'eux manque ici.
-		@devtools path /_sitemap /_sitemap.html /catalogue /catalogue.html
+		#    Avec ce qui les suit aussi (montées du 12/11/2026) : sans cela, /catalogue.html/
+		#    répondait 308 vers /catalogue.html au lieu de 404, et /catalogue.html/./ en dépend.
+		@devtools path /_sitemap /_sitemap.html /catalogue /catalogue.html /_sitemap/* /_sitemap.html/* /catalogue/* /catalogue.html/*
 		error @devtools 404
 		# 1. Le fichier lui-même (/_expo/static/js/…), ou la page du même nom :
 		#    /sign-in → sign-in.html, /account/delete → account/delete.html.
