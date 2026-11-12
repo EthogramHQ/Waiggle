@@ -120,16 +120,20 @@ const honeyShown = () =>
     (node) => styleOf(node).backgroundColor === palettes.day.highlightSoft && seenOpacity(node) > 0,
   )
 
-/** Vrai si une vue de la carte bouge (une transformation, une animation d'entrée ou de place). */
-const anythingMoves = () =>
-  allNodes().some((node) => {
+/**
+ * Les vues de la carte qui bougent ou pourraient bouger (une transformation, une animation d'entrée
+ * ou de place). Une carte d'avant R8 en a déjà (l'avatar ajuste ses initiales, un bouton garde
+ * `scale: 1` pour l'effet d'appui) : on compare donc à une carte non éclairée, rendue de même.
+ */
+const movingCount = () =>
+  allNodes().filter((node) => {
     const transform = styleOf(node).transform
     return (
       (Array.isArray(transform) && transform.length > 0) ||
       node.props.entering !== undefined ||
       node.props.layout !== undefined
     )
-  })
+  }).length
 
 /** Le temps passe (faux minuteurs), et avec lui les animations de Reanimated. */
 const wait = async (ms: number) => {
@@ -172,15 +176,19 @@ describe('CommentCard lit', () => {
   it('keeps the tint then removes it without any movement when animations are reduced', async () => {
     reducedMotion.mockReturnValue(true)
     jest.useFakeTimers()
+    const { unmount } = await renderWithProviders(card())
+    const plain = movingCount()
+    await unmount()
     await renderWithProviders(card({ lit: true }))
 
     expect(honeyShown()).toBe(true)
-    expect(anythingMoves()).toBe(false)
+    // L'éclairage n'ajoute aucune vue qui bouge.
+    expect(movingCount()).toBe(plain)
 
     await wait(2500)
 
     expect(honeyShown()).toBe(false)
-    expect(anythingMoves()).toBe(false)
+    expect(movingCount()).toBe(plain)
   })
 
   it('does not take more room once lit: the text does not jump', async () => {
@@ -270,7 +278,16 @@ describe('CommentCard focusSelf', () => {
 
     const toCard = sent.mock.calls.filter(([, kind]) => kind === 'focus')
     expect(toCard).toHaveLength(1)
-    const label = labelOf(toCard[0]?.[0])
-    expect([MENU, REPLY, jean.name]).not.toContain(label)
+    // Le cadre de la carte, qui contient le commentaire, et pas une de ses actions. (Sur téléphone,
+    // `labelOf` d'une vue sans nom rend son premier texte, le nom de l'auteur : on ne s'y fie pas.)
+    const target = toCard[0]?.[0] as unknown as { props?: Record<string, unknown> } | undefined
+    expect([MENU, REPLY]).not.toContain(labelOf(target))
+    const children = target?.props?.children
+    const element = allNodes().find(
+      (node) => children !== undefined && node.props.children === children,
+    )
+    expect(element).toBeDefined()
+    expect(chainOf(screen.getByText(BODY) as unknown as Node).includes(element as Node)).toBe(true)
+    expect(element?.props.accessibilityRole).not.toBe('button')
   })
 })
