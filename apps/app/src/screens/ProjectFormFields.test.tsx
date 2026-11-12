@@ -3,6 +3,7 @@
 // la ligne, et chacune ouvre la seconde feuille en disant d'où), le lien de démo (« Lien valide »
 // lu avec ce qui n'est pas vérifié), la description de la photo choisie et la phrase d'audience.
 // La feuille entière (envoi, abandon, seconde feuille) est testée par `ProjectFormScreen.test.tsx`.
+import { appName } from '@ruche/brand'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { useState } from 'react'
 import { request } from '../api/client'
@@ -175,5 +176,32 @@ describe('ProjectFormFields, who can see it', () => {
     await renderWithProviders(<Fields projectId="p1" />)
 
     expect(screen.getByText(containing(TEXT.audienceMembersEdit))).toBeTruthy()
+  })
+
+  // R8 (relecture juridique du plan, décision de Louis du 12/11/2026, texte tel quel) : l'aide du
+  // choix « Membres » dit que les abonnés trouvent le projet dans leur récap par e-mail, qui reste
+  // dans leur messagerie. Le texte est écrit ici en entier : un changement de la phrase se voit.
+  it('tells a new project that followers find it in their recap e-mail, which stays in their mailbox', async () => {
+    await renderWithProviders(<Fields />)
+
+    expect(
+      screen.getByText(
+        containing(
+          `Les membres de ${appName} verront ce projet ; tes abonnés le trouveront dans leur fil et dans leur récap par e‑mail, qui reste dans leur messagerie.`,
+        ),
+      ),
+    ).toBeTruthy()
+  })
+
+  it('tells it too when the project is edited, in the present', async () => {
+    await renderWithProviders(<Fields projectId="p1" />)
+
+    expect(
+      screen.getByText(
+        containing(
+          `Les membres de ${appName} voient ce projet ; tes abonnés le retrouvent dans leur fil et dans leur récap par e‑mail, qui reste dans leur messagerie.`,
+        ),
+      ),
+    ).toBeTruthy()
   })
 })
