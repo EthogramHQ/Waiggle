@@ -83,13 +83,8 @@ export function ChoiceRow<T extends string>({
         onPress={onToggle}
         {...insetFocus}
         style={({ pressed }) => ({
-          flexDirection: 'row',
-          // Quand la place manque (320 points, texte à 200 %), le choix et la flèche passent sous
-          // le libellé au lieu de l'écraser, comme dans une ListRow.
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          columnGap: space.md,
-          rowGap: space.xxs,
+          justifyContent: 'center',
+          gap: space.xxs,
           minHeight: layout.controlHeight.regular,
           paddingHorizontal: space.lg,
           paddingVertical: space.md,
@@ -97,50 +92,62 @@ export function ChoiceRow<T extends string>({
           opacity: disabled ? 0.55 : 1,
         })}
       >
-        {/* Le libellé et sa note : `flexGrow` et une vraie `flexBasis`, jamais `flex: 1` (sa base
-            nulle ne ferait jamais passer le choix à la ligne). */}
-        <View
-          style={{ flexGrow: 1, flexShrink: 1, flexBasis: MIN_NAME, minWidth: 0, gap: space.xxs }}
-        >
-          {/* Ouverte, le libellé s'appuie : c'est le titre des choix du dessous. */}
-          <Text weight={open ? 600 : 400}>{label}</Text>
-          {note ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
-              {/* L'icône dans sa vue : sur le web, un dessin seul rétrécit près d'un texte. */}
-              <View style={{ flexShrink: 0 }}>
-                <Icon name="bell-slash" size={16} tone="muted" />
-              </View>
-              <View style={{ flexShrink: 1, minWidth: 0 }}>
-                <Text variant="caption" tone="muted" nativeID={noteId}>
-                  {note}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-        </View>
-        {/* Le choix actuel et la flèche, d'un seul bloc, rangés à droite même passés à la ligne. */}
+        {/* La rangée du libellé et du choix. Quand la place manque (320 points, texte à 200 %), le
+            choix et la flèche passent sous le libellé au lieu de l'écraser, comme dans une ListRow. */}
         <View
           style={{
             flexDirection: 'row',
+            flexWrap: 'wrap',
             alignItems: 'center',
-            gap: space.xs,
-            marginLeft: 'auto',
-            maxWidth: '100%',
-            flexShrink: 1,
+            columnGap: space.md,
+            rowGap: space.xxs,
           }}
         >
-          <View style={{ flexShrink: 1, minWidth: 0 }}>
-            <Text tone="muted">{current}</Text>
+          {/* Le libellé : `flexGrow` et une vraie `flexBasis`, jamais `flex: 1` (sa base nulle ne
+              ferait jamais passer le choix à la ligne). Ouverte, il s'appuie : c'est le titre des
+              choix du dessous. */}
+          <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: MIN_NAME, minWidth: 0 }}>
+            <Text weight={open ? 600 : 400}>{label}</Text>
           </View>
-          {/* La même flèche que les lignes qui mènent ailleurs, tournée vers le haut une fois
-              ouverte : elle dit que la ligne se referme. */}
+          {/* Le choix actuel et la flèche, d'un seul bloc, rangés à droite même passés à la ligne. */}
           <View
-            style={{ flexShrink: 0, transform: [{ rotate: open ? '-90deg' : '0deg' }] }}
-            aria-hidden
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.xs,
+              marginLeft: 'auto',
+              maxWidth: '100%',
+              flexShrink: 1,
+            }}
           >
-            <Icon name="caret-right" size={18} tone="muted" />
+            <View style={{ flexShrink: 1, minWidth: 0 }}>
+              <Text tone="muted">{current}</Text>
+            </View>
+            {/* La même flèche que les lignes qui mènent ailleurs, tournée vers le haut une fois
+                ouverte : elle dit que la ligne se referme. */}
+            <View
+              style={{ flexShrink: 0, transform: [{ rotate: open ? '-90deg' : '0deg' }] }}
+              aria-hidden
+            >
+              <Icon name="caret-right" size={18} tone="muted" />
+            </View>
           </View>
         </View>
+        {/* La note, sur toute la largeur de la ligne, sous le libellé (planche) : elle ne se
+            serre pas à côté du choix. */}
+        {note ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+            {/* L'icône dans sa vue : sur le web, un dessin seul rétrécit près d'un texte. */}
+            <View style={{ flexShrink: 0 }}>
+              <Icon name="bell-slash" size={16} tone="muted" />
+            </View>
+            <View style={{ flexShrink: 1, minWidth: 0 }}>
+              <Text variant="caption" tone="muted" nativeID={noteId}>
+                {note}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </Pressable>
       {open ? (
         // Les choix s'alignent sur le libellé. Leur question n'est pas réécrite (`labelHidden`) :
