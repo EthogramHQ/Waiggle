@@ -11,7 +11,7 @@ import type { ReactNode } from 'react'
 import { request } from '../api/client'
 import { maxComment } from '../testing/comments'
 import { recipesProject } from '../testing/projects'
-import { useCommentContext } from './api'
+import { type CommentContextState, useCommentContext } from './api'
 
 // Le client réseau est remplacé : on lit les demandes envoyées, et on choisit les réponses.
 jest.mock('../api/client', () => ({ request: jest.fn(), requestWithoutBody: jest.fn() }))
@@ -24,6 +24,15 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 /** La réponse de Léa : la réponse de Zoé, dans le fil de Max, sur le projet des recettes. */
 const [zoeReply] = maxComment.replies
 const context: CommentContext = { projectId: recipesProject.id, thread: maxComment }
+
+/**
+ * L'état « trouvé », restreint : le projet et le fil n'existent que pour `status: 'found'` (une
+ * « union discriminée » : TypeScript ne laisse lire `thread` qu'après avoir regardé `status`).
+ */
+const found = (state: CommentContextState) => {
+  if (state.status !== 'found') throw new Error(`expected « found », got « ${state.status} »`)
+  return state
+}
 
 /** Les adresses demandées à l'API, dans l'ordre. */
 const asked = () => jest.mocked(request).mock.calls.map(([to]) => to)
@@ -43,7 +52,7 @@ describe('useCommentContext', () => {
     const { result } = await renderHook(() => useCommentContext(null), { wrapper })
 
     expect(result.current.status).toBe('idle')
-    expect(result.current.thread).toBeUndefined()
+    expect('thread' in result.current).toBe(false)
     expect(request).not.toHaveBeenCalled()
   })
 
@@ -59,9 +68,10 @@ describe('useCommentContext', () => {
     const { result } = await renderHook(() => useCommentContext(zoeReply?.id ?? ''), { wrapper })
 
     await waitFor(() => expect(result.current.status).toBe('found'))
-    expect(result.current.projectId).toBe(recipesProject.id)
-    expect(result.current.thread?.id).toBe(maxComment.id)
-    expect(result.current.thread?.replies.map((reply) => reply.body)).toEqual([
+    const { projectId, thread } = found(result.current)
+    expect(projectId).toBe(recipesProject.id)
+    expect(thread.id).toBe(maxComment.id)
+    expect(thread.replies.map((reply) => reply.body)).toEqual([
       'Moi aussi, dis-nous !',
       'Merci à vous deux.',
     ])
@@ -73,8 +83,8 @@ describe('useCommentContext', () => {
     const { result } = await renderHook(() => useCommentContext(zoeReply?.id ?? ''), { wrapper })
 
     await waitFor(() => expect(result.current.status).toBe('gone'))
-    expect(result.current.thread).toBeUndefined()
-    expect(result.current.projectId).toBeUndefined()
+    expect('thread' in result.current).toBe(false)
+    expect('projectId' in result.current).toBe(false)
   })
 
   it('keeps the identifier a single part of the address', async () => {

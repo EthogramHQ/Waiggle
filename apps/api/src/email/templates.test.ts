@@ -1179,7 +1179,8 @@ describe('changeEmailConfirmationEmail', () => {
     expect(email.text).toContain(fill(fr.greeting, { name: 'Inès' }))
     for (const sentence of [
       fr.changeEmail.body,
-      fr.changeEmail.next,
+      // R8 : la version texte n'a pas de bouton ; sa consigne parle du lien ci-dessous.
+      fr.changeEmail.textNext,
       fr.changeEmail.expires,
       fr.changeEmail.ignore,
     ]) {
@@ -1206,7 +1207,8 @@ describe('newEmailVerificationEmail', () => {
     const email = newEmailVerificationEmail('fr', { url })
 
     expect(email.subject).toBe(fill(fr.newEmail.subject))
-    for (const sentence of [fr.newEmail.body, fr.newEmail.expires, fr.newEmail.ignore]) {
+    // R8 : la version texte parle du lien ci-dessous (`textBody`), le HTML de son bouton.
+    for (const sentence of [fr.newEmail.textBody, fr.newEmail.expires, fr.newEmail.ignore]) {
       expect(email.text).toContain(fill(sentence))
     }
     expect(email.text).toContain(url)
@@ -1223,7 +1225,10 @@ describe('newEmailVerificationEmail', () => {
       const t = resources[language].translation.email
 
       expect(email.subject).toBe(fill(t.newEmail.subject))
-      expect(email.text.split('\n')[0]).toBe(fill(t.newEmail.greeting))
+      // R8 : le titre ouvre maintenant le texte ; la salutation, neutre, le suit.
+      const lines = email.text.split('\n')
+      expect(lines[0]).toBe(fill(t.newEmail.heading))
+      expect(lines).toContain(fill(t.newEmail.greeting))
       const addresses = (email.text.match(/[^\s@]+@[^\s@]+/g) ?? []).map((found: string) =>
         found.replace(/[.,;:!?)]+$/, ''),
       )
@@ -1356,11 +1361,13 @@ describe('the order of the e-mails of an address change', () => {
       url: 'https://api.waiggle.com/v',
     })
     const lines = email.text.split('\n').filter((line) => line !== '')
-    const next = lines.indexOf(fill(fr.changeEmail.next))
+    // R8 : la version texte n'a pas de bouton ; la consigne parle du lien, et le libellé du lien
+    // remplace le texte du bouton.
+    const next = lines.indexOf(fill(fr.changeEmail.textNext))
     expect(lines.slice(next, next + 4)).toEqual([
-      fill(fr.changeEmail.next),
+      fill(fr.changeEmail.textNext),
       fill(fr.changeEmail.expires),
-      fill(fr.changeEmail.button),
+      fill(fr.changeEmail.textLink),
       'https://api.waiggle.com/v',
     ])
   })
@@ -1472,7 +1479,8 @@ describe('resetPasswordEmail', () => {
     const t = fr.resetPassword
 
     expect(email.subject).toBe(fill(t.subject))
-    for (const sentence of [t.body, t.ignore, t.reason]) {
+    // R8 : la version texte parle du lien ci-dessous (`textBody`), le HTML de son bouton.
+    for (const sentence of [t.textBody, t.ignore, t.reason]) {
       expect(email.text).toContain(fill(sentence))
     }
     expect(email.text).toContain(expiresIn(fr, 1))
