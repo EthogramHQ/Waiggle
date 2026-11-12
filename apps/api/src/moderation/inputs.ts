@@ -532,6 +532,21 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     from_category: 'un code de la table category',
     created_at: 'date',
   },
+  // R8 : les notifications du catalogue, écrites par l'API au geste d'un administrateur.
+  catalogue_notice: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    // Pas une saisie à modérer : une copie, faite par l'API, de project_tool.label (au registre)
+    // au moment où le rattachement l'efface, montrée à son seul auteur dans sa notification. Aucun
+    // autre membre ne la lit : rien à signaler, rien à cacher par un blocage ; effacée à 90 jours.
+    typed_name:
+      'copie par l’API de project_tool.label (au registre), montrée à son seul auteur, 90 jours',
+    kind: 'une sorte d’une liste fermée (project_category, tool_added, tool_merged), écrite par l’API',
+    project_id: 'identifiant',
+    tool_id: 'identifiant',
+    category_code: 'un code de la table category, choisi par un administrateur',
+    created_at: 'date',
+  },
   content_report: {
     id: 'identifiant',
     reporter_id: 'identifiant',

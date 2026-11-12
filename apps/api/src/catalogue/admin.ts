@@ -14,7 +14,7 @@ import {
   toolSlug,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { Tx } from '../moderation/guard'
 import { categoriesExist } from '../projects/categories'
 import { listedVerifiedProject } from '../projects/visibility'
@@ -73,6 +73,70 @@ const journal = (
     fromCategory: line.fromCategory ?? null,
     createdAt: line.now,
   })
+
+// ─── Les notifications du catalogue (R8) ─────────────────────────────────────────────────────────
+//
+// Les seules notifications qui s'écrivent (`catalogue_notice`) : le geste de l'administrateur ne
+// laisse aucune autre trace lisible par l'auteur (après un rattachement, le nom tapé est effacé).
+// Elles s'écrivent dans la transaction du geste : le geste et sa notification réussissent ou
+// échouent ensemble. Jamais pour l'administrateur lui-même ; jamais d'e-mail (notifications/load.ts
+// ne les donne qu'à l'écran et à la cloche). Un auteur qui a bloqué l'administrateur est prévenu
+// quand même : la notification est signée par l'équipe, jamais par l'administrateur.
+
+/**
+ * Prévient les auteurs des projets qui citent l'« Autre » `otherId`, une seule fois chacun quel que
+ * soit le nombre de ses projets, avec le nom tel qu'il l'avait tapé. À appeler AVANT d'effacer
+ * `project_tool.label` (admettre, rattacher) : c'est la seule trace de ce nom. `noticeToolId` est
+ * l'outil que la notification nomme : l'« Autre » lui-même pour une admission, l'outil cible pour
+ * un rattachement (l'« Autre » va être effacé).
+ *
+ * Seuls les projets comptent, pas les profils (« Mes outils préférés ») ; et seulement ceux que
+ * les membres voient (publics, pas retirés, auteur vérifié) : un outil cité seulement sur un projet
+ * privé ou retiré ne prévient pas, comme le rangement d'un tel projet est impossible.
+ *
+ * Deux requêtes, quel que soit le nombre de projets :
+ * 1. « select distinct on (author_id) … order by author_id, created_at » : une ligne par auteur,
+ *    celle de son plus ancien projet qui cite l'outil (le nom qu'il a tapé la première fois).
+ *    `project_tool_tool_idx` (tool_id) donne les projets de l'outil, puis la clé primaire de
+ *    `project` chaque projet. `coalesce` : le nom de l'« Autre » si la ligne n'a pas de nom tapé.
+ * 2. une seule insertion de toutes les lignes (aucune si personne n'est à prévenir).
+ */
+const noticeToolAuthors = async (
+  tx: Tx,
+  notice: {
+    otherId: string
+    noticeToolId: string
+    kind: 'tool_added' | 'tool_merged'
+    adminId: string
+    now: Date
+  },
+) => {
+  const p = schema.project
+  const pt = schema.projectTool
+  const authors = await tx
+    .selectDistinctOn([p.authorId], {
+      memberId: p.authorId,
+      typedName: sql<string>`coalesce(${pt.label}, ${t.name})`,
+    })
+    .from(pt)
+    .innerJoin(p, eq(p.id, pt.projectId))
+    .innerJoin(t, eq(t.id, pt.toolId))
+    .where(
+      and(eq(pt.toolId, notice.otherId), listedVerifiedProject(), ne(p.authorId, notice.adminId)),
+    )
+    .orderBy(p.authorId, asc(p.createdAt))
+  if (authors.length === 0) return
+  await tx.insert(schema.catalogueNotice).values(
+    authors.map((author) => ({
+      id: crypto.randomUUID(),
+      memberId: author.memberId,
+      kind: notice.kind,
+      toolId: notice.noticeToolId,
+      typedName: author.typedName,
+      createdAt: notice.now,
+    })),
+  )
+}
 
 // ─── Les noms et les adresses des outils ─────────────────────────────────────────────────────────
 
@@ -243,6 +307,14 @@ export const admitTool = async (
     if (folded !== tool.folded) {
       await tx.insert(schema.toolAlias).values({ folded: tool.folded, toolId: tool.id })
     }
+    // R8 : les auteurs sont prévenus avant que le nom tapé ne s'efface (juste en dessous).
+    await noticeToolAuthors(tx, {
+      otherId: tool.id,
+      noticeToolId: tool.id,
+      kind: 'tool_added',
+      adminId,
+      now,
+    })
     await tx
       .update(schema.projectTool)
       .set({ label: null })
@@ -349,6 +421,15 @@ export const mergeTool = async (
       .where(and(eq(t.slug, into), eq(t.status, 'catalogue')))
       .for('update')
     if (!source || !target) return { ok: false, error: 'not_found' }
+    // R8 : les auteurs sont prévenus d'abord, tant que les projets citent encore l'« Autre » avec le
+    // nom tapé ; la notification nomme l'outil cible, qui reste.
+    await noticeToolAuthors(tx, {
+      otherId: source.id,
+      noticeToolId: target.id,
+      kind: 'tool_merged',
+      adminId,
+      now,
+    })
     // Trois requêtes par table, quel que soit le nombre de projets (sur la clé primaire et l'index
     // `*_tool_tool_idx`) :
     // 1. là où les deux outils sont cités, l'outil prend la place de l'« Autre » si elle est plus
@@ -493,6 +574,18 @@ export const recategorize = async (
       categoryCode: category,
       fromCategory: OTHER_CATEGORY,
     })
+    // R8 : l'auteur est prévenu (son propre projet a déjà été refusé plus haut : la condition le
+    // redit, un administrateur n'est jamais prévenu de ses propres gestes).
+    if (project.authorId !== adminId) {
+      await tx.insert(schema.catalogueNotice).values({
+        id: crypto.randomUUID(),
+        memberId: project.authorId,
+        kind: 'project_category',
+        projectId,
+        categoryCode: category,
+        createdAt: now,
+      })
+    }
     return { ok: true, value: null }
   })
 
