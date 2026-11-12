@@ -20,6 +20,7 @@
 // l'un après l'autre.
 import { radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
+import type { Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
@@ -87,6 +88,12 @@ type Props = {
   isNew: boolean
   /** Où elle mène ; `null` : elle ne se touche pas (ni lien ni bouton). */
   onPress: (() => void) | null
+  /**
+   * La vue qui reçoit le focus quand la ligne arrive avec la page suivante (`useFirstArrived` de
+   * l'écran) : le lien lui-même, que le lecteur d'écran du téléphone lit en entier, ou la ligne
+   * quand elle ne mène nulle part.
+   */
+  ref?: Ref<View>
 }
 
 /**
@@ -145,12 +152,15 @@ function Row({
   onPress,
   dateShown,
   dateName,
+  ref,
 }: RowProps) {
   const { t } = useTranslation()
   const { colors, shadows } = useTheme()
   const newWord = t(($) => $.notifications.new)
   const content = (
     <View
+      // La ligne qui ne mène nulle part reçoit elle-même le focus d'arrivée ; un lien le prend.
+      ref={onPress ? undefined : ref}
       style={{
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -186,8 +196,15 @@ function Row({
               ),
             )}
           </Text>{' '}
-          {/* La date, dans la phrase : elle passe à la ligne avec elle, sans colonne à part. */}
-          <Text variant="caption" tone="muted">
+          {/* La date, dans la phrase : elle passe à la ligne avec elle, sans colonne à part. Sur une
+              ligne qui n'est pas un lien, aucun nom de lien ne dit la date complète : le texte
+              court la donne lui-même au lecteur d'écran du téléphone (« 19 octobre à 20:00 »,
+              comme avant R8 ; test d'écran de R4). */}
+          <Text
+            variant="caption"
+            tone="muted"
+            {...(onPress ? null : { accessibilityLabel: dateName })}
+          >
             {dateShown}
           </Text>
         </Text>
@@ -262,7 +279,7 @@ function Row({
     .map(sentence)
     .join(' ')
   return (
-    <Pressed label={label} onPress={onPress} role="link">
+    <Pressed label={label} onPress={onPress} role="link" ref={ref}>
       {content}
     </Pressed>
   )

@@ -2859,7 +2859,24 @@ const pages = [
   // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
   { name: 'introuvable', path: '/nulle-part', signedIn: false },
   // Les notifications (tranche 6b) : la liste (avec sa suite), l'écran vide, et la cloche à « 9+ ».
-  { name: 'notifications', path: '/notifications', signedIn: true, fullPage: true },
+  // R8 : la page « Activité » de la planche R8-Activite (sections, miel, roue sur téléphone ; sur
+  // ordinateur « Tout marquer comme lu » et la colonne des e-mails, réponses « Tout de suite »), puis
+  // les lignes du coin des testeurs et du catalogue (R8-Activite-Plus), et l'état vide à deux boutons.
+  {
+    name: 'notifications',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'activity',
+    emailChoices: 'replies-now',
+    fullPage: true,
+  },
+  {
+    name: 'notifications-plus',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'plus',
+    fullPage: true,
+  },
   { name: 'notifications-vide', path: '/notifications', signedIn: true, notifications: 'none' },
   { name: 'cloche-pleine', path: '/', signedIn: true, notifications: 'many' },
   // La page d'un autre membre et son projet : les boutons « Suivre ».
