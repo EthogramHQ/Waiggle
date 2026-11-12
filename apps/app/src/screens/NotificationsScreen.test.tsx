@@ -959,13 +959,15 @@ describe('the sections of the Activity (R8)', () => {
       mockPages([firstPage], { hasNextPage: true })
       // Une vue témoin : toutes les vues natives du rendu partagent son prototype.
       const probe = createRef<View>()
-      const page = (
+      // Un élément neuf à chaque rendu : avec le même objet, React sauterait l'écran (mêmes props)
+      // et ne relirait jamais les pages simulées.
+      const page = () => (
         <>
           <View ref={probe} />
           <NotificationsScreen />
         </>
       )
-      const view = await renderWithProviders(page)
+      const view = await renderWithProviders(page())
       const proto = Object.getPrototypeOf(probe.current) as { contains?: unknown; focus?: unknown }
       const hadContains = Object.hasOwn(proto, 'contains')
       const hadFocus = Object.hasOwn(proto, 'focus')
@@ -977,9 +979,9 @@ describe('the sections of the Activity (R8)', () => {
         await fireEvent(button, 'focus')
         await fireEvent.press(button)
         mockPages([firstPage], { hasNextPage: true, isFetchingNextPage: true })
-        await view.rerender(page)
+        await view.rerender(page())
         mockPages([firstPage, secondPage])
-        await view.rerender(page)
+        await view.rerender(page())
 
         const focused = focus.mock.contexts
           .map(labelOf)
@@ -1131,7 +1133,9 @@ describe('the new lines of the Activity (R8)', () => {
 
     const sources: unknown[] = []
     const collect = (node: ReturnType<typeof screen.getByRole>) => {
-      if (node.props.source) sources.push(node.props.source)
+      // expo-image reçoit ses sources en tableau ; une image de React Native, un objet seul.
+      const source: unknown = node.props.source
+      if (source) sources.push(...(Array.isArray(source) ? source : [source]))
       for (const child of node.children) if (typeof child !== 'string') collect(child)
     }
     if (screen.root) collect(screen.root)
