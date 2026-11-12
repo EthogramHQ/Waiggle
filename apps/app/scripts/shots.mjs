@@ -3272,11 +3272,18 @@ const pages = [
   },
   // Tranche R2 : la page « Réglages » (qui remplace « Mon compte ») et chacune de ses rubriques.
   { name: 'reglages', path: '/settings', signedIn: true, fullPage: true },
+  // R8, planche R8-Reglages : le récap coupé (les types « Dans le récap » le disent), et les
+  // commentaires ouverts sur leurs trois choix.
   {
     name: 'reglages-notifications',
     path: '/settings/notifications',
     signedIn: true,
     fullPage: true,
+    emailChoices: 'recap-off',
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Commentaires sur tes projets, / }).click()
+      await page.getByRole('radio', { name: 'Tout de suite' }).waitFor()
+    },
   },
   { name: 'reglages-langue', path: '/settings/language', signedIn: true, fullPage: true },
   { name: 'reglages-apparence', path: '/settings/appearance', signedIn: true, fullPage: true },
@@ -3376,17 +3383,17 @@ const pages = [
       await page.getByText(/te reste réservé/).waitFor()
     },
   },
-  // Tranche 6c : un réglage d'e-mail touché, enregistré tout de suite (« Réglage enregistré. »).
+  // Tranche 6c, R8 : un choix d'e-mail touché, enregistré tout de suite (« Réponses et mentions »
+  // passe à « Tout de suite », la ligne reste ouverte).
   {
     name: 'profil-email',
     path: '/settings/notifications',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page
-        .getByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' })
-        .click()
-      await page.getByText('Réglage enregistré.').waitFor()
+      await page.getByRole('button', { name: /^Réponses et mentions, / }).click()
+      await page.getByRole('radio', { name: 'Tout de suite' }).click()
+      await page.getByRole('button', { name: 'Réponses et mentions, Tout de suite' }).waitFor()
     },
   },
   // Tranche 6c : la session expire pendant la visite. Suivre le projet est refusé (401) : le
@@ -3785,6 +3792,8 @@ const pages = [
       await page.getByText(/plus aucun e‑mail de notification/).waitFor()
     },
   },
+  // R8, planche R8-Email-TdS : le lien d'un e-mail « tout de suite », « Dans le récap » coché.
+  { name: 'desinscription-instant', path: `/unsubscribe?token=${instantToken}`, signedIn: false },
   {
     name: 'desinscription-invalide',
     path: `/unsubscribe?token=${malformedToken}`,

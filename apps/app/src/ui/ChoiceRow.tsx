@@ -14,7 +14,7 @@
 // Elle se pose dans un ListGroup, comme une ListRow : mêmes marges, même hauteur, même anneau de
 // focus dessiné à l'intérieur (le groupe rogne ce qui dépasse).
 import { layout, space } from '@ruche/brand'
-import { useId } from 'react'
+import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View } from 'react-native'
 import { describedBy } from './aria'
@@ -46,6 +46,11 @@ type Props<T extends string> = {
   note?: string | null
   /** Ni la ligne ni ses choix ne répondent : tout pâlit. */
   disabled?: boolean
+  /**
+   * La ligne touchable, pour y poser le focus du clavier quand l'élément qui l'avait disparaît
+   * (« Réessayer » a marché, R8 ; voir focus.ts).
+   */
+  ref?: Ref<View>
 }
 
 export function ChoiceRow<T extends string>({
@@ -57,6 +62,7 @@ export function ChoiceRow<T extends string>({
   onChange,
   note = null,
   disabled = false,
+  ref,
 }: Props<T>) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -71,6 +77,7 @@ export function ChoiceRow<T extends string>({
     // type appartiennent les boutons radio (couleurs mesurées sur ce fond, contrastPairs).
     <View style={open ? { backgroundColor: colors.highlightSoft } : null}>
       <Pressable
+        ref={ref}
         accessibilityRole="button"
         accessibilityLabel={name}
         // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle.

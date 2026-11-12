@@ -1,13 +1,15 @@
-// Les e-mails de notification vus par l'appli (tranche 6c) : les deux réglages de « Mon profil »
-// (le récap de la semaine, l'e-mail de mentions et de réponses), et la désinscription demandée par
-// la page ouverte depuis un e-mail.
+// Les e-mails de notification vus par l'appli (tranche 6c, R8) : les réglages de l'écran
+// « Notifications » (le récap de la semaine, et depuis R8 un choix par type : « Tout de suite »,
+// « Dans le récap » ou « Jamais »), et la désinscription demandée par la page ouverte depuis un
+// e-mail.
 //
-// Les réglages changent au toucher, comme « Suivre » (follows/api.ts) : l'interrupteur bascule
-// tout de suite (« mise à jour optimiste »), le changement part ensuite, et revient en arrière si
-// l'API refuse.
+// Les réglages changent au toucher, comme « Suivre » (follows/api.ts) : le choix se lit tout de
+// suite (« mise à jour optimiste »), le changement part ensuite, et revient en arrière si l'API
+// refuse. Chaque changement ne porte qu'un champ (EmailPreferencesPatch) : celui qu'on vient de
+// toucher.
 import {
   EmailPreferences,
-  type EmailPreferencesUpdate,
+  type EmailPreferencesPatch,
   type UnsubscribeQuery,
 } from '@ruche/contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -21,7 +23,7 @@ const path = '/v1/me/email-preferences'
 /** La clé des réglages dans le cache de React Query. */
 export const emailPreferencesQueryKey = ['email-preferences'] as const
 
-/** Lit les deux réglages du membre connecté (GET /v1/me/email-preferences). */
+/** Lit les réglages du membre connecté (GET /v1/me/email-preferences). */
 export const getEmailPreferences = async (): Promise<EmailPreferences> => {
   const result = await request(path, { method: 'GET' }, EmailPreferences)
   if (!result.ok) throw new ApiError(result.error)
@@ -29,11 +31,11 @@ export const getEmailPreferences = async (): Promise<EmailPreferences> => {
 }
 
 /**
- * Change un réglage, ou les deux (PATCH). Seul ce qui change part : deux interrupteurs touchés
- * l'un après l'autre ne s'écrasent pas. L'API rend l'état complet.
+ * Change un seul réglage (PATCH). Seul ce qui change part : deux types touchés l'un après l'autre
+ * ne s'écrasent pas. L'API rend l'état complet.
  */
 export const updateEmailPreferences = async (
-  changes: EmailPreferencesUpdate,
+  changes: EmailPreferencesPatch,
 ): Promise<EmailPreferences> => {
   const result = await request(
     path,
@@ -53,7 +55,7 @@ export const useEmailPreferences = (enabled = true) =>
   useQuery({ queryKey: emailPreferencesQueryKey, queryFn: getEmailPreferences, enabled })
 
 // Un changement, et les réglages d'avant pour revenir en arrière si l'API refuse.
-type Change = { changes: EmailPreferencesUpdate; previous: EmailPreferences | undefined }
+type Change = { changes: EmailPreferencesPatch; previous: EmailPreferences | undefined }
 
 const mutationKey = ['email-preferences', 'update']
 
@@ -72,23 +74,34 @@ export const useUpdateEmailPreferences = () => {
     scope: { id: mutationKey.join(':') },
     // cancelQueries : une lecture déjà en route ne doit pas écraser le changement affiché.
     onMutate: () => queryClient.cancelQueries({ queryKey: emailPreferencesQueryKey }),
-    // Refusé : les interrupteurs reviennent à ce qu'ils étaient avant ce toucher.
-    onError: (_error, { previous }) => {
-      if (previous) queryClient.setQueryData(emailPreferencesQueryKey, previous)
+    // Refusé : seul le champ de ce toucher revient à ce qu'il était. Remettre tout l'état d'avant
+    // effacerait un autre choix pris entre-temps, encore en route (deux types changés vite).
+    onError: (_error, { changes, previous }) => {
+      if (!previous) return
+      const field = Object.keys(changes)[0] as keyof EmailPreferences | undefined
+      if (!field) return
+      queryClient.setQueryData<EmailPreferences>(emailPreferencesQueryKey, (current) =>
+        current ? { ...current, [field]: previous[field] } : previous,
+      )
     },
-    // Une fois le dernier changement fait, on relit les réglages enregistrés. Pas avant : relire
-    // entre deux touchers rapides ferait sauter l'interrupteur. isMutating compte encore le
-    // changement qui se termine, d'où « 1 ».
-    onSettled: () => {
-      if (queryClient.isMutating({ mutationKey }) > 1) return
-      void queryClient.invalidateQueries({ queryKey: emailPreferencesQueryKey })
+    // Accepté : la réponse confirme le champ envoyé, et lui seul. R8 : on ne relit plus tout l'état
+    // (ni la réponse entière, ni une nouvelle lecture) : deux types changés vite partent l'un après
+    // l'autre, et la réponse du premier, écrite avant le second, remettrait le second à son ancien
+    // choix sous les yeux du membre. Chaque champ a déjà sa valeur depuis le toucher ; la page
+    // relira tout à sa prochaine ouverture.
+    onSuccess: (saved, { changes }) => {
+      const field = Object.keys(changes)[0] as keyof EmailPreferences | undefined
+      if (!field) return
+      queryClient.setQueryData<EmailPreferences>(emailPreferencesQueryKey, (current) =>
+        current ? { ...current, [field]: saved[field] } : saved,
+      )
     },
   })
   const { mutate } = mutation
   const update = useCallback(
-    (changes: EmailPreferencesUpdate) => {
-      // L'interrupteur change ici même, au toucher, avant tout envoi : un second toucher, même
-      // très rapide, lit déjà le nouvel état. On garde l'ancien pour revenir en arrière.
+    (changes: EmailPreferencesPatch) => {
+      // Le choix change ici même, au toucher, avant tout envoi : un second toucher, même très
+      // rapide, lit déjà le nouvel état. On garde l'ancien pour revenir en arrière.
       const previous = queryClient.getQueryData<EmailPreferences>(emailPreferencesQueryKey)
       if (previous) {
         queryClient.setQueryData<EmailPreferences>(emailPreferencesQueryKey, {
@@ -111,17 +124,24 @@ export const useUpdateEmailPreferences = () => {
 }
 
 /**
- * Coupe un e-mail depuis le lien d'un e-mail (POST /v1/email/unsubscribe?token=…), ou les deux
- * avec `scope = 'all'` (« Tout couper »). La demande ne porte que le jeton du lien, jamais la
- * session : la page sert sans connexion, et l'API ne regarde que la signature du jeton. D'où un
- * `fetch` direct, sans passer par le client qui ajoute la session (api/client.ts), et
- * `credentials: 'omit'` pour que le navigateur n'y joigne aucun cookie. Elle répond 204.
+ * Coupe un e-mail depuis le lien d'un e-mail (POST /v1/email/unsubscribe?token=…), ou tous avec
+ * `scope = 'all'` (« Tout couper »). R8 : pour le lien d'un e-mail « tout de suite », `choice` dit
+ * ce que deviennent les types réglés ainsi, « Dans le récap » (`digest`) ou « Jamais » (`never`).
+ * La demande ne porte que le jeton du lien, jamais la session : la page sert sans connexion, et
+ * l'API ne regarde que la signature du jeton. D'où un `fetch` direct, sans passer par le client qui
+ * ajoute la session (api/client.ts), et `credentials: 'omit'` pour que le navigateur n'y joigne
+ * aucun cookie. Elle répond 204.
  */
 export const unsubscribe = async (
   token: string,
   scope?: NonNullable<UnsubscribeQuery['scope']>,
+  choice?: NonNullable<UnsubscribeQuery['choice']>,
 ): Promise<ApiResult<null>> => {
-  const query = new URLSearchParams({ token, ...(scope ? { scope } : null) })
+  const query = new URLSearchParams({
+    token,
+    ...(scope ? { scope } : null),
+    ...(choice ? { choice } : null),
+  })
   let res: Response
   try {
     res = await fetch(`${apiUrl}/v1/email/unsubscribe?${query}`, {
