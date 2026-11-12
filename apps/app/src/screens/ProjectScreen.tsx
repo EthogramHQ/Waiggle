@@ -515,9 +515,15 @@ function ProjectView({ project }: { project: Project }) {
     ) : null
   // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
   // « Voir en contexte » (R8) : venu d'une notification (`?comment=<id>`), la feuille des commentaires
-  // s'ouvre sur ce commentaire. Fermée, elle retire le paramètre : recharger la page ne la rouvre pas.
+  // s'ouvre sur ce commentaire. Ouverte, le paramètre reste (recharger la page la rouvre au même
+  // endroit) ; fermée, elle le retire : recharger ne la rouvre plus. Rien ne change l'adresse à
+  // l'arrivée : le focus posé sur le commentaire n'a pas à attendre un nouveau dessin de la page.
   const comments = (
-    <Comments project={project} focusCommentId={focusCommentId} onFocusDone={closeCommentContext} />
+    <Comments
+      project={project}
+      focusCommentId={focusCommentId}
+      onContextClosed={closeCommentContext}
+    />
   )
 
   // « Signaler ce projet », un lien gris en bas de la page, en plus du menu « … » (F-Pr12). Jamais

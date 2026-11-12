@@ -89,6 +89,7 @@ export function Comments({
   project,
   focusCommentId = null,
   onFocusDone,
+  onContextClosed,
 }: {
   project: Project
   /**
@@ -103,6 +104,12 @@ export function Comments({
    * l'adresse, et recharger la page ne la rouvre pas.
    */
   onFocusDone?: () => void
+  /**
+   * R8 : la feuille ouverte sur le commentaire visé vient de se fermer. L'écran retire alors le
+   * paramètre `?comment=` de l'adresse : tant qu'elle est ouverte, il y reste, et recharger la page
+   * la rouvre au même endroit. Sur ordinateur, sans feuille, la colonne garde le paramètre.
+   */
+  onContextClosed?: () => void
 }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
@@ -223,6 +230,9 @@ export function Comments({
       arrivedFor.current = contextId
       onFocusDone?.()
     }
+    // Le paramètre de l'adresse part maintenant, pas à l'arrivée : recharger la page pendant que la
+    // feuille est ouverte la rouvre sur le même commentaire (plan R8).
+    if (contextId !== null) onContextClosed?.()
     setContextId(null)
     setContext({ status: 'idle' })
   }
@@ -657,6 +667,9 @@ export function Comments({
           title={t(($) => $.project.comments.title)}
           titleCount={{ count, spoken: t(($) => $.project.comments.spokenCount, { count }) }}
           {...(openOnField ? { initialFocusRef: inputRef } : null)}
+          // « Voir en contexte » (R8, planche R8-Contexte) : à mi-hauteur, on voit encore le projet
+          // au-dessus du fil visé. Ouverte depuis la page, elle garde sa pleine hauteur.
+          phoneHeight={contextId === null ? 'full' : 'partial'}
           revealRef={sheetReveal}
           titleRef={sheetTitleRef}
           // Une feuille couvre le bandeau de la suspension : elle redit pourquoi il n'y a pas de champ.

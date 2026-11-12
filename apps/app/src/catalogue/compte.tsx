@@ -47,6 +47,9 @@ const fr = {
     'Feuille, disposition téléphone : poignée, « Fermer », titre, contenu qui défile, pied collé',
   sheetDesktop: 'Feuille, disposition ordinateur : panneau centré',
   sheetOpen: 'Ouvrir la feuille',
+  partialPhone:
+    'Feuille à mi-hauteur sur téléphone (R8, voir en contexte), collée en bas d’un écran de 844 points',
+  partialOpen: 'Ouvrir la feuille à mi-hauteur',
   sheetTitle: 'Supprimer ton compte',
   sheetBody: 'Tes projets, tes notes et tes commentaires. Ton pseudo redevient libre.',
   sheetField: 'Confirme avec ton mot de passe',
@@ -96,6 +99,9 @@ const en: typeof fr = {
   sheetPhone: 'Sheet, phone layout: handle, “Close”, title, scrolling content, pinned footer',
   sheetDesktop: 'Sheet, desktop layout: centred panel',
   sheetOpen: 'Open the sheet',
+  partialPhone:
+    'Partial-height sheet on a phone (R8, see in context), at the bottom of an 844-point screen',
+  partialOpen: 'Open the partial-height sheet',
   sheetTitle: 'Delete your account',
   sheetBody: 'Your projects, your notes and your comments. Your handle becomes free again.',
   sheetField: 'Confirm with your password',
@@ -138,6 +144,8 @@ const blockedAt = () => {
 }
 /** La hauteur donnée à la feuille « téléphone » posée dans la page. */
 const PHONE_SHEET_HEIGHT = 560
+/** Un écran de téléphone entier, pour la feuille à mi-hauteur (planche R8-Contexte). */
+const PHONE_SCREEN_HEIGHT = 844
 
 type TabKey = 'sign-in' | 'sign-up'
 type SectionKey =
@@ -157,6 +165,7 @@ export function AccountCatalogue() {
   const [tab, setTab] = useState<TabKey>('sign-in')
   const [groupedTab, setGroupedTab] = useState<TabKey>('sign-up')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [partialOpen, setPartialOpen] = useState(false)
   // Le refus simulé : null tant qu'on n'a pas appuyé ; le hook libère tout seul au bout du délai.
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const retry = useRetryAt(retryAfter)
@@ -270,6 +279,45 @@ export function AccountCatalogue() {
       >
         <Text>{l.sheetBody}</Text>
         <TextField label={l.sheetField} value="" onChangeText={() => {}} secureTextEntry />
+      </Sheet>
+
+      {/* La feuille à mi-hauteur (`phoneHeight="partial"`) : sa part de l'écran se calcule sur la
+          fenêtre du navigateur ; dans un cadre de la taille d'un téléphone, elle se pose en bas et
+          laisse voir le haut. Le bouton ouvre la vraie (à mi-hauteur sur une fenêtre étroite). */}
+      <Text tone="secondary">{l.partialPhone}</Text>
+      <View
+        style={{
+          height: PHONE_SCREEN_HEIGHT,
+          maxWidth: layout.formWidth,
+          justifyContent: 'flex-end',
+          backgroundColor: colors.scrim,
+          borderRadius: radii.tile,
+          overflow: 'hidden',
+        }}
+      >
+        <SheetPanel
+          layout="phone"
+          phoneHeight="partial"
+          title={l.sheetTitle}
+          closeLabel={l.close}
+          onClose={() => {}}
+          footer={deleteFooter}
+        >
+          <Text>{l.sheetBody}</Text>
+        </SheetPanel>
+      </View>
+      <View style={{ alignSelf: 'flex-start' }}>
+        <Button label={l.partialOpen} variant="secondary" onPress={() => setPartialOpen(true)} />
+      </View>
+      <Sheet
+        open={partialOpen}
+        phoneHeight="partial"
+        title={l.sheetTitle}
+        closeLabel={l.close}
+        onClose={() => setPartialOpen(false)}
+        footer={deleteFooter}
+      >
+        <Text>{l.sheetBody}</Text>
       </Sheet>
 
       <Text tone="secondary">{l.retry}</Text>

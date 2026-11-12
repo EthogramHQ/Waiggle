@@ -1382,3 +1382,92 @@ describe('the sheet and the on-screen keyboard of a phone browser (R6b, U15)', (
     expect(layer().height).toBeUndefined()
   })
 })
+
+// R8, « Voir en contexte » (planche `R8-Contexte`) : sur téléphone, la feuille des commentaires
+// ouverte depuis une notification ne prend pas toute la hauteur. Son bord haut est vers 190 points
+// sur un écran de 844 : on voit encore la photo et les boutons du projet au-dessus. Elle reste
+// collée en bas, se glisse et se ferme comme les autres ; quand le clavier à l'écran rétrécit la
+// zone visible (web), elle reprend toute la hauteur qui reste, pour garder sa liste au-dessus du
+// champ. Les tests lisent la hauteur maximale de la feuille (le style de la boîte de dialogue).
+describe('the partial-height sheet, on a phone (R8)', () => {
+  const style = (node: { props: Record<string, unknown> }) =>
+    StyleSheet.flatten(node.props.style as never) as Record<string, unknown>
+  /** La feuille « Commentaires » à mi-hauteur, avec son champ collé en bas. */
+  const PartialSheet = ({ onClose = jest.fn() }: { onClose?: jest.Mock }) => (
+    <Sheet
+      open
+      phoneHeight="partial"
+      title="Commentaires"
+      titleCount={{ count: 6, spoken: '6 commentaires' }}
+      onClose={onClose}
+      footer={<Button label="Envoyer le commentaire" onPress={() => {}} />}
+    >
+      <Text>Super idée, je teste ce soir.</Text>
+    </Sheet>
+  )
+  /**
+   * La feuille elle-même : la vue qui garde VoiceOver dedans (`accessibilityViewIsModal`). Sur le
+   * web, ce n'est pas elle qui porte le rôle `dialog` (la couche du Modal le porte).
+   */
+  const panel = () => {
+    const found = hostsOf(root()).find((node) => node.props.accessibilityViewIsModal === true)
+    if (!found) throw new Error('no sheet panel')
+    return style(found)
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    Reflect.deleteProperty(globalThis, 'visualViewport')
+    Reflect.deleteProperty(globalThis, 'innerHeight')
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('starts about 190 points below the top of an 844-point phone, as on the board', async () => {
+    await renderWithProviders(<PartialSheet />)
+
+    // Collée en bas (la couche la pose au pied de l'écran) : sa hauteur fixe son bord haut.
+    const height = panel().maxHeight as number
+    expect(844 - height).toBeGreaterThanOrEqual(180)
+    expect(844 - height).toBeLessThanOrEqual(200)
+    // Elle grandit encore jusqu'à cette hauteur (le contenu défile dedans), sans la dépasser.
+    expect(panel().flex).toBe(1)
+  })
+
+  it('keeps the full height without the option (témoin)', async () => {
+    await renderWithProviders(<CommentsSheet onClose={jest.fn()} />)
+
+    expect(panel().maxHeight).toBeUndefined()
+    expect(panel().flex).toBe(1)
+  })
+
+  it('still closes when dragged down', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<PartialSheet onClose={onClose} />)
+
+    await dragDown(400)
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+
+  it('takes all the room left on the web when the on-screen keyboard opens', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument({ focus: jest.fn() }),
+      configurable: true,
+    })
+    Object.defineProperty(globalThis, 'innerHeight', { value: 844, configurable: true })
+    // Le clavier ouvert : la zone visible ne fait plus que 500 points.
+    const viewport = {
+      height: 500,
+      offsetTop: 0,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    }
+    Object.defineProperty(globalThis, 'visualViewport', { value: viewport, configurable: true })
+
+    await renderWithProviders(<PartialSheet />)
+
+    expect(panel().maxHeight).toBeUndefined()
+    expect(panel().flex).toBe(1)
+  })
+})

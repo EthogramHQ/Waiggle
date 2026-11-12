@@ -171,6 +171,16 @@ type PanelProps = {
    */
   compact?: boolean
   /**
+   * La hauteur de la feuille sur téléphone (R8, planche `R8-Contexte`). `full` (défaut) : presque
+   * tout l'écran. `partial` : environ les trois quarts du bas, et l'on voit encore le haut de la
+   * page dessous (la photo et les boutons du projet), pour la feuille des commentaires ouverte
+   * depuis une notification. Elle reste collée en bas, se glisse et se ferme comme les autres, et son
+   * contenu défile dedans. Quand le clavier à l'écran rétrécit la zone visible (web), ou la couche
+   * (iOS), elle prend toute la place qui reste au-dessus de lui, pour garder sa liste au-dessus du
+   * champ. Sans effet sur ordinateur et sur une feuille `compact`.
+   */
+  phoneHeight?: 'full' | 'partial'
+  /**
    * Pour Sheet, sur téléphone : ce qui fait suivre le doigt à la tête de la feuille (la poignée,
    * « Fermer » et le titre), pour la glisser vers le bas.
    */
@@ -487,6 +497,11 @@ const restoreAfterUnmount = (back: unknown, name: string | null, left = RESTORE_
 const HANDLE = { width: 36, height: 5 }
 /** L'espace gardé au-dessus de la feuille sur téléphone : on voit encore l'écran dessous. */
 const SHEET_TOP_GAP = space.huge
+/**
+ * La part de l'écran que prend une feuille `phoneHeight="partial"` (R8) : sur la planche
+ * `R8-Contexte`, son bord haut est vers 190 points sur 844, soit 654 points de feuille.
+ */
+const PARTIAL_SHARE = 654 / 844
 /** Les marges autour du panneau sur ordinateur. */
 const PANEL_MARGIN = space.xxxl
 /**
@@ -1082,6 +1097,10 @@ export function Sheet({
             panelRef={panelRef}
             keys={keys}
             {...(Platform.OS === 'web' ? { titleId, subtitleId } : null)}
+            // Le clavier à l'écran du web ouvert : une feuille à mi-hauteur reprend toute la zone
+            // visible (sinon les trois quarts d'une zone déjà rétrécie ne laissaient presque rien
+            // à sa liste, entre sa tête et son champ).
+            {...(visible ? { phoneHeight: 'full' as const } : null)}
             // Sur ordinateur, le panneau centré ne se glisse pas : « Fermer », Échap et le voile.
             {...(phone ? { dragHandlers: drag.panHandlers } : null)}
           />
@@ -1126,6 +1145,7 @@ export function SheetPanel({
   titleId: givenTitleId,
   subtitleId: givenSubtitleId,
   compact = false,
+  phoneHeight = 'full',
   titleCount,
   dragHandlers,
   revealRef,
@@ -1137,6 +1157,8 @@ export function SheetPanel({
   const { t } = useTranslation()
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
+  // La hauteur de l'écran, pour la feuille à mi-hauteur (`phoneHeight`).
+  const windowHeight = useWindowDimensions().height
   const reveal = useSheetReveal(revealRef, useCalmMotion())
   const fold = useBelowFold()
   const phone = disposition === 'phone'
@@ -1361,6 +1383,13 @@ export function SheetPanel({
   const beside = aside !== undefined && !phone
   // Une feuille courte sur téléphone : la hauteur de son contenu (voir `compact`).
   const hug = compact && phone
+  // À mi-hauteur (R8, `phoneHeight`) : la feuille garde `flex: 1` sous l'écart du haut, mais ne
+  // dépasse pas sa part de l'écran. La couche la pose en bas : son bord haut descend d'autant. Si
+  // la couche rétrécit (le clavier d'iOS), `flex: 1` l'emporte et la feuille prend ce qui reste.
+  const partialHeight =
+    phone && !hug && phoneHeight === 'partial'
+      ? { maxHeight: Math.round(windowHeight * PARTIAL_SHARE) }
+      : null
 
   // La phrase sous le titre, dans la tête à action (relecture du 10/11) : elle ouvre le contenu qui
   // défile au lieu de rester dans la tête fixe. Dans la tête, elle grandissait avec le texte
@@ -1569,7 +1598,7 @@ export function SheetPanel({
           ? hug
             ? // Courte : la hauteur du contenu, qui rétrécit (et défile) si la fenêtre manque de place.
               { flexShrink: 1, marginTop: insets.top + SHEET_TOP_GAP }
-            : { flex: 1, marginTop: insets.top + SHEET_TOP_GAP }
+            : { flex: 1, marginTop: insets.top + SHEET_TOP_GAP, ...partialHeight }
           : {
               alignSelf: 'center',
               width: '100%',
