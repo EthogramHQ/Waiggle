@@ -244,7 +244,10 @@ export const presentNotification = (
         leading: iconLeading('eye-slash'),
         thumb: projectThumb(project),
         quote: comment.excerpt,
-        target: commentRoute(project.id, comment.id),
+        // La page du projet, sans viser le commentaire : masqué, il n'est plus dans le fil que
+        // lisent les autres, et « Voir en contexte » ne vaut que pour un commentaire, une réponse
+        // ou une mention (scénario R8, « Où mène chaque ligne » ; test d'écran de 6b).
+        target: projectRoute(project.id),
       }
     }
     case 'tester_call': {
