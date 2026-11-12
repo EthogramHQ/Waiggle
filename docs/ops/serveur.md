@@ -602,6 +602,9 @@ pas** : on prévient Louis.
 
          ```bash
          ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id)
+           select id from "user" where id = '<identifiant>'
+           on conflict (user_id) do nothing;
          update email_preference set
            email_replies = case when email_replies = 'now' then 'C' else email_replies end,
            updated_at = now() at time zone 'UTC'
@@ -614,6 +617,9 @@ pas** : on prévient Louis.
 
          ```bash
          ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id)
+           select id from "user" where id = '<identifiant>'
+           on conflict (user_id) do nothing;
          update email_preference set
            email_comments = case when email_comments = 'now' then 'C' else email_comments end,
            email_replies = case when email_replies = 'now' then 'C' else email_replies end,
@@ -629,6 +635,9 @@ pas** : on prévient Louis.
 
          ```bash
          ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+         insert into email_preference (user_id)
+           select id from "user" where id = '<identifiant>'
+           on conflict (user_id) do nothing;
          update email_preference set
            email_T = case when 'C' = 'never' or email_T = 'now' then 'C' else email_T end,
            updated_at = now() at time zone 'UTC'
@@ -636,9 +645,10 @@ pas** : on prévient Louis.
          SQL
          ```
 
-       Un membre sans ligne dans `email_preference` reçoit les valeurs par défaut (« dans le
-       récap ») : les trois dernières requêtes n'ont alors rien à baisser, et la première crée sa
-       ligne. Le nom de la colonne (`email_T`) et le choix (`C`) viennent de la liste fermée ci-dessus,
+       Un membre sans ligne dans `email_preference` (par exemple, sa ligne est née après la
+       sauvegarde) : l'`insert` de chacune des trois dernières requêtes la crée d'abord avec les
+       valeurs par défaut (« dans le récap »), sinon l'`update` ne trouverait rien et un « Jamais »
+       serait perdu ; la première requête crée sa ligne elle-même. Le nom de la colonne (`email_T`) et le choix (`C`) viennent de la liste fermée ci-dessus,
        jamais d'un texte recopié du journal ;
 
      - pour chaque `Account deleted <identifiant>` que la vérification de l'étape 0 a trouvé absent
