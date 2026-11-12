@@ -310,7 +310,7 @@ export const useHideComment = (projectId: string): HideState => {
 
 /** Ce que rend `useCommentContext` : où en est la lecture, et, si trouvé, le fil du commentaire. */
 export type CommentContextState =
-  | { status: 'idle' | 'loading' | 'gone' }
+  | { status: 'idle' | 'loading' | 'gone' | 'error' }
   | { status: 'found'; projectId: string; thread: Comment }
 
 /** Le commentaire visé, avec son fil (GET /v1/comments/{commentId}/context). */
@@ -328,8 +328,9 @@ export const getCommentContext = async (commentId: string): Promise<CommentConte
  * Hook : le fil d'un commentaire que l'on ouvre depuis une notification
  * (`/projects/<id>?comment=<commentId>`). `null` : rien à chercher, aucune requête (`idle`).
  * `gone` : le commentaire n'existe plus ou n'est plus visible pour soi (l'API répond le même 404
- * dans les deux cas), et aussi toute autre panne : la feuille dit alors « n'est plus là » sans
- * bloquer la page. Un 404 n'est pas retenté : rien n'y changerait.
+ * dans les deux cas). `error` : une autre panne (réseau, serveur), après un nouvel essai : la
+ * feuille s'ouvre alors en haut sans rien affirmer, car le commentaire existe peut-être encore
+ * (R8, assemblage). Un 404 n'est pas retenté : rien n'y changerait.
  */
 export const useCommentContext = (commentId: string | null): CommentContextState => {
   const query = useQuery({
@@ -343,5 +344,6 @@ export const useCommentContext = (commentId: string | null): CommentContextState
   if (query.data) {
     return { status: 'found', projectId: query.data.projectId, thread: query.data.thread }
   }
-  return { status: query.isError ? 'gone' : 'loading' }
+  if (query.isError) return { status: errorKey(query.error) === 'notFound' ? 'gone' : 'error' }
+  return { status: 'loading' }
 }
