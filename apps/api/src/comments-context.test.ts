@@ -205,6 +205,35 @@ describe('the context of a comment', () => {
     expect(JSON.stringify(context)).not.toContain('Une racine bientôt supprimée')
   })
 
+  it('keeps in the thread a targeted reply beyond the first 50', async () => {
+    const project = await publish()
+    const root = await comment(project.id, max, 'Un fil très suivi')
+    // 55 réponses, écrites à tour de rôle par quatre membres (60 commentaires par heure chacun).
+    const writers = [lea, max, zoe, sam]
+    const replies: Comment[] = []
+    for (let i = 0; i < 55; i++) {
+      const writer = writers[i % writers.length] ?? lea
+      replies.push(await comment(project.id, writer, `Réponse ${i + 1}`, root.id))
+    }
+    const targeted = replies[51] // la 52e : au-delà des 50 que borne le contrat
+    expect(targeted).toBeDefined()
+
+    const context = await contextOf(targeted?.id ?? '', zoe)
+
+    // Le fil porte les 50 réponses qui finissent par elle, dans l'ordre chronologique.
+    expect(context.thread.id).toBe(root.id)
+    expect(context.thread.replies).toHaveLength(50)
+    expect(context.thread.replies.map((reply) => reply.id)).toEqual(
+      replies.slice(2, 52).map((reply) => reply.id),
+    )
+    // Une réponse du début se trouve, elle, dans les 50 premières, comme dans la liste.
+    const first = await contextOf(replies[0]?.id ?? '', zoe)
+    expect(first.thread).toEqual(await listedThread(project.id, root.id, zoe))
+    expect(first.thread.replies.map((reply) => reply.id)).toEqual(
+      replies.slice(0, 50).map((reply) => reply.id),
+    )
+  })
+
   it('is documented in the API contract', async () => {
     const doc = (await (await ctx.request('/openapi.json')).json()) as {
       paths: Record<string, Record<string, unknown>>
