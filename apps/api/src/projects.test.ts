@@ -237,6 +237,27 @@ describe('reading a project', () => {
   })
 })
 
+// Audit de sécurité du 7/11/2026, N5 (avis de Hono sur les chemins décodés), rejoué aux montées
+// du 12/11/2026 : un retour à la ligne encodé dans l'adresse ne contourne ni la session ni la
+// garde des autres sites.
+describe('an address with an encoded line break', () => {
+  it('asks a visitor without an account to sign in', async () => {
+    expect((await read('a%0Ab', null)).status).toBe(401)
+  })
+
+  it('cannot change a project from another website', async () => {
+    const { id } = await publish()
+
+    const res = await ctx.request(`/v1/projects/${id}%0A`, {
+      method: 'PATCH',
+      headers: { cookie: lea, 'content-type': 'application/json', origin: 'https://evil.example' },
+      body: JSON.stringify({ title: 'Piraté' }),
+    })
+
+    expect(res.status).toBe(403)
+  })
+})
+
 describe('changing a project', () => {
   it('lets the author change any field', async () => {
     const { id } = await publish()
