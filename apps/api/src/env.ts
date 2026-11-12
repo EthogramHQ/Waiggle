@@ -30,7 +30,34 @@ const EnvSchema = z
     PUBLIC_API_URL: z.url().default('http://localhost:3000'),
     APP_URL: z.url().default('http://localhost:8081'),
     // Qui envoie les e-mails : la console (développement), Brevo, ou Scaleway (ADR 0005).
+    // Ancienne variable, gardée : `scaleway` veut toujours dire l'API HTTP de Scaleway.
     MAIL_PROVIDER: z.enum(['console', 'brevo', 'scaleway']).default('console'),
+    // R8 : le transport choisi, qui l'emporte sur MAIL_PROVIDER quand il est écrit. `scaleway-smtp`
+    // est le seul qui sache joindre les vignettes du récap ; `scaleway-api` revient à l'ancien
+    // envoi sans redéployer (les e-mails sans pièce jointe passent par les deux).
+    EMAIL_TRANSPORT: optional(z.enum(['scaleway-smtp', 'scaleway-api', 'brevo', 'console'])),
+    // Le serveur SMTP : un nom de machine seul (pas d'adresse avec « / », « @ » ou « : »), pour
+    // qu'une faute de frappe ne dirige pas l'identification vers un autre endroit.
+    // Vide : la valeur par défaut (un .env laissé à « SMTP_HOST= »).
+    SMTP_HOST: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z
+        .string()
+        .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i)
+        .default('smtp.tem.scaleway.com'),
+    ),
+    // Seuls les deux ports qui chiffrent sont permis : 465 (TLS dès la connexion) et 587
+    // (STARTTLS exigé). Le port 25 ou 2525 enverrait l'identification en clair : refusé.
+    SMTP_PORT: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce
+        .number()
+        .refine(
+          (port) => port === 465 || port === 587,
+          'only 465 (TLS) or 587 (STARTTLS) are allowed',
+        )
+        .default(465),
+    ),
     BREVO_API_KEY: optional(z.string()),
     SCALEWAY_SECRET_KEY: optional(z.string()),
     // L'identifiant du projet Scaleway, un UUID : z.uuid() refuse une valeur mal copiée.
@@ -96,9 +123,10 @@ const EnvSchema = z
           'this code is a public example of the repository: choose another one (openssl rand -hex 8)',
       })
     }
+    const transport = resolveTransport(env)
     if (
       env.NODE_ENV === 'production' &&
-      env.MAIL_PROVIDER === 'console' &&
+      transport === 'console' &&
       env.ALLOW_CONSOLE_MAIL !== 'true'
     ) {
       ctx.addIssue({
@@ -107,10 +135,12 @@ const EnvSchema = z
         message: 'console writes the sign-in links in the logs: use scaleway in production',
       })
     }
-    if (env.MAIL_PROVIDER === 'brevo' && !env.BREVO_API_KEY) {
+    if (transport === 'brevo' && !env.BREVO_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['BREVO_API_KEY'], message: 'required to send emails' })
     }
-    if (env.MAIL_PROVIDER === 'scaleway') {
+    // Le SMTP de Scaleway et son API partagent les mêmes clés (identifiant : le projet ; mot de
+    // passe : la clé secrète).
+    if (transport === 'scaleway-api' || transport === 'scaleway-smtp') {
       for (const key of ['SCALEWAY_SECRET_KEY', 'SCALEWAY_PROJECT_ID'] as const) {
         if (!env[key])
           ctx.addIssue({ code: 'custom', path: [key], message: 'required to send emails' })
@@ -132,10 +162,28 @@ const DEVELOPMENT_SECRET = 'development-only-secret-do-not-use-in-production'
 
 type Sender = { email: string; name: string }
 
+type Transport = 'scaleway-smtp' | 'scaleway-api' | 'brevo' | 'console'
+
+/** Le transport voulu : EMAIL_TRANSPORT s'il est écrit, sinon celui que dit l'ancien MAIL_PROVIDER. */
+const resolveTransport = (env: {
+  EMAIL_TRANSPORT?: Transport | undefined
+  MAIL_PROVIDER: 'console' | 'brevo' | 'scaleway'
+}): Transport =>
+  env.EMAIL_TRANSPORT ?? (env.MAIL_PROVIDER === 'scaleway' ? 'scaleway-api' : env.MAIL_PROVIDER)
+
 export type MailConfig =
   | { provider: 'console' }
   | { provider: 'brevo'; apiKey: string; from: Sender }
+  // `scaleway` désigne l'API HTTP (nom gardé : le journal et les essais existants le lisent ainsi).
   | { provider: 'scaleway'; secretKey: string; projectId: string; region: string; from: Sender }
+  | {
+      provider: 'scaleway-smtp'
+      host: string
+      port: 465 | 587
+      user: string
+      password: string
+      from: Sender
+    }
 
 export type Env = {
   port: number
@@ -169,18 +217,29 @@ export const loadEnv = (source: Record<string, string | undefined>): Env => {
   const env = result.data
   const from: Sender = { email: env.MAIL_FROM_EMAIL, name: env.MAIL_FROM_NAME }
   // Les « ?? '' » ne servent qu'au typage : superRefine a déjà refusé une clé absente.
+  const transport = resolveTransport(env)
   const mail: MailConfig =
-    env.MAIL_PROVIDER === 'scaleway'
+    transport === 'scaleway-smtp'
       ? {
-          provider: 'scaleway',
-          secretKey: env.SCALEWAY_SECRET_KEY ?? '',
-          projectId: env.SCALEWAY_PROJECT_ID ?? '',
-          region: env.SCALEWAY_REGION,
+          provider: 'scaleway-smtp',
+          host: env.SMTP_HOST,
+          // superRefine du port : seuls 465 et 587 passent, le type le dit.
+          port: env.SMTP_PORT === 587 ? 587 : 465,
+          user: env.SCALEWAY_PROJECT_ID ?? '',
+          password: env.SCALEWAY_SECRET_KEY ?? '',
           from,
         }
-      : env.MAIL_PROVIDER === 'brevo'
-        ? { provider: 'brevo', apiKey: env.BREVO_API_KEY ?? '', from }
-        : { provider: 'console' }
+      : transport === 'scaleway-api'
+        ? {
+            provider: 'scaleway',
+            secretKey: env.SCALEWAY_SECRET_KEY ?? '',
+            projectId: env.SCALEWAY_PROJECT_ID ?? '',
+            region: env.SCALEWAY_REGION,
+            from,
+          }
+        : transport === 'brevo'
+          ? { provider: 'brevo', apiKey: env.BREVO_API_KEY ?? '', from }
+          : { provider: 'console' }
   return {
     port: env.PORT,
     nodeEnv: env.NODE_ENV,
