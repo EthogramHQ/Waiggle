@@ -55,11 +55,14 @@ import {
 } from '../src/testing/catalogue.ts'
 import { categoryList } from '../src/testing/categories.ts'
 import {
+  instantToken,
   leaEmailPreferences,
   malformedToken,
   mentionsToken,
+  recapOffPreferences,
   recapToken,
   refusedToken,
+  repliesNowPreferences,
 } from '../src/testing/email.ts'
 import { leaMe, suspendedMe } from '../src/testing/fixtures.ts'
 import {
@@ -1371,7 +1374,20 @@ const installShotClock = (context) =>
 // cloche à « 9+ »), et ce choix est donné à sa propre API simulée, comme le fil.
 const hoursAgo = (hours) => new Date(SHOT_NOW - hours * 3_600_000).toISOString()
 const dayOf = (iso) => iso.slice(0, 10)
-const notified = (project) => ({ id: project.id, title: project.title })
+// R8 : la miniature (`cover`), la première photo du projet s'il en a une, sinon null (sa tuile).
+const notified = (project) => {
+  const first = project.visuals?.[0]
+  return {
+    id: project.id,
+    title: project.title,
+    cover: first ? { url: first.url, thumbhash: first.thumbhash } : null,
+  }
+}
+// R8 : le commentaire que « Voir en contexte » trouve (la réponse d'Inès sur le projet de Léa, dans
+// recipesComments), et un commentaire disparu (404). Les pages `contexte` et `contexte-parti`
+// s'ouvrent sur `/projects/${recipesProject.id}?comment=<l'un ou l'autre>`.
+const contextCommentId = '5e6f7081-92a3-4b4c-8d5e-000000000002'
+const goneCommentId = '5e6f7081-92a3-4b4c-8d5e-0000000000ff'
 // L'identifiant d'un commentaire cité (un UUID, comme l'exige le contrat).
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
@@ -1391,6 +1407,7 @@ const notificationPages = (choice) => {
             title: testedProject.latestUpdate.title,
             version: 'v1.2',
             firstLine: testedProject.latestUpdate.lines[0],
+            moreLines: testedProject.latestUpdate.lines.length - 1,
           },
         },
         {
@@ -1405,7 +1422,170 @@ const notificationPages = (choice) => {
             title: null,
             version: null,
             firstLine: line('fixed', 'Les rappels n’arrivent plus deux fois le dimanche'),
+            moreLines: 0,
           },
+        },
+      ],
+    ]
+  }
+  // R8, planche R8-Activite (page `notifications`, jour, nuit et ordinateur : `notifications:
+  // 'activity'`) : aujourd'hui, un commentaire de Papi Jean et 12 réactions, nouveaux, puis une
+  // mise à jour v1.2 et ses deux autres changements ; cette semaine, une mention de Max et trois
+  // abonnés ; plus tôt, un commentaire de Léa retiré par la modération. Une seule page.
+  if (choice === 'activity') {
+    return [
+      [
+        {
+          kind: 'comment',
+          reason: 'comment',
+          id: `comment:${commentIdOf(5)}`,
+          at: hoursAgo(0.2),
+          isNew: true,
+          project: notified(recipesProject),
+          comment: { id: commentIdOf(5), excerpt: 'On le regarde avec Yanis ce soir !' },
+          author: { ...jean, handle: 'papi_jean' },
+        },
+        {
+          kind: 'reactions',
+          id: `reactions:${commentedProject.id}:${dayOf(hoursAgo(1))}`,
+          at: hoursAgo(1),
+          isNew: true,
+          project: notified(commentedProject),
+          day: dayOf(hoursAgo(1)),
+          counts: { amazing: 3, inspiring: 1, useful: 2, funny: 0, bravo: 6 },
+          total: 12,
+        },
+        {
+          kind: 'project_update',
+          id: `project_update:${testedProject.latestUpdate.id}`,
+          at: hoursAgo(3),
+          isNew: false,
+          project: notified(testedProject),
+          author: testedProject.author,
+          update: {
+            id: testedProject.latestUpdate.id,
+            title: testedProject.latestUpdate.title,
+            version: 'v1.2',
+            firstLine: line('new', 'Un compte à rebours avant chaque question'),
+            moreLines: 2,
+          },
+        },
+        {
+          kind: 'comment',
+          reason: 'mention',
+          id: `comment:${commentIdOf(6)}`,
+          at: hoursAgo(24 * 2),
+          isNew: false,
+          project: notified(fromOthers[1]),
+          comment: {
+            id: commentIdOf(6),
+            excerpt: '@lea_moreau, tu avais fait la même chose pour tes recettes ?',
+          },
+          author: { ...max, handle: 'max_durand' },
+        },
+        {
+          kind: 'member_follows',
+          id: `member_follows:${dayOf(hoursAgo(24 * 3))}`,
+          at: hoursAgo(24 * 3),
+          isNew: false,
+          day: dayOf(hoursAgo(24 * 3)),
+          count: 3,
+        },
+        {
+          ...removedCommentNotification,
+          at: hoursAgo(24 * 9),
+          isNew: false,
+          project: notified(commentedProject),
+        },
+      ],
+    ]
+  }
+  // R8, planche R8-Activite-Plus (page `notifications-plus` : `notifications: 'plus'`) : les
+  // lignes du coin des testeurs et de l'équipe. Léa teste « Décollage ! » de Papi Jean ; Inès teste
+  // le projet de Léa. Les deux du catalogue sont signées par l'équipe, jamais un administrateur.
+  if (choice === 'plus') {
+    return [
+      [
+        {
+          kind: 'tester_call',
+          id: 'tester_call:00000000-0000-4000-8000-00000000a801',
+          at: hoursAgo(0.33),
+          isNew: true,
+          project: notified(testedProject),
+          author: testedProject.author,
+          call: {
+            id: '00000000-0000-4000-8000-00000000a801',
+            excerpt: 'Nouveau niveau caché sur Saturne ! Essayez-le ce week-end…',
+          },
+        },
+        {
+          kind: 'tester_message',
+          id: 'tester_message:00000000-0000-4000-8000-00000000a802',
+          at: hoursAgo(2),
+          isNew: true,
+          project: notified(recipesProject),
+          from: ines,
+          role: 'tester',
+          message: {
+            id: '00000000-0000-4000-8000-00000000a802',
+            kind: 'feedback',
+            testerId: ines.id,
+          },
+        },
+        {
+          kind: 'tester_message',
+          id: 'tester_message:00000000-0000-4000-8000-00000000a803',
+          at: hoursAgo(5),
+          isNew: false,
+          project: notified(testedProject),
+          from: testedProject.author,
+          role: 'author',
+          message: {
+            id: '00000000-0000-4000-8000-00000000a803',
+            kind: 'reply',
+            testerId: leaMe.id,
+          },
+        },
+        {
+          kind: 'feedback_settled',
+          id: 'feedback_settled:00000000-0000-4000-8000-00000000a804',
+          at: hoursAgo(26),
+          isNew: false,
+          project: notified(testedProject),
+          author: testedProject.author,
+          update: {
+            id: '00000000-0000-4000-8000-00000000a805',
+            version: 'v1.3',
+            createdAt: hoursAgo(26),
+          },
+        },
+        {
+          kind: 'project_category',
+          id: `project_category:${recipesProject.id}`,
+          at: hoursAgo(24 * 2),
+          isNew: false,
+          project: notified(recipesProject),
+          category: 'cooking',
+        },
+        {
+          kind: 'tool_added',
+          id: 'tool_added:glide',
+          at: hoursAgo(24 * 3),
+          isNew: false,
+          merged: false,
+          typedName: 'Glide',
+          toolSlug: 'glide',
+          toolName: 'Glide',
+        },
+        {
+          kind: 'tool_added',
+          id: 'tool_added:glide-apps',
+          at: hoursAgo(24 * 10),
+          isNew: false,
+          merged: true,
+          typedName: 'Glide',
+          toolSlug: 'glide-apps',
+          toolName: 'Glide Apps',
         },
       ],
     ]
@@ -1822,6 +2002,9 @@ const newestFirst = (messages) => [...messages].reverse()
 // `blocks` (tranche 7b) : 'some', Léa a bloqué Sam et Théo ; 'none', personne.
 // `email` (tranche « adresse ») : 'current', l'adresse de toujours ; 'changed', la nouvelle.
 // `suspended` (tranche 7c) : le compte de Léa est suspendu 7 jours (GET /v1/me le dit).
+// `emailChoices` (R8) : les réglages d'e-mail de départ, 'default' (tout « Dans le récap »),
+// 'replies-now' (les réponses et mentions « Tout de suite ») ou 'recap-off' (récap coupé, les
+// commentaires « Tout de suite », les abonnés « Jamais »).
 const fakeApi = (
   signedIn,
   feed = 'following',
@@ -1830,6 +2013,7 @@ const fakeApi = (
   blocks = 'some',
   email = 'current',
   suspended = false,
+  emailChoices = 'default',
 ) => {
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
@@ -1858,7 +2042,14 @@ const fakeApi = (
   // Les suggestions que Léa écarte dans ce navigateur (« × », R4) : elles quittent sa liste.
   const dismissed = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
-  let emailPreferences = structuredClone(leaEmailPreferences)
+  // R8 : `emailChoices` choisit ceux du départ (voir plus haut, avant fakeApi).
+  let emailPreferences = structuredClone(
+    emailChoices === 'recap-off'
+      ? recapOffPreferences
+      : emailChoices === 'replies-now'
+        ? repliesNowPreferences
+        : leaEmailPreferences,
+  )
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
   // R7a : les testeurs de ce navigateur (POST / DELETE …/testers) : `isTester` suit le dernier geste,
   // pour que la relecture qui suit la feuille rende l'état voulu et non celui d'avant.
@@ -1907,12 +2098,27 @@ const fakeApi = (
     // vient de l'adresse ; un jeton de bonne forme mais refusé (refusedToken) reçoit 400.
     if (pathname === '/v1/email/unsubscribe' && method === 'POST') {
       const token = url.searchParams.get('token')
-      if (token === refusedToken || ![recapToken, mentionsToken].includes(token)) {
+      if (token === refusedToken || ![recapToken, mentionsToken, instantToken].includes(token)) {
         return json(400, { error: { code: 'unsubscribe_invalid', message: '' } })
       }
       return route.fulfill({ status: 204, body: '' })
     }
     if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
+    // R8, « Voir en contexte » : le fil entier d'un commentaire et son projet ; un commentaire
+    // inconnu (supprimé, masqué, retiré, d'un projet qu'on ne voit pas) : le même 404 partout.
+    const contextOf = pathname.match(/^\/v1\/comments\/([^/]+)\/context$/)
+    if (contextOf) {
+      for (const [projectId, pages] of Object.entries(commentsOf)) {
+        const thread = pages
+          .flat()
+          .find(
+            (root) =>
+              root.id === contextOf[1] || root.replies.some((reply) => reply.id === contextOf[1]),
+          )
+        if (thread) return json(200, { projectId, thread })
+      }
+      return json(404, { error: { code: 'not_found', message: '' } })
+    }
     // Demander un changement d'adresse (tranche « adresse ») : la route de Better Auth répond
     // { code, message } en cas de refus, { status: true } sinon (même pour une adresse déjà prise :
     // on ne révèle pas qui a un compte). Rien ne change avant les deux liens : l'adresse reste.
@@ -3791,7 +3997,7 @@ if (script) {
   const browser = await chromium.launch()
   const open = async (
     signedIn,
-    { feed, notifications, admin, blocks, email, suspended, ...options } = {},
+    { feed, notifications, admin, blocks, email, suspended, emailChoices, ...options } = {},
   ) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
@@ -3803,7 +4009,7 @@ if (script) {
     await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended),
+      fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended, emailChoices),
     )
     return context
   }
@@ -3917,6 +4123,7 @@ async function layoutReport() {
             shot.blocks,
             shot.email,
             shot.suspended,
+            shot.emailChoices,
           ),
         )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
@@ -4094,6 +4301,7 @@ const capture = async ({ shot, device, scheme }) => {
         shot.blocks,
         shot.email,
         shot.suspended,
+        shot.emailChoices,
       ),
     )
     const page = await context.newPage()
