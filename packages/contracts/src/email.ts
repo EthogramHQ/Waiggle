@@ -143,6 +143,11 @@ export const EmailPreferencesExport = EmailPreferences.extend({
   recapUnvisited: z.number().int().min(0).max(RECAP_UNVISITED_MAX),
   /** R8 : le dernier e-mail « tout de suite » (avant R8, le dernier e-mail de mentions). */
   instantSentAt: z.iso.datetime().nullable(),
+  /**
+   * R8 : la date du premier récap habillé, qui porte la note « le récap change » une seule fois.
+   * Gardée toute la vie du compte, donc dans l'export comme toute date d'envoi (règle de 6c).
+   */
+  recapV2At: z.iso.datetime().nullable(),
   /** La dernière modification des réglages ; null s'il n'y a jamais touché. */
   updatedAt: z.iso.datetime().nullable(),
 })
