@@ -41,8 +41,6 @@ const fr = {
   projectKind: 'Projet',
   profileKind: 'Profil',
   copyLabel: 'Copie au moment du signalement',
-  count2: '2 signalements',
-  count1: '1 signalement',
   scamReason: 'Arnaque ou spam : 2',
   impersonationReason: 'Usurpation d’identité : 1',
   since: 'Premier signalement le 22 oct.',
@@ -120,8 +118,6 @@ const en: typeof fr = {
   projectKind: 'Project',
   profileKind: 'Profile',
   copyLabel: 'Copy made when reported',
-  count2: '2 reports',
-  count1: '1 report',
   scamReason: 'Scam or spam: 2',
   impersonationReason: 'Impersonation: 1',
   since: 'First reported on Oct 22',
@@ -268,7 +264,7 @@ export function ReportSamples() {
       </Text>
       <ReportCard
         kind={l.projectKind}
-        count={l.count2}
+        count={2}
         snapshot={l.fields}
         snapshotLabel={l.copyLabel}
         snapshotNote={l.changed}
@@ -284,7 +280,7 @@ export function ReportSamples() {
       />
       <ReportCard
         kind={l.profileKind}
-        count={l.count1}
+        count={1}
         snapshot={l.profileFields}
         snapshotLabel={l.copyLabel}
         images={l.avatarImage}
@@ -301,7 +297,7 @@ export function ReportSamples() {
       </Text>
       <ReportCard
         kind={l.projectKind}
-        count={l.count1}
+        count={1}
         snapshot={l.fullFields}
         snapshotLabel={l.copyLabel}
         images={l.numberedImages}
@@ -320,7 +316,7 @@ export function ReportSamples() {
       </Text>
       <ReportCard
         kind={l.messageKind}
-        count={l.count1}
+        count={1}
         snapshot={l.messageFields}
         snapshotLabel={l.copyLabel}
         images={[l.pictureState]}

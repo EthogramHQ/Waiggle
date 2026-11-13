@@ -530,7 +530,7 @@ function AdminModeration() {
         record={item.concernsMe ? undefined : recordOf(item)}
         detailsLabel={t(($) => $.moderation.detailsLabel)}
         kind={kind}
-        count={t(($) => $.moderation.count, { count: item.count })}
+        count={item.count}
         // Tranche 7b : la copie champ par champ, chacun sous son libellé ; une copie d'avant 7b
         // n'a qu'un champ, « Texte ». Les images ne sont dites que par leur état.
         snapshot={item.snapshot.filter(isTextEntry).map(({ field, value }) => ({

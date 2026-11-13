@@ -20,8 +20,6 @@ const fr = {
   profile: 'Profil',
   note: 'Note',
   project: 'Projet',
-  three: '3 signalements',
-  one: '1 signalement',
   snapshotLabel: 'Copie au moment du signalement',
   scam: 'Envoie-moi le code de ta carte, je te débloque la version pro.',
   scamReasons: ['Arnaque ou spam : 2', 'Harcèlement ou haine : 1'],
@@ -99,8 +97,6 @@ const en: typeof fr = {
   profile: 'Profile',
   note: 'Note',
   project: 'Project',
-  three: '3 reports',
-  one: '1 report',
   snapshotLabel: 'Copy at the time of the report',
   scam: 'Send me your card code and I’ll unlock the pro version.',
   scamReasons: ['Scam or spam: 2', 'Harassment or hate: 1'],
@@ -315,7 +311,7 @@ export function ModerationCatalogue() {
       <Stack gap="md" accessibilityRole="list">
         <ReportCard
           kind={l.comment}
-          count={l.three}
+          count={3}
           snapshot={l.scam}
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
@@ -334,7 +330,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.profile}
-          count={l.one}
+          count={1}
           snapshot={l.impersonation}
           snapshotLabel={l.snapshotLabel}
           reasons={l.impersonationReasons}
@@ -352,7 +348,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.note}
-          count={l.one}
+          count={1}
           snapshot={l.ownNote}
           snapshotLabel={l.snapshotLabel}
           reasons={l.otherReasons}
@@ -363,7 +359,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.project}
-          count={l.three}
+          count={3}
           snapshot={l.longText}
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
@@ -401,7 +397,7 @@ export function ModerationCatalogue() {
       <Stack gap="md" accessibilityRole="list">
         <ReportCard
           kind={l.comment}
-          count={l.three}
+          count={3}
           snapshot={l.scam}
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
@@ -417,7 +413,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.comment}
-          count={l.one}
+          count={1}
           snapshot={l.removedText}
           snapshotLabel={l.snapshotLabel}
           reasons={l.otherReasons}
@@ -428,7 +424,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.project}
-          count={l.one}
+          count={1}
           snapshot={l.longText}
           snapshotLabel={l.snapshotLabel}
           reasons={l.otherReasons}
@@ -439,7 +435,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.profile}
-          count={l.one}
+          count={1}
           snapshot={l.impersonation}
           snapshotLabel={l.snapshotLabel}
           reasons={l.impersonationReasons}
