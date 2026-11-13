@@ -53,6 +53,7 @@ import { ProjectCover } from './ProjectCover'
 import { STATUS_PILL_HEIGHT, StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
+import { useLargeText } from './textScale'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Un champ de la copie : son libellé (« Pitch ») et sa valeur, telle que le membre l'a écrite. */
@@ -536,6 +537,7 @@ function QueueItem({
     .filter((piece): piece is string => Boolean(piece))
     .join(', ')
   const descriptionId = useId()
+  const { large, probe } = useLargeText()
   const select = () => onSelect?.()
   // Sur le web, l'heure exacte s'affiche au survol de l'heure relative (attribut `title`, que
   // react-native-web ne transmet pas : posé à la main sur l'élément du navigateur).
@@ -549,6 +551,7 @@ function QueueItem({
   }, [exact])
   return (
     <View style={{ alignSelf: 'stretch', gap: space.sm }}>
+      {probe}
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={name}
@@ -584,7 +587,9 @@ function QueueItem({
               : 'transparent',
         })}
       >
-        {icon ? (
+        {/* La tuile de la sorte n'est qu'un repère (la sorte est écrite à côté) : à texte très
+            agrandi, elle laisse sa place au titre, qui se coupait au milieu d'un mot à 320 px. */}
+        {icon && !large ? (
           <View
             style={{
               width: layout.touchTarget,
