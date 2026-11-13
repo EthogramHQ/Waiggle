@@ -115,6 +115,8 @@ const call = (n: number): TesterCall => ({
   photo: null,
   createdAt: at,
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 })
 const message = (n: number, changes: Partial<TesterMessage> = {}): TesterMessage => ({
   id: uuid('c', n),
@@ -127,6 +129,8 @@ const message = (n: number, changes: Partial<TesterMessage> = {}): TesterMessage
   createdAt: at,
   settled: null,
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
   mine: false,
   ...changes,
 })

@@ -469,6 +469,53 @@ export const presentNotification = (
         target,
       }
     }
+    case 'profile_removed': {
+      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce rendu (feuille de choix
+      // du nom ou du pseudo, motivation complète), avec ses tests. Ici : la phrase de la partie.
+      const { part, replacedBy, ground, explanation, afterReport } = notification
+      const said = say({ replacedBy: replacedBy ?? '' }, (params) =>
+        t(($) => $.notifications.profileRemoved[part.field], params as { replacedBy: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: 'prohibit',
+        leading: iconLeading('prohibit', 'danger'),
+        detail: [
+          t(($) => $.removal.onlyYou),
+          afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
+          t(($) => $.removal.grounds[ground]),
+          t(($) => $.removal.explanation, { explanation }),
+          t(($) => $.removal.contest),
+        ].join('\n'),
+        target: null,
+      }
+    }
+    case 'restored': {
+      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce rendu (la partie
+      // rétablie, la valeur revenue ou non), avec ses tests. Ici : la phrase du contenu entier.
+      const { targetKind, project, handle, valueBack } = notification
+      const said =
+        targetKind === 'member'
+          ? say({ handle: handle ?? '' }, (params) =>
+              valueBack
+                ? t(($) => $.notifications.restored.handleBack, params as { handle: string })
+                : t(($) => $.notifications.restored.handleNotBack, params as { handle: string }),
+            )
+          : project
+            ? say({ title: project.title }, (params) =>
+                t(($) => $.notifications.restored[targetKind], params as { title: string }),
+              )
+            : say({}, () => t(($) => $.notifications.restored.commentElsewhere))
+      return {
+        ...plain,
+        ...said,
+        icon: 'check-circle',
+        leading: iconLeading('check-circle', 'honey'),
+        thumb: project ? projectThumb(project) : null,
+        target: project ? projectRoute(project.id) : null,
+      }
+    }
     case 'report_handled': {
       // Tranche 7a, règle 2 : la sorte de contenu et l'issue, et comment contester ; ni titre, ni
       // extrait, ni auteur. Un lien seulement si la cible est encore visible (l'API le décide).

@@ -262,6 +262,12 @@ export const loadQueuePage = async (
       .map(([reason, count]) => ({ reason, count }))
     return {
       target,
+      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+      part: null,
+      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+      context: null,
+      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+      contentCreatedAt: null,
       projectId: first?.projectId ?? null,
       // Les textes de la copie ; ses images à part, sans leur clé : encore là, ou parties depuis.
       authorRecord: memberId === null ? null : recordOf(records, memberId, adminId, blocked),
@@ -314,6 +320,8 @@ type Records = {
   suspensions: Map<string, number>
   suspendedNow: ReadonlySet<string>
   admins: ReadonlySet<string>
+  // Le nom, le pseudo actuel et la date d'inscription de chaque membre (la carte du membre visé).
+  cards: Map<string, { name: string; handle: string; joinedAt: string }>
 }
 
 const MemberCount = z.object({ member_id: z.string(), n: z.coerce.number() })
@@ -349,6 +357,7 @@ const authorRecords = async (db: Database, memberIds: string[], now: Date): Prom
     suspensions: new Map(),
     suspendedNow: new Set(),
     admins: new Set(),
+    cards: new Map(),
   }
   if (memberIds.length === 0) return records
   const yearAgo = new Date(now.getTime() - REPORT_RETENTION_DAYS * DAY)
@@ -395,6 +404,23 @@ const authorRecords = async (db: Database, memberIds: string[], now: Date): Prom
     .from(a)
     .where(and(inArray(a.userId, memberIds), isNull(a.revokedAt)))
   records.admins = new Set(admins.map((row) => row.id))
+
+  // 4. sa carte : son nom et sa date d'inscription (table user), son pseudo actuel (la ligne de
+  // member_handle sans date de fin). left join : un membre sans pseudo n'est pas écarté.
+  const u = schema.user
+  const h = schema.memberHandle
+  const cards = await db
+    .select({ id: u.id, name: u.name, joinedAt: u.createdAt, handle: h.handle })
+    .from(u)
+    .leftJoin(h, and(eq(h.userId, u.id), isNull(h.releasedAt)))
+    .where(inArray(u.id, memberIds))
+  for (const card of cards) {
+    records.cards.set(card.id, {
+      name: card.name,
+      handle: card.handle ?? '',
+      joinedAt: card.joinedAt.toISOString(),
+    })
+  }
   return records
 }
 
@@ -410,8 +436,15 @@ const recordOf = (
   blocked: ReadonlySet<string>,
 ): NonNullable<ModerationQueueItem['authorRecord']> => {
   const suspendedNow = records.suspendedNow.has(memberId)
+  const card = records.cards.get(memberId)
   return {
     memberId,
+    name: card?.name ?? '',
+    handle: card?.handle ?? '',
+    joinedAt: card?.joinedAt ?? new Date(0).toISOString(),
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests : les comptes de projets et de commentaires.
+    projectCount: 0,
+    commentCount: 0,
     removals: records.removals.get(memberId) ?? 0,
     suspensions: records.suspensions.get(memberId) ?? 0,
     suspendedNow,
@@ -711,6 +744,8 @@ export const loadRemovedPage = async (
       return [
         {
           ...base,
+          // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+          part: null,
           projectId: row.targetId,
           text: `${row.projectTitle}\n\n${row.projectPitch ?? ''}`,
           removedAt: row.projectRemovedAt.toISOString(),
@@ -722,6 +757,8 @@ export const loadRemovedPage = async (
       return [
         {
           ...base,
+          // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+          part: null,
           projectId: row.updateProjectId,
           text: updateText(row.updateTitle, readLines(row.updateLines)),
           removedAt: row.updateRemovedAt.toISOString(),
@@ -733,6 +770,8 @@ export const loadRemovedPage = async (
       return [
         {
           ...base,
+          // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+          part: null,
           projectId: row.commentProjectId,
           text: row.commentBody,
           removedAt: row.commentRemovedAt.toISOString(),
@@ -744,6 +783,8 @@ export const loadRemovedPage = async (
       return [
         {
           ...base,
+          // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+          part: null,
           projectId: row.callProjectId,
           text: row.callText,
           removedAt: row.callRemovedAt.toISOString(),
@@ -756,6 +797,8 @@ export const loadRemovedPage = async (
       return [
         {
           ...base,
+          // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+          part: null,
           projectId: row.messageProjectId,
           text: row.messageText ?? '',
           removedAt: row.messageRemovedAt.toISOString(),

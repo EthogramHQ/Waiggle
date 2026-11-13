@@ -74,5 +74,7 @@ export const loadMe = async (
     // n'en est plus un tant que dure sa suspension (S19, reports/admin.ts) : l'entrée disparaît.
     isAdmin: row.adminSince !== null && suspension === null,
     suspension,
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (nom et pseudo mis d'office).
+    provisional: { name: false, handle: false },
   }
 }

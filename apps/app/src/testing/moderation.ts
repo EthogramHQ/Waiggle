@@ -35,6 +35,10 @@ export const removalByLaw: Removal = {
 /** Le commentaire de Sam sur « Météo » : trois signalements, deux motifs, une précision. */
 export const scamCommentItem: ModerationQueueItem = {
   target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: meteoProjectId,
   // Tranche 7b : la copie est un tableau de champs, nommés comme au registre des entrées.
   snapshot: [
@@ -56,6 +60,12 @@ export const scamCommentItem: ModerationQueueItem = {
   // suspension, finie depuis. Il peut être suspendu de nouveau.
   authorRecord: {
     memberId: 'u5',
+    name: 'Sam',
+    handle: 'sam',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 2,
     suspensions: 1,
     suspendedNow: false,
@@ -71,6 +81,10 @@ export const scamCommentItem: ModerationQueueItem = {
  */
 export const fakeReviewsItem: ModerationQueueItem = {
   target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
   snapshot: [
     { field: 'title', value: 'Faux avis en masse' },
@@ -98,6 +112,12 @@ export const fakeReviewsItem: ModerationQueueItem = {
   // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
   authorRecord: {
     memberId: 'u4',
+    name: 'Nora',
+    handle: 'nora',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 0,
     suspensions: 0,
     suspendedNow: false,
@@ -108,6 +128,10 @@ export const fakeReviewsItem: ModerationQueueItem = {
 /** Le profil de « Lucas Martin », signalé pour usurpation : pas de projet, donc pas de lien vers un projet. */
 export const impersonationItem: ModerationQueueItem = {
   target: { kind: 'member', id: 'u7' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: null,
   snapshot: [
     { field: 'name', value: 'Lucas Martin' },
@@ -127,6 +151,12 @@ export const impersonationItem: ModerationQueueItem = {
   // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
   authorRecord: {
     memberId: 'u7',
+    name: 'Jules',
+    handle: 'jules',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 0,
     suspensions: 0,
     suspendedNow: false,
@@ -137,6 +167,10 @@ export const impersonationItem: ModerationQueueItem = {
 /** Une note de Louis lui-même : il ne peut pas en décider (« Te concerne »). */
 export const ownNoteItem: ModerationQueueItem = {
   target: { kind: 'note', id: 'e2f30415-2637-4c48-8d59-6a7b8c9daebf' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: 'f3041526-3748-4d59-9e6a-7b8c9daebfc0',
   // Une copie d'avant la tranche 7b : un seul champ `text`, le texte tel qu'on le gardait alors.
   snapshot: [{ field: 'text', value: 'v3 : export en PDF' }],
@@ -152,6 +186,12 @@ export const ownNoteItem: ModerationQueueItem = {
   // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
   authorRecord: {
     memberId: 'u9',
+    name: 'Maya',
+    handle: 'maya',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 0,
     suspensions: 0,
     suspendedNow: false,
@@ -181,6 +221,8 @@ export const moderationQueuePageOf = (
 /** Le commentaire d'Alex sur « Météo », retiré hier : on peut le rétablir. */
 export const removedCommentItem: RemovedItem = {
   target: { kind: 'comment', id: 'a7b8c9da-ebfc-4d0e-9f10-213243546576' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: meteoProjectId,
   text: 'Clique ici pour gagner un téléphone.',
   ground: 'rules',
@@ -192,6 +234,8 @@ export const removedCommentItem: RemovedItem = {
 /** Un projet retiré au nom de la loi. */
 export const removedProjectItem: RemovedItem = {
   target: { kind: 'project', id: 'b8c9daeb-fc0d-4e1f-8021-324354657687' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: 'b8c9daeb-fc0d-4e1f-8021-324354657687',
   text: 'Photos de la soirée — Toutes les photos de samedi, avec les noms.',
   ground: 'illegal',
@@ -274,6 +318,8 @@ export const suspendDecision: DecisionHistoryItem = {
   at: '2026-10-22T10:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'member', id: samMember.id },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   member: samMember,
   ground: 'rules',
@@ -290,6 +336,8 @@ export const liftDecision: DecisionHistoryItem = {
   at: '2026-10-24T09:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'member', id: samMember.id },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   member: samMember,
   ground: null,
@@ -306,6 +354,8 @@ export const removeDecision: DecisionHistoryItem = {
   at: '2026-10-21T09:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: meteoProjectId,
   member: samMember,
   ground: 'rules',
@@ -322,6 +372,8 @@ export const dismissByGoneAdminDecision: DecisionHistoryItem = {
   at: '2026-10-20T16:00:00.000Z',
   admin: null,
   target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
   member: noraMember,
   ground: null,
@@ -338,6 +390,8 @@ export const goneTargetDecision: DecisionHistoryItem = {
   at: '2026-10-19T08:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'note', id: 'e2f30415-2637-4c48-8d59-6a7b8c9daebf' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   member: null,
   ground: 'illegal',

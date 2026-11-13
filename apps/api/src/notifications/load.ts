@@ -971,6 +971,8 @@ export const present = (
           ...common,
           kind: 'removed',
           targetKind,
+          // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+          part: null,
           project,
           excerpt: text === null ? null : testerExcerptOf(text),
           ground: removal.ground,
@@ -992,6 +994,8 @@ export const present = (
         ...common,
         kind: 'removed',
         targetKind,
+        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+        part: null,
         project,
         excerpt: text === null ? null : excerptOf(text),
         ground: removal.ground,
@@ -1021,6 +1025,8 @@ export const present = (
         ...common,
         kind: 'suspension_ended',
         lifted: row.lifted,
+        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests : la requête ne lit pas encore la cause de la levée.
+        cause: row.lifted ? 'early' : 'end',
         explanation: row.lifted ? (row.explanation ?? '') : null,
       }
     case 'report_handled': {

@@ -175,6 +175,8 @@ const toProjectBase = (
   isMine: project.authorId === viewerId,
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString(),
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 })
 
 /**

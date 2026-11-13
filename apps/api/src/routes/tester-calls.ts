@@ -225,6 +225,8 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
         photo: outcome.photo ? toTesterMedia(outcome.photo, publicApiUrl) : null,
         createdAt: call.createdAt.toISOString(),
         removal: null,
+        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+        removedParts: [],
       },
       201,
     )
@@ -301,6 +303,8 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
             createdAt: row.createdAt.toISOString(),
             // Seul l'auteur reçoit les appels retirés (filtrés plus haut pour les autres).
             removal: row.removedAt === null ? null : (removals.get(row.removalId ?? '') ?? null),
+            // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+            removedParts: [],
           }
         }),
         nextCursor:

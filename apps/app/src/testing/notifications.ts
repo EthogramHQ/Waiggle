@@ -136,6 +136,8 @@ export const removedCommentNotification: Of<'removed'> = {
   at: '2026-10-21T09:00:00.000Z',
   isNew: true,
   targetKind: 'comment',
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   project: meteoProject,
   excerpt: 'Écris-moi en privé pour le code',
   ground: 'rules',
@@ -151,6 +153,8 @@ export const removedProjectNotification: Of<'removed'> = {
   at: '2026-10-21T08:00:00.000Z',
   isNew: false,
   targetKind: 'project',
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   project: meteoProject,
   excerpt: null,
   ground: 'illegal',
@@ -240,6 +244,8 @@ export const suspensionEndedNotification: Of<'suspension_ended'> = {
   at: '2026-11-02T23:30:00.000Z',
   isNew: true,
   lifted: false,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  cause: 'end',
   explanation: null,
 }
 
@@ -250,6 +256,8 @@ export const suspensionLiftedNotification: Of<'suspension_ended'> = {
   at: '2026-10-28T10:00:00.000Z',
   isNew: true,
   lifted: true,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  cause: 'early',
   explanation: 'Les messages en cause ont été supprimés ; la suspension n’a plus lieu d’être.',
 }
 

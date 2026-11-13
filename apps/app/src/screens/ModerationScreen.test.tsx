@@ -782,6 +782,12 @@ describe('the card of a report, slice 7c', () => {
       ...fakeReviewsItem,
       authorRecord: {
         memberId: 'u4',
+        name: 'Nora',
+        handle: 'nora',
+        joinedAt: '2026-08-14T09:00:00.000Z',
+        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+        projectCount: 3,
+        commentCount: 7,
         removals: 1,
         suspensions: 1,
         suspendedNow: true,
