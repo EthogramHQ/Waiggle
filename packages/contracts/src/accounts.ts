@@ -158,6 +158,12 @@ export const Me = z
      * alors le bandeau et retire les actions refusées ; l'API refuse ces actions de toute façon.
      */
     suspension: Suspension.nullable(),
+    /**
+     * R9 (7d) : vrai quand son nom (« Membre ») ou son pseudo (« membre_4f2a ») a été mis d'office
+     * par la modération, et qu'il n'en a pas choisi d'autre depuis. L'appli lui propose alors d'en
+     * choisir un (une feuille une fois par visite, un bandeau sur « Moi »).
+     */
+    provisional: z.object({ name: z.boolean(), handle: z.boolean() }).strict(),
   })
   .meta({ id: 'Me' })
 export type Me = z.infer<typeof Me>

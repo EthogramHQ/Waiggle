@@ -8,7 +8,7 @@ import { EmailPreferencesExport } from './email'
 import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 import { Removal } from './removal'
-import { ReportExport } from './reports'
+import { ModerationDecisionExport, ReportExport } from './reports'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
 import {
@@ -149,6 +149,12 @@ export const AccountExport = z
      * récentes. Les retraits de ses contenus sont déjà dans `removal` de chacun.
      */
     moderation: z.array(SuspensionExport),
+    /**
+     * R9 (jur-P3) : les décisions qui le visent (retraits entiers ou d'une partie, rétablissements,
+     * suspensions, levées), avec la partie retirée et l'ancien nom ou pseudo remplacé d'office,
+     * des plus anciennes aux plus récentes. Jamais l'administrateur, jamais qui a signalé.
+     */
+    moderationDecisions: z.array(ModerationDecisionExport),
     /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
     emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

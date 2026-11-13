@@ -5,6 +5,7 @@
 import { sql } from 'drizzle-orm'
 import {
   boolean,
+  check,
   index,
   jsonb,
   pgTable,
@@ -78,6 +79,18 @@ export const moderationDecision = pgTable(
     // La raison d'une levée : 'early' | 'error' (LiftCause) ; null sinon. Une suspension levée
     // pour erreur ne compte plus dans le rappel des décisions passées (J10).
     liftCause: text('lift_cause'),
+    // R9 (7d) : la partie visée par un retrait, un classement ou un rétablissement d'une partie
+    // (`ReportPartField`), et sa photo ; null pour le contenu entier. Pas de clé étrangère vers la
+    // photo : la décision reste après sa suppression, le temps de la garde d'un an.
+    partField: text('part_field'),
+    partMediaId: uuid('part_media_id'),
+    // R9 : l'ancien nom ou pseudo remplacé d'office (« Membre », « membre_4f2a »), gardé un an avec
+    // la décision pour un rétablissement ; null sinon. Vidé quand le compte part (relecture de
+    // sécurité P2). Pour un pseudo, `explanation` reste celle montrée au membre.
+    previousValue: text('previous_value'),
+    // R9 : le pseudo provisoire donné par ce retrait, pour savoir au rétablissement si le membre en a
+    // choisi un autre depuis (relecture de sécurité P3) ; null sinon.
+    provisionalValue: text('provisional_value'),
   },
   (t) => [
     // L'historique d'une cible (la dernière décision, le rétablissement) et la purge.
@@ -99,6 +112,10 @@ export const moderationDecision = pgTable(
     // Les garde-fous (apps/api/src/moderation/guard.ts) : les retraits d'un administrateur dans
     // l'heure, ses suspensions du jour. Et « set null » au départ de son compte.
     index('moderation_decision_admin_idx').on(t.adminId, t.createdAt),
+    check(
+      'moderation_decision_part_check',
+      sql`${t.partMediaId} is null or ${t.partField} in ('cover', 'photo', 'photoDescription')`,
+    ),
   ],
 )
 
@@ -185,13 +202,25 @@ export const contentReport = pgTable(
     decisionId: uuid('decision_id').references(() => moderationDecision.id, {
       onDelete: 'set null',
     }),
+    // R9 (7d) : la partie signalée (`ReportPartField`) et sa photo ; null pour le contenu entier.
+    // La copie (`snapshot`) ne garde alors que ce champ.
+    partField: text('part_field'),
+    partMediaId: uuid('part_media_id'),
   },
   (t) => [
-    // Un seul signalement ouvert par membre et par cible (le refaire répond « déjà signalé »). Index
-    // partiel (tranche 7b) : une fois le précédent clos, la même personne peut signaler de nouveau
-    // un contenu modifié depuis ; l'API compare les copies.
+    // Un seul signalement ouvert par membre, par cible et par partie (le refaire répond « déjà
+    // signalé »). Index partiel (tranche 7b) : une fois le précédent clos, la même personne peut
+    // signaler de nouveau un contenu modifié depuis ; l'API compare les copies. R9 : la partie y
+    // entre, et `coalesce` remplace un null par une valeur fixe, car deux null ne sont jamais égaux
+    // pour un index (relecture de sécurité P6 : deux signalements du contenu entier se heurtent).
     uniqueIndex('content_report_reporter_target_idx')
-      .on(t.reporterId, t.targetKind, t.targetId)
+      .on(
+        t.reporterId,
+        t.targetKind,
+        t.targetId,
+        sql`coalesce(${t.partField}, '')`,
+        sql`coalesce(${t.partMediaId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      )
       .where(sql`${t.status} = 'open'`),
     // La file : les signalements ouverts, du plus ancien au plus récent. Index partiel : les
     // signalements clos, bien plus nombreux avec le temps, n'y sont pas.
@@ -201,5 +230,11 @@ export const contentReport = pgTable(
     index('content_report_target_author_idx').on(t.targetAuthorId),
     // L'export et la notification « signalement traité » : les signalements d'un membre.
     index('content_report_reporter_idx').on(t.reporterId),
+    // Une photo n'est visée que par une partie qui en est une.
+    check(
+      'content_report_part_check',
+      sql`(${t.partField} is null and ${t.partMediaId} is null)
+        or (${t.partField} is not null and (${t.partField} in ('cover', 'photo', 'photoDescription')) = (${t.partMediaId} is not null))`,
+    ),
   ],
 )

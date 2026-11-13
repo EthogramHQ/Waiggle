@@ -2613,8 +2613,9 @@ départ ») ; les photos se nomment par leur rang et montrent leur miniature («
   signalements sont traités, et ceux qui visaient tout le projet restent dans la file
 - Et Inès reçoit une notification qui nomme la partie (« La 2e photo de Météo a été retirée par la
   modération »), l'explication, et « Contester »
-- Et dans « Météo », Inès voit la photo avec « Retiré par la modération », l'explication,
-  « Remplacer » et « Supprimer »
+- Et dans « Météo », Inès voit la photo avec « Retiré par la modération », le fondement,
+  l'explication, la date, « Contester » avec l'adresse de contact écrite en clair (et son lien), la
+  possibilité de saisir la justice, « Remplacer » et « Supprimer » (décision L2 de Louis, 13/11/2026)
 - Et Malik est prévenu que son signalement a été traité, sans le détail de la décision
 
 Ce que voient les autres d'une partie retirée : rien, comme si elle n'avait jamais été là (une
@@ -2642,7 +2643,8 @@ profil retirée laisse les initiales).
 - Quand Louis rétablit un contenu ou une partie retirés (onglet « Retirés »)
 - Alors l'auteur reçoit une notification « Ton projet Météo est de nouveau visible » (ou « La 2e
   photo de Météo… »), signée « L'équipe de {{appName}} », sans nom d'administrateur (renvoyé de R8)
-- Et un pseudo ou un nom rétabli ne revient pas tout seul s'il a été changé entre-temps
+- Et un pseudo ou un nom rétabli ne revient pas tout seul s'il a été changé entre-temps : la
+  notification dit alors que l'ancien ne peut pas revenir (décision L3 de Louis, 13/11/2026)
 
 ### Bloquer (planche `R9-Bloquer`, A7, F-S4)
 
@@ -2692,10 +2694,12 @@ profil retirée laisse les initiales).
   l'objet nomme la décision (J12) ; le « + » disparaît de la barre d'onglets
 - Et en plus de ce qu'il peut faire aujourd'hui (supprimer ses contenus, exporter, régler, bloquer,
   signaler…), il peut **retirer** sa bio, ses outils et sa photo, sans en mettre d'autres (jur-R5)
-- Et il peut passer un projet public en privé, jamais l'inverse (J14)
+- Et il peut passer un projet public en privé, jamais l'inverse (J14), après une confirmation
+  (décision L6 de Louis, 13/11/2026)
 - Quand Louis lève la suspension « pour erreur »
 - Alors la notification le dit : « Ta suspension a été levée : c'était une erreur de la
-  modération. Toutes tes actions sont de retour. » (jur-R6, texte à relire par le juridique)
+  modération. Tu peux de nouveau publier et interagir. » (jur-R6 ; texte relu, décision L1 de
+  Louis, 13/11/2026)
 - Et une levée simple dit seulement que la suspension est levée, comme aujourd'hui
 
 ### L'adresse de contact, partout un lien

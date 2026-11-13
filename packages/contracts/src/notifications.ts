@@ -9,7 +9,7 @@ import { CommentId } from './comments'
 import { FeedCursor } from './feed'
 import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
-import { RemovalGround } from './removal'
+import { RemovalGround, ReportPartField } from './removal'
 import { StoredReportTargetKind } from './reports'
 import { SettledUpdate, TESTER_EXCERPT_MAX, TesterMessageKind, TesterRole } from './testers'
 import { TOOL_NAME_MAX, ToolSlug } from './tools'
@@ -41,6 +41,14 @@ const NotifiedProject = z.object({
 })
 /** Le commentaire dont parle une notification : son texte actuel, raccourci. */
 const NotifiedComment = z.object({ id: CommentId, excerpt: z.string().max(EXCERPT_MAX + 1) })
+/**
+ * R9 : la partie dont parle une notification de modération : son champ, et le rang de la photo à
+ * partir de 1 (« La 2e photo de Météo ») ; null hors photo, ou pour une photo qui n'est plus là.
+ */
+const NotifiedPart = z.object({
+  field: ReportPartField,
+  position: z.int().positive().nullable(),
+})
 /** Un jour, en heure de Paris (« 2026-10-20 ») : les groupes vont par jour. */
 const Day = z.iso.date()
 
@@ -228,6 +236,8 @@ export const RemovedNotification = z.object({
     .string()
     .max(EXCERPT_MAX + 1)
     .nullable(),
+  /** R9 : la partie retirée seule (le reste du contenu reste affiché) ; null : le contenu entier. */
+  part: NotifiedPart.nullable(),
   ground: RemovalGround,
   explanation: z.string(),
   afterReport: z.boolean(),
@@ -237,6 +247,41 @@ export const RemovedNotification = z.object({
    * avant à un titre vide). Sur un projet devenu privé, la notification disparaît (règle 3 de 7a).
    */
   projectHidden: z.boolean(),
+})
+
+/**
+ * R9 (7d) : une partie de son profil a été retirée par la modération (nom, pseudo, bio, outils
+ * favoris, photo), avec le fondement, l'explication, et comment contester. `replacedBy` : le nom
+ * (« Membre ») ou le pseudo provisoire (« membre_4f2a ») mis à la place, que l'appli propose de
+ * changer (« Choisir un pseudo ») ; null pour une bio, des outils ou une photo. Rétablie, la
+ * notification disparaît.
+ */
+export const ProfileRemovedNotification = z.object({
+  ...Common,
+  kind: z.literal('profile_removed'),
+  part: z.object({ field: z.enum(['name', 'handle', 'bio', 'favoriteTools', 'avatar']) }),
+  replacedBy: z.string().nullable(),
+  ground: RemovalGround,
+  explanation: z.string(),
+  afterReport: z.boolean(),
+})
+
+/**
+ * R9 : un contenu ou une partie retirés ont été rétablis par la modération (renvoyé de R8). Signée
+ * « L'équipe de {{appName}} », jamais le nom de l'administrateur. Seulement si le retrait lui avait
+ * été notifié. `project` : le projet du contenu (null pour une partie du profil, ou un projet qui ne
+ * lui est plus visible). `valueBack` : la valeur retirée est revenue ; faux quand il l'a changée
+ * entre-temps (un pseudo rétabli ne revient pas s'il en a choisi un autre). `handle` : son pseudo
+ * actuel, pour le rétablissement d'un pseudo ; null sinon.
+ */
+export const RestoredNotification = z.object({
+  ...Common,
+  kind: z.literal('restored'),
+  targetKind: z.enum(['project', 'update', 'comment', 'call', 'message', 'member']),
+  project: NotifiedProject.nullable(),
+  part: NotifiedPart.nullable(),
+  valueBack: z.boolean(),
+  handle: z.string().nullable(),
 })
 
 /**
@@ -263,6 +308,11 @@ export const SuspensionEndedNotification = z.object({
   kind: z.literal('suspension_ended'),
   /** Vrai si un administrateur l'a levée avant la date prévue (ou d'une suspension sans fin). */
   lifted: z.boolean(),
+  /**
+   * R9 (jur-R6) : comment elle a fini : levée plus tôt (`early`), levée parce qu'elle était une
+   * erreur de la modération (`error`, que la notification dit), ou à la date prévue (`end`).
+   */
+  cause: z.enum(['early', 'error', 'end']),
   /** L'explication de la levée ; null pour une fin à la date prévue. */
   explanation: z.string().nullable(),
 })
@@ -301,6 +351,8 @@ export const Notification = z
     HiddenNotification,
     HandleNotification,
     RemovedNotification,
+    ProfileRemovedNotification,
+    RestoredNotification,
     ReportHandledNotification,
     SuspendedNotification,
     SuspensionEndedNotification,

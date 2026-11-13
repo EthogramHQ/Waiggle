@@ -4,7 +4,7 @@
 // la carte du projet dans « Abonnements » et prévient ses abonnés et ses testeurs. On ne la modifie
 // pas : on la supprime, puis on la republie.
 import { z } from 'zod'
-import { Removal } from './removal'
+import { Removal, RemovedPart } from './removal'
 import { ShortLabel } from './text'
 import { ProjectVisual, VisualDescription } from './visuals'
 
@@ -127,6 +127,11 @@ export const ProjectUpdate = z
     beforeAfter: z.boolean(),
     createdAt: z.iso.datetime(),
     removal: Removal.nullable(),
+    /**
+     * R9 (7d) : les parties de cette mise à jour (une photo) retirées seules par la modération, pour son auteur seul
+     * (vide pour tout autre membre, qui ne les voit plus, comme si elles n'avaient jamais été là).
+     */
+    removedParts: z.array(RemovedPart),
   })
   .meta({ id: 'ProjectUpdate' })
 export type ProjectUpdate = z.infer<typeof ProjectUpdate>

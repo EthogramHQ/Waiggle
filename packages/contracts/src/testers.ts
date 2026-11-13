@@ -6,7 +6,7 @@
 // (textes, photos, retraits, mises à jour) : les notifications, les signalements et l'export le
 // lisent, et le faire dépendre d'eux ferait une boucle d'imports.
 import { z } from 'zod'
-import { Removal } from './removal'
+import { Removal, RemovedPart } from './removal'
 import { VisibleFreeText } from './text'
 import { UpdateId } from './updates'
 import { Thumbhash, VisualDescription } from './visuals'
@@ -160,6 +160,11 @@ export const TesterCall = z
     photo: TesterMedia.nullable(),
     createdAt: z.iso.datetime(),
     removal: Removal.nullable(),
+    /**
+     * R9 (7d) : les parties de cet appel (sa photo) retirées seules par la modération, pour son auteur seul
+     * (vide pour tout autre membre, qui ne les voit plus, comme si elles n'avaient jamais été là).
+     */
+    removedParts: z.array(RemovedPart),
   })
   .meta({ id: 'TesterCall' })
 export type TesterCall = z.infer<typeof TesterCall>
@@ -222,6 +227,11 @@ export const TesterMessage = z
     createdAt: z.iso.datetime(),
     settled: z.object({ at: z.iso.datetime(), update: SettledUpdate.nullable() }).nullable(),
     removal: Removal.nullable(),
+    /**
+     * R9 (7d) : les parties de ce message (sa capture) retirées seules par la modération, pour son auteur seul
+     * (vide pour tout autre membre, qui ne les voit plus, comme si elles n'avaient jamais été là).
+     */
+    removedParts: z.array(RemovedPart),
     mine: z.boolean(),
   })
   .meta({ id: 'TesterMessage' })
