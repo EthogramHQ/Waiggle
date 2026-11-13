@@ -1608,11 +1608,16 @@ export const en: Translation = {
       preview: 'What {{name}} will read',
       dsa: 'The European Digital Services Act (DSA, article 17) requires telling the author what is removed, why, and how to appeal.',
       confirmPart: 'Remove {{part}}',
+      // The ground menu, before a choice; and what is still missing under the inactive button.
+      groundNone: 'To choose',
+      missing: 'To remove, choose a ground and write an explanation.',
     },
     suspendSheet: {
       subtitle: '@{{handle}} · joined on {{date}} · already decided: {{record}}',
       afterReport:
         'The suspension follows this report: the history and the notification say so. Open reports stay in the queue.',
+      // Nothing decided yet for this member: the subtitle without its record.
+      subtitleNew: '@{{handle}} · joined on {{date}}',
     },
   },
   suspension: {

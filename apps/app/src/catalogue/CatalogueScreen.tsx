@@ -102,6 +102,7 @@ import { UpdateFamiliesCatalogue } from './mises-a-jour'
 import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
 import { ModerationCatalogue } from './moderation'
+import { ModerationSheetsCatalogue } from './moderation-fenetres'
 import { NavigationCatalogue } from './navigation'
 import { NotificationsCatalogue } from './notifications'
 import { ToolsCatalogue } from './outils'
@@ -755,6 +756,8 @@ export function CatalogueScreen() {
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
       <ModerationCatalogue />
+      {/* R9 : les briques de la fenêtre « Retirer » (moderation-fenetres.tsx). */}
+      <ModerationSheetsCatalogue />
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
