@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { SuspendSheet } from '../src/moderation/SuspendSheet'
 import { firstParam } from '../src/navigation/params'
 import { useGoBack } from '../src/navigation/useGoBack'
+import { useHydrated } from '../src/ui/theme/hydration'
 
 export default function SuspendPage() {
   const { member, fromKind, fromId } = useLocalSearchParams<{
@@ -20,11 +21,14 @@ export default function SuspendPage() {
   const back = useGoBack({ pathname: '/members/[id]', params: { id: memberId } })
   // Fermée, la fenêtre part d'abord (son fondu), puis la page revient en arrière.
   const [open, setOpen] = useState(true)
+  // La page est pré-rendue sans connaître le visiteur ni l'adresse : la fenêtre ne s'ouvre qu'une
+  // fois dans le navigateur, sinon React signale un écart avec le pré-rendu (#418).
+  const hydrated = useHydrated()
   const parsed = ReportTarget.safeParse({ kind: firstParam(fromKind), id: firstParam(fromId) })
   return (
     <SuspendSheet
       memberId={memberId}
-      open={open}
+      open={open && hydrated}
       onClose={() => {
         setOpen(false)
         back()
