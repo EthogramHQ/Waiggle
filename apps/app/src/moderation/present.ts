@@ -1,6 +1,12 @@
 // Ce que la page « Modération » écrit d'un signalement, et où mène son lien « Voir ». Des fonctions
 // pures, à part des hooks de api.ts : les tests de l'écran remplacent api.ts sans perdre celles-ci.
-import { type PartOut, ReportPart, type ReportReason, StoredReportTarget } from '@ruche/contracts'
+import {
+  isReportablePart,
+  type PartOut,
+  ReportPart,
+  type ReportReason,
+  StoredReportTarget,
+} from '@ruche/contracts'
 import type { Translation } from '@ruche/i18n'
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
@@ -52,10 +58,13 @@ type T = ReturnType<typeof useTranslation>['t']
 /**
  * La partie en minuscules, après le genre du contenu (« la photo 2 », « le titre »). Une photo dit
  * son rang dans sa galerie (`position`) ; si la photo n'est plus là (rang inconnu), « la photo »
- * tout court, plutôt qu'un « {{n}} » écrit tel quel.
+ * tout court, plutôt qu'un « {{n}} » écrit tel quel. `kind` : la sorte du contenu, pour nommer la
+ * seule image d'un message (« la capture ») ou d'un appel (« la photo »).
  */
-export const partText = (part: PartOut, t: T): string => {
+export const partText = (part: PartOut, t: T, kind?: StoredReportTarget['kind']): string => {
   const field: PartTextKey = part.field
+  if (field === 'photo' && kind === 'message') return t(($) => $.moderation.parts.capture)
+  if (field === 'photo' && kind === 'call') return t(($) => $.moderation.parts.callPhoto)
   if ((field === 'photo' || field === 'photoDescription') && part.position === null) {
     return t(($) => $.moderation.parts.callPhoto)
   }
@@ -92,5 +101,7 @@ export const parseItemKey = (
   if (!target.success) return null
   if (field === undefined) return mediaId === undefined ? { target: target.data, part: null } : null
   const part = ReportPart.safeParse({ field, ...(mediaId === undefined ? {} : { mediaId }) })
-  return part.success ? { target: target.data, part: part.data } : null
+  // Une partie que cette sorte de contenu n'a pas (une photo d'un commentaire) n'existe pas.
+  if (!part.success || !isReportablePart(target.data.kind, part.data.field)) return null
+  return { target: target.data, part: part.data }
 }
