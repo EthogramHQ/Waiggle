@@ -199,7 +199,8 @@ describe('who sees the moderation', () => {
     await renderWithProviders(<ModerationScreen />)
 
     expect(await screen.findByRole('header', { name: 'Modération' })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'En attente', checked: true })).toBeTruthy()
+    // R9 : « En attente » devient « À traiter », suivi du nombre d'éléments (« À traiter (4) »).
+    expect(screen.getByRole('radio', { name: /^À traiter/, checked: true })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Retirés', checked: false })).toBeTruthy()
     expect(screen.getByText(firstTextOf(scamCommentItem))).toBeTruthy()
     // Le groupe d'onglets porte un nom à lui, pas celui de la page (relecture de 7a).
@@ -226,7 +227,7 @@ describe('who sees the moderation', () => {
 
     expect(await screen.findByRole('button', { name: 'Retour à l’accueil' })).toBeTruthy()
     expect(screen.queryByText(firstTextOf(scamCommentItem))).toBeNull()
-    expect(screen.queryByRole('radio', { name: 'En attente' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: /^À traiter/ })).toBeNull()
   })
 
   it('says « not found » when the API does not know the page (a revoked administrator)', async () => {
@@ -782,11 +783,11 @@ describe('the card of a report, slice 7c', () => {
       ...fakeReviewsItem,
       authorRecord: {
         memberId: 'u4',
+        // R9 : la fiche de l'auteur, son nom, son pseudo, son inscription et ses nombres.
         name: 'Nora',
         handle: 'nora',
-        joinedAt: '2026-08-14T09:00:00.000Z',
-        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
-        projectCount: 3,
+        joinedAt: '2026-09-14T09:00:00.000Z',
+        projectCount: 2,
         commentCount: 7,
         removals: 1,
         suspensions: 1,
