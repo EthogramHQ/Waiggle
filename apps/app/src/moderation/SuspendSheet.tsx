@@ -28,7 +28,7 @@ import {
   SUSPENSIONS_BEFORE_PASSWORD,
   type SuspensionDuration,
 } from '@ruche/contracts'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, errorKey } from '../api/errors'
@@ -108,21 +108,16 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
     } else body = 'form'
   } else if (member.error) body = 'error'
 
-  if (body === 'form' && data) {
-    return (
-      <DecisionSheet
-        // Un formulaire neuf par membre et par mode : rien de la fois d'avant ne reste.
-        key={`${data.id}:${mode}`}
-        open={open}
-        onClose={onClose}
-        mode={mode}
-        member={data}
-        title={title}
-        subtitle={subtitle}
-        {...(fromReport ? { fromReport } : null)}
-      />
-    )
-  }
+  // Le formulaire, quand il y en a un. Une seule feuille pour tous les états : celle du chargement
+  // devient celle du formulaire sans se refermer ni se rouvrir (une feuille montée déjà ouverte
+  // ne s'animerait pas, et le focus posé dans la première se perdrait).
+  const form = useDecisionForm({
+    open,
+    onClose,
+    mode,
+    member: body === 'form' ? (data ?? null) : null,
+    ...(fromReport ? { fromReport } : null),
+  })
 
   const reasons = {
     blocked: t(($) => $.moderation.blockedTarget),
@@ -132,7 +127,16 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
   const failureKey = member.error ? errorKey(member.error) : null
 
   return (
-    <Sheet open={open} title={title} {...(subtitle ? { subtitle } : null)} onClose={onClose}>
+    <Sheet
+      open={open}
+      title={title}
+      {...(subtitle ? { subtitle } : null)}
+      onClose={onClose}
+      // La fenêtre s'ouvre sous le doigt de « Suspendre » : ses boutons ignorent une double tape.
+      guardTaps
+      {...(form ? form.sheet : null)}
+    >
+      {form ? form.content : null}
       {body === 'loading' ? <StateMessage kind="loading" level={2} /> : null}
       {body === 'none' ? (
         <StateMessage kind="notFound" level={2} title={t(($) => $.states.notFoundTitle)} />
@@ -173,24 +177,26 @@ const useAuthorLine = (author: SuspendSheetAuthor | undefined): string | undefin
     : t(($) => $.moderation.suspendSheet.subtitleNew, { handle: author.handle, date })
 }
 
-/** Le formulaire de la suspension, ou de sa levée, dans la fenêtre. */
-function DecisionSheet({
+/**
+ * Hook : le formulaire de la suspension, ou de sa levée (son contenu, son pied et son message), pour
+ * la feuille de SuspendSheet ; null sans membre à suspendre (`member` null).
+ */
+function useDecisionForm({
   open,
   onClose,
   mode,
   member,
-  title,
-  subtitle,
   fromReport,
 }: {
   open: boolean
   onClose: () => void
   mode: Mode
-  member: Member
-  title: string
-  subtitle: string | undefined
+  member: Member | null
   fromReport?: ReportTarget
-}) {
+}): {
+  sheet: { busy: boolean; notice: SheetNotice | null; footer: ReactNode }
+  content: ReactNode
+} | null {
   const { t, i18n } = useTranslation()
   const signInAgain = useSignInAgain()
   const toast = useToast()
@@ -207,10 +213,13 @@ function DecisionSheet({
   // Un envoi à la fois : deux touchers rapides ne suspendent qu'une fois.
   const busy = useRef(false)
 
-  // À chaque ouverture, un formulaire neuf (voir RemoveSheet).
+  // À chaque ouverture, et pour un autre membre ou un autre mode (une suspension faite devient une
+  // levée), un formulaire neuf : rien de la fois d'avant ne reste (voir RemoveSheet).
+  const formKey = `${member?.id ?? ''}:${mode}`
   const wasOpen = useRef(open)
+  const lastKey = useRef(formKey)
   useEffect(() => {
-    if (open && !wasOpen.current) {
+    if ((open && !wasOpen.current) || formKey !== lastKey.current) {
       setDuration(null)
       setGround(null)
       setCause(null)
@@ -221,10 +230,11 @@ function DecisionSheet({
       setFailure(null)
     }
     wasOpen.current = open
-  }, [open])
+    lastKey.current = formKey
+  }, [open, formKey])
 
   const suspending = mode === 'suspend'
-  const suspension = member.moderation?.suspension ?? null
+  const suspension = member?.moderation?.suspension ?? null
   const text = explanation.trim()
   const ready =
     text !== '' &&
@@ -232,7 +242,7 @@ function DecisionSheet({
     (!passwordAsked || password !== '')
 
   const submit = async () => {
-    if (busy.current || !ready) return
+    if (busy.current || !ready || !member) return
     if (!RemovalExplanation.safeParse(text).success) {
       setFieldError(t(($) => $.profile.errors.invalidCharacters))
       return
@@ -293,16 +303,12 @@ function DecisionSheet({
         })
     : null
 
-  return (
-    <Sheet
-      open={open}
-      title={title}
-      {...(subtitle ? { subtitle } : null)}
-      onClose={onClose}
-      busy={sending}
-      guardTaps
-      notice={notice}
-      footer={
+  if (!member) return null
+  return {
+    sheet: {
+      busy: sending,
+      notice,
+      footer: (
         <Row gap="sm" justify="end" wrap>
           <Button
             label={t(($) => $.moderation.cancel)}
@@ -326,8 +332,9 @@ function DecisionSheet({
             disabled={!ready}
           />
         </Row>
-      }
-    >
+      ),
+    },
+    content: (
       <Stack gap="xl">
         <Stack gap="sm">
           <Text>
@@ -426,6 +433,6 @@ function DecisionSheet({
           />
         ) : null}
       </Stack>
-    </Sheet>
-  )
+    ),
+  }
 }
