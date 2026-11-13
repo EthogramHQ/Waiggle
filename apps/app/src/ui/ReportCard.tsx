@@ -50,7 +50,7 @@ import type { PressEvent } from './ListGroup'
 import { Notice } from './Notice'
 import { PICTURE_MAX_HEIGHT } from './OpenableImage'
 import { ProjectCover } from './ProjectCover'
-import { StatusPill } from './StatusPill'
+import { STATUS_PILL_HEIGHT, StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
 import { useTheme } from './theme/ThemeProvider'
@@ -658,14 +658,23 @@ function QueueItem({
           {status ? <InfoLine text={status} /> : null}
         </View>
       </Pressable>
-      <CardEnd
-        actions={actions}
-        decided={decided}
-        decidedRef={decidedRef}
-        error={error}
-        description={description}
-        descriptionId={descriptionId}
-      />
+      {/* Les actions, la panne et le résultat, sous le lien, alignés sur son contenu. Rien du tout
+          sans eux : pas d'écart vide sous un élément de la file sans action. */}
+      {actions.length > 0 || decided || error ? (
+        <View style={{ gap: space.sm, paddingHorizontal: space.md, paddingBottom: space.sm }}>
+          <CardEnd
+            actions={actions}
+            decided={decided}
+            decidedRef={decidedRef}
+            error={error}
+            description={description}
+            descriptionId={descriptionId}
+            ownsDescription={false}
+          />
+        </View>
+      ) : null}
+      {/* La description cachée, lue après le nom du lien et de chaque bouton. */}
+      {description ? <ActionDescription id={descriptionId} text={description} /> : null}
     </View>
   )
 }
@@ -681,6 +690,7 @@ function CardEnd({
   error,
   description,
   descriptionId,
+  ownsDescription = true,
 }: {
   actions: readonly ReportCardAction[]
   decided: Props['decided']
@@ -688,6 +698,8 @@ function CardEnd({
   error: string | undefined
   description: string | undefined
   descriptionId: string
+  /** Faux : la carte pose elle-même la description cachée (l'élément de la file, dont le lien la lit aussi). */
+  ownsDescription?: boolean
 }) {
   const describes = description
     ? { describedById: descriptionId, hint: description }
@@ -728,7 +740,9 @@ function CardEnd({
           ))}
         </View>
       ) : null}
-      {description ? <ActionDescription id={descriptionId} text={description} /> : null}
+      {description && ownsDescription ? (
+        <ActionDescription id={descriptionId} text={description} />
+      ) : null}
     </>
   )
 }
@@ -746,6 +760,8 @@ function ReportedTimes({ label }: { label: string }) {
         alignItems: 'center',
         alignSelf: 'flex-start',
         maxWidth: '100%',
+        // La hauteur de la pastille de statut (« Compte récent »), posée à côté : même ligne.
+        minHeight: STATUS_PILL_HEIGHT,
         gap: space.xxs,
         paddingHorizontal: space.sm,
         paddingVertical: space.xxs,
