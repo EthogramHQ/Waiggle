@@ -177,6 +177,8 @@ const en: typeof fr = {
 const louis = { id: 'u0', name: 'Louis', handle: 'louis' }
 const sam = { id: 'u5', name: 'Sam', handle: 'sam' }
 const blank = {
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   ground: null,
   explanation: null,

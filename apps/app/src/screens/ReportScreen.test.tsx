@@ -78,7 +78,20 @@ const target: ReportTarget = { kind: 'comment', id: commentId }
  * l'auteur de la cible, pour proposer « Bloquer aussi @sam » après l'envoi.
  */
 const sam = { id: 'u9', name: 'Sam Petit', handle: 'sam', isBlocked: false }
-const preview: ReportTargetPreview = { target, text: commentText, projectId, author: sam }
+// Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests : le rappel en tête, les parties, « déjà signalé » et les signalements restants.
+const r9Preview = {
+  head: { title: null, authorName: 'Sam Petit', image: null },
+  parts: [],
+  reportedByMe: false,
+  remainingToday: 20,
+}
+const preview: ReportTargetPreview = {
+  target,
+  text: commentText,
+  projectId,
+  author: sam,
+  ...r9Preview,
+}
 
 /** La page « Signaler » de ce commentaire, telle que l'ouvre l'action « Signaler ». */
 const reportComment = () => renderWithProviders(<ReportScreen kind="comment" id={commentId} />)
@@ -170,6 +183,7 @@ describe('what is reported', () => {
       projectId: null,
       // Pour un profil, l'auteur est le membre lui-même.
       author: { id: 'u7', name: 'Lucas Martin', handle: 'lucas_martin', isBlocked: false },
+      ...r9Preview,
     })
     await renderWithProviders(<ReportScreen kind="member" id="u7" />)
 

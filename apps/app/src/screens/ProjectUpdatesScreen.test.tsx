@@ -41,6 +41,8 @@ const updateNo = (n: number): ProjectUpdate => ({
   beforeAfter: false,
   createdAt: new Date(Date.UTC(2026, 9, 30, 12) - n * 3_600_000).toISOString(),
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 })
 
 /** Le projet de Léa avec ses trois mises à jour (la fusée en tête). */

@@ -123,6 +123,8 @@ export const callNo = (n: number, text = `Appel numéro ${n}`): TesterCall => ({
   photo: null,
   createdAt: daysAgo(n),
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 })
 
 /** Deux appels de Léa, le plus récent en tête ; le second a une photo décrite. */
@@ -145,6 +147,8 @@ export const messageOf = (n: number, changes: Partial<TesterMessage>): TesterMes
   createdAt: daysAgo(0, 10 - n),
   settled: null,
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
   mine: false,
   ...changes,
 })

@@ -90,6 +90,8 @@ export const toUpdate = (
   beforeAfter: row.beforeAfter,
   createdAt: row.createdAt.toISOString(),
   removal,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 })
 
 /**

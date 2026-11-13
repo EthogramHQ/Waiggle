@@ -125,6 +125,8 @@ const rocket = (l: Labels): ProjectUpdate => ({
   beforeAfter: true,
   createdAt: hoursAgo(50),
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 })
 
 export function UpdateEntryCatalogue() {

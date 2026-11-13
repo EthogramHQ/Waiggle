@@ -465,6 +465,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // « stocké », qui l'admet encore.
       targetKind: StoredReportTargetKind.parse(row.targetKind),
       targetId: row.targetId,
+      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+      part: null,
       reason: ReportReason.parse(row.reason),
       details: row.details,
       createdAt: row.createdAt.toISOString(),
@@ -505,6 +507,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         reports,
         blocks,
         moderation,
+        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+        moderationDecisions: [],
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         feed: { readAt: feedReadAt?.toISOString() ?? null },
         dismissedSuggestions,

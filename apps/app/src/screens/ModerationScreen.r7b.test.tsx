@@ -68,6 +68,10 @@ const PHOTO_URI = 'https://api.waiggle.test/v1/testers/call-photos/p4'
 
 const messageItem: ModerationQueueItem = {
   target: { kind: 'message', id: 'a1b2c3d4-0000-4a26-8b37-48596a7b8c01' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: meteoProjectId,
   snapshot: [{ field: 'body', value: 'Mon retour : le bouton ne répond pas.' }],
   images: [{ field: 'photo', state: 'present', url: CAPTURE_URI }],
@@ -104,6 +108,8 @@ const publicPhotoItem: ModerationQueueItem = {
 
 const removedMessage: RemovedItem = {
   target: { kind: 'message', id: 'a1b2c3d4-0000-4a26-8b37-48596a7b8c05' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: meteoProjectId,
   text: 'Un message retiré du fil.',
   ground: 'rules',

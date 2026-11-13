@@ -135,6 +135,8 @@ export const loadDecisionHistory = async (
             ? { id: row.adminId, name: row.adminName, handle: row.adminHandle }
             : null,
         target: target.data,
+        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+        part: null,
         projectId:
           row.projectId ??
           row.updateProjectId ??

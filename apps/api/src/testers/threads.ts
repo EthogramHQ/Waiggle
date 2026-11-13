@@ -103,6 +103,8 @@ export const toTesterMessage = (
       row.removedAt !== null && row.senderId === context.viewerId
         ? (context.removals.get(row.removalId ?? '') ?? null)
         : null,
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+    removedParts: [],
     mine: row.senderId === context.viewerId,
   }
 }

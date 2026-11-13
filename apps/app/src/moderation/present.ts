@@ -14,6 +14,7 @@ export const reasonTextKey = {
   scam_spam: 'scamSpam',
   impersonation: 'impersonation',
   privacy: 'privacy',
+  dangerous_link: 'dangerousLink',
   other: 'other',
 } as const satisfies Record<ReportReason, string>
 
