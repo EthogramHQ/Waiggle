@@ -123,6 +123,21 @@ describe('no other way in', () => {
     expect(res.status).toBe(404)
   })
 
+  // Audit de sécurité du 7/11/2026, N1 (GHSA-4wq4) : le relais signe aussi un paramètre `state`.
+  // Fermé quel que soit le nom du paramètre : ni cookie, ni redirection (montées du 12/11/2026).
+  it.each(['state=a', 'oauthState=a', 'state=a&oauthState=b'])(
+    'keeps the Expo sign-in relay closed with %s',
+    async (params) => {
+      const res = await ctx.request(
+        `/api/auth/expo-authorization-proxy?authorizationURL=https://evil.example/&${params}`,
+      )
+
+      expect(res.status).toBe(404)
+      expect(res.headers.get('set-cookie')).toBeNull()
+      expect(res.headers.get('location')).toBeNull()
+    },
+  )
+
   it('lets no route other than the sign-up with the code create an account', async () => {
     // Le garde-fou de la base de données (auth.ts), appelé comme le ferait une future connexion
     // par Google (/callback/:id) : la création est annulée.

@@ -261,12 +261,15 @@ export const unverifiedEmailRoutes = ({ db, limiter, auth, mailer, appUrl, secre
 
     // Le nouveau lien, fabriqué comme Better Auth le fait (sendVerificationEmailFn), vers la page
     // /verified imposée (S6). Si l'adresse demandée est l'adresse actuelle, rien ne change en base
-    // et un nouveau lien part : c'est un renvoi.
+    // et un nouveau lien part : c'est un renvoi. Il nomme le compte (`userId`), comme ceux de
+    // Better Auth depuis 1.7.16 (montées du 12/11/2026) : Better Auth refuse alors de vérifier un
+    // autre compte qui aurait repris l'adresse, même dans la seconde où il l'a reprise.
     const token = await createEmailVerificationToken(
       context.secret,
       newEmail,
       undefined,
       context.options.emailVerification?.expiresIn ?? LINK_LIFETIME_SECONDS,
+      { userId: account.id },
     )
     const url = new URL(`${context.baseURL}/verify-email`)
     url.searchParams.set('token', token)
