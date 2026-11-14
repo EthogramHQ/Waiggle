@@ -14,12 +14,12 @@ import {
   ReportTargetPreview,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
-import { loadReportable, sameSnapshot } from '../reports/target'
+import { findPart, loadReportable, sameSnapshot } from '../reports/target'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -74,9 +74,14 @@ const previewRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter }
+type Deps = {
+  db: Database
+  limiter: RateLimiter
+  /** R9 : pour l'adresse des miniatures de la feuille (photos, photo de profil). */
+  publicApiUrl: string
+}
 
-export const reportRoutes = ({ db, limiter }: Deps) => {
+export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste (401).
@@ -110,38 +115,51 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
     // Validé par CreateReport : la cible (id conforme à sa sorte), le motif, la précision (500
     // caractères au plus ; vide, elle compte comme absente). Tout autre champ (un `snapshot`
     // envoyé par l'appli) est ignoré.
-    const { target, reason, details } = c.req.valid('json')
+    const { target, part, reason, details } = c.req.valid('json')
 
     // L'ordre de la règle 5 : visibilité, puis « son propre contenu », puis « déjà signalé ».
     // Inconnu, privé, retiré, masqué ou supprimé : la même réponse, qui ne révèle rien.
-    const found = await loadReportable(db, user.id, target)
+    const found = await loadReportable(db, user.id, target, publicApiUrl)
     if (!found) return notFound(c)
     if (found.authorId === user.id) return ownContent(c)
+    // R9 : une partie doit être sur la page que ce membre voit (une photo d'un autre contenu, une
+    // photo retirée, un prompt absent) : sinon le même 404 qu'un contenu inconnu. La copie ne garde
+    // alors que cette partie.
+    const reported = part ? findPart(found, part) : null
+    if (part && !reported) return notFound(c)
+    const snapshot = reported ? reported.copy : found.snapshot
+    const partField = part?.field ?? null
+    const partMediaId = reported?.mediaId ?? null
 
-    // Re-signaler (tranche 7b, règle 14) : le dernier signalement de ce membre pour cette cible.
-    // Encore ouvert : « déjà signalé ». Clos (retiré, classé, sans objet) avec la même copie : la
-    // modération a déjà examiné ce contenu tel qu'il est, un code à part (« already_examined »).
-    // Clos et le contenu a changé depuis : un nouveau signalement est permis. L'index
-    // content_report_target_idx (target_kind, target_id) donne les quelques signalements de la
-    // cible, filtrés ensuite par leur auteur.
+    // Re-signaler (tranche 7b, règle 14) : le dernier signalement de ce membre pour cette cible et
+    // cette partie (R9 : le contenu entier et chaque partie se signalent à part). Encore ouvert :
+    // « déjà signalé ». Clos (retiré, classé, sans objet) avec la même copie : la modération a déjà
+    // examiné ce contenu tel qu'il est, un code à part (« already_examined »). Clos et le contenu a
+    // changé depuis : un nouveau signalement est permis. L'index content_report_target_idx
+    // (target_kind, target_id) donne les quelques signalements de la cible, filtrés ensuite par
+    // leur auteur et leur partie. `is not distinct from` : l'égalité qui tient aussi entre deux null
+    // (le contenu entier n'a ni champ ni photo).
+    const r = schema.contentReport
     const [previous] = await db
-      .select({ status: schema.contentReport.status, snapshot: schema.contentReport.snapshot })
-      .from(schema.contentReport)
+      .select({ status: r.status, snapshot: r.snapshot })
+      .from(r)
       .where(
         and(
-          eq(schema.contentReport.targetKind, target.kind),
-          eq(schema.contentReport.targetId, target.id),
-          eq(schema.contentReport.reporterId, user.id),
+          eq(r.targetKind, target.kind),
+          eq(r.targetId, target.id),
+          eq(r.reporterId, user.id),
+          sql`${r.partField} is not distinct from ${partField}`,
+          sql`${r.partMediaId} is not distinct from ${partMediaId}::uuid`,
         ),
       )
-      .orderBy(desc(schema.contentReport.createdAt), desc(schema.contentReport.id))
+      .orderBy(desc(r.createdAt), desc(r.id))
       .limit(1)
     if (previous?.status === 'open') return alreadyReported(c)
     if (previous) {
       // safeParse : une copie mal formée en base ne fait pas tomber la route ; elle compte alors
       // comme différente, et le signalement est accepté.
       const before = ReportSnapshot.safeParse(previous.snapshot)
-      if (before.success && sameSnapshot(before.data, found.snapshot)) {
+      if (before.success && sameSnapshot(before.data, snapshot)) {
         return c.json(errorBody(languageOf(c), 'already_examined'), 409)
       }
     }
@@ -164,7 +182,9 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
         targetAuthorId: found.authorId,
         reason,
         details: details === undefined || details === '' ? null : details,
-        snapshot: found.snapshot,
+        snapshot,
+        partField,
+        partMediaId,
         status: 'open',
         // L'heure de JavaScript, comme toutes les dates qui rangent (la file, la purge).
         createdAt: new Date(),
@@ -185,9 +205,30 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
     if (!parsed.success) return c.json(errorBody(languageOf(c), 'validation'), 400)
     const target = parsed.data
 
-    const found = await loadReportable(db, user.id, target)
+    const found = await loadReportable(db, user.id, target, publicApiUrl)
     if (!found) return notFound(c)
     if (found.authorId === user.id) return ownContent(c)
+
+    // R9 : ce que ce membre a déjà signalé et qui reste ouvert, le contenu entier ou ses parties.
+    // Servi par l'index unique partiel content_report_reporter_target_idx (reporter_id,
+    // target_kind, target_id…, où status = 'open') : seules ses lignes ouvertes sur cette cible.
+    const r = schema.contentReport
+    const mine = await db
+      .select({ field: r.partField, mediaId: r.partMediaId })
+      .from(r)
+      .where(
+        and(
+          eq(r.reporterId, user.id),
+          eq(r.targetKind, target.kind),
+          eq(r.targetId, target.id),
+          eq(r.status, 'open'),
+        ),
+      )
+    const reportedByMe = (field: string | null, mediaId: string | null) =>
+      mine.some((row) => row.field === field && row.mediaId === mediaId)
+    // Le quota du jour, lu sans compter ni ouvrir de fenêtre (`peek`, relecture de sécurité P8).
+    const { remaining } = await limiter.peek(memberCounterKeys(user.id).report, reportRule)
+
     return c.json(
       ReportTargetPreview.parse({
         target,
@@ -196,6 +237,17 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
         // L'auteur (le membre lui-même pour un profil) : son nom et son pseudo publics, rien de
         // son compte ; `isBlocked` dit si l'appli peut encore proposer « Bloquer aussi @x ».
         author: found.author,
+        head: { ...found.head, authorName: found.author.name },
+        // La copie de chaque partie reste ici : elle n'est que pour le signalement.
+        parts: found.parts.map(({ field, mediaId, position, thumb }) => ({
+          field,
+          mediaId,
+          position,
+          thumb,
+          reportedByMe: reportedByMe(field, mediaId),
+        })),
+        reportedByMe: reportedByMe(null, null),
+        remainingToday: remaining,
       }),
       200,
     )

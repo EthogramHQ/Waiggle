@@ -2001,6 +2001,9 @@ export const fr = {
       profilePart: 'retrait de {{part}} de mon profil',
       suspension: 'suspension de mon compte',
     },
+    // Le nom donné d'office quand la modération retire celui d'un membre (R9), dans la langue de
+    // son compte ; il le garde jusqu'à ce qu'il en choisisse un autre.
+    provisionalNameValue: 'Membre',
   },
   member: {
     // {{nameOf}} : « d’Inès », « de Léa » (nameOf de @ruche/i18n, tranche 6c).
