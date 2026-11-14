@@ -13,7 +13,7 @@
 import { contactEmail } from '@ruche/brand'
 import type { Removal } from '@ruche/contracts'
 import { fireEvent, screen, within } from '@testing-library/react-native'
-import { Linking, View } from 'react-native'
+import { Linking, Platform, View } from 'react-native'
 import { labelOf } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
@@ -220,5 +220,72 @@ describe('RemovedPart', () => {
     await fireEvent.press(within(group()).getByRole('button', { name: 'Supprimer' }))
 
     expect(focused().at(-1)).toContain(TITLE)
+  })
+
+  it('says « Pour contester » once, not once from the notice and once from a sentence', async () => {
+    await show()
+
+    // Le fil « Pour contester : » est écrit une fois dans l'encadré, avec une seule adresse.
+    const lead = fr.t(($) => $.removal.part.contestLead)
+    expect(within(group()).queryAllByText(containing(lead))).toHaveLength(1)
+    expect(within(group()).queryAllByText(containing(contactEmail))).toHaveLength(1)
+  })
+
+  it('shows Delete as loading while the photo is being deleted', async () => {
+    await renderWithProviders(
+      <RemovedPart
+        title={TITLE}
+        removal={removal}
+        contestSubject={SUBJECT}
+        onReplace={onReplace}
+        onDelete={onDelete}
+        deleting
+      />,
+    )
+
+    const busy = (button: { props: Record<string, unknown> }) =>
+      button.props['aria-busy'] === true ||
+      (button.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+    const remove = within(group()).getByRole('button', { name: 'Supprimer' })
+    expect(busy(remove)).toBe(true)
+    await fireEvent.press(remove)
+    expect(onDelete).not.toHaveBeenCalled()
+    expect(within(group()).getByRole('button', { name: 'Remplacer' })).toBeDisabled()
+  })
+
+  it('does not show Delete as loading by default (witness)', async () => {
+    await show()
+
+    const remove = within(group()).getByRole('button', { name: 'Supprimer' })
+    expect(remove.props['aria-busy']).not.toBe(true)
+    expect(within(group()).getByRole('button', { name: 'Remplacer' })).not.toBeDisabled()
+  })
+
+  describe('with two removed parts in a page', () => {
+    // Deux « Supprimer » de même nom : chacun se lit avec le titre de sa partie.
+    it('reads the title of the removed part after Delete and Replace on a phone', async () => {
+      await show()
+
+      for (const name of ['Supprimer', 'Remplacer']) {
+        expect(within(group()).getByRole('button', { name }).props.accessibilityHint).toBe(TITLE)
+      }
+    })
+
+    it('points Delete and Replace to the title with aria-describedby on the web', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await show()
+
+        const titleId = within(group()).getByText(TITLE).props.nativeID
+        expect(titleId).toBeTruthy()
+        for (const name of ['Supprimer', 'Remplacer']) {
+          expect(within(group()).getByRole('button', { name }).props['aria-describedby']).toBe(
+            titleId,
+          )
+        }
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
   })
 })

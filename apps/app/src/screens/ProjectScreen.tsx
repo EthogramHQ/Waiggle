@@ -48,7 +48,7 @@ import { startedMonth } from '../projects/month'
 import { ProjectActions } from '../projects/ProjectActions'
 import { ProjectHeader } from '../projects/ProjectHeader'
 import {
-  isPhotoPart,
+  isDeletablePhoto,
   isProjectPart,
   type ProjectPartField,
   ProjectRemovedPart,
@@ -519,7 +519,9 @@ function ProjectView({ project }: { project: Project }) {
     return (
       <Stack gap="lg">
         {parts.map((part) => {
-          const mediaId = isPhotoPart(part) ? part.mediaId : null
+          // L'identifiant de la photo que « Supprimer » ferait partir : la photo ou la couverture
+          // seulement. La description d'une photo retirée n'a que « Remplacer ».
+          const mediaId = isDeletablePhoto(part) ? part.mediaId : null
           return (
             <ProjectRemovedPart
               key={`${part.field}-${part.mediaId ?? ''}`}
@@ -528,6 +530,7 @@ function ProjectView({ project }: { project: Project }) {
               onReplace={canReplace ? edit : null}
               onDelete={mediaId ? () => void photoDeletion.remove(mediaId) : null}
               error={deletionError(mediaId)}
+              deleting={mediaId !== null && photoDeletion.deleting === mediaId}
             />
           )
         })}

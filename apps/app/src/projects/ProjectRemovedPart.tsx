@@ -41,9 +41,6 @@ const PROJECT_PART_FIELDS = [
 ] as const satisfies readonly ReportPartField[]
 export type ProjectPartField = (typeof PROJECT_PART_FIELDS)[number]
 
-/** Les parties qui désignent une photo de la galerie (elles portent son identifiant). */
-const PHOTO_FIELDS: readonly ProjectPartField[] = ['cover', 'photo', 'photoDescription']
-
 /** Une partie retirée d'un projet, son champ rétréci aux parties qu'un projet peut perdre seules. */
 export type ProjectRemovedPartData = RemovedPartData & { field: ProjectPartField }
 
@@ -51,9 +48,13 @@ export type ProjectRemovedPartData = RemovedPartData & { field: ProjectPartField
 export const isProjectPart = (part: RemovedPartData): part is ProjectRemovedPartData =>
   (PROJECT_PART_FIELDS as readonly ReportPartField[]).includes(part.field)
 
-/** Vrai si la partie désigne une photo (elle reste dans la galerie de l'auteur, marquée). */
-export const isPhotoPart = (part: ProjectRemovedPartData): boolean =>
-  PHOTO_FIELDS.includes(part.field) && part.mediaId !== null
+/**
+ * Vrai si « Supprimer » a un sens : la partie est la photo elle-même (la photo ou la couverture).
+ * Sous la description d'une photo retirée, il supprimerait la photo avec sa bonne description :
+ * « Remplacer » suffit (le formulaire change le texte).
+ */
+export const isDeletablePhoto = (part: ProjectRemovedPartData): boolean =>
+  (part.field === 'photo' || part.field === 'cover') && part.mediaId !== null
 
 type Props = {
   project: Project
@@ -64,9 +65,18 @@ type Props = {
   onDelete: (() => void) | null
   /** Le refus de la dernière suppression de cette partie, lu sous l'encadré ; null, rien. */
   error?: string | null
+  /** La suppression de cette photo est en cours : « Supprimer » charge, « Remplacer » attend. */
+  deleting?: boolean
 }
 
-export function ProjectRemovedPart({ project, part, onReplace, onDelete, error = null }: Props) {
+export function ProjectRemovedPart({
+  project,
+  part,
+  onReplace,
+  onDelete,
+  error = null,
+  deleting = false,
+}: Props) {
   const { t, i18n } = useTranslation()
   const toSource = useMediaSources()
   // Le rang d'une photo dans la galerie de l'auteur, à partir de 1 ; null si elle n'y est plus.
@@ -125,6 +135,7 @@ export function ProjectRemovedPart({ project, part, onReplace, onDelete, error =
         contestSubject={subject}
         onReplace={onReplace}
         onDelete={onDelete}
+        deleting={deleting}
       >
         {content}
       </RemovedPart>
@@ -160,13 +171,17 @@ export const useDeleteRemovedPhoto = (projectId: string, onDeleted: () => void) 
   const queryClient = useQueryClient()
   const sending = useRef(false)
   const [failed, setFailed] = useState<{ mediaId: string; error: ApiErrorKey } | null>(null)
+  // La photo en cours de suppression : son encadré montre « Supprimer » en chargement.
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const remove = async (mediaId: string) => {
     if (sending.current) return
     sending.current = true
     setFailed(null)
+    setDeleting(mediaId)
     const result = await deleteVisual(projectId, mediaId)
     sending.current = false
+    setDeleting(null)
     if (result.ok) {
       setProject(result.data)
     } else if (result.error === 'notFound') {
@@ -178,5 +193,5 @@ export const useDeleteRemovedPhoto = (projectId: string, onDeleted: () => void) 
     onDeleted()
   }
 
-  return { remove, failed }
+  return { remove, failed, deleting }
 }

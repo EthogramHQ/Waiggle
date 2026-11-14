@@ -12,7 +12,7 @@
 // phrases de la décision sont écrites ici, à partir de la `Removal` du contrat.
 import { borders, radii, space } from '@ruche/brand'
 import type { Removal } from '@ruche/contracts'
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from './Button'
@@ -40,6 +40,11 @@ type Props = {
   onDelete: (() => void) | null
   /** La partie elle-même (la photo, le texte retiré), que l'auteur voit encore. */
   children?: ReactNode
+  /**
+   * « Supprimer » est en cours (la photo part pour de bon, l'API peut mettre quelques secondes) :
+   * le bouton montre son chargement, et « Remplacer » est inactif le temps de l'envoi.
+   */
+  deleting?: boolean
 }
 
 export function RemovedPart({
@@ -49,10 +54,14 @@ export function RemovedPart({
   onReplace,
   onDelete,
   children,
+  deleting = false,
 }: Props) {
   const { t, i18n } = useTranslation()
   const { colors } = useTheme()
   const titleRef = useRef<Focusable>(null)
+  // L'identifiant du titre : les deux boutons s'y rattachent (« Supprimer », puis le titre lu),
+  // car deux parties retirées dans une page donnent deux boutons de même nom.
+  const titleId = useId()
 
   // Le fondement est une clé fabriquée à partir de la valeur du contrat (« illegal », « rules ») :
   // recopiée dans une constante avant le sélecteur, comme le veut le typage des textes.
@@ -103,7 +112,13 @@ export function RemovedPart({
           </View>
           {/* flexShrink et minWidth 0 : le titre passe à la ligne au lieu de sortir du cadre. */}
           <View style={{ flexShrink: 1, flexGrow: 1, minWidth: 0 }}>
-            <Text variant="callout" weight={700} tone="danger" focusRef={titleRef}>
+            <Text
+              variant="callout"
+              weight={700}
+              tone="danger"
+              focusRef={titleRef}
+              nativeID={titleId}
+            >
               {title}
             </Text>
           </View>
@@ -157,6 +172,9 @@ export function RemovedPart({
               icon="arrows-left-right"
               variant="secondary"
               onPress={onReplace}
+              disabled={deleting}
+              describedById={titleId}
+              hint={title}
             />
           ) : null}
           {remove ? (
@@ -166,6 +184,9 @@ export function RemovedPart({
               icon="trash"
               variant="danger"
               onPress={remove}
+              loading={deleting}
+              describedById={titleId}
+              hint={title}
             />
           ) : null}
         </ButtonPair>
