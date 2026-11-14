@@ -13,7 +13,7 @@ import { requireUser } from '../auth/session'
 import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
 import { currentHandleOf } from '../handles/load'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { cornerAccess, isMissingMember } from '../testers/access'
@@ -292,7 +292,7 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           id: row.id,
           name: row.name,
           handle: row.handle,
-          avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+          avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
           since: row.since.toISOString(),
         })),
       },

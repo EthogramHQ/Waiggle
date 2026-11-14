@@ -17,10 +17,11 @@ import { memberFollowState } from '../follows/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { searchMentionable } from '../mentions/search'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { loadSummaries, visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { isActiveAdmin } from '../reports/admin'
 import { loadActiveSuspension } from '../suspension/load'
 import { createRouter, errorResponse } from './router'
@@ -220,7 +221,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       id: row.id,
       name: row.name,
       handle,
-      avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+      // R9 : une photo retirée par la modération ne paraît plus ici (avatarUrlOf), pas même pour
+      // elle ; elle la relit dans `removedParts`.
+      avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
       isMe: row.id === viewer.id,
     }
 
@@ -237,7 +240,7 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           isFollowed: false,
           followerCount: 0,
           projects: [],
-          // Provisoire (R9) : BE-B remplira ce champ (les parties retirées, pour l'auteur seul).
+          // Un membre ne se bloque pas lui-même : ce n'est jamais sa propre page, donc vide.
           removedParts: [],
           // Un administrateur qui l'a bloqué lit encore sa suspension et ses décisions, mais ne
           // peut pas le suspendre (canSuspend faux, S4).
@@ -258,6 +261,15 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const follow = await memberFollowState(db, id, viewer.id)
     // R6b : ses outils favoris, lus par profile_tool (le nom tapé pour un « Autre », `inCatalogue`).
     const favoriteTools = await favoriteToolsOf(db, id)
+    // R9 : les parties de son profil retirées par la modération (bio, outils favoris, photo), sur
+    // sa propre page seulement ; pour tout autre visiteur, rien, et aucune requête
+    // (removals/parts.ts ne cherche que les contenus dont le lecteur est l'auteur).
+    const removedParts = await removedPartsOf(
+      db,
+      [{ kind: 'member', id: row.id, authorId: row.id }],
+      viewer.id,
+      publicApiUrl,
+    )
     // Member.parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
     return c.json(
       Member.parse({
@@ -267,8 +279,7 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         isBlocked: false,
         ...follow,
         projects,
-        // Provisoire (R9) : BE-B remplira ce champ (les parties retirées, pour l'auteur seul).
-        removedParts: [],
+        removedParts: removedParts.get(partOwnerKey('member', row.id)) ?? [],
         moderation: await moderationOf(db, viewer.id, row.id, false),
       }),
       200,

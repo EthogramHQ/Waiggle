@@ -20,10 +20,12 @@ import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL } from 'drizzle-orm'
 import { commentCountsOf } from '../comments/load'
 import { projectFollowStates } from '../follows/load'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { reactionStatesOf, reactionTotalsOf } from '../reactions/load'
 import { removalsOf } from '../removals/load'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { latestUpdatesOf, updateCountsOf, updateSummariesOf } from '../updates/load'
+import { mediaShownTo, visibleMedia } from './media-visibility'
 import { testerRemovalsOf, testerStatesOf } from './testers'
 import { projectVisibleTo } from './visibility'
 import { type MediaRow, toVisual } from './visual'
@@ -123,6 +125,7 @@ type ProjectBase = Omit<
   | 'reactions'
   | 'commentCount'
   | 'removal'
+  | 'removedParts'
 >
 
 /**
@@ -132,52 +135,65 @@ type ProjectBase = Omit<
  */
 export const visibleTo = projectVisibleTo
 
-/** Transforme une ligne de la base en projet, sans son état d'abonnement. */
+/**
+ * Transforme une ligne de la base en projet, sans son état d'abonnement. `photosFor` : à qui
+ * montrer les photos (projects/media-visibility.ts) ; le lecteur sur la page du projet, où l'auteur
+ * garde ses photos retirées à leur place, ou null (« à tous ») pour une carte, dont la couverture
+ * n'est jamais une photo retirée.
+ */
 const toProjectBase = (
   { project, authorName, authorAvatarKey }: ProjectRow,
-  media: MediaRow[],
+  allMedia: MediaRow[],
   tools: ProjectTool[],
   viewerId: string,
   publicApiUrl: string,
-): ProjectBase => ({
-  id: project.id,
-  author: {
-    id: project.authorId,
-    name: authorName,
-    avatarUrl: authorAvatarKey ? mediaUrl(publicApiUrl, authorAvatarKey) : null,
-  },
-  title: project.title,
-  pitch: project.pitch,
-  description: project.description,
-  // .parse vérifie que la valeur lue est bien l'une de celles permises (sinon, erreur 500 :
-  // mieux vaut le signaler que renvoyer une donnée incohérente).
-  status: ProjectStatus.parse(project.status),
-  visibility: ProjectVisibility.parse(project.visibility),
-  demoUrl: project.demoUrl,
-  // R6b : lus par `project_tool` (toolsOfProjects) ; les anciennes colonnes ne sont plus lues.
-  tools,
-  prompts: project.prompts,
-  // R6a : catégories, difficulté et mois de départ. Les listes fermées sont revérifiées à la
-  // lecture (comme `status`) ; null pour un projet d'avant R6a. Le temps passé n'est plus lu
-  // (sa colonne s'efface en R6b). Le mois sort tel quel : le contrat de sortie est souple (sec-M1).
-  primaryCategory: ProjectCategory.nullable().parse(project.primaryCategory),
-  secondaryCategory: ProjectCategory.nullable().parse(project.secondaryCategory),
-  difficulty: ProjectDifficulty.nullable().parse(project.difficulty),
-  startedOn: project.startedOn,
-  // Les médias arrivent déjà triés par position : la galerie garde l'ordre choisi par l'auteur.
-  visuals: media
-    .filter((m) => m.projectId === project.id && m.slot === 'gallery')
-    .map((m) => toVisual(m, publicApiUrl)),
-  portraitCover: (() => {
-    const portrait = media.find((m) => m.projectId === project.id && m.slot === 'portrait')
-    return portrait ? toVisual(portrait, publicApiUrl) : null
-  })(),
-  isMine: project.authorId === viewerId,
-  createdAt: project.createdAt.toISOString(),
-  updatedAt: project.updatedAt.toISOString(),
-  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-  removedParts: [],
-})
+  photosFor: string | null,
+): ProjectBase => {
+  const media = allMedia.filter(
+    (m) =>
+      m.projectId === project.id &&
+      mediaShownTo(
+        m,
+        photosFor === null ? null : { ownerId: project.authorId, viewerId: photosFor },
+      ),
+  )
+  return {
+    id: project.id,
+    author: {
+      id: project.authorId,
+      name: authorName,
+      avatarUrl: avatarUrlOf(publicApiUrl, authorAvatarKey),
+    },
+    title: project.title,
+    pitch: project.pitch,
+    description: project.description,
+    // .parse vérifie que la valeur lue est bien l'une de celles permises (sinon, erreur 500 :
+    // mieux vaut le signaler que renvoyer une donnée incohérente).
+    status: ProjectStatus.parse(project.status),
+    visibility: ProjectVisibility.parse(project.visibility),
+    demoUrl: project.demoUrl,
+    // R6b : lus par `project_tool` (toolsOfProjects) ; les anciennes colonnes ne sont plus lues.
+    tools,
+    prompts: project.prompts,
+    // R6a : catégories, difficulté et mois de départ. Les listes fermées sont revérifiées à la
+    // lecture (comme `status`) ; null pour un projet d'avant R6a. Le temps passé n'est plus lu
+    // (sa colonne s'efface en R6b). Le mois sort tel quel : le contrat de sortie est souple (sec-M1).
+    primaryCategory: ProjectCategory.nullable().parse(project.primaryCategory),
+    secondaryCategory: ProjectCategory.nullable().parse(project.secondaryCategory),
+    difficulty: ProjectDifficulty.nullable().parse(project.difficulty),
+    startedOn: project.startedOn,
+    // Les médias arrivent déjà triés par position : la galerie garde l'ordre choisi par l'auteur.
+    // Une carte prend la première photo restante en couverture (toSummary) : la 1re photo visible.
+    visuals: media.filter((m) => m.slot === 'gallery').map((m) => toVisual(m, publicApiUrl)),
+    portraitCover: (() => {
+      const portrait = media.find((m) => m.slot === 'portrait')
+      return portrait ? toVisual(portrait, publicApiUrl) : null
+    })(),
+    isMine: project.authorId === viewerId,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+  }
+}
 
 /**
  * Des lignes de la base, transformées en projets tels que l'API les renvoie (contrat `Project`),
@@ -187,7 +203,8 @@ const toProjectBase = (
  * commentaires), quel que soit leur nombre. Promise.all les lance en même temps. Une de plus,
  * seulement si l'un d'eux est un projet retiré du membre qui regarde : l'explication du retrait
  * (removals/load.ts). Un projet retiré n'arrive ici que pour son auteur (visibleTo) ; la condition
- * est redite, pour que `removal` ne soit jamais rempli pour un autre.
+ * est redite, pour que `removal` ne soit jamais rempli pour un autre. Une de plus encore, seulement
+ * si le lecteur est l'auteur de l'un d'eux : ses parties retirées seules (R9, removals/parts.ts).
  */
 const toProjects = async (
   db: Database,
@@ -212,16 +229,28 @@ const toProjects = async (
       reactionStatesOf(db, ids, viewerId),
       commentCountsOf(db, ids),
     ])
-  const [removals, tools, removedFrom] = await Promise.all([
+  const [removals, tools, removedFrom, removedParts] = await Promise.all([
     removalsOf(db, rows.map(removalIdOf)),
     toolsOfProjects(db, ids),
     // Les projets dont l'auteur a retiré ce membre des testeurs (une requête pour toute la liste).
     testerRemovalsOf(db, ids, viewerId),
+    // R9 : les parties retirées seules, pour l'auteur (une requête si le lecteur en a écrit un,
+    // aucune sinon : removals/parts.ts).
+    removedPartsOf(
+      db,
+      rows.map(({ project }) => ({ kind: 'project', id: project.id, authorId: project.authorId })),
+      viewerId,
+      publicApiUrl,
+    ),
   ])
   return rows.map((row) => {
     const removalId = removalIdOf(row)
+    const projectTools = tools.get(row.project.id) ?? []
     return {
-      ...toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl),
+      // Sur la page d'un projet, ses photos telles que ce lecteur les voit : l'auteur garde les
+      // siennes retirées à leur place (désignées dans `removedParts`), les autres ne les voient pas.
+      ...toProjectBase(row, media, projectTools, viewerId, publicApiUrl, viewerId),
+      removedParts: removedParts.get(partOwnerKey('project', row.project.id)) ?? [],
       ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
       latestUpdate: latestUpdates.get(row.project.id) ?? null,
       updateCount: updateCounts.get(row.project.id) ?? 0,
@@ -347,7 +376,9 @@ export const rowsToSummaries = async (
   ])
   return rows.map((row) =>
     toSummary(
-      toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl),
+      // « À tous » (null) : la couverture d'une carte n'est jamais une photo retirée, pas même
+      // pour son auteur.
+      toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl, null),
       totals.get(row.project.id) ?? 0,
       updates.get(row.project.id) ?? { latest: null, version: null },
     ),
@@ -400,11 +431,14 @@ export const mediaKeysOf = async (db: Reader, projectIds: string[]): Promise<str
  * - une photo de la galerie ou la couverture verticale : rien de plus ;
  * - une photo d'une mise à jour publiée et pas retirée : rien de plus ;
  * - une photo en attente (pas encore publiée) ou d'une mise à jour retirée : l'auteur seul, sans
- *   exception, administrateur compris.
+ *   exception, administrateur compris ;
+ * - R9 : une photo retirée seule par la modération (`removal_id`), quelle qu'elle soit : l'auteur
+ *   seul (projects/media-visibility.ts). Les autres reçoivent le 404 d'un fichier inconnu.
  *
  * En SQL : select … from project_media inner join project on … left join project_update on
  * project_update.id = project_media.update_id where storage_key = $1 and <projet visible> and
- * (slot <> 'update' or (update_id is not null and removed_at is null) or author_id = $viewer).
+ * (slot <> 'update' or (update_id is not null and removed_at is null) or author_id = $viewer)
+ * and (project_media.removal_id is null or author_id = $viewer).
  * La clé unique de storage_key trouve la photo ; le projet et la mise à jour, par leur clé primaire.
  * « left join » : une photo de la galerie n'a pas de mise à jour, et doit rester dans le résultat.
  */
@@ -424,6 +458,8 @@ export const isVisualVisibleTo = async (db: Database, storageKey: string, viewer
           and(isNotNull(m.updateId), isNull(schema.projectUpdate.removedAt)),
           eq(schema.project.authorId, viewerId),
         ),
+        // R9 : une photo retirée seule par la modération, à son auteur seul (media-visibility.ts).
+        visibleMedia(m.removalId, { ownerId: schema.project.authorId, viewerId }),
       ),
     )
   return row !== undefined

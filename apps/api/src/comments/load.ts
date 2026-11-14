@@ -36,7 +36,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { listedProject, projectVisibleTo } from '../projects/visibility'
 import { removalsOf } from '../removals/load'
 
@@ -349,7 +349,7 @@ export const authorsOf = async (
         id: row.id,
         name: row.name,
         handle: row.handle,
-        avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+        avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
         isTester: testerIds.has(row.id),
       },
     ]),
