@@ -25,6 +25,7 @@ import { sentence } from './NotificationCard'
 import { Pressed } from './Pressed'
 import { ProjectThumb } from './ProjectThumb'
 import { useRelativeDate } from './RelativeTime'
+import { STATUS_PILL_HEIGHT } from './StatusPill'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
 import { useTheme } from './theme/ThemeProvider'
@@ -164,7 +165,11 @@ function ReservedPill({ label }: { label: string }) {
         gap: space.xs,
         paddingHorizontal: space.sm,
         paddingVertical: space.xxs,
-        borderRadius: radii.pill,
+        minHeight: STATUS_PILL_HEIGHT,
+        // La moitié de sa hauteur d'une ligne, pas `radii.pill` : une pilule sur une ligne, mais un
+        // bloc aux coins ronds quand le texte agrandi la fait passer sur deux (une pilule de deux
+        // lignes devenait un ovale, 320 points à 200 %).
+        borderRadius: STATUS_PILL_HEIGHT / 2,
         backgroundColor: colors.honeySoft,
       }}
     >
