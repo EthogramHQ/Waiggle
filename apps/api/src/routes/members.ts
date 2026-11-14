@@ -237,6 +237,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           isFollowed: false,
           followerCount: 0,
           projects: [],
+          // Provisoire (R9) : BE-B remplira ce champ (les parties retirées, pour l'auteur seul).
+          removedParts: [],
           // Un administrateur qui l'a bloqué lit encore sa suspension et ses décisions, mais ne
           // peut pas le suspendre (canSuspend faux, S4).
           moderation: await moderationOf(db, viewer.id, row.id, true),
@@ -265,6 +267,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         isBlocked: false,
         ...follow,
         projects,
+        // Provisoire (R9) : BE-B remplira ce champ (les parties retirées, pour l'auteur seul).
+        removedParts: [],
         moderation: await moderationOf(db, viewer.id, row.id, false),
       }),
       200,
