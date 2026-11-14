@@ -327,6 +327,23 @@ describe('a sign-up link issued before the correction', () => {
     expect(landing(accepted)).toEqual({ page: VERIFIED_PAGE, error: null })
     expect((await accountNamed('Léa')).emailVerified).toBe(true)
   })
+
+  // Montées du 12/11/2026 : le lien nomme le compte (`userId`), comme ceux de Better Auth depuis
+  // 1.7.16. Comparer les dates ne suffit pas dans la même seconde : le lien d'un compte supprimé
+  // vérifierait le compte neuf qui reprend son adresse.
+  it('does not verify a new account that took the address in the same second', async () => {
+    await ctx.signUp(lea)
+    later(SECOND)
+    expect((await leaCorrects()).status).toBe(200)
+    const leasLink = lastLinkTo(RIGHT)
+    await ctx.db.delete(schema.user).where(eq(schema.user.name, 'Léa'))
+    await ctx.signUp({ name: 'Inconnu', email: RIGHT, password: 'someone-else-pass' })
+
+    const res = await open(leasLink)
+
+    expect(landing(res).error).not.toBeNull()
+    expect((await accountNamed('Inconnu')).emailVerified).toBe(false)
+  })
 })
 
 describe('the quotas of the correction', () => {

@@ -477,6 +477,25 @@ describe('an address that belongs to another account', () => {
     expect((await accountOf('Malik')).email).toBe(malik.email)
   })
 
+  // Montées du 12/11/2026 : depuis Better Auth 1.7.16, un lien qui nomme une nouvelle adresse
+  // doit aussi nommer le compte (`userId`), sinon il est refusé. Le premier lien d'une adresse
+  // prise, que l'API fabrique elle-même, doit donc le porter : si l'adresse se libère avant le
+  // clic, il poursuit comme celui d'une adresse libre.
+  it('goes on as for a free address when the address is freed before the first link is opened', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    await ctx.verifiedMember(malik)
+    expect((await ask(cookie, { newEmail: malik.email, password: ines.password })).status).toBe(200)
+    // Malik supprime son compte : son adresse est libre.
+    await ctx.db.delete(schema.user).where(eq(schema.user.name, 'Malik'))
+
+    const confirm = await open(linkOf('changeEmail', ines.email))
+
+    expect(landing(confirm)).toEqual({ page: CONFIRMED_PAGE, error: null })
+    const done = await open(linkOf('newEmail', malik.email), cookie)
+    expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
+    expect(await accountOf('Inès')).toMatchObject({ email: malik.email, emailVerified: true })
+  })
+
   // Plan, S5 : quelqu'un s'inscrit avec la nouvelle adresse entre les deux liens.
   it('refuses the second link when the address got an account in between, without a 500', async () => {
     const cookie = await ctx.verifiedMember(ines)
@@ -738,6 +757,31 @@ describe('a link that is no longer valid', () => {
     expect(res.status).toBe(302)
     expect(landing(res).error).not.toBeNull()
     expect((await accountOf('Inès')).email).toBe(ines.email)
+    expect(ctx.mailer.sent.slice(before)).toEqual([])
+  })
+})
+
+describe('a link bound to another account (upgrades of 12/11/2026)', () => {
+  // Depuis Better Auth 1.7.16, un lien nomme le compte qui l'a demandé (`userId`). Pour une adresse
+  // prise, l'API répond elle-même au premier lien, sans que Better Auth le voie : elle doit donc
+  // refuser, elle aussi, un lien qui ne nomme pas le compte de son adresse.
+  it('refuses a first link to a taken address when it names another account', async () => {
+    await ctx.verifiedMember(ines)
+    await ctx.verifiedMember(malik)
+    const before = ctx.mailer.sent.length
+    const token = await createEmailVerificationToken(
+      TEST_AUTH_SECRET,
+      ines.email,
+      malik.email,
+      60 * 60,
+      { requestType: 'change-email-confirmation', userId: (await accountOf('Malik')).id },
+    )
+
+    const res = await ctx.request(`/api/auth/verify-email?token=${token}`)
+
+    expect(res.status).toBe(302)
+    expect(landing(res).page).toBe(CONFIRMED_PAGE)
+    expect(landing(res).error).not.toBeNull()
     expect(ctx.mailer.sent.slice(before)).toEqual([])
   })
 })
