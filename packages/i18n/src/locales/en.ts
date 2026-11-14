@@ -1118,7 +1118,8 @@ export const en: Translation = {
     },
     alsoBlockNamed: 'Also block {{name}} (@{{handle}})',
     sentTitle: 'Thank you, your report has been sent.',
-    sentBody: 'Moderation will look at it. A notification will tell you once it has been handled.',
+    sentBody:
+      'Moderation will look at it. If the content is still there, a notification will tell you what they decided.',
     sentRecap: '{{what}} ({{nameOf}}) · {{reason}}',
     alsoBlocked: 'You also blocked {{name}}.',
     blockFailed:
@@ -1646,6 +1647,8 @@ export const en: Translation = {
       'While suspended, you can neither post nor edit a project. You can make it private or delete it.',
     profileLocked:
       'While suspended, you can only remove your bio, your favourite tools and your photo.',
+    profileLockedProvisional:
+      'While suspended, you can only remove your bio, your favourite tools and your photo, and replace your temporary name or handle.',
     formTitle: 'Publishing isn’t possible for now',
     removeBio: 'Remove my bio',
     removeTools: 'Remove my tools',
@@ -1707,6 +1710,9 @@ export const en: Translation = {
         'Meanwhile, it is temporarily “{{name}}”, everywhere. Choose another one: the reason is in Activity.',
       chooseHandle: 'Choose my handle',
       chooseName: 'Choose my name',
+      deleteConfirmTitle: 'Delete this photo?',
+      deleteConfirmBody:
+        'It will be gone from your project for good: you won’t be able to get it back.',
       photoDeleted: 'Photo deleted.',
       deleteError: 'The photo couldn’t be deleted. Try again.',
     },
@@ -2422,6 +2428,10 @@ export const en: Translation = {
       message: {
         removed: 'Your report of a message was handled: the message was removed.',
         dismissed: 'Your report of a message was handled: we did not remove it.',
+      },
+      part: {
+        removed: 'Your report was handled: the part you reported was removed.',
+        dismissed: 'Your report was handled: we did not remove the part you reported.',
       },
       contest: 'Disagree? Write to us: {{contactEmail}}',
     },

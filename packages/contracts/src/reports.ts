@@ -290,8 +290,8 @@ export const ReportTargetPreview = z
      * après l'envoi (tranche 7b) ; `isBlocked` : le visiteur l'a déjà bloqué (rien à proposer).
      * `handle` vaut null quand un blocage les sépare, dans un sens ou dans l'autre (un commentaire
      * lu malgré le blocage, règles 1 et 2) : le nom reste, le pseudo et la photo non (24/10/2026).
-     * `isAdmin` (R9) : l'auteur est administrateur en fonction ; l'appli ne propose alors pas
-     * « Bloquer aussi » (on ne bloque pas un administrateur, l'API refuserait).
+     * Jamais si l'auteur est administrateur : ce rôle n'est dit à aucun membre, et un
+     * administrateur se bloque comme tout membre (relecture de sécurité de R9, 14/11/2026).
      */
     author: z
       .object({
@@ -299,7 +299,6 @@ export const ReportTargetPreview = z
         name: z.string(),
         handle: z.string().nullable(),
         isBlocked: z.boolean(),
-        isAdmin: z.boolean(),
       })
       .strict(),
     /**

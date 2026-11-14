@@ -2569,11 +2569,12 @@ Hors de R9, et où ça va :
 - Quand il la coche et envoie
 - Alors la fenêtre de blocage (A7, plus bas) s'ouvre avant l'envoi ; « Bloquer » envoie le
   signalement puis bloque ; « Annuler » décoche la case et laisse la feuille ouverte
-- La case n'existe pas pour son propre contenu, pour un membre déjà bloqué, ni pour un
-  administrateur
+- La case n'existe pas pour son propre contenu, ni pour un membre déjà bloqué ; un administrateur
+  se bloque comme tout membre : sa place ne se devine nulle part (relecture de sécurité, 14/11/2026)
 
 **Envoyé** (planche `R9-Signaler-Envoye`)
-- Alors la feuille dit « Merci, ton signalement a été envoyé. La modération va le regarder. », et
+- Alors la feuille dit « Merci, ton signalement a été envoyé. La modération va le regarder. Si le
+  contenu est encore là, une notification te dira ce qu’elle a décidé. » (14/11/2026), et
   « Fermer » ; si Malik a bloqué Inès, elle le rappelle (« Tu as aussi bloqué Inès Haddad. »)
 
 **Les cas où l'on ne signale pas**
@@ -2616,7 +2617,8 @@ départ ») ; les photos se nomment par leur rang et montrent leur miniature («
 - Et dans « Météo », Inès voit la photo avec « Retiré par la modération », le fondement,
   l'explication, la date, « Contester » avec l'adresse de contact écrite en clair (et son lien), la
   possibilité de saisir la justice, « Remplacer » et « Supprimer » (décision L2 de Louis, 13/11/2026)
-- Et Malik est prévenu que son signalement a été traité, sans le détail de la décision
+- Et Malik est prévenu que son signalement a été traité, sans le détail de la décision : « la
+  partie que tu as signalée a été retirée », jamais « le projet a été retiré » (14/11/2026)
 
 Ce que voient les autres d'une partie retirée : rien, comme si elle n'avait jamais été là (une
 couverture retirée laisse la place à la photo suivante, ou au fond de la marque ; un lien de démo
@@ -2626,6 +2628,10 @@ profil retirée laisse les initiales).
 - Quand Inès remplace la photo
 - Alors la nouvelle s'affiche pour tous, peut être signalée à son tour, et la décision reste dans
   l'historique
+- Quand Inès touche « Supprimer », une fenêtre demande « Supprimer cette photo ? » (« Elle
+  disparaîtra de ton projet pour de bon : tu ne pourras pas la récupérer. »), « Annuler » et
+  « Supprimer » ; « Supprimer » n'existe que sous une photo ou la couverture, jamais sous la seule
+  description d'une photo (14/11/2026)
 - Quand Inès supprime la photo, la partie et sa mention « Retiré » disparaissent
 
 ### Un nom ou un pseudo retiré (planche `R9-Partie-Retiree`)

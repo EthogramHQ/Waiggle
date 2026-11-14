@@ -329,6 +329,12 @@ export const ReportHandledNotification = z.object({
   kind: z.literal('report_handled'),
   targetKind: StoredReportTargetKind,
   outcome: z.enum(['removed', 'dismissed']),
+  /**
+   * R9 (relectures, 14/11/2026) : vrai quand le signalement ne visait qu'une partie du contenu
+   * (une photo, la description…) ; l'appli dit alors « la partie que tu as signalée », jamais « le
+   * projet a été retiré ». Absent pour un signalement du contenu entier.
+   */
+  part: z.boolean().optional(),
   link: z.object({ projectId: ProjectId.nullable(), memberId: z.string().nullable() }).nullable(),
 })
 

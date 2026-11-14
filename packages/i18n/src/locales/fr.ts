@@ -1319,7 +1319,8 @@ export const fr = {
     // La case avant l'envoi (décision des planches, 28/10), jamais cochée d'avance.
     alsoBlockNamed: 'Bloquer aussi {{name}} (@{{handle}})',
     sentTitle: 'Merci, ton signalement a été envoyé.',
-    sentBody: 'La modération va le regarder. Une notification te dira quand il aura été traité.',
+    sentBody:
+      'La modération va le regarder. Si le contenu est encore là, une notification te dira ce qu’elle a décidé.',
     sentRecap: '{{what}}, {{nameOf}} · {{reason}}',
     alsoBlocked: 'Tu as aussi bloqué {{name}}.',
     // Décision L4 de Louis (13/11/2026) : le blocage refusé après l'envoi.
@@ -1924,6 +1925,9 @@ export const fr = {
       'Pendant la suspension, tu ne peux ni publier ni modifier un projet. Tu peux le passer en privé ou le supprimer.',
     profileLocked:
       'Pendant la suspension, tu peux seulement retirer ta bio, tes outils favoris et ta photo.',
+    // R9 (relecture juridique jur-B4) : un nom ou un pseudo provisoire se remplace même suspendu.
+    profileLockedProvisional:
+      'Pendant la suspension, tu peux seulement retirer ta bio, tes outils favoris et ta photo, et remplacer ton nom ou ton pseudo provisoire.',
     // Le titre de la page qui remplace le formulaire de projet (C, 7c) : le bandeau dit
     // déjà « Ton compte est suspendu », le titre ne le répète pas.
     formTitle: 'Publication impossible pour l’instant',
@@ -1998,6 +2002,10 @@ export const fr = {
       chooseHandle: 'Choisir mon pseudo',
       chooseName: 'Choisir mon nom',
       // R9 : « Supprimer » d'une photo retirée, réussi (bulle) ou refusé (sous la partie).
+      // R9 (relectures) : la confirmation avant de supprimer une photo retirée, pour de bon.
+      deleteConfirmTitle: 'Supprimer cette photo ?',
+      deleteConfirmBody:
+        'Elle disparaîtra de ton projet pour de bon : tu ne pourras pas la récupérer.',
       photoDeleted: 'Photo supprimée.',
       deleteError: 'La photo n’a pas pu être supprimée. Réessaie.',
     },
@@ -2906,6 +2914,12 @@ export const fr = {
       message: {
         removed: 'Ton signalement d’un message a été traité : le message a été retiré.',
         dismissed: 'Ton signalement d’un message a été traité : nous ne l’avons pas retiré.',
+      },
+      // R9 (relectures, 14/11/2026) : le signalement ne visait qu'une partie du contenu.
+      part: {
+        removed: 'Ton signalement a été traité : la partie que tu as signalée a été retirée.',
+        dismissed:
+          'Ton signalement a été traité : nous n’avons pas retiré la partie que tu as signalée.',
       },
       contest: 'Pas d’accord ? Écris-nous : {{contactEmail}}',
     },
