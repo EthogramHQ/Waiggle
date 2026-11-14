@@ -36,6 +36,7 @@ import { languageOfMember } from '../email/language'
 import { categoryTile, recapThumb } from '../email/recap-images'
 import { type Attachment, type RecapData, type RecapLine, recapEmail } from '../email/templates'
 import { loadNotificationsSince, utc } from '../notifications/load'
+import { mediaOnCoversSql } from '../projects/media-visibility'
 import { listedVerifiedProjectFor } from '../projects/visibility'
 import { activeSuspensionSql } from '../suspension/load'
 import {
@@ -364,7 +365,8 @@ const ImageRow = z.object({
  * catégorie (la tuile), la clé de sa photo, et s'il a un signalement ouvert.
  *
  * La photo est celle de l'Activité (notifications/load.ts, « cover ») : la première de la galerie
- * dans l'ordre de l'auteur, sinon la couverture verticale ; l'index project_media_project_idx
+ * dans l'ordre de l'auteur, sinon la couverture verticale, jamais une photo retirée seule par la
+ * modération (R9 : la vignette part chez l'envoyeur d'e-mails, « à tous », même pour son auteur) ; l'index project_media_project_idx
  * (project_id, slot, position) la trouve. Le signalement : content_report_target_idx
  * (target_kind, target_id) ; `target_id` est un texte, d'où `project.id::text` (la conversion est
  * du côté du projet, l'index de la colonne reste utilisable). Le projet lui-même : sa clé primaire.
@@ -375,6 +377,7 @@ const imageRows = async (db: Database, ids: string[]) => {
     select project.id, project.primary_category,
       (select m.storage_key from project_media m
         where m.project_id = project.id and m.slot in ('gallery', 'portrait')
+          and ${mediaOnCoversSql('m')}
         order by m.slot = 'portrait', m.position, m.created_at
         limit 1) as cover_key,
       (select 1 from content_report r

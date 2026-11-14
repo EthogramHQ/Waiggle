@@ -20,8 +20,10 @@ import { requireUser } from '../auth/session'
 import { after, encodeCursor, readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
+import { visibleMedia } from '../projects/media-visibility'
 import { memberCounterKeys, projectCallKey, type RateLimiter, type RateRule } from '../rate-limit'
 import { removalsOf } from '../removals/load'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { cornerAccess } from '../testers/access'
 import { toTesterMedia } from '../testers/media'
 import type { AppEnv } from '../types'
@@ -225,7 +227,7 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
         photo: outcome.photo ? toTesterMedia(outcome.photo, publicApiUrl) : null,
         createdAt: call.createdAt.toISOString(),
         removal: null,
-        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+        // Un appel tout neuf n'a encore aucune partie retirée.
         removedParts: [],
       },
       201,
@@ -267,24 +269,35 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
       .limit(CALLS_PAGE_SIZE + 1)
     const page = rows.slice(0, CALLS_PAGE_SIZE)
 
-    // Les photos et les retraits de toute la page : une requête chacun, quel que soit le nombre
-    // d'appels. L'index tester_media_call_idx (call_id) donne la photo de chaque appel.
+    // Les photos, les retraits et les parties retirées de toute la page : une requête chacun, quel
+    // que soit le nombre d'appels. L'index tester_media_call_idx (call_id) donne la photo de chaque
+    // appel ; `visibleMedia` écarte une photo retirée seule, sauf pour son auteur (R9), qui la garde
+    // à sa place. `removedPartsOf` n'interroge rien pour un testeur (il n'est l'auteur d'aucun appel).
     const m = schema.testerMedia
-    const [photos, removals] = await Promise.all([
+    const [photos, removals, parts] = await Promise.all([
       page.length === 0
         ? []
         : db
             .select()
             .from(m)
             .where(
-              inArray(
-                m.callId,
-                page.map((row) => row.id),
+              and(
+                inArray(
+                  m.callId,
+                  page.map((row) => row.id),
+                ),
+                visibleMedia(m.removalId, { ownerId: m.ownerId, viewerId: user.id }),
               ),
             ),
       removalsOf(
         db,
         page.map((row) => (row.removedAt === null ? null : row.removalId)),
+      ),
+      removedPartsOf(
+        db,
+        isAuthor ? page.map((row) => ({ kind: 'call', id: row.id, authorId: user.id })) : [],
+        user.id,
+        publicApiUrl,
       ),
     ])
     const photoOf = new Map(
@@ -303,8 +316,7 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
             createdAt: row.createdAt.toISOString(),
             // Seul l'auteur reçoit les appels retirés (filtrés plus haut pour les autres).
             removal: row.removedAt === null ? null : (removals.get(row.removalId ?? '') ?? null),
-            // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-            removedParts: [],
+            removedParts: parts.get(partOwnerKey('call', row.id)) ?? [],
           }
         }),
         nextCursor:
