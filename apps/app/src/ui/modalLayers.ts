@@ -14,10 +14,19 @@
 // dans la page quand le composant paraît, même fermé ; une fenêtre montée avant la feuille peut donc
 // être dessinée avant elle dans le document, et s'ouvrir quand même par-dessus.
 
+import { useSyncExternalStore } from 'react'
+
 /** Une couche ouverte : son identifiant, et de quoi savoir si un élément de la page est dedans. */
 type Layer = { id: string; contains: (node: unknown) => boolean }
 
 const layers: Layer[] = []
+
+// Ceux qui suivent le nombre de couches ouvertes (R9 : la feuille du pseudo provisoire attend
+// qu'aucune autre feuille ne soit ouverte). Prévenus à chaque ouverture et fermeture.
+const listeners = new Set<() => void>()
+const notify = () => {
+  for (const listener of listeners) listener()
+}
 
 /**
  * Inscrit une couche qui vient de s'ouvrir, en haut de la pile. Rend la fonction qui l'en retire, à
@@ -26,11 +35,32 @@ const layers: Layer[] = []
 export const openModalLayer = (id: string, contains: (node: unknown) => boolean): (() => void) => {
   const layer: Layer = { id, contains }
   layers.push(layer)
+  notify()
   return () => {
     const index = layers.indexOf(layer)
-    if (index !== -1) layers.splice(index, 1)
+    if (index === -1) return
+    layers.splice(index, 1)
+    notify()
   }
 }
+
+/** S'abonne aux ouvertures et fermetures de couches ; rend la fonction qui désabonne. */
+const subscribe = (listener: () => void) => {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+const countLayers = () => layers.length
+const noLayer = () => 0
+
+/**
+ * Hook : le nombre de feuilles et de fenêtres ouvertes, sur le web (0 ailleurs, où la pile ne
+ * s'inscrit pas, et pendant le pré-rendu). `useSyncExternalStore` branche le composant sur une valeur
+ * gardée hors de React : il se redessine quand elle change.
+ */
+export const useOpenModalLayers = (): number =>
+  useSyncExternalStore(subscribe, countLayers, noLayer)
 
 // Le peu du navigateur que lisent les aides suivantes. (Les types de React Native ne décrivent pas
 // la page web.)

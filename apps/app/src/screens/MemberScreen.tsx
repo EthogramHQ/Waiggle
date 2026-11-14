@@ -32,6 +32,7 @@ import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { ProvisionalNameBanner } from '../profile/ProvisionalNameBanner'
 import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Button } from '../ui/Button'
@@ -283,6 +284,8 @@ function MemberView({ member }: { member: Member }) {
         action={
           member.isMe ? (
             <Stack gap="sm" align="center">
+              {/* R9 : le pseudo ou le nom provisoire, au-dessus de « Modifier mon profil ». */}
+              <ProvisionalNameBanner />
               <FollowerCount text={followers} />
               {/* R3 (F-Nav8) : la rubrique « Mon profil » des réglages. */}
               <Button
