@@ -63,7 +63,12 @@ type Props = {
    * Le texte sous le titre. Une liste : un paragraphe par élément, alignés à gauche (au-delà d'une
    * phrase ou deux, un texte centré se lit mal : chaque ligne commence ailleurs).
    */
-  message: string | string[]
+  message?: string | string[]
+  /**
+   * R9 : un texte plus riche que des paragraphes (un résumé en gras, des puces : `KeyPoints`), sous
+   * le message ou à sa place. Il fait partie de ce qui décrit la fenêtre (web), comme le message.
+   */
+  body?: ReactNode
   /**
    * Les boutons ignorent les tapes juste après l'ouverture (TAP_GUARD_MS) : pour une fenêtre qui
    * s'ouvre là où l'on vient de toucher (un menu, un bouton à la même hauteur que sa confirmation).
@@ -195,7 +200,8 @@ export { TAP_GUARD_MS } from './tapGuard'
 export function Dialog({
   visible,
   title,
-  message,
+  message = [],
+  body,
   guardTaps = false,
   illustration,
   quote,
@@ -344,6 +350,7 @@ export function Dialog({
                     {paragraph}
                   </Text>
                 ))}
+                {body}
               </View>
               {/* L'échec de l'action, juste au-dessus des boutons : on le lit, puis on réessaie ou
                   on annule sans chercher. Une alerte (`Notice`), lue dès qu'elle paraît. */}
