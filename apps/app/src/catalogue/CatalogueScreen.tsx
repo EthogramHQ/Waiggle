@@ -146,6 +146,7 @@ import { RemovalR9Catalogue } from './removal-r9'
 import { ReportSamples } from './reports'
 import { HiveNewsCatalogue } from './ruches-actualite'
 import { HiveCellsCatalogue } from './ruches-alveoles'
+import { HiveRowsCatalogue } from './ruches-lignes'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
@@ -828,6 +829,8 @@ export function CatalogueScreen() {
       <RemovalR9Catalogue />
       {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
       <HiveCellsCatalogue />
+      {/* Tranche R10, la ligne d'une ruche et la carte d'une invitation (ruches-lignes.tsx). */}
+      <HiveRowsCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}

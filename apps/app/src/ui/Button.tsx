@@ -90,6 +90,12 @@ type Props = {
   role?: 'button' | 'link'
   /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteComposer). */
   ref?: Ref<View>
+  /**
+   * R10 : dessiné seulement, dans un aperçu (« Ce que reçoit Max », la carte d'invitation telle que
+   * l'invité la verra) : la même pilule, sans rôle, sans geste et sans focus. Son libellé se lit
+   * comme un texte : l'aperçu montre, il n'agit pas. `onPress` n'est jamais appelé.
+   */
+  drawing?: boolean
 }
 
 export function Button({
@@ -109,6 +115,7 @@ export function Button({
   hint,
   role = 'button',
   ref,
+  drawing = false,
 }: Props) {
   const { colors, shadows } = useTheme()
   const spokenRole = checked === undefined ? role : 'switch'
@@ -278,6 +285,22 @@ export function Button({
       ) : null}
     </>
   )
+
+  if (drawing) {
+    // L'aperçu : la pilule au repos, dans son cadre de 44 points s'il en a un (même hauteur que le
+    // vrai bouton), sans Pressable (ni rôle, ni focus, ni appui).
+    return (
+      <View style={{ maxWidth: '100%', flexShrink: 1 }}>
+        {framed ? (
+          <View style={{ minHeight: layout.touchTarget, justifyContent: 'center' }}>
+            <View style={pill(false)}>{content}</View>
+          </View>
+        ) : (
+          <View style={pill(false)}>{content}</View>
+        )}
+      </View>
+    )
+  }
 
   return (
     // Deux couches : Animated.View porte l'enfoncement animé, Pressable reçoit le doigt.
