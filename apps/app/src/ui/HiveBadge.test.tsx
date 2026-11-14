@@ -38,7 +38,9 @@ const draws = (icon: HiveIcon) =>
   everyNode(screen.root as unknown as Node).some((node) => node.props.d === iconPaths[icon][0])
 
 /** Les images que les lecteurs d'écran annoncent (rôle `img` du web ou `image` du téléphone). */
-const images = () => [...screen.queryAllByRole('img'), ...screen.queryAllByRole('image')]
+// RNTL 14 ramène le rôle « image » à « img », sur l'élément comme dans la requête : la seule
+// requête « img » trouve les deux, et les réunir comptait chaque image deux fois.
+const images = () => screen.queryAllByRole('img')
 
 /** La taille d'un élément : par son style, ou par ses props (un `<Svg width>`). */
 const sizeOf = (node: ReturnType<typeof screen.getByRole>) => {
