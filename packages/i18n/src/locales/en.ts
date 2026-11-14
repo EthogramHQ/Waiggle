@@ -1650,6 +1650,7 @@ export const en: Translation = {
     makePrivateBody:
       'Only you will see it. While suspended, you won’t be able to make it public again.',
     madePrivate: 'Project made private.',
+    makePrivateError: 'The project couldn’t be made private. Try again.',
   },
   removal: {
     banner: 'Removed by moderation',
@@ -1698,6 +1699,8 @@ export const en: Translation = {
         'Meanwhile, it is temporarily “{{name}}”, everywhere. Choose another one: the reason is in Activity.',
       chooseHandle: 'Choose my handle',
       chooseName: 'Choose my name',
+      photoDeleted: 'Photo deleted.',
+      deleteError: 'The photo couldn’t be deleted. Try again.',
     },
     contestSubject: 'Appeal: {{decision}} of {{date}}',
     contestDecision: {
@@ -1944,6 +1947,7 @@ export const en: Translation = {
     previous: 'Previous photo',
     next: 'Next photo',
     enlarge: 'View full size: {{description}}',
+    marked: '{{photo}}. {{mark}}',
   },
   share: {
     action: 'Share',
