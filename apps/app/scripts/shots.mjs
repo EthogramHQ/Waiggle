@@ -66,6 +66,31 @@ import {
 } from '../src/testing/email.ts'
 import { leaMe, suspendedMe } from '../src/testing/fixtures.ts'
 import {
+  amisId,
+  amisPage,
+  atelier,
+  createdHive,
+  familleId,
+  familleProjects,
+  activity as hiveActivity,
+  animatorPage as hiveAnimatorPage,
+  hiveFeed,
+  memberPage as hiveMemberPage,
+  members as hiveMembers,
+  hiveNotifications,
+  projectsPage as hiveProjectsPage,
+  invitableFor,
+  invitationId,
+  invitedOnly,
+  membersLeaAnimator,
+  myHives,
+  myHivesAnimator,
+  noHives,
+  odileMemberPage,
+  quizJeudi,
+  readyPage,
+} from '../src/testing/hives.ts'
+import {
   decisionHistory,
   decisionHistoryPageOf,
   meteoPreview,
@@ -1418,6 +1443,8 @@ const goneCommentId = '5e6f7081-92a3-4b4c-8d5e-0000000000ff'
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
+  // R10 : les cinq lignes des ruches (testing/hives.ts), page `activite-ruches`.
+  if (choice === 'hives') return [hiveNotifications]
   if (choice === 'moderation') {
     return [
       [
@@ -2100,6 +2127,10 @@ const fakeApi = (
   suspended = false,
   emailChoices = 'default',
   moderation = null,
+  // R10 : les ruches de Léa. 'some' : Famille et Amis du jeudi, une invitation dans Atelier IA ;
+  // 'animator' : les mêmes, Léa animatrice de Famille (ses réglages) ; 'none' : aucune ruche ni
+  // invitation ; 'invited' : le premier lancement, aucune ruche, une invitation qui attend.
+  hives = 'some',
 ) => {
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
@@ -2531,6 +2562,79 @@ const fakeApi = (
     ) {
       return route.fulfill({ status: 204, body: '' })
     }
+    // R10, les ruches (testing/hives.ts), avec les réponses des écritures du plan : POST /v1/hives
+    // → 201 HiveSummary ; PATCH /v1/hives/{id} → 200 HivePage ; DELETE d'une ruche, d'un membre,
+    // d'une invitation, POST …/animator → 204 ; POST …/invitations → 201 sans corps ; POST
+    // …/accept → 200 HiveSummary. Une ruche inconnue répond 404, comme une ruche qu'on ne voit pas.
+    if (pathname === '/v1/hives' && method === 'GET') {
+      return json(
+        200,
+        hives === 'none'
+          ? noHives
+          : hives === 'invited'
+            ? invitedOnly
+            : hives === 'animator'
+              ? myHivesAnimator
+              : myHives,
+      )
+    }
+    if (pathname === '/v1/hives' && method === 'POST') {
+      const { name, icon } = JSON.parse(route.request().postData() ?? '{}')
+      return json(201, createdHive(name ?? null, icon ?? 'house-line'))
+    }
+    if (pathname === `/v1/hive-invitations/${invitationId}/accept` && method === 'POST') {
+      return json(200, atelier)
+    }
+    if (pathname === `/v1/hive-invitations/${invitationId}` && method === 'DELETE') {
+      return route.fulfill({ status: 204, body: '' })
+    }
+    const hiveRoute = pathname.match(/^\/v1\/hives\/([^/]+)(?:\/([a-z]+))?(?:\/([^/]+))?$/)
+    if (hiveRoute && hives !== 'none') {
+      const [, id, part, rest] = hiveRoute
+      const animator = hives === 'animator'
+      const created = createdHive(null, 'house-line').id
+      const page =
+        id === familleId
+          ? animator
+            ? hiveAnimatorPage
+            : hiveMemberPage
+          : id === amisId
+            ? amisPage
+            : id === created
+              ? readyPage('Famille', 'house-line')
+              : null
+      if (!page) return json(404, { error: { code: 'not_found', message: '' } })
+      const done = () => route.fulfill({ status: 204, body: '' })
+      if (!part && method === 'GET') return json(200, page)
+      if (!part && method === 'PATCH') {
+        const changes = JSON.parse(route.request().postData() ?? '{}')
+        const { pinnedProjectId: _pin, invitePolicy, ...summary } = changes
+        return json(200, {
+          ...page,
+          summary: { ...page.summary, ...summary },
+          ...(invitePolicy ? { invitePolicy } : null),
+        })
+      }
+      if (!part && method === 'DELETE') return done()
+      if (part === 'activity') {
+        return json(200, id === familleId ? hiveActivity : { items: [], nextCursor: null })
+      }
+      if (part === 'projects') {
+        const items = id === familleId ? familleProjects : id === amisId ? [quizJeudi] : []
+        return json(200, id === familleId ? hiveProjectsPage : { items, nextCursor: null })
+      }
+      if (part === 'members' && !rest && method === 'GET') {
+        if (id !== familleId) return json(200, { members: hiveMembers.members.slice(0, 2) })
+        return json(200, animator ? membersLeaAnimator : hiveMembers)
+      }
+      if (part === 'members' && method === 'DELETE') return done()
+      if (part === 'invitable') {
+        return json(200, { members: invitableFor(url.searchParams.get('q') ?? '') })
+      }
+      if (part === 'invitations' && method === 'POST')
+        return route.fulfill({ status: 201, body: '' })
+      if (part === 'animator' && method === 'POST') return done()
+    }
     // Bloquer (PUT) et débloquer (DELETE) un membre (tranche 7b) : 204, comme la vraie API ; la
     // liste et la page du membre suivent. Se bloquer soi-même : 422.
     const block = pathname.match(/^\/v1\/members\/([^/]+)\/block$/)
@@ -2566,6 +2670,8 @@ const fakeApi = (
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
     if (pathname === `/v1/members/${ines.id}`) return json(200, inesMember)
+    // R10 : Tante Odile, ses projets en tuiles (dont deux réservés à Famille).
+    if (pathname === `/v1/members/${odileMemberPage.id}`) return json(200, odileMemberPage)
     // Tranche 7c : Sam, auteur du commentaire signalé de la file, et Karim, déjà suspendu. Leur
     // page dit à un administrateur seul où en est la modération (`Member.moderation`) ; la page
     // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
@@ -2584,6 +2690,15 @@ const fakeApi = (
     if (pathname === '/v1/categories') {
       const english = (route.request().headers()['accept-language'] ?? '').startsWith('en')
       return json(200, categoryList(english ? 'en' : 'fr', categoryCounts))
+    }
+    // R10 : le Fil d'une ruche (`?hive=<id>`) : les projets de Famille ; une autre ruche, rien.
+    if (pathname === '/v1/feed/following' && url.searchParams.get('hive')) {
+      return json(
+        200,
+        url.searchParams.get('hive') === familleId
+          ? hiveFeed
+          : { items: [], nextCursor: null, followsAnyone: true, lastReadAt: null },
+      )
     }
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     // « Marquer le fil lu » (R4) : l'appli l'envoie quand la première page s'affiche. La page
@@ -4078,7 +4193,77 @@ const pages = [
       await page.getByText('Aucun projet trouvé dans cette catégorie.').waitFor()
     },
   },
-  { name: 'ruches', path: '/hives', signedIn: true },
+  // R10 (planches R10-*) : l'onglet Ruches (deux ruches, une invitation), vide ; la page de
+  // Famille (Actualité, Projets en tuiles, Membres ; jour, nuit, ordinateur comme toutes les pages) ;
+  // les feuilles Créer et Inviter ; les réglages de l'animatrice ; la fenêtre « Quitter » ; le Fil
+  // d'une ruche ; l'invitation du premier lancement ; publier pour une ruche ; l'Activité ; la page
+  // d'un membre en tuiles.
+  { name: 'ruches', path: '/hives', signedIn: true, fullPage: true },
+  { name: 'ruches-vide', path: '/hives', signedIn: true, hives: 'none' },
+  { name: 'ruche', path: `/hives/${familleId}`, signedIn: true, fullPage: true },
+  {
+    name: 'ruche-membres',
+    path: `/hives/${familleId}?tab=members`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'ruche-projets',
+    path: `/hives/${familleId}?tab=projects`,
+    signedIn: true,
+    fullPage: true,
+  },
+  { name: 'ruche-creer', path: '/hives/new', signedIn: true },
+  {
+    name: 'ruche-inviter',
+    path: `/hives/${familleId}/invite`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('textbox', { name: fr.hives.invite.search }).fill('ma')
+      await page.getByText('Max Durand').first().waitFor()
+    },
+  },
+  // Les réglages ne s'ouvrent qu'à l'animateur : Léa anime Famille (sinon retour à la ruche).
+  {
+    name: 'ruche-reglages',
+    path: `/hives/${familleId}/settings`,
+    signedIn: true,
+    hives: 'animator',
+  },
+  {
+    name: 'ruche-quitter',
+    path: `/hives/${familleId}?tab=members`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.hives.page.leave }).last().click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
+  { name: 'fil-ruche', path: `/?hive=${familleId}`, signedIn: true, fullPage: true },
+  {
+    name: 'fil-premier-invitation',
+    path: '/',
+    signedIn: true,
+    feed: 'nobody',
+    hives: 'invited',
+  },
+  {
+    name: 'publier-ruche',
+    path: '/projects/new',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: fr.project.form.hive }).click()
+    },
+  },
+  {
+    name: 'activite-ruches',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'hives',
+    fullPage: true,
+  },
+  { name: 'membre-tuiles', path: `/members/${odileMemberPage.id}`, signedIn: true, fullPage: true },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
 // habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se
@@ -4267,6 +4452,7 @@ if (script) {
       suspended,
       emailChoices,
       moderation,
+      hives,
       ...options
     } = {},
   ) => {
@@ -4290,6 +4476,7 @@ if (script) {
         suspended,
         emailChoices,
         moderation,
+        hives,
       ),
     )
     return context
@@ -4406,6 +4593,7 @@ async function layoutReport() {
             shot.suspended,
             shot.emailChoices,
             shot.moderation,
+            shot.hives,
           ),
         )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
@@ -4585,6 +4773,7 @@ const capture = async ({ shot, device, scheme }) => {
         shot.suspended,
         shot.emailChoices,
         shot.moderation,
+        shot.hives,
       ),
     )
     const page = await context.newPage()
