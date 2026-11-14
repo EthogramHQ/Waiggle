@@ -840,6 +840,7 @@ const ListRow = z.object({
   part_position: z.number().int().positive().nullable(),
   provisional_value: z.string().nullable(),
   lift_cause: z.string().nullable(),
+  report_part: z.boolean().nullable(),
   value_back: z.boolean().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
@@ -1190,6 +1191,8 @@ export const present = (
         kind: 'report_handled',
         targetKind: row.target_kind,
         outcome: outcome.data,
+        // Seulement le fait qu'une partie était visée, jamais laquelle (règle 2 : l'issue seulement).
+        ...(row.report_part === true && { part: true }),
         link,
       }
     }
@@ -1252,6 +1255,13 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       case when md.part_media_id is not null then ${photoRankSql(sql.raw('md.part_media_id'))} end
         as part_position,
       md.provisional_value, md.lift_cause,
+      -- R9 (relectures) : un signalement traité visait-il une partie ? Le signalement se retrouve par
+      -- sa clé (« report:<id> », clé primaire de content_report) ; seule la notification de
+      -- signalement lance cette sous-requête. Le champ de la partie n'est jamais lu, seulement sa présence.
+      case when n.kind = 'report_handled' then (
+        select r.part_field is not null from content_report r
+        where r.id = substr(n.key, 8)::uuid
+      ) end as report_part,
       case
         when n.kind <> 'restored' then null
         when md.part_field = 'handle' then exists (

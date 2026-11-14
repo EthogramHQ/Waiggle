@@ -42,7 +42,6 @@ import { projectVisibleTo } from '../projects/visibility'
 import { type MediaRow, toVisual } from '../projects/visual'
 import { cornerAccess } from '../testers/access'
 import { photosOfUpdates, readLines, updateShownTo } from '../updates/load'
-import { isActiveAdmin } from './admin'
 
 const p = schema.project
 const u = schema.projectUpdate
@@ -207,8 +206,8 @@ const authorOf = async (
     name: row.name,
     handle: separated ? null : handle,
     isBlocked: blocks.byMe.has(authorId),
-    // R9 : un administrateur en fonction ne se bloque pas ; l'appli ne propose donc pas « Bloquer aussi ».
-    isAdmin: await isActiveAdmin(db, authorId, new Date()),
+    // Relecture de sécurité (14/11/2026) : l'aperçu ne dit jamais si l'auteur est administrateur ;
+    // un administrateur se bloque comme tout membre.
   }
 }
 

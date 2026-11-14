@@ -6,7 +6,7 @@
 //
 // Quatre membres : Léa (l'autrice de « Météo », un projet complet : description, outils, démo,
 // prompt, deux photos dont la première décrite), Max (qui signale), Zoé (une autre, qui signale
-// aussi) et Louis, l'administrateur (pour les retraits et pour `author.isAdmin`).
+// aussi) et Louis, l'administrateur (pour les retraits).
 //
 // Ce que la route promet :
 // - une partie se signale à part : « déjà signalé » vaut pour le contenu entier, ou pour cette
@@ -14,7 +14,7 @@
 // - la photo visée appartient au contenu, sinon la même réponse 404 qu'un contenu inconnu ;
 // - la copie gardée au signalement ne prend que le champ visé ;
 // - l'aperçu donne le rappel de tête (`head`), les parties présentes dans l'ordre de la feuille
-//   avec ce que ce membre a déjà signalé, et si l'auteur est administrateur en fonction ;
+//   avec ce que ce membre a déjà signalé (jamais si l'auteur est administrateur) ;
 // - une photo n'est retirée qu'une fois, qu'on l'ait signalée comme couverture ou comme photo.
 //
 // Le temps est maîtrisé par le test (fausse horloge, voir reports.test.ts).
@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto'
 import {
   ErrorResponse,
   Me,
+  NotificationPage,
   Project,
   ProjectUpdate,
   REPORTABLE_PARTS,
@@ -565,16 +566,60 @@ describe('the preview of a target, its head and its parts', () => {
     expect(head.image?.url).toBe(second?.url)
   })
 
-  it('says whether the author is an administrator in office', async () => {
-    expect((await readPreview(max, 'project', meteo.id)).author.isAdmin).toBe(false)
-
+  // Relecture de sécurité (14/11/2026, choix A) : l'aperçu ne dit à aucun membre si l'auteur est
+  // administrateur. On lit le texte brut : un champ de plus, même à faux, serait déjà une fuite.
+  it('never tells a member whether the author is an administrator', async () => {
     await act.makeAdmin(leaId)
-    expect((await readPreview(max, 'project', meteo.id)).author.isAdmin).toBe(true)
-    expect((await readPreview(max, 'member', leaId)).author.isAdmin).toBe(true)
+    for (const [kind, id] of [
+      ['project', meteo.id],
+      ['member', leaId],
+    ] as const) {
+      const res = await act.send('GET', previewPath(kind, id), max)
+      expect(res.status, kind).toBe(200)
+      expect(await res.text(), kind).not.toContain('isAdmin')
+    }
+  })
 
+  // Conséquence du même choix : un administrateur se bloque comme tout membre.
+  it('lets a member block an administrator, like any member', async () => {
+    await act.makeAdmin(leaId)
+    await act.block(leaId, max)
+    const preview = await readPreview(max, 'member', leaId)
+    expect(preview.author.isBlocked).toBe(true)
+  })
+
+  // R9 (relectures, 14/11/2026) : la notification du signalement d'une partie le dit, sans rien
+  // montrer de la partie (règle 2 de 7a : l'issue seulement).
+  it('tells the reporter of a part that a part, not the whole project, was handled', async () => {
+    const second = photoId(meteo, 2)
+    expect((await postReport(max, projectOf(), { field: 'photo', mediaId: second })).status).toBe(
+      201,
+    )
+    expect((await postReport(zoe, projectOf())).status).toBe(201)
     later()
-    await act.revokeAdmin(leaId)
-    expect((await readPreview(max, 'project', meteo.id)).author.isAdmin).toBe(false)
+    await act.decide(louis, {
+      action: 'remove',
+      target: { kind: 'project', id: meteo.id },
+      part: { field: 'photo', mediaId: second },
+      ground: 'rules',
+      explanation: 'Une photo volée.',
+    })
+    later()
+    await act.decide(louis, { action: 'dismiss', target: { kind: 'project', id: meteo.id } })
+
+    const handled = async (cookie: string) => {
+      const res = await act.send('GET', '/v1/notifications', cookie)
+      expect(res.status).toBe(200)
+      return NotificationPage.parse(await res.json()).items.filter(
+        (item) => item.kind === 'report_handled',
+      )
+    }
+    const [forMax] = await handled(max)
+    expect(forMax).toMatchObject({ outcome: 'removed', part: true })
+    expect(JSON.stringify(forMax)).not.toContain(second)
+    const [forZoe] = await handled(zoe)
+    expect(forZoe).toMatchObject({ outcome: 'dismissed' })
+    expect(forZoe).not.toHaveProperty('part')
   })
 
   it('gives the reports this member can still send today', async () => {

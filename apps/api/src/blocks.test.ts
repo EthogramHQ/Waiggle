@@ -614,7 +614,6 @@ describe('the profile photo of a blocked member', () => {
         name: 'Malik',
         handle: null,
         isBlocked: false,
-        isAdmin: false,
       })
     }
 
@@ -636,7 +635,6 @@ describe('the profile photo of a blocked member', () => {
       name: 'Malik',
       handle: null,
       isBlocked: true,
-      isAdmin: false,
     })
 
     // Témoin : Zoé, qui n'a bloqué personne, lit la photo de Malik chez elle.
