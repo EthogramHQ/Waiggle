@@ -338,7 +338,9 @@ function AlsoBlock({ author }: { author: ReportTargetPreview['author'] & { handl
           <Button
             label={t(($) => $.report.alsoBlock, { handle })}
             variant="secondary"
-            onPress={() => setAsking({ gesture: 'block', member: { id: author.id, handle } })}
+            onPress={() =>
+              setAsking({ gesture: 'block', member: { id: author.id, name: author.name, handle } })
+            }
           />
         </>
       )}

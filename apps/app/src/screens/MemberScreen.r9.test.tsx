@@ -112,6 +112,17 @@ const openMenu = async () => {
 const linkOrButton = (name: string) =>
   screen.queryByRole('link', { name }) ?? screen.getByRole('button', { name })
 
+/**
+ * Le groupe de ce nom, une fois la page arrivée. Cherché par son nom, puis son rôle vérifié (comme
+ * `group` de ui/RemovedPart.test.tsx) : `getByRole` ne trouve qu'une vue `accessible`, qui cacherait
+ * à VoiceOver, sur iOS, les boutons et le lien qu'elle contient.
+ */
+const findGroup = async (name: string) => {
+  const found = await screen.findByLabelText(name)
+  expect(found.props.role ?? found.props.accessibilityRole).toBe('group')
+  return found
+}
+
 beforeEach(() => {
   mockSession({ user: { id: 'u2', name: 'Max' } })
   mockBlock.mockReset().mockResolvedValue({ ok: true, data: null })
@@ -238,7 +249,7 @@ describe('the removed parts of her own profile, on « Moi » (R9)', () => {
     jest.mocked(getMember).mockResolvedValue(myPage([removedBio], { bio: '' }))
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    const group = await screen.findByRole('group', { name: bioTitle })
+    const group = await findGroup(bioTitle)
     const inside = within(group)
     expect(inside.getByText(containing(fr.t(($) => $.removal.grounds.rules)))).toBeTruthy()
     expect(inside.getByText(containing(removal.explanation))).toBeTruthy()
@@ -255,7 +266,7 @@ describe('the removed parts of her own profile, on « Moi » (R9)', () => {
     jest.mocked(getMember).mockResolvedValue(myPage([removedBio], { bio: '' }))
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    const inside = within(await screen.findByRole('group', { name: bioTitle }))
+    const inside = within(await findGroup(bioTitle))
     expect(inside.getByRole('link', { name: contactEmail })).toBeTruthy()
     expect(inside.getByText(containing(fr.t(($) => $.removal.part.court)))).toBeTruthy()
   })
@@ -266,7 +277,7 @@ describe('the removed parts of her own profile, on « Moi » (R9)', () => {
       jest.mocked(getMember).mockResolvedValue(myPage([removedBio], { bio: '' }))
       await renderWithProviders(<MemberScreen id="u1" />)
 
-      const inside = within(await screen.findByRole('group', { name: bioTitle }))
+      const inside = within(await findGroup(bioTitle))
       await fireEvent.press(inside.getByRole('link', { name: contactEmail }))
 
       expect(openURL).toHaveBeenCalledTimes(1)
@@ -294,9 +305,7 @@ describe('the removed parts of her own profile, on « Moi » (R9)', () => {
     jest.mocked(getMember).mockResolvedValue(myPage([removedHandle], { handle: provisionalHandle }))
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    const group = await screen.findByRole('group', {
-      name: fr.t(($) => $.removal.part.titles.handle),
-    })
+    const group = await findGroup(fr.t(($) => $.removal.part.titles.handle))
     expect(
       within(group).getByText(
         containing(fr.t(($) => $.removal.part.provisionalHandle, { handle: provisionalHandle })),
