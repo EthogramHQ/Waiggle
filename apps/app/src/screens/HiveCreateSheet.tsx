@@ -204,7 +204,13 @@ export function HiveCreateSheet() {
                 <Text variant="caption" weight={700} tone="accent">
                   {t(($) => $.hives.myHive)}
                 </Text>
-                <Text variant="title1" {...(typed === '' ? { tone: 'muted' as const } : null)}>
+                <Text
+                  variant="title1"
+                  // Un nom de 40 lettres sans espace, en grand, à 320 points : coupé plutôt que de
+                  // sortir de la feuille.
+                  breakAnywhere
+                  {...(typed === '' ? { tone: 'muted' as const } : null)}
+                >
                   {shownName}
                 </Text>
               </Stack>
