@@ -3135,8 +3135,10 @@ Hors de R10, et où ça va :
    l'animateur peut aussi la confier.
 6. **Une nouvelle publication dans une ruche ne fait pas de ligne d'Activité** : nouveautés, Fil
    et récap suffisent ; les invitations et les départs en font une.
-7. **Le nom de la ruche n'est jamais dans un e-mail** (écrit par un membre) ; jamais de vignette
-   pour un projet réservé.
+7. **Le nom de la ruche n'est jamais dans l'e-mail d'invitation** ni dans la ligne d'une invitation
+   du récap (écrit par un membre qu'on ne connaît peut-être pas) ; la partie « Dans tes ruches » du
+   récap l'écrit en texte simple, jamais en lien (décision de Louis du 14/11/2026, planche
+   `R10-Recap`) ; jamais de vignette pour un projet réservé.
 8. **Le nom d'une ruche se signale et se retire**, comme un pseudo (R9) : une invitation est le
    seul endroit où un inconnu peut écrire un texte à un membre.
 9. **« Ne pas me proposer aux autres » est un réglage unique** pour toutes les ruches, aussi dans
