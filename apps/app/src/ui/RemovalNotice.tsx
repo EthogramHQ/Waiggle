@@ -6,8 +6,14 @@
 // Il sert en tête d'un projet, au-dessus d'une note du journal et au-dessus d'un commentaire.
 // Ce n'est pas une alerte : le bandeau est là dès l'ouverture de la page, il se lit à son tour,
 // sans interrompre le lecteur d'écran.
+//
+// R9 (7d) : le bandeau est un groupe nommé par son titre (son texte se fondait avec celui qui le
+// suit dans l'arbre lu), et, avec `contest`, il finit par « Pour contester : » suivi de notre
+// adresse, écrite en entier et en lien qui ouvre la messagerie avec un objet tout prêt.
 import { radii, space } from '@ruche/brand'
+import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
+import { ContactLink } from './ContactLink'
 import { Icon } from './Icon'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -21,12 +27,24 @@ export type RemovedBanner = { title: string; lines: readonly string[] }
 type Props = RemovedBanner & {
   /** compact : au-dessus d'un commentaire ou d'une note, un cadre plus serré. */
   compact?: boolean
+  /**
+   * « Pour contester », écrit par le bandeau lui-même, après toutes les phrases : l'adresse de
+   * contact en entier (elle se lit et se recopie, même sans appli de messagerie), en lien
+   * `mailto:` dont l'objet nomme la décision (J12). Absent : rien de plus ; `lines` ne doit alors
+   * pas déjà contenir la phrase « Pour contester : … », qui serait dite deux fois.
+   */
+  contest?: { subject: string }
 }
 
-export function RemovalNotice({ title, lines, compact = false }: Props) {
+export function RemovalNotice({ title, lines, compact = false, contest }: Props) {
+  const { t } = useTranslation()
   const { colors } = useTheme()
   return (
     <View
+      // Un groupe nommé par son titre, sans `accessible` : sur iOS, un conteneur `accessible`
+      // devient un seul élément pour VoiceOver, qui n'atteindrait plus le lien qu'il contient.
+      role="group"
+      accessibilityLabel={title}
       style={{
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -56,6 +74,26 @@ export function RemovalNotice({ title, lines, compact = false }: Props) {
             {line}
           </Text>
         ))}
+        {contest ? (
+          // « Pour contester : » puis l'adresse, comme dans RemovedPart : une rangée qui passe à la
+          // ligne (à 320 points ou à 200 %, l'adresse descend sous le début). Le lien garde sa zone
+          // de 44 points, plus haute qu'une ligne : une marge négative la laisse déborder sur l'air
+          // de la phrase voisine, pour que la ligne ne paraisse pas détachée des autres.
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: space.xs,
+              marginVertical: -space.sm,
+            }}
+          >
+            <Text variant="callout">{t(($) => $.removal.part.contestLead)}</Text>
+            <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+              <ContactLink subject={contest.subject} />
+            </View>
+          </View>
+        ) : null}
       </View>
     </View>
   )

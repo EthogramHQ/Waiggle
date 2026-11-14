@@ -26,6 +26,8 @@ const fr = {
   explanationLong:
     'Explication : Demander un code de carte bancaire n’est pas permis ici, même pour rire : https://exemple.fr/une-adresse-tres-longue-qui-doit-se-couper',
   contest: 'Pour contester : contact@waiggle.com',
+  // R9 : l'objet de l'e-mail du bandeau qui écrit lui-même « Pour contester » (`contest`).
+  contestSubject: 'Contestation : retrait de mon projet « Faux avis » du 18 oct.',
   removedPlaceholder: 'Contenu retiré par la modération',
   when: '18 oct.',
   maxPage: 'Voir la page de Max',
@@ -106,6 +108,7 @@ const en: typeof fr = {
   explanationLong:
     'Explanation: Asking for a bank card code is not allowed here, even as a joke: https://example.com/a-very-long-address-that-has-to-wrap',
   contest: 'To contest: contact@waiggle.com',
+  contestSubject: 'Contest: removal of my project “Fake reviews” on Oct 18',
   removedPlaceholder: 'Content removed by the moderation',
   when: 'Oct 18',
   maxPage: 'See Max’s page',
@@ -215,6 +218,19 @@ export function ReportSamples() {
       {/* En tête d'un projet retiré, pour son auteur : les deux sortes de retrait. */}
       <RemovalNotice {...afterReport} />
       <RemovalNotice {...byLaw} />
+      {/* R9 : « Pour contester », écrit par le bandeau lui-même, avec l'adresse en lien qui ouvre
+          la messagerie sur un objet prêt ; puis le même, serré, au-dessus d'un commentaire. */}
+      <RemovalNotice
+        title={l.removedTitle}
+        lines={afterReport.lines.slice(0, -1)}
+        contest={{ subject: l.contestSubject }}
+      />
+      <RemovalNotice
+        title={l.removedTitle}
+        lines={byLaw.lines.slice(0, -1)}
+        contest={{ subject: l.contestSubject }}
+        compact
+      />
       {/* Les commentaires : celui d'un autre membre, avec « Signaler » ; le sien, retiré (le
           bandeau, et « Supprimer » seul : il ne se modifie plus) ; l'emplacement que lisent les
           autres, l'auteur du projet compris. */}

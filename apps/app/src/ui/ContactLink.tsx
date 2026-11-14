@@ -21,6 +21,14 @@ type Props = {
    * (WCAG 2.5.3 : le nom suit ce qui est affiché). Par défaut, l'adresse elle-même.
    */
   children?: string
+  /**
+   * Le texte qui dit de quoi parle le lien, quand plusieurs liens portent le même nom (un
+   * « Contester » sur chaque notification d'Activité, R9) : le `nativeID` de la phrase, relié par
+   * `aria-describedby` sur le web…
+   */
+  describedById?: string | undefined
+  /** …et la même phrase en indice, lu après le nom sur téléphone. */
+  hint?: string | undefined
 }
 
 /**
@@ -32,13 +40,15 @@ export const contactMailto = (subject?: string): string =>
     ? `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}`
     : `mailto:${contactEmail}`
 
-export function ContactLink({ subject, children }: Props) {
+export function ContactLink({ subject, children, describedById, hint }: Props) {
   // Une double tape ouvrirait deux brouillons : la seconde tombe dans la garde (600 ms).
   const guard = useTapGuard()
   const label = children ?? contactEmail
   return (
     <TextLink
       label={label}
+      describedById={describedById}
+      hint={hint}
       // Une adresse n'a pas d'espace : sans coupure possible, elle sortirait du cadre sur un petit
       // téléphone, à 200 % de texte. Un autre texte (« Contester ») se coupe entre ses mots.
       breakAnywhere={children === undefined}
