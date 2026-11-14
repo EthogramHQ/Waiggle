@@ -2,8 +2,9 @@
 // C8 l'ouvrait sur « Annuler ». La contre-visite du design (S1) a montré que cela ne protège de
 // rien ici : « Retirer » reste inactif tant que le fondement et l'explication manquent, et
 // « Annuler » coûtait un Tab de plus, entendu avant le formulaire. Une fenêtre à champs obligatoires
-// s'ouvre donc sur son premier champ : le groupe « Fondement », par son premier choix. Mêmes
-// simulations que ModerationScreen.test.tsx, en plus court.
+// s'ouvre donc sur son premier champ : « Fondement ». Depuis R9, ce champ est un menu (`MenuField`),
+// et le focus va à sa ligne, nommée « Fondement, … ». Mêmes simulations que
+// ModerationScreen.test.tsx, en plus court.
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import {
   useDecide,
@@ -91,18 +92,20 @@ afterEach(() => {
 })
 
 describe('the « Retirer » window opening focus', () => {
-  it('opens on the first choice of « Fondement », not on « Annuler » or « Retirer »', async () => {
+  it('opens on the « Fondement » field, not on « Annuler » or « Retirer »', async () => {
     // R9 (test adapté à l'écran refait) : « Retirer » est dans le détail de l'élément ; sur un grand
     // écran, le détail montre le premier élément de la file, le commentaire de Sam.
     const restoreWindow = setDesktopWindow()
     try {
       await renderWithProviders(<ModerationScreen />)
-      await screen.findByText(firstTextOf(scamCommentItem))
+      // Sur grand écran, le texte est à la fois dans la carte de la file et dans le détail.
+      await screen.findAllByText(firstTextOf(scamCommentItem))
       const focused = watchOpeningFocus()
 
       await fireEvent.press(screen.getByRole('button', { name: 'Retirer' }))
 
-      await waitFor(() => expect(focused()).toBe(fr.t(($) => $.moderation.grounds.illegal)))
+      const ground = fr.t(($) => $.moderation.groundLabel)
+      await waitFor(() => expect(focused() ?? '').toMatch(new RegExp(`^${ground}`)))
     } finally {
       restoreWindow()
     }

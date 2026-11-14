@@ -69,7 +69,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
-import { type Focusable, focusTarget, focusWithoutScroll } from './focus'
+import { type Focusable, focusTarget, focusWithoutScroll, moveReaderTo } from './focus'
 import { IconButton } from './IconButton'
 import { inLayerAbove, layerStillOpening, openModalLayer, sameLayer } from './modalLayers'
 import { Notice, type NoticeAction } from './Notice'
@@ -735,7 +735,13 @@ export function Sheet({
   // titre de la page qui reste (`giveFocusBack`).
   useEffect(() => {
     escapeHandled.current = false
-    if (Platform.OS !== 'web') return
+    if (Platform.OS !== 'web') {
+      // Sur téléphone, le lecteur d'écran va lui aussi à l'élément attendu, comme dans `Dialog` :
+      // le `focus()` de `onShow` (plus bas) n'ouvre que le clavier d'un champ, et ne déplace rien
+      // quand l'élément attendu est un bouton (« Fondement » du retrait, R9).
+      if (open) moveReaderTo(initialFocusRef?.current)
+      return
+    }
     if (open) {
       shown.current = true
       opener.current = activeElement()
