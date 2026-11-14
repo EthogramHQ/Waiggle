@@ -77,7 +77,7 @@ const target: ReportTarget = { kind: 'comment', id: commentId }
  * Ce que rend GET /v1/reports/target pour ce commentaire (ReportTargetPreview). Tranche 7b :
  * l'auteur de la cible, pour proposer « Bloquer aussi @sam » après l'envoi.
  */
-const sam = { id: 'u9', name: 'Sam Petit', handle: 'sam', isBlocked: false }
+const sam = { id: 'u9', name: 'Sam Petit', handle: 'sam', isBlocked: false, isAdmin: false }
 // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests : le rappel en tête, les parties, « déjà signalé » et les signalements restants.
 const r9Preview = {
   head: { title: null, authorName: 'Sam Petit', image: null },
@@ -182,7 +182,13 @@ describe('what is reported', () => {
       text: 'Lucas Martin (@lucas_martin)',
       projectId: null,
       // Pour un profil, l'auteur est le membre lui-même.
-      author: { id: 'u7', name: 'Lucas Martin', handle: 'lucas_martin', isBlocked: false },
+      author: {
+        id: 'u7',
+        name: 'Lucas Martin',
+        handle: 'lucas_martin',
+        isBlocked: false,
+        isAdmin: false,
+      },
       ...r9Preview,
     })
     await renderWithProviders(<ReportScreen kind="member" id="u7" />)
