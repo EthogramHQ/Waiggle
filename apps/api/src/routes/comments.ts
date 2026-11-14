@@ -38,7 +38,7 @@ import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
-import { projectReachableBy } from '../projects/visibility'
+import { inViewerHiveColumn, projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -226,6 +226,12 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    * partout ailleurs (visibleTo), reste alors trouvé : `projectReachableBy`
    * (projects/visibility.ts), la condition de visibleTo moins le blocage. Un projet privé ou
    * retiré d'un autre reste introuvable, comme avant.
+   *
+   * R10 : un projet réservé à une ruche se trouve pour les membres actuels de sa ruche (visibleTo),
+   * et, pour défaire son geste, aussi pour un ancien membre (décision Q2 de la relecture du plan :
+   * projectReachableBy ne regarde pas l'appartenance). Pour lui, le projet est « privé » (viewerOf,
+   * `inViewerHive` faux) : commentOf ne lui trouve que ses propres commentaires, et la page des
+   * commentaires lui reste fermée (elle passe par visibleTo).
    */
   const projectOf = async (projectId: string, userId: string, undo = false) => {
     // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
@@ -236,6 +242,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         authorId: schema.project.authorId,
         visibility: schema.project.visibility,
         removedAt: schema.project.removedAt,
+        // Sa ruche est-elle l'une de celles du membre ? (index hive_member_user_idx)
+        inViewerHive: inViewerHiveColumn(userId),
       })
       .from(schema.project)
       .where(and(eq(schema.project.id, projectId), reachable))

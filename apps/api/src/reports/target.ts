@@ -38,7 +38,7 @@ import { mediaUrl } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
 import { type MediaMark, mediaShownTo, visibleMedia } from '../projects/media-visibility'
-import { projectVisibleTo } from '../projects/visibility'
+import { inViewerHiveColumn, projectVisibleTo } from '../projects/visibility'
 import { type MediaRow, toVisual } from '../projects/visual'
 import { cornerAccess } from '../testers/access'
 import { photosOfUpdates, readLines, updateShownTo } from '../updates/load'
@@ -434,6 +434,8 @@ const loadVisible = async (
           projectAuthorId: p.authorId,
           visibility: p.visibility,
           projectRemovedAt: p.removedAt,
+          // R10 : la ruche du projet est-elle l'une de celles du membre ? (viewerOf)
+          inViewerHive: inViewerHiveColumn(viewerId),
           mentionsMe: sql<boolean>`exists (select 1 from ${cm} where ${cm.commentId} = ${c.id} and ${cm.memberId} = ${viewerId})`,
         })
         .from(c)
@@ -448,6 +450,7 @@ const loadVisible = async (
           authorId: row.projectAuthorId,
           visibility: row.visibility,
           removedAt: row.projectRemovedAt,
+          inViewerHive: row.inViewerHive,
         },
         blocks,
       )
