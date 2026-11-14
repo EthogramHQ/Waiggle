@@ -800,6 +800,8 @@ function AdminModeration() {
       header={<TopNav />}
       onBack={tab === 'history' ? closeHistory : phoneDetail ? backToQueue : back}
       title={t(($) => $.moderation.title)}
+      // Toute la largeur, pour les trois colonnes sur ordinateur (une colonne sur téléphone).
+      width="page"
       {...(phoneDetail ? null : { subtitle: t(($) => $.moderation.subtitle) })}
       titleAside={<StatusPill label={t(($) => $.moderation.adminOnly)} />}
       // Sur téléphone, l'historique a son bouton en haut de la file (planche R9-Moderation-Telephone).
