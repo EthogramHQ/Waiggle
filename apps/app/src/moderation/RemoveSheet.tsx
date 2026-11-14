@@ -30,11 +30,14 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { Button } from '../ui/Button'
 import type { Focusable } from '../ui/focus'
 import { Hint } from '../ui/Hint'
+import type { ImageSource } from '../ui/image'
 import { MenuField } from '../ui/MenuField'
+import { QuotedContent } from '../ui/QuotedContent'
 import { RadioGroup } from '../ui/Radio'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Sheet, type SheetNotice, useSheetAside } from '../ui/Sheet'
@@ -43,6 +46,7 @@ import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { useDecide } from './api'
 import { decisionFailure } from './failure'
+import { firstText } from './ModerationDetail'
 import { partText } from './present'
 
 type Props = {
@@ -80,6 +84,39 @@ const sentPart = (part: NonNullable<ModerationQueueItem['part']>): ReportPart =>
   ...(part.mediaId ? { mediaId: part.mediaId } : null),
 })
 
+type T = ReturnType<typeof useTranslation>['t']
+
+/**
+ * Ce que la feuille rappelle du contenu visé : une vignette quand l'API en donne l'adresse (la
+ * capture d'un message de testeur, la photo d'un appel), sinon un texte. Le texte de la partie
+ * visée quand la copie le porte (la description), à défaut le premier texte de la copie ; une
+ * partie image sans adresse (une photo publique, que la file ne montre pas) se dit par son nom
+ * (« La photo 2 »). Un contenu déjà retiré porte son texte.
+ */
+function quotedOf(
+  item: ModerationQueueItem | RemovedItem,
+  partLabel: string | null,
+  t: T,
+  mediaSource: (url: string) => ImageSource | null,
+): { text?: string; picture?: { name: string; source: ImageSource } } {
+  if ('text' in item) return { text: item.text }
+  const wanted = item.part?.field
+  const image = item.images.find(
+    (candidate) =>
+      candidate.state === 'present' &&
+      candidate.url &&
+      candidate.field === (wanted ?? candidate.field),
+  )
+  const source = image?.url ? mediaSource(image.url) : null
+  if (image && source) {
+    return { picture: { name: t(($) => $.moderation.images[image.field]), source } }
+  }
+  const own = item.snapshot.find((entry) => entry.field === wanted)?.value
+  const text = own ?? firstText(item.snapshot)
+  if (text) return { text }
+  return partLabel ? { text: partLabel.charAt(0).toLocaleUpperCase() + partLabel.slice(1) } : {}
+}
+
 export function RemoveSheet({ item, open, onClose, onDone, returnFocusTo }: Props) {
   const { t } = useTranslation()
   const signInAgain = useSignInAgain()
@@ -97,6 +134,10 @@ export function RemoveSheet({ item, open, onClose, onDone, returnFocusTo }: Prop
   const record = 'authorRecord' in item ? item.authorRecord : null
   const context = 'context' in item ? item.context : null
   const contentTitle = context?.title ?? record?.name ?? null
+
+  // Ce qu'on rappelle du contenu : sa vignette (capture d'un testeur) ou son texte.
+  const mediaSource = useMediaSources()
+  const quoted = quotedOf(item, partLabel, t, mediaSource)
 
   const [scope, setScope] = useState<Scope>(partAlone ? 'part' : 'whole')
   const [ground, setGround] = useState<RemovalGround | null>(null)
@@ -212,7 +253,12 @@ export function RemoveSheet({ item, open, onClose, onDone, returnFocusTo }: Prop
     <Sheet
       open={open}
       title={title}
-      subtitle={t(($) => $.moderation.removeSheet.message)}
+      // « Cette partie » seulement quand une partie se retire ; le contenu entier a son propre texte.
+      subtitle={
+        removingPart
+          ? t(($) => $.moderation.removeSheet.message)
+          : t(($) => $.moderation.removeMessage)
+      }
       onClose={onClose}
       // Sur ordinateur, l'aperçu dans la colonne à droite du formulaire ; quand la fenêtre n'a pas
       // la place de la poser (téléphone, fenêtre étroite), il vient sous le formulaire.
@@ -246,6 +292,14 @@ export function RemoveSheet({ item, open, onClose, onDone, returnFocusTo }: Prop
       }
     >
       <Stack gap="xl">
+        {/* Le contenu visé, rappelé comme dans la fenêtre de 7a : la feuille couvre la carte, on
+            vérifie ici qu'on retire le bon. */}
+        <QuotedContent
+          label={t(($) => $.moderation.kinds[kind])}
+          text={quoted.text}
+          picture={quoted.picture}
+        />
+
         {offerChoice && partLabel && wholeKind ? (
           <RadioGroup<Scope>
             label={t(($) => $.moderation.removeSheet.what)}

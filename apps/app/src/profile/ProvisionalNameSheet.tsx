@@ -43,9 +43,16 @@ type Props = {
   me: Me
   /** Une autre feuille (ou fenêtre) est ouverte : celle-ci attend qu'elle se ferme. */
   otherSheetOpen: boolean
+  /**
+   * Ouverte à la demande de la page (« Choisir mon pseudo » de « Mon profil » d'un compte suspendu,
+   * R9 jur-B4) : la page décide seule de l'ouverture, avec `onClose` pour la fermer. Sans cette
+   * prop, la feuille s'ouvre d'elle-même, une fois par visite (le cadre de l'appli).
+   */
+  open?: boolean
+  onClose?: () => void
 }
 
-export function ProvisionalNameSheet({ me, otherSheetOpen }: Props) {
+export function ProvisionalNameSheet({ me, otherSheetOpen, open, onClose }: Props) {
   const { t } = useTranslation()
   const hydrated = useHydrated()
   const setMe = useSetMe()
@@ -57,7 +64,8 @@ export function ProvisionalNameSheet({ me, otherSheetOpen }: Props) {
   // fois ouverte, elle ne dépend plus d'`otherSheetOpen` : sa propre couche compte parmi les
   // feuilles ouvertes.
   const wanted = firstKind(me)
-  if (state.phase === 'waiting' && hydrated && !otherSheetOpen && wanted) {
+  const asked = open !== undefined
+  if (!asked && state.phase === 'waiting' && hydrated && !otherSheetOpen && wanted) {
     setState({ phase: 'open', kind: wanted })
   }
   const kind = state.phase === 'open' ? state.kind : (wanted ?? 'handle')
@@ -73,6 +81,13 @@ export function ProvisionalNameSheet({ me, otherSheetOpen }: Props) {
   const close = () => {
     if (sending.current) return
     setState({ phase: 'closed' })
+    // À la demande de la page : elle ferme, et la prochaine ouverture repart d'un champ vide.
+    if (asked) {
+      setTyped('')
+      setFieldError(null)
+      setFailure(null)
+      onClose?.()
+    }
   }
 
   const handleMessages: Record<NonNullable<ProfileFormErrors['handle']>, string> = {
@@ -133,7 +148,7 @@ export function ProvisionalNameSheet({ me, otherSheetOpen }: Props) {
       setState({ phase: 'open', kind: 'name' })
       return
     }
-    setState({ phase: 'closed' })
+    close()
   }
 
   const title =
@@ -143,7 +158,7 @@ export function ProvisionalNameSheet({ me, otherSheetOpen }: Props) {
 
   return (
     <Sheet
-      open={state.phase === 'open'}
+      open={asked ? open : state.phase === 'open'}
       onClose={close}
       title={title}
       compact

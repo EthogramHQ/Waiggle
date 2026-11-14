@@ -10,6 +10,7 @@ import { Button } from '../ui/Button'
 import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
 import { NotificationCard } from '../ui/NotificationCard'
+import { QuotedContent } from '../ui/QuotedContent'
 import { ReportCard } from '../ui/ReportCard'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -344,6 +345,10 @@ const compactDecisions: DecisionHistoryItem[] = [
 
 const noop = () => {}
 
+/** Une image grise d'un point (exemple du catalogue : aucune photo réelle à montrer). */
+const pixel =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO8f/36fwAJGAOvOmFqmQAAAABJRU5ErkJggg=='
+
 export function ModerationCatalogue() {
   const { i18n, t } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -519,6 +524,13 @@ export function ModerationCatalogue() {
         <Button label={l.confirmRemove} variant="confirm" onPress={() => setDialog(false)} />
         <Button label={l.cancel} variant="secondary" onPress={() => setDialog(false)} />
       </Dialog>
+      {/* Le contenu rappelé en citation (fenêtre et feuille « Retirer ») : un texte court, un texte
+          coupé à trois lignes, et une vignette (la capture d'un message de testeur). */}
+      <Stack gap="md">
+        <QuotedContent label={l.project} text={l.snapshotLabel} />
+        <QuotedContent label={l.project} text={l.removeMessage.repeat(3)} />
+        <QuotedContent label={l.project} picture={{ name: l.project, source: { uri: pixel } }} />
+      </Stack>
       {/* Les deux notifications de la modération : un commentaire retiré (le détail, une phrase
           par ligne, puis l'extrait), un signalement traité sans lien (la cible n'est plus
           visible), et un autre qui mène encore au projet. */}

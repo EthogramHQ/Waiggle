@@ -45,7 +45,7 @@
 // bas, comme le pied d'une feuille. « Bloquer » et « Annuler » étaient sous le pli à 390 × 844 et à
 // 1440 × 900. Sur un écran bas (téléphone en paysage), toute la couche défile, comme avant : un pied
 // collé y mangerait presque toute la hauteur.
-import { borders, layout, space } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react'
 import {
   type LayoutChangeEvent,
@@ -59,6 +59,7 @@ import {
 import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from './focus'
 import { openModalLayer, sameLayer } from './modalLayers'
 import { Notice } from './Notice'
+import { QuotedContent } from './QuotedContent'
 import { Surface } from './Surface'
 import { SheetFade, useBelowFold } from './sheetFade'
 import { Text } from './Text'
@@ -158,9 +159,6 @@ const webScrim = (onPress: (() => void) | undefined): object => ({
   'aria-hidden': true,
   onClick: onPress,
 })
-
-/** Le nombre de lignes du texte rappelé : de quoi le reconnaître, sans pousser les boutons loin. */
-const QUOTE_LINES = 3
 
 /**
  * La hauteur d'écran (points) à partir de laquelle les boutons peuvent rester collés en bas de la
@@ -460,7 +458,6 @@ function DialogTop({
   align: 'left' | 'center'
   body: ReactNode
 }) {
-  const { colors } = useTheme()
   return (
     <>
       {illustration ? <View style={{ alignItems: 'center' }}>{illustration}</View> : null}
@@ -468,25 +465,8 @@ function DialogTop({
       <Text variant="heading" align="center" heading={2} nativeID={titleId}>
         {title}
       </Text>
-      {quote ? (
-        // Le contenu visé, souligné d'un trait de miel à gauche comme une citation (la
-        // carte de la modération, une note). Aligné à gauche : c'est un texte qu'on lit.
-        <View
-          style={{
-            gap: space.xxs,
-            borderLeftWidth: borders.quote,
-            borderLeftColor: colors.honey,
-            paddingLeft: space.md,
-          }}
-        >
-          <Text variant="caption" weight={600} tone="muted">
-            {quote.label}
-          </Text>
-          <Text numberOfLines={QUOTE_LINES} breakAnywhere>
-            {quote.text}
-          </Text>
-        </View>
-      ) : null}
+      {/* Le contenu visé, en citation (voir QuotedContent), aligné à gauche : c'est un texte qu'on lit. */}
+      {quote ? <QuotedContent label={quote.label} text={quote.text} /> : null}
       {/* Les paragraphes plus serrés entre eux qu'avec le titre et les boutons. Leur bloc
                   porte l'identifiant qui décrit la boîte de dialogue (web). */}
       <View nativeID={messageId} style={{ gap: space.md }}>

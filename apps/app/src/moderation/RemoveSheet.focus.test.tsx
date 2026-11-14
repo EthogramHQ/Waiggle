@@ -13,6 +13,10 @@ import { useDecide } from './api'
 import { RemoveSheet } from './RemoveSheet'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// La feuille rappelle le contenu visé : ses vignettes lisent la session (api/media.ts).
+jest.mock('../api/media', () => ({
+  useMediaSources: () => (url: string | null | undefined) => (url ? { uri: url } : null),
+}))
 jest.mock('./api', () => ({ useDecide: jest.fn() }))
 
 type SheetProps = ComponentProps<typeof Sheet>
@@ -52,7 +56,7 @@ describe('the place of the focus when « Retirer » closes', () => {
     )
     await passTapGuard()
     // Témoin : la feuille est ouverte.
-    expect(screen.getByText(fr.t(($) => $.moderation.removeSheet.message))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.moderation.removeMessage))).toBeTruthy()
     expect(mockSheet.props?.returnFocusTo?.()).toBe(outcome)
   })
 })

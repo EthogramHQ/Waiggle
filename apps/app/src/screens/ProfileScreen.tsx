@@ -28,6 +28,7 @@ import { useRouteSheet } from '../navigation/useRouteSheet'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { type ProfileFormErrors, toProfileUpdate } from '../profile/form'
 import { type RemovablePart, useMe, useRemoveProfilePart, useSetMe } from '../profile/hooks'
+import { ProvisionalNameSheet } from '../profile/ProvisionalNameSheet'
 import { useTools } from '../tools/api'
 import { useToolLabels } from '../tools/labels'
 import { isCatalogueName, matchTools } from '../tools/match'
@@ -88,6 +89,9 @@ function LockedProfile({ me }: { me: Me }) {
   const sheet = useRouteSheet('/settings')
   const title = t(($) => $.profile.title)
   const removePart = useRemoveProfilePart()
+  // Le pseudo (d'abord) ou le nom provisoire, que la modération a remplacé : `null` s'il n'y en a pas.
+  const provisionalKind = me.provisional.handle ? 'handle' : me.provisional.name ? 'name' : null
+  const [choosing, setChoosing] = useState(false)
 
   // R9 (jur-R5, décision L5) : retirer sa bio, ses outils, sa photo, sans rien mettre à la place.
   // Un retrait à la fois : `sending` le sait tout de suite (une double tape n'envoie qu'une fois),
@@ -162,7 +166,15 @@ function LockedProfile({ me }: { me: Me }) {
         notice={notice}
       >
         {/* Lue à son tour (role « status ») : elle est là dès l'ouverture, ce n'est pas une alerte. */}
-        <Notice tone="info" message={t(($) => $.suspension.profileLocked)} polite />
+        <Notice
+          tone="info"
+          message={
+            provisionalKind
+              ? t(($) => $.suspension.profileLockedProvisional)
+              : t(($) => $.suspension.profileLocked)
+          }
+          polite
+        />
         <MemberHeader
           name={me.name}
           handle={t(($) => $.member.handle, { handle: me.handle })}
@@ -172,8 +184,22 @@ function LockedProfile({ me }: { me: Me }) {
           tools={tools}
           heading={2}
         />
-        {removals.length > 0 ? (
+        {removals.length > 0 || provisionalKind ? (
           <Stack gap="sm">
+            {/* Un nom ou un pseudo provisoire (retiré par la modération) se remplace même suspendu
+                (jur-B4) : ce bouton ouvre la feuille du nom provisoire, comme celle de « Moi ». */}
+            {provisionalKind ? (
+              <Button
+                label={
+                  provisionalKind === 'handle'
+                    ? t(($) => $.removal.part.chooseHandle)
+                    : t(($) => $.removal.part.chooseName)
+                }
+                variant="secondary"
+                icon="pencil-simple"
+                onPress={() => setChoosing(true)}
+              />
+            ) : null}
             {removals.map(({ part, label }) => (
               <Button
                 // La clé suit la partie, pas la place : quand un voisin disparaît, le bouton qui a
@@ -190,6 +216,15 @@ function LockedProfile({ me }: { me: Me }) {
           </Stack>
         ) : null}
       </Sheet>
+      {/* La feuille du nom provisoire, ouverte par le bouton ci-dessus et par lui seul. */}
+      {provisionalKind ? (
+        <ProvisionalNameSheet
+          me={me}
+          otherSheetOpen={false}
+          open={choosing}
+          onClose={() => setChoosing(false)}
+        />
+      ) : null}
     </Screen>
   )
 }
