@@ -20,6 +20,7 @@ import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
 import { processVisual } from '../media/visual'
+import { dropPhotoDescriptionRemoval } from '../moderation/replaced'
 import { loadVisibleProject, projectAccess } from '../projects/load'
 import { toVisual } from '../projects/visual'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -372,19 +373,26 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // a pu retirer le projet entre-temps ; la condition « exists » est revérifiée au moment même de
     // l'écriture. « returning » rend la ligne écrite ; aucune ligne, c'est qu'une condition n'est
     // plus vraie. (Les colonnes sont qualifiées par leur table : « id » existe dans les deux.)
-    const written = await db
-      .update(schema.projectMedia)
-      .set({ description })
-      .where(
-        and(
-          eq(schema.projectMedia.id, visualId),
-          eq(schema.projectMedia.projectId, id),
-          // R7a : une photo rattachée à une mise à jour ne se décrit pas ici (A4).
-          or(ne(schema.projectMedia.slot, 'update'), isNull(schema.projectMedia.updateId)),
-          sql`exists (select 1 from project where project.id = ${id} and project.author_id = ${user.id} and project.removed_at is null)`,
-        ),
-      )
-      .returning({ id: schema.projectMedia.id })
+    // R9 (P5) : dans la même transaction, une nouvelle description non vide remplace celle que la
+    // modération avait retirée de CETTE photo, dont la marque s'efface (moderation/replaced.ts).
+    // Décrire une autre photo, ou la photo retirée elle-même, ne rend jamais une photo retirée.
+    const written = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(schema.projectMedia)
+        .set({ description })
+        .where(
+          and(
+            eq(schema.projectMedia.id, visualId),
+            eq(schema.projectMedia.projectId, id),
+            // R7a : une photo rattachée à une mise à jour ne se décrit pas ici (A4).
+            or(ne(schema.projectMedia.slot, 'update'), isNull(schema.projectMedia.updateId)),
+            sql`exists (select 1 from project where project.id = ${id} and project.author_id = ${user.id} and project.removed_at is null)`,
+          ),
+        )
+        .returning({ id: schema.projectMedia.id })
+      if (rows.length > 0 && description) await dropPhotoDescriptionRemoval(tx, user.id, visualId)
+      return rows
+    })
     if (written.length === 0) {
       // Photo inconnue ou d'un autre projet (404), ou projet retiré/supprimé depuis la garde : on
       // relit les droits pour répondre comme les autres routes.
