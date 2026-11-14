@@ -976,3 +976,220 @@ describe('the end of a suspension, and its cause (R9, jur-R6)', () => {
     )
   })
 })
+
+// --- R10 : les ruches (planche R10-Activite ; options 7 et 8 des planches ; scénario, « Les
+// notifications et le récap », « Recevoir une invitation », « La modération ») ---
+//
+// Ce que ces tests supposent de present.ts (plan R10, UI-E2 ; « Réponses des écritures et petites
+// questions », la ruche sans nom) :
+// - les cinq lignes ont chacune leur phrase (`notifications.hiveInvited`…), noms et ruche en gras ;
+// - où elles mènent (option 8) : l'invitation à l'onglet Ruches (`/hives`), « a rejoint » aux membres
+//   de la ruche (`/hives/<id>?tab=members`), l'animation à la ruche (`/hives/<id>`), le retrait et la
+//   suppression nulle part ;
+// - le retrait et la suppression ont une seconde ligne (option 7, `detail`) : « Tes projets réservés
+//   à la ruche sont redevenus privés. » ;
+// - une ruche sans nom (retiré par la modération) : « la ruche sans nom » là où la phrase dit déjà
+//   « la ruche » (`hives.unnamedInline`), « Ruche sans nom » ailleurs (`hives.unnamed`, « a rejoint »).
+
+const hiveOf = (name: string | null) => ({
+  id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c01',
+  name,
+  icon: 'house-line' as const,
+})
+const famille = hiveOf('Famille')
+const familleAddress = `/hives/${famille.id}`
+const inesInviter = { id: 'u9', name: 'Inès Haddad', avatarUrl: null }
+const maxMember = { id: 'u2', name: 'Max Durand', avatarUrl: null }
+const hiveCommon = { at: '2026-11-12T07:00:00.000Z', isNew: true }
+
+const hiveInvited = (changes: Partial<Of<'hive_invited'>> = {}): Of<'hive_invited'> => ({
+  ...hiveCommon,
+  kind: 'hive_invited',
+  id: 'hive_invited:1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c04',
+  invitation: { id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c04' },
+  hive: famille,
+  inviter: inesInviter,
+  ...changes,
+})
+const hiveJoined = (changes: Partial<Of<'hive_joined'>> = {}): Of<'hive_joined'> => ({
+  ...hiveCommon,
+  kind: 'hive_joined',
+  id: `hive_joined:${famille.id}:u2`,
+  hive: famille,
+  member: maxMember,
+  ...changes,
+})
+/** Une des trois lignes gardées (retrait, animation, suppression). */
+const hiveNotice = (
+  kind: 'hive_removed' | 'hive_animator' | 'hive_deleted',
+  hive: { id: string | null; name: string | null; icon: 'house-line' | null } = famille,
+): Notification => ({
+  ...hiveCommon,
+  kind,
+  id: `${kind}:2c3d4e5f-6071-4b8c-9d0e-1f2a3b4c5d06`,
+  hive,
+})
+
+const PRIVATE_AGAIN = fr.t(($) => $.notifications.hivePrivateAgain)
+const UNNAMED = fr.t(($) => $.hives.unnamed)
+const UNNAMED_INLINE = fr.t(($) => $.hives.unnamedInline)
+
+describe('the five hive lines of the Activity (R10)', () => {
+  it('says « Inès Haddad t’invite dans la ruche Famille », both names in bold', () => {
+    const shown = present(hiveInvited())
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.hiveInvited, { name: 'Inès Haddad', hive: 'Famille' })),
+    )
+    expect(strongOf(shown)).toEqual(['Inès Haddad', 'Famille'])
+  })
+
+  it('still names the hive of an invitation whose sender deleted their account', () => {
+    const shown = present(hiveInvited({ inviter: null }))
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.hiveInvitedNoInviter, { hive: 'Famille' })),
+    )
+  })
+
+  it('says « Max Durand a rejoint Famille » to the member who invited him', () => {
+    const shown = present(hiveJoined())
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.hiveJoined, { name: 'Max Durand', hive: 'Famille' })),
+    )
+    expect(strongOf(shown)).toEqual(['Max Durand', 'Famille'])
+  })
+
+  it('says « Tu ne fais plus partie de la ruche Famille. », without saying who removed her', () => {
+    const shown = present(hiveNotice('hive_removed'))
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.hiveRemoved, { hive: 'Famille' })),
+    )
+    expect(strongOf(shown)).toEqual(['Famille'])
+  })
+
+  it('says « Tu animes maintenant la ruche Famille. »', () => {
+    expect(sentenceOf(present(hiveNotice('hive_animator')))).toBe(
+      plain(fr.t(($) => $.notifications.hiveAnimator, { hive: 'Famille' })),
+    )
+  })
+
+  it('says « La ruche Famille a été supprimée. »', () => {
+    expect(sentenceOf(present(hiveNotice('hive_deleted')))).toBe(
+      plain(fr.t(($) => $.notifications.hiveDeleted, { hive: 'Famille' })),
+    )
+  })
+})
+
+describe('where the hive lines lead (R10, option 8)', () => {
+  it('opens the hives tab from an invitation', () => {
+    expect(addressOf(present(hiveInvited()).target)).toBe('/hives')
+    expect(addressOf(present(hiveInvited({ inviter: null })).target)).toBe('/hives')
+  })
+
+  it('opens the members of the hive from « a rejoint »', () => {
+    expect(addressOf(present(hiveJoined()).target)).toBe(`${familleAddress}?tab=members`)
+  })
+
+  it('opens the hive from « Tu animes maintenant la ruche Famille. »', () => {
+    expect(addressOf(present(hiveNotice('hive_animator')).target)).toBe(familleAddress)
+  })
+
+  it('leads nowhere from a removal or a deleted hive', () => {
+    expect(present(hiveNotice('hive_removed')).target).toBeNull()
+    expect(present(hiveNotice('hive_deleted')).target).toBeNull()
+    // Une ruche supprimée n'a plus d'identifiant ni d'icône : la ligne ne mène toujours nulle part.
+    expect(
+      present(hiveNotice('hive_deleted', { id: null, name: 'Famille', icon: null })).target,
+    ).toBeNull()
+  })
+})
+
+describe('the second line of a removal and of a deleted hive (R10, option 7)', () => {
+  it('says under a removal that her projects reserved to the hive are private again', () => {
+    expect(present(hiveNotice('hive_removed')).detail).toBe(PRIVATE_AGAIN)
+  })
+
+  it('says it under a deleted hive too', () => {
+    expect(present(hiveNotice('hive_deleted')).detail).toBe(PRIVATE_AGAIN)
+  })
+
+  it('has no such line under an invitation, a member who joined, or the animation (témoin)', () => {
+    for (const shown of [
+      present(hiveInvited()),
+      present(hiveJoined()),
+      present(hiveNotice('hive_animator')),
+    ]) {
+      expect(shown.detail ?? '').not.toContain(PRIVATE_AGAIN)
+    }
+  })
+})
+
+describe('a hive whose name was removed (R10, « Ruche sans nom »)', () => {
+  const unnamed = hiveOf(null)
+
+  it('says « la ruche sans nom » in the lines that already say « la ruche »', () => {
+    expect(sentenceOf(present(hiveInvited({ hive: unnamed })))).toBe(
+      plain(
+        fr.t(($) => $.notifications.hiveInvited, { name: 'Inès Haddad', hive: UNNAMED_INLINE }),
+      ),
+    )
+    expect(sentenceOf(present(hiveNotice('hive_removed', unnamed)))).toBe(
+      plain(fr.t(($) => $.notifications.hiveRemoved, { hive: UNNAMED_INLINE })),
+    )
+    expect(sentenceOf(present(hiveNotice('hive_animator', unnamed)))).toBe(
+      plain(fr.t(($) => $.notifications.hiveAnimator, { hive: UNNAMED_INLINE })),
+    )
+    expect(sentenceOf(present(hiveNotice('hive_deleted', unnamed)))).toBe(
+      plain(fr.t(($) => $.notifications.hiveDeleted, { hive: UNNAMED_INLINE })),
+    )
+  })
+
+  it('says « Ruche sans nom » where the line does not say « la ruche » (« a rejoint »)', () => {
+    expect(sentenceOf(present(hiveJoined({ hive: unnamed })))).toBe(
+      plain(fr.t(($) => $.notifications.hiveJoined, { name: 'Max Durand', hive: UNNAMED })),
+    )
+  })
+})
+
+describe('the moderation of a hive name (R10)', () => {
+  /** Le nom de Famille retiré après un signalement, au nom des règles : la ruche n'a plus de nom. */
+  const removedName: Of<'removed'> = {
+    kind: 'removed',
+    id: `removed:hive:name:${famille.id}`,
+    at: '2026-11-12T08:00:00.000Z',
+    isNew: true,
+    targetKind: 'hive',
+    project: null,
+    hive: hiveOf(null),
+    excerpt: null,
+    part: { field: 'name', position: null },
+    ground: 'rules',
+    explanation: 'Un nom qui vise une personne.',
+    afterReport: true,
+    projectHidden: false,
+  }
+
+  it('says the name of her hive was removed by the moderation', () => {
+    expect(sentenceOf(present(removedName))).toBe(fr.t(($) => $.notifications.removed.hive))
+  })
+
+  it('keeps the ground, the explanation and how to contest under the sentence (DSA art. 17)', () => {
+    const { detail } = present(removedName)
+
+    expect(detail).toContain(fr.t(($) => $.removal.grounds.rules))
+    expect(detail).toContain(removedName.explanation)
+    expect(detail).toContain(fr.t(($) => $.removal.contest))
+  })
+
+  it('says the name of Famille is visible again once restored', () => {
+    const shown = present(restored({ targetKind: 'hive', project: null, hive: famille }))
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.restored.hive, { hive: 'Famille' })),
+    )
+    expect(shown.detail).toBe(fr.t(($) => $.notifications.team))
+  })
+})
