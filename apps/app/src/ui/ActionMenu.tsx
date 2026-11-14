@@ -31,7 +31,6 @@ import { borders, layout, radii, space } from '@ruche/brand'
 import { type ReactElement, type Ref, type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  AccessibilityInfo,
   type LayoutChangeEvent,
   Modal,
   Platform,
@@ -41,7 +40,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import { type Focusable, focusWithoutScroll } from './focus'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from './focus'
 import { Icon, type IconName } from './Icon'
 import { IconButton } from './IconButton'
 import { Surface } from './Surface'
@@ -253,8 +252,8 @@ export function ActionMenu({
     }
     if (!wasOpen.current) return
     wasOpen.current = false
-    // sendAccessibilityEvent(vue, 'focus') : le lecteur d'écran se pose sur cette vue native.
-    if (trigger.current) AccessibilityInfo.sendAccessibilityEvent(trigger.current, 'focus')
+    // moveReaderTo : le lecteur d'écran se pose sur cette vue native (rien sur le web).
+    moveReaderTo(trigger.current)
     const action = chosen.current
     chosen.current = null
     action?.()
