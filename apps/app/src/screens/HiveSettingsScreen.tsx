@@ -307,6 +307,8 @@ function SettingsPage({ page, leaving }: PageProps) {
             value={name}
             onChangeText={setName}
             limit={HIVE_NAME_MAX}
+            // Le compteur se voit toujours (« 7 / 40 », comme la planche), pas seulement près de la fin.
+            showCount
             error={nameMessage}
             onBlur={saveName}
             onSubmitEditing={saveName}
