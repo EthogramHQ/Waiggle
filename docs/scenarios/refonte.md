@@ -2824,8 +2824,9 @@ Hors de R10, et où ça va :
 - Quand elle touche « Rejoindre la ruche »
 - Alors elle devient membre, la ruche prend sa place dans la liste, et sa page s'ouvre
 - Quand elle touche « Refuser »
-- Alors l'invitation disparaît, personne n'est prévenu, et Nora pourra l'inviter de nouveau plus
-  tard
+- Alors l'invitation disparaît de chez elle, et personne n'est prévenu : pour la ruche,
+  l'invitation reste « Invitation envoyée » et compte dans les 50 places jusqu'à ses 30 jours ; ni
+  nouvelle invitation ni nouvel e-mail avant (choix de Louis du 14/11/2026, relecture du plan)
 - Et deux tapes rapides n'acceptent ni ne refusent deux fois
 
 **Aucune ruche**
@@ -2983,7 +2984,10 @@ Hors de R10, et où ça va :
 - Quand Léa touche « Quitter la ruche »
 - Alors une fenêtre dit « Quitter la ruche Famille ? Tes projets réservés à la ruche redeviennent
   privés. »
+- Et la fenêtre dit aussi : « Tes commentaires sur ses projets restent lisibles par ses membres. »
 - Et après confirmation, elle n'est plus membre ; personne n'est prévenu
+- Et elle peut toujours effacer ses propres commentaires, réactions et messages sur les projets de
+  la ruche, sans plus les voir (choix de Louis du 14/11/2026, relecture du plan)
 - Et si l'animateur quitte la ruche, l'animation passe au membre le plus ancien, et la fenêtre le
   dit avant (« Léa animera la ruche. ») ; celui-ci est prévenu
 - Et si le dernier membre part, la ruche est supprimée, et la fenêtre le dit avant
@@ -2992,7 +2996,8 @@ Hors de R10, et où ça va :
 
 **Le choisir**
 - Étant donné Inès, membre d'au moins une ruche, qui publie ou modifie un projet
-- Alors « Qui peut le voir ? » propose « Membres », « Une ruche » et « Privé » (« Public, trouvable
+- Alors « Qui peut le voir ? » propose « Membres de Waiggle » (nouveau libellé de « Membres »,
+  choix de Louis du 14/11/2026), « Une ruche » et « Privé » (« Public, trouvable
   sur Google » reste pour R12)
 - Quand elle choisit « Une ruche »
 - Alors elle choisit laquelle parmi ses ruches, et la phrase du bas dit « Seuls les membres de
@@ -3047,8 +3052,10 @@ Hors de R10, et où ça va :
 
 ### La mosaïque de tuiles (F-Et5, renvoi de R6b)
 
-- Alors la page d'un membre (« Ses projets ») et « Récents » dans Explorer montrent les projets en
-  tuiles, comme la page d'un outil ; le Fil garde ses grandes cartes
+- Alors la page d'un membre (« Ses projets ») montre les projets en tuiles, comme la page d'un
+  outil ; le Fil garde ses grandes cartes
+- Et « Récents » dans Explorer garde ses cartes, avec « Suivre » (F-Fil8) et « Tester » (choix de
+  Louis du 14/11/2026, relecture du plan : les tuiles les perdraient)
 
 ### Les notifications et le récap (renvois de R8)
 
@@ -3077,6 +3084,10 @@ Hors de R10, et où ça va :
 - Deux membres d'une même ruche qui se bloquent restent membres tous les deux ; chacun ne voit plus
   rien de l'autre dans la ruche (actualité, projets, membres, épingle, testeurs)
 - « Animée par » ne nomme pas un animateur bloqué dans un sens ou dans l'autre
+- Sauf pour l'animateur : un membre qui l'a bloqué reste dans sa liste des membres, sous une forme
+  réduite (son nom seul, sans photo, pseudo ni lien), avec « Retirer de la ruche » ; un blocage ne
+  retire jamais à l'animateur le pouvoir de modérer sa ruche (choix de Louis du 14/11/2026,
+  relecture du plan)
 
 ### La modération
 
@@ -3143,7 +3154,13 @@ Hors de R10, et où ça va :
    seul endroit où un inconnu peut écrire un texte à un membre.
 9. **« Ne pas me proposer aux autres » est un réglage unique** pour toutes les ruches, aussi dans
    les réglages.
-10. **La mosaïque de tuiles** (F-Et5) vient avec R10, comme R6b l'a renvoyé.
+10. **La mosaïque de tuiles** (F-Et5) vient avec R10, comme R6b l'a renvoyé, sur la page d'un
+    membre seulement (relecture du plan).
+
+Après la relecture du plan, Louis a retenu le 14/11/2026 les cinq propositions (« Oui, comme
+proposé ») : l'invitation refusée reste « envoyée » pour la ruche jusqu'à ses 30 jours ; un ancien
+membre efface toujours ses commentaires ; l'animateur voit et peut retirer un membre qui l'a
+bloqué ; « Membres de Waiggle » ; la mosaïque sur la page d'un membre seulement.
 
 ### Les planches qui manquent (les visuels d'abord)
 
