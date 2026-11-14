@@ -1874,12 +1874,17 @@ export const fr = {
       preview: 'Ce que lira {{name}}',
       dsa: 'Le règlement européen sur les services numériques (DSA, article 17) demande de dire à l’auteur ce qui est retiré, pourquoi, et comment contester.',
       confirmPart: 'Retirer {{part}}',
+      // Le menu du fondement, avant un choix ; et ce qui manque encore, sous le bouton inactif.
+      groundNone: 'À choisir',
+      missing: 'Pour retirer, choisis un fondement et écris une explication.',
     },
     // La fenêtre « Suspendre » (planche R9-Suspendre).
     suspendSheet: {
       subtitle: '@{{handle}} · inscription le {{date}} · déjà décidé : {{record}}',
       afterReport:
         'La suspension suit ce signalement : l’historique et la notification le disent. Les signalements ouverts restent dans la file.',
+      // Rien encore de décidé pour ce membre : le sous-titre sans son rappel.
+      subtitleNew: '@{{handle}} · inscription le {{date}}',
     },
   },
   // Le compte suspendu, tel que son membre le lit (tranche 7c, article 17 du DSA) : la mesure, sa
