@@ -56,6 +56,11 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   'PATCH /v1/projects/:id',
   'POST /v1/email/unsubscribe',
   'POST /v1/moderation/decisions',
+  // R10 (relecture du plan, point 2) : rejoindre une ruche où l'on est invité reste permis (refuser
+  // est un DELETE, déjà permis). Quitter une ruche aussi est un DELETE ; mais retirer un membre et
+  // supprimer la ruche, deux DELETE « en partie » permis, se refusent dans leur route
+  // (routes/hives.ts) à un animateur suspendu.
+  'POST /v1/hive-invitations/:id/accept',
 ])
 
 /** Un objet JSON (pas un tableau, ni null) : le seul corps dont on puisse juger les clés. */
