@@ -112,6 +112,9 @@ function ThemedChrome() {
           testeurs : leur adresse à elles, et donc le Retour du navigateur pour les fermer. */}
       <Stack.Screen name="projects/[id]/testers/new-call" options={sheetRoute} />
       <Stack.Screen name="projects/[id]/testers/new-feedback" options={sheetRoute} />
+      {/* R9 : « Signaler » est une feuille posée sur la page du contenu signalé (le Retour du
+          navigateur la ferme, la page d'où l'on vient reste dessinée dessous). */}
+      <Stack.Screen name="report" options={sheetRoute} />
     </Stack>
   )
   return (
