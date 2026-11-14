@@ -317,6 +317,44 @@ describe('a photo removed by the moderation, seen by its author', () => {
     expect(deleteVisual).toHaveBeenCalledWith(id, secondPhoto.id)
   })
 
+  it('offers no Delete under a removed photo description, which would delete the photo', async () => {
+    const described: Project = {
+      ...projectWithPhotos,
+      removedParts: [
+        {
+          field: 'photoDescription',
+          mediaId: secondPhoto.id,
+          value: 'Le texte retiré',
+          imageUrl: null,
+          removal: photoRemoval,
+        },
+      ],
+    }
+    await openProject(described)
+
+    const title = fr.t(($) => $.removal.part.titles.photoDescription, { n: 2 })
+    // Témoin : « Remplacer » est là, et « Supprimer » seul manque.
+    expect(part(title).getByRole('button', { name: T.replace })).toBeTruthy()
+    expect(part(title).queryByRole('button', { name: T.remove })).toBeNull()
+  })
+
+  it('shows Delete as loading while the photo is being deleted', async () => {
+    let finish: (result: ApiResult<Project>) => void = () => {}
+    jest.mocked(deleteVisual).mockReset()
+    jest.mocked(deleteVisual).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+    await openProject(withRemovedPhoto)
+    const busy = (button: { props: Record<string, unknown> }) =>
+      button.props['aria-busy'] === true ||
+      (button.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+
+    await fireEvent.press(part(T.photoTitle).getByRole('button', { name: T.remove }))
+
+    await waitFor(() =>
+      expect(busy(part(T.photoTitle).getByRole('button', { name: T.remove }))).toBe(true),
+    )
+    await act(async () => finish({ ok: true, data: { ...projectWithPhotos, removedParts: [] } }))
+  })
+
   it('offers no « Remplacer » to a suspended author, who cannot edit the project', async () => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
     await openProject(withRemovedPhoto)

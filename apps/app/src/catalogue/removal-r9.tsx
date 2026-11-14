@@ -22,6 +22,7 @@ const fr = {
   photoTitle: 'La photo 2 a été retirée par la modération',
   photoWhy:
     'Cette photo montre une personne reconnaissable sur son balcon, sans son accord (droit à l’image).',
+  deleting: 'RemovedPart : « Supprimer » en cours (le bouton charge, « Remplacer » attend)',
   description: 'RemovedPart : la description, sans signalement, sans « Remplacer »',
   descriptionTitle: 'La description a été retirée par la modération',
   descriptionText:
@@ -46,6 +47,7 @@ const en: typeof fr = {
   photo: 'RemovedPart: a photo, after a report, on the ground of the law',
   photoTitle: 'Photo 2 was removed by moderation',
   photoWhy: 'This photo shows a recognizable person on their balcony, without their consent.',
+  deleting: 'RemovedPart: “Delete” in progress (the button loads, “Replace” waits)',
   description: 'RemovedPart: the description, without a report, without “Replace”',
   descriptionTitle: 'The description was removed by moderation',
   descriptionText:
@@ -118,6 +120,19 @@ export function RemovalR9Catalogue() {
           onDelete={noop}
         >
           {/* La photo retirée, que l'auteur voit encore (ici, une couverture sans image). */}
+          <ProjectCover height={160} />
+        </RemovedPart>
+      </Stack>
+      <Stack gap="sm">
+        <Caption>{l.deleting}</Caption>
+        <RemovedPart
+          title={l.photoTitle}
+          removal={examples.photo}
+          contestSubject={l.subject}
+          onReplace={noop}
+          onDelete={noop}
+          deleting
+        >
           <ProjectCover height={160} />
         </RemovedPart>
       </Stack>
