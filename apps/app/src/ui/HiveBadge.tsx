@@ -94,7 +94,12 @@ export function HiveBadge({ icon, name, size }: Props) {
             honey), de jour comme de nuit. */}
         <Hexagon size={size} fill={colors.honey} />
       </View>
-      <Icon name={icon} size={Math.round(size * layout.hive.iconRatio)} color="onHoneyTile" />
+      {/* L'icône dans sa propre vue : sur le web, une vue est « positionnée » (react-native-web),
+          et se peint donc par-dessus l'hexagone posé en absolu avant elle ; un <svg> seul passait
+          dessous, invisible. */}
+      <View>
+        <Icon name={icon} size={Math.round(size * layout.hive.iconRatio)} color="onHoneyTile" />
+      </View>
     </View>
   )
 }

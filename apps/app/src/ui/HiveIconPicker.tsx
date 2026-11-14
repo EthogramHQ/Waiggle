@@ -1,5 +1,5 @@
 // Le choix de l'icône d'une ruche (R10, planche R10-Creer, « Son icône ») : douze alvéoles en deux
-// rangées de six, sur le modèle de IconGrid. C'est un groupe de boutons radio nommé « Icône de la
+// rangées de six (trois de quatre sur un écran étroit), sur le modèle de IconGrid. C'est un groupe de boutons radio nommé « Icône de la
 // ruche » : une seule alvéole cochée (le miel plein et une coche dans son coin, pour qui ne
 // distingue pas les couleurs), chacune nommée par son sens (« Maison », « Café »), jamais par son
 // code (« house-line »). Au clavier (web) : Tab n'arrive que sur l'alvéole cochée (« tabIndex
@@ -28,11 +28,22 @@ type Props = {
 
 type KeyEvent = { key: string; preventDefault: () => void }
 
-/** Les douze icônes en rangées de six, dans l'ordre du contrat (celui de la planche). */
-const rows: HiveIcon[][] = []
-for (let start = 0; start < HIVE_ICONS.length; start += layout.hive.pickerColumns) {
-  rows.push(HIVE_ICONS.slice(start, start + layout.hive.pickerColumns))
+/**
+ * Les douze icônes, dans l'ordre du contrat (celui de la planche), groupées par deux. Les paires
+ * passent à la ligne ensemble : six alvéoles par rangée quand il y a la place (deux rangées, comme
+ * sur la planche), sinon quatre (trois rangées), jamais cinq puis une seule, et jamais une zone à
+ * toucher rognée sous 44 points.
+ */
+const PAIR = 2
+const pairs: HiveIcon[][] = []
+for (let start = 0; start < HIVE_ICONS.length; start += PAIR) {
+  pairs.push(HIVE_ICONS.slice(start, start + PAIR))
 }
+/** La largeur d'une paire : deux alvéoles et leur écart, au moins à 44 points, au plus à `pickerCell`. */
+const pairWidth = (cell: number) => PAIR * cell + (PAIR - 1) * space.xs
+/** La grille ne s'élargit pas au-delà de six alvéoles par rangée. */
+const gridMaxWidth =
+  layout.hive.pickerColumns * layout.hive.pickerCell + (layout.hive.pickerColumns - 1) * space.xs
 
 export function HiveIconPicker({ value, onChange, disabled = false }: Props) {
   const { t } = useTranslation()
@@ -83,18 +94,26 @@ export function HiveIconPicker({ value, onChange, disabled = false }: Props) {
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={t(($) => $.hives.createSheet.icon)}
-      style={{ gap: space.xs }}
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: space.xs,
+        maxWidth: gridMaxWidth,
+      }}
     >
-      {rows.map((row, rowIndex) => (
+      {pairs.map((pair) => (
         <View
-          // biome-ignore lint/suspicious/noArrayIndexKey: une rangée n'a pas d'autre identité que son rang
-          key={rowIndex}
-          // Une rangée de six : les alvéoles s'y partagent la largeur, jusqu'à `pickerCell` chacune.
-          // Plus étroite que six fois 44 points, la rangée passe à la ligne plutôt que de rogner une
-          // zone à toucher.
-          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}
+          key={pair.join()}
+          // Une paire : ses deux alvéoles s'y partagent la largeur, de 44 points à `pickerCell`.
+          style={{
+            flexDirection: 'row',
+            gap: space.xs,
+            flexGrow: 1,
+            flexBasis: pairWidth(layout.touchTarget),
+            maxWidth: pairWidth(layout.hive.pickerCell),
+          }}
         >
-          {row.map((icon) => {
+          {pair.map((icon) => {
             const index = HIVE_ICONS.indexOf(icon)
             const checked = icon === value
             return (
@@ -148,12 +167,17 @@ export function HiveIconPicker({ value, onChange, disabled = false }: Props) {
                     </View>
                     {/* L'icône : brune sur le miel plein (onHoneyTile sur honey), couleur des
                         pastilles de statut sur le miel pâle (statusText sur honeySoft), deux
-                        couples de contrastPairs ; grisée pendant l'envoi. */}
-                    <Icon
-                      name={icon}
-                      size={Math.round(layout.hive.regular * layout.hive.iconRatio)}
-                      color={disabled ? 'onHoneyDisabled' : checked ? 'onHoneyTile' : 'statusText'}
-                    />
+                        couples de contrastPairs ; grisée pendant l'envoi. Dans sa propre vue, pour
+                        se peindre par-dessus l'hexagone sur le web (voir HiveBadge). */}
+                    <View>
+                      <Icon
+                        name={icon}
+                        size={Math.round(layout.hive.regular * layout.hive.iconRatio)}
+                        color={
+                          disabled ? 'onHoneyDisabled' : checked ? 'onHoneyTile' : 'statusText'
+                        }
+                      />
+                    </View>
                     {checked ? (
                       // La coche, sur le coin bas droit : l'état coché se voit sans la couleur.
                       // Un rond brun (la couleur de l'icône) et la coche en miel, le même couple
