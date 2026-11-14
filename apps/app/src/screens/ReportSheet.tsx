@@ -674,9 +674,13 @@ function useReportForm({
     )
   }
 
+  // Une des deux étapes est affichée (ni « Merci », ni la limite du jour) : la feuille se remplit.
+  const sent = recap !== null && current === 'sent'
+  const limited = !sent && preview.remainingToday === 0
+  const filling = !sent && !limited && (current === 'part' || current === 'reason')
   // « Retour » dans la tête : de l'étape du motif (ou « déjà signalé ») à « Quelle partie ? ».
   const back =
-    hasParts && (current === 'reason' || current === 'already')
+    hasParts && !sent && !limited && (current === 'reason' || current === 'already')
       ? { back: { label: t(($) => $.report.stepBack), onPress: goBack } }
       : null
 
@@ -688,9 +692,7 @@ function useReportForm({
       busy: sending,
       ...back,
       // « Annuler » tant qu'on remplit ; « Merci » et les états n'ont que « Fermer ».
-      ...(current === 'part' || current === 'reason'
-        ? { cancelLabel: t(($) => $.report.cancel) }
-        : null),
+      ...(filling ? { cancelLabel: t(($) => $.report.cancel) } : null),
       closeGuard: requestClose,
       onClose: requestClose,
     },
