@@ -197,6 +197,10 @@ export const memberCounterKeys = (userId: string) => ({
   // Les lectures des ruches (mes ruches, la page, l'actualité, les projets, les membres) : 600 par
   // heure, un quota large comme celui du Fil ; chacune recalcule 30 jours d'actualité.
   hiveRead: `hive-read:${userId}`,
+  // Les invitations envoyées (R10, choix 1 du scénario) : 20 par jour et par inviteur, toutes ruches
+  // ensemble, comptées avant tout examen (une invitation refusée en 404 ou 409 compte aussi : on ne
+  // sonde pas l'annuaire par les invitations). Le quota est celui du membre, pas de la ruche.
+  hiveInvitations: `hive-invitations:${userId}`,
 })
 
 /**
