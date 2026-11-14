@@ -7,7 +7,7 @@ import { CommentId } from './comments'
 import { EmailPreferencesExport } from './email'
 import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
-import { Removal } from './removal'
+import { Removal, RemovedPart } from './removal'
 import { ModerationDecisionExport, ReportExport } from './reports'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
@@ -155,6 +155,14 @@ export const AccountExport = z
      * des plus anciennes aux plus récentes. Jamais l'administrateur, jamais qui a signalé.
      */
     moderationDecisions: z.array(ModerationDecisionExport),
+    /**
+     * R9 (jur-B5, RGPD art. 15 et 20) : les parties de son profil retirées par la modération, avec leur
+     * valeur et leur décision : bio, outils favoris, photo (son adresse, servie à lui seul), et nom ou
+     * pseudo tant qu'ils sont provisoires. Leur texte ne vit plus que là : `user.bio` est vide. Les
+     * parties de ses projets sont dans `removedParts` de chaque projet. Jamais l'administrateur, ni
+     * qui a signalé, ni le nom ou pseudo provisoire.
+     */
+    profileRemovedParts: z.array(RemovedPart),
     /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
     emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

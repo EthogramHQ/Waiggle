@@ -43,6 +43,7 @@ import { loadProjectsOf } from '../projects/load'
 import { listedProject, listedProjectFor } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isJsonObject, suspendedProfileChange } from '../suspension/guard'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
@@ -617,6 +618,26 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }),
     )
 
+    // R9 (RGPD art. 15 et 20) : les parties de son profil retirées (bio, outils favoris, photo, et nom
+    // ou pseudo encore provisoires), avec leur valeur et leur décision, lues comme sur sa page :
+    // leur texte n'est plus que dans la ligne de retrait. Une requête, plus celle du nom et du pseudo.
+    const profileRemovedParts =
+      (
+        await removedPartsOf(
+          db,
+          [
+            {
+              kind: 'member',
+              id: user.id,
+              authorId: user.id,
+              current: { name: me.name, handle: me.handle },
+            },
+          ],
+          user.id,
+          publicApiUrl,
+        )
+      ).get(partOwnerKey('member', user.id)) ?? []
+
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
     c.header('Content-Disposition', `attachment; filename="${appName.toLowerCase()}-export.json"`)
@@ -640,6 +661,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         blocks,
         moderation,
         moderationDecisions,
+        profileRemovedParts,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         feed: { readAt: feedReadAt?.toISOString() ?? null },
         dismissedSuggestions,
