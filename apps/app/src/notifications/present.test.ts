@@ -18,7 +18,7 @@
 // leading, parts, thumb, reactions?, version? } ; `target: Href | null`. La forme de la photo dans
 // `leading` et `thumb` (l'adresse que l'écran passe à `useMediaSources`) n'est pas fixée : ces tests
 // ne lisent que la sorte, le nom, l'icône et sa teinte, le titre.
-import { appName } from '@ruche/brand'
+import { appName, contactEmail } from '@ruche/brand'
 import type { Notification } from '@ruche/contracts'
 import type { Href } from 'expo-router'
 import { createI18n } from '../i18n'
@@ -173,6 +173,8 @@ describe('the moderation and the updates (R7a)', () => {
       part: null,
       project: meteoProject,
       excerpt: 'Un compte à rebours avant chaque question',
+      // R9 : la mise à jour entière, pas une partie.
+      part: null,
       ground: 'rules',
       explanation: 'Publicité répétée.',
       afterReport: true,
@@ -403,6 +405,8 @@ describe('the moderation and the testers corner (R7b)', () => {
     part: null,
     project: decollage,
     excerpt: 'Essayez le niveau 3 ce week-end',
+    // R9 : le contenu entier, pas une partie.
+    part: null,
     ground: 'rules',
     explanation: 'Publicité répétée.',
     afterReport: true,
@@ -644,5 +648,314 @@ describe('the two notifications of the catalogue (R8)', () => {
     expect(sentenceOf(present(toolAddedNotification)).length).toBeGreaterThan(0)
     // … et ne nomme ni Papi Jean, ni un administrateur.
     expect(sentenceOf(present(toolAddedNotification))).not.toMatch(new RegExp(papiJeanAuthor.name))
+  })
+})
+
+// --- R9 (7d) : la modération d'une partie, le pseudo provisoire, le rétablissement, la levée pour
+// erreur (planche R9-Activite-Moderation ; décisions L1 et L3 de Louis, 13/11/2026) ---
+//
+// L'API promise (choix de ce fichier, `Presented` gagne une action, que la ligne dessine par la
+// prop `action` de `NotificationCard`) :
+//   action?: { label: string; target: Href } | { label: string; contact: { subject: string } } | null
+// `target` : un lien dans l'appli (« Choisir un pseudo ») ; `contact` : l'adresse de contact, avec
+// un objet qui nomme la décision et sa date (« Contester », J12).
+
+type Action = NonNullable<Shown['action']>
+
+/** L'action d'une ligne : son libellé, et où elle mène (une adresse, ou un e-mail et son objet). */
+const actionOf = (shown: Shown): { label: string; path: string | null; subject: string | null } => {
+  const action: Action | null | undefined = shown.action
+  if (!action) return { label: '', path: null, subject: null }
+  return 'contact' in action
+    ? { label: action.label, path: null, subject: action.contact.subject }
+    : { label: action.label, path: addressOf(action.target), subject: null }
+}
+
+/** Tout ce que la ligne écrit : la phrase et ce qu'elle dit dessous. */
+const everythingOf = (shown: Shown): string => [sentenceOf(shown), shown.detail ?? ''].join('\n')
+
+/** Le cadre de l'objet de « Contester » : « Contestation : » avant la décision, « du » avant la date. */
+const subjectFrame = fr.t(($) => $.removal.contestSubject, { decision: 'DECISION', date: 'DATE' })
+/** Le 12 novembre (l'heure de Paris de `at`), tel qu'un objet l'écrit, l'année ou non. */
+const twelfthOfNovember = /12 nov[a-zé.]*(?: 2026)?/
+
+/** « 2e », « 1re » : le rang d'une photo, comme la feuille Signaler l'écrit. */
+const rank = (n: number) =>
+  n === 1 ? fr.t(($) => $.report.rank.first) : fr.t(($) => $.report.rank.other, { n })
+
+/** La 2e photo de « Météo », retirée seule après un signalement, au nom des règles. */
+const removedPhotoNotification: Of<'removed'> = {
+  kind: 'removed',
+  id: 'removed:project:photo:9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
+  at: '2026-11-12T08:00:00.000Z',
+  isNew: true,
+  targetKind: 'project',
+  project: meteoProject,
+  excerpt: null,
+  part: { field: 'photo', position: 2 },
+  ground: 'rules',
+  explanation: 'Une personne reconnaissable, sans son accord.',
+  afterReport: true,
+  projectHidden: false,
+}
+
+/** Son pseudo retiré : il est « @membre_4f2a » jusqu'à ce qu'il en choisisse un autre. */
+const handleRemovedNotification: Of<'profile_removed'> = {
+  kind: 'profile_removed',
+  id: 'profile_removed:handle:0f1e2d3c-4b5a-4968-8776-655443322110',
+  at: '2026-11-12T08:00:00.000Z',
+  isNew: true,
+  part: { field: 'handle' },
+  replacedBy: 'membre_4f2a',
+  ground: 'rules',
+  explanation: 'Ce pseudo imite celui d’un autre membre.',
+  afterReport: true,
+}
+
+/** Sa bio retirée, sans signalement, au nom de la loi : rien n'est mis à la place. */
+const bioRemovedNotification: Of<'profile_removed'> = {
+  kind: 'profile_removed',
+  id: 'profile_removed:bio:1f2e3d4c-5b6a-4978-8887-766554433221',
+  at: '2026-11-12T08:00:00.000Z',
+  isNew: true,
+  part: { field: 'bio' },
+  replacedBy: null,
+  ground: 'illegal',
+  explanation: 'Un lien vers un site de paris en ligne non autorisé.',
+  afterReport: false,
+}
+
+/** Un rétablissement, signé par l'équipe : un projet, une partie, ou une partie du profil. */
+const restored = (changes: Partial<Of<'restored'>>): Of<'restored'> => ({
+  kind: 'restored',
+  id: 'restored:project:2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d',
+  at: '2026-11-11T10:00:00.000Z',
+  isNew: false,
+  targetKind: 'project',
+  project: meteoProject,
+  part: null,
+  valueBack: true,
+  handle: null,
+  ...changes,
+})
+
+describe('a removed part of a project (R9)', () => {
+  it('names the removed photo by its rank and bolds the title of the project', () => {
+    const shown = present(removedPhotoNotification)
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.removedPart.photo, { rank: rank(2), title: 'Météo' })),
+    )
+    expect(strongOf(shown)).toEqual(['Météo'])
+  })
+
+  it('says « 1re » for the first photo', () => {
+    const shown = present({ ...removedPhotoNotification, part: { field: 'photo', position: 1 } })
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.removedPart.photo, { rank: rank(1), title: 'Météo' })),
+    )
+  })
+
+  it('names the removed demo link of a project', () => {
+    const shown = present({
+      ...removedPhotoNotification,
+      part: { field: 'demoUrl', position: null },
+    })
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.removedPart.demoUrl, { title: 'Météo' })),
+    )
+  })
+
+  it('keeps the ground and the explanation under the sentence', () => {
+    const shown = present(removedPhotoNotification)
+
+    expect(shown.detail).toContain(fr.t(($) => $.removal.grounds.rules))
+    expect(shown.detail).toContain(removedPhotoNotification.explanation)
+  })
+
+  it('offers « Contester », to the contact address, with a subject naming the decision and its date', () => {
+    const { label, subject } = actionOf(present(removedPhotoNotification))
+
+    expect(label).toBe(fr.t(($) => $.notifications.contest))
+    const [before = ''] = subjectFrame.split('DECISION')
+    expect(subject?.startsWith(before)).toBe(true)
+    // La décision nomme le projet (« retrait de la 2e photo de « Météo » ») ; puis sa date.
+    expect(subject).toContain('Météo')
+    expect(subject).toMatch(twelfthOfNovember)
+  })
+
+  it('leads to the project, where its author sees the removed photo', () => {
+    expect(addressOf(present(removedPhotoNotification).target)).toBe(`/projects/${meteoProject.id}`)
+  })
+})
+
+describe('a removed part of the profile (R9)', () => {
+  it('tells the member his handle was removed and which provisional one he has', () => {
+    const shown = present(handleRemovedNotification)
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.profileRemoved.handle, { replacedBy: 'membre_4f2a' })),
+    )
+    expect(strongOf(shown)).toEqual(['@membre_4f2a'])
+  })
+
+  it('offers « Choisir un pseudo », which opens his profile settings', () => {
+    const { label, path } = actionOf(present(handleRemovedNotification))
+
+    expect(label).toBe(fr.t(($) => $.notifications.chooseHandle))
+    expect(['/settings/profile', '/profile']).toContain(path)
+  })
+
+  it('offers « Choisir un nom » for a removed name', () => {
+    const shown = present({
+      ...handleRemovedNotification,
+      part: { field: 'name' },
+      replacedBy: 'Membre',
+    })
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.profileRemoved.name, { replacedBy: 'Membre' })),
+    )
+    expect(actionOf(shown).label).toBe(fr.t(($) => $.notifications.chooseName))
+  })
+
+  it('still gives the ground, the explanation and how to contest a removed handle', () => {
+    const shown = present(handleRemovedNotification)
+
+    // L'action va au pseudo : « comment contester » s'écrit alors dessous, l'adresse comprise
+    // (article 17 du DSA, comme pour un contenu retiré).
+    expect(everythingOf(shown)).toContain(fr.t(($) => $.removal.grounds.rules))
+    expect(everythingOf(shown)).toContain(handleRemovedNotification.explanation)
+    expect(everythingOf(shown)).toContain(contactEmail)
+  })
+
+  it('tells the member her bio was removed, and offers « Contester » about her profile', () => {
+    const shown = present(bioRemovedNotification)
+
+    expect(sentenceOf(shown)).toBe(fr.t(($) => $.notifications.profileRemoved.bio))
+    expect(shown.detail).toContain(fr.t(($) => $.removal.grounds.illegal))
+    expect(shown.detail).toContain(bioRemovedNotification.explanation)
+    const { label, subject } = actionOf(shown)
+    expect(label).toBe(fr.t(($) => $.notifications.contest))
+    const ofMyProfile =
+      fr.t(($) => $.removal.contestDecision.profilePart, { part: 'PART' }).split('PART')[1] ?? ''
+    expect(subject).toContain(ofMyProfile)
+    expect(subject).toMatch(twelfthOfNovember)
+  })
+
+  it('never names an administrator nor a reporter', () => {
+    const shown = present(handleRemovedNotification)
+
+    // Témoin : la ligne a une phrase et un détail…
+    expect(sentenceOf(shown).length).toBeGreaterThan(0)
+    // … qui ne nomment personne : ni Louis (l'administrateur des tests), ni Malik.
+    expect(everythingOf(shown)).not.toMatch(/Louis|Malik/)
+  })
+})
+
+describe('a restored content or part (R9)', () => {
+  it('says the project is visible again, signed by the team', () => {
+    const shown = present(restored({}))
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.restored.project, { title: 'Météo' })),
+    )
+    expect(everythingOf(shown)).toContain(fr.t(($) => $.notifications.team))
+    expect(addressOf(shown.target)).toBe(`/projects/${meteoProject.id}`)
+  })
+
+  it('names the restored photo by its rank', () => {
+    const shown = present(restored({ part: { field: 'photo', position: 2 } }))
+    const part = fr.t(($) => $.report.parts.photo, { rank: rank(2) })
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.restored.part, { part, title: 'Météo' })),
+    )
+  })
+
+  it('says the bio is visible again, signed by the team', () => {
+    const shown = present(
+      restored({ targetKind: 'member', project: null, part: { field: 'bio', position: null } }),
+    )
+
+    expect(sentenceOf(shown)).toBe(fr.t(($) => $.notifications.restored.bio))
+    expect(everythingOf(shown)).toContain(fr.t(($) => $.notifications.team))
+  })
+
+  it('says the former handle is back when the restore gives it back', () => {
+    const shown = present(
+      restored({
+        targetKind: 'member',
+        project: null,
+        part: { field: 'handle', position: null },
+        valueBack: true,
+        handle: 'karim_le_vrai',
+      }),
+    )
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.restored.handleBack, { handle: 'karim_le_vrai' })),
+    )
+  })
+
+  it('says the member keeps the handle he chose when the former one cannot come back', () => {
+    const shown = present(
+      restored({
+        targetKind: 'member',
+        project: null,
+        part: { field: 'handle', position: null },
+        valueBack: false,
+        handle: 'karim_42',
+      }),
+    )
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.restored.handleNotBack, { handle: 'karim_42' })),
+    )
+  })
+
+  it('says whether the former name came back', () => {
+    const name = { field: 'name' as const, position: null }
+    const back = present(restored({ targetKind: 'member', project: null, part: name }))
+    const notBack = present(
+      restored({ targetKind: 'member', project: null, part: name, valueBack: false }),
+    )
+
+    expect(sentenceOf(back)).toBe(fr.t(($) => $.notifications.restored.nameBack))
+    expect(sentenceOf(notBack)).toBe(fr.t(($) => $.notifications.restored.nameNotBack))
+  })
+})
+
+describe('the end of a suspension, and its cause (R9, jur-R6)', () => {
+  const ended = (changes: Partial<Of<'suspension_ended'>>): Of<'suspension_ended'> => ({
+    kind: 'suspension_ended',
+    id: 'suspension_ended:93a4b5c6-d7e8-4f34-9a06-8192a3b4c5d6',
+    at: '2026-11-09T10:00:00.000Z',
+    isNew: true,
+    lifted: true,
+    cause: 'early',
+    explanation: 'Ces commentaires citaient le site pour mettre en garde.',
+    ...changes,
+  })
+
+  it('says the suspension was lifted because it was an error of the moderation', () => {
+    const shown = present(ended({ cause: 'error' }))
+
+    expect(sentenceOf(shown)).toBe(fr.t(($) => $.notifications.suspensionEnded.liftedError))
+    expect(shown.detail).toContain('Ces commentaires citaient le site pour mettre en garde.')
+  })
+
+  it('says only that it was lifted when it was lifted early', () => {
+    expect(sentenceOf(present(ended({ cause: 'early' })))).toBe(
+      fr.t(($) => $.notifications.suspensionEnded.lifted),
+    )
+  })
+
+  it('says it ended at the planned date', () => {
+    expect(sentenceOf(present(ended({ lifted: false, cause: 'end', explanation: null })))).toBe(
+      fr.t(($) => $.notifications.suspensionEnded.ended),
+    )
   })
 })
