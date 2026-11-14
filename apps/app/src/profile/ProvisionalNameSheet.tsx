@@ -34,7 +34,7 @@ type Kind = 'handle' | 'name'
  */
 type Phase = { phase: 'waiting' } | { phase: 'open'; kind: Kind } | { phase: 'closed' }
 
-/** La première question à poser : le pseudo d'abord (choix de la session), puis le nom. */
+/** La première question à poser : le pseudo d'abord (plan de R9), puis le nom. */
 const firstKind = (me: Me): Kind | null =>
   me.provisional.handle ? 'handle' : me.provisional.name ? 'name' : null
 
