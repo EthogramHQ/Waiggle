@@ -169,8 +169,6 @@ describe('the moderation and the updates (R7a)', () => {
       at: '2026-10-21T09:00:00.000Z',
       isNew: true,
       targetKind: 'update',
-      // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-      part: null,
       project: meteoProject,
       excerpt: 'Un compte à rebours avant chaque question',
       // R9 : la mise à jour entière, pas une partie.
@@ -401,8 +399,6 @@ describe('the moderation and the testers corner (R7b)', () => {
     at: '2026-11-11T09:00:00.000Z',
     isNew: true,
     targetKind,
-    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-    part: null,
     project: decollage,
     excerpt: 'Essayez le niveau 3 ce week-end',
     // R9 : le contenu entier, pas une partie.
