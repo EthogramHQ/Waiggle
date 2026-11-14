@@ -27,6 +27,9 @@
 // - on la ferme aussi en la glissant vers le bas par sa tête (décision D1 de Louis), sauf pendant
 //   une action en cours (`busy`).
 //
+// Tranche R9 (la feuille « Signaler », deux étapes) : `back`, un « Retour » en haut à gauche de la
+// tête, qui revient d'une étape sans fermer la feuille (voir la prop).
+//
 // Tranche R6a (la feuille de publication), pour toutes les feuilles, chaque prop facultative :
 // - `closeGuard` : la feuille a des changements à ne pas perdre. Toute demande de fermeture
 //   (« Annuler », « Fermer », Échap, voile, retour d'Android, glisser) l'appelle au lieu de
@@ -213,6 +216,13 @@ type PanelProps = {
    * projet… », R6a) ; sur téléphone, où l'action est dans la tête, à la fin du contenu.
    */
   footerNote?: ReactNode
+  /**
+   * « Retour » (R9, la feuille « Signaler » : de l'étape du motif, retour à « Quelle partie ? »), en
+   * haut à gauche de la tête, avant le titre. Revenir d'une étape ne ferme pas la feuille : il
+   * n'appelle ni `onClose` ni `closeGuard`. Pendant une action en cours (`busy`), il est inactif
+   * comme « Fermer ». « Annuler » passe alors à droite, à la place où se trouvait la croix.
+   */
+  back?: { label: string; onPress: () => void }
 }
 
 /**
@@ -1153,6 +1163,7 @@ export function SheetPanel({
   action,
   cancelLabel,
   footerNote,
+  back,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -1245,6 +1256,14 @@ export function SheetPanel({
     </Text>
   )
 
+  // « Retour », au bord gauche de la rangée du haut, dessiné avant tout le reste : le premier
+  // élément atteignable de la tête. Il ne ferme rien (`onPress` de l'écran) ; inactif pendant `busy`.
+  const backLink = back ? (
+    <View style={{ position: 'absolute', left: 0 }}>
+      <TextLink label={back.label} onPress={back.onPress} role="button" disabled={busy} />
+    </View>
+  ) : null
+
   // La poignée, au centre ; décorative (« Fermer » ou « Annuler » font le même geste).
   const handle = (
     <View
@@ -1267,8 +1286,13 @@ export function SheetPanel({
       <View style={{ gap: space.xs }}>
         <View
           {...dragHandlers}
-          style={{ alignItems: 'center', justifyContent: 'center', minHeight: space.xl }}
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: back ? layout.touchTarget : space.xl,
+          }}
         >
+          {backLink}
           {handle}
         </View>
         <SheetHeader
@@ -1313,12 +1337,16 @@ export function SheetPanel({
           minHeight: layout.touchTarget,
         }}
       >
+        {backLink}
         {phone ? handle : null}
         {/* « Fermer », à côté de la poignée, au bord droit : le premier élément atteignable de la
             feuille, où le focus arrive à l'ouverture. Sur téléphone, « Annuler » (R6a) le
             remplace, au bord gauche ; sur ordinateur, « Annuler » est au pied, et la croix reste. */}
         {phone && cancelLabel !== undefined ? (
-          <View style={{ position: 'absolute', left: 0 }}>
+          // À gauche ; à droite quand « Retour » a pris la gauche.
+          <View
+            style={back ? { position: 'absolute', right: 0 } : { position: 'absolute', left: 0 }}
+          >
             <TextLink
               label={cancelLabel}
               onPress={guarded(onClose)}

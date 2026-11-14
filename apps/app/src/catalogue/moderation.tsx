@@ -3,7 +3,7 @@
 // qui l'importe en une ligne : deux personnes y travaillaient en même temps. Ses exemples (un outil
 // de développement, absent de l'appli publiée) sont écrits ici, en français et en anglais.
 import { appName, contactEmail } from '@ruche/brand'
-import type { DecisionHistoryItem } from '@ruche/contracts'
+import type { DecisionHistoryItem, PartOut } from '@ruche/contracts'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/Button'
@@ -91,6 +91,7 @@ const fr = {
   profileNoRemove:
     'Un profil ne se retire pas en entier : classe le signalement, ou suspends le compte.',
   history: 'Historique des décisions',
+  historyCompact: 'Historique récent, version compacte (R9)',
 }
 
 const en: typeof fr = {
@@ -168,6 +169,7 @@ const en: typeof fr = {
   profileNoRemove:
     'A profile is not removed as a whole: dismiss the report, or suspend the account.',
   history: 'History of decisions',
+  historyCompact: 'Recent history, compact version (R9)',
 }
 
 // Les décisions d'exemple de l'historique (DecisionCard écrit lui-même ses textes, dans la langue
@@ -293,6 +295,31 @@ const decisions: DecisionHistoryItem[] = [
     ground: 'illegal',
     explanation: 'Ces photos montrent des personnes sans leur accord.',
   },
+]
+
+// La version compacte (R9) : les six sortes de décision, dont le retrait et le rétablissement d'une
+// partie (la 2e photo d'un projet), en plus des décisions ci-dessus (suspension sans fin, levée pour
+// erreur).
+const photoPart: PartOut = {
+  field: 'photo',
+  mediaId: '2b3c4d5e-6f70-4a81-9b2c-3d4e5f607182',
+  position: 2,
+}
+const partDecision: DecisionHistoryItem = {
+  ...blank,
+  id: '93a4b5c6-d7e8-4df4-9fa6-8192a3b4c5d6',
+  action: 'remove',
+  at: '2026-10-23T08:00:00.000Z',
+  admin: louis,
+  target: { kind: 'project', id: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d' },
+  projectId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  member: sam,
+  part: photoPart,
+}
+const compactDecisions: DecisionHistoryItem[] = [
+  partDecision,
+  { ...partDecision, id: 'a4b5c6d7-e8f9-4e05-8ab7-92a3b4c5d6e7', action: 'restore' },
+  ...decisions.slice(0, 8),
 ]
 
 const noop = () => {}
@@ -502,6 +529,15 @@ export function ModerationCatalogue() {
       <Stack gap="md" accessibilityRole="list">
         {decisions.map((decision) => (
           <DecisionCard key={decision.id} decision={decision} onView={noop} />
+        ))}
+      </Stack>
+      {/* La version compacte : une ligne par décision, une icône de couleur par sorte. */}
+      <Text variant="headline" heading={3}>
+        {l.historyCompact}
+      </Text>
+      <Stack gap="md" accessibilityRole="list">
+        {compactDecisions.map((decision) => (
+          <DecisionCard key={decision.id} decision={decision} compact />
         ))}
       </Stack>
     </Stack>
