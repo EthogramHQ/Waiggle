@@ -22,6 +22,13 @@
 // permise par la garde : un administrateur suspendu n'en est plus un (S19), et la garde de la
 // modération lui répond le même 404 qu'à tout membre (S16). Une boucle sur chaque route, avec un
 // membre suspendu et un corps invalide, prouve la colonne.
+//
+// R9 (relecture de sécurité du plan, P7) : deux écritures sont permises « en partie » (`partial`) :
+// la garde les laisse entrer, et la route ne garde que quelques corps (`PATCH /v1/me` : la langue,
+// vider sa bio ou ses outils, un nom ou un pseudo provisoires ; `PATCH /v1/projects/:id` :
+// `{ visibility: 'private' }`). Chacune cite dans SUSPENSION_PROOFS les tests qui le prouvent. Et
+// chaque route qui montre le contenu d'un autre membre cite dans PART_PROOFS le test qui prouve
+// qu'une partie retirée par la modération n'y paraît plus (ou dit pourquoi elle n'en montre pas).
 import { readFileSync } from 'node:fs'
 import { ErrorResponse } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -32,7 +39,7 @@ import { createTestContext } from './testing/context'
 
 type RouteClass = 'hidesBlocked' | 'own' | 'admin' | 'public'
 /** Ce que la garde des comptes suspendus fait de la route (tranche 7c). */
-type DuringSuspension = 'allowed' | 'refused'
+type DuringSuspension = 'allowed' | 'refused' | 'partial'
 
 /**
  * Chaque route, « MÉTHODE /chemin » tel que Hono l'écrit (`:id` pour un paramètre), avec ses deux
@@ -48,8 +55,10 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /media/:folder/:file': ['public', 'allowed'],
   // Mon compte.
   'GET /v1/me': ['own', 'allowed'],
-  'PATCH /v1/me': ['own', 'allowed'],
+  'PATCH /v1/me': ['own', 'partial'],
   'POST /v1/me/avatar': ['own', 'refused'],
+  // R9 (jur-R5) : retirer sa photo de profil, permis pendant une suspension comme tout DELETE.
+  'DELETE /v1/me/avatar': ['own', 'allowed'],
   'GET /v1/me/export': ['own', 'allowed'],
   'GET /v1/me/email-preferences': ['own', 'allowed'],
   'PATCH /v1/me/email-preferences': ['own', 'allowed'],
@@ -63,7 +72,8 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   // Les projets, leurs mises à jour, testeurs, visuels, réactions et commentaires.
   'POST /v1/projects': ['own', 'refused'],
   'GET /v1/projects/:id': ['hidesBlocked', 'allowed'],
-  'PATCH /v1/projects/:id': ['own', 'refused'],
+  // R9 (J14, décision L6) : un suspendu peut passer son projet en privé, et rien d'autre.
+  'PATCH /v1/projects/:id': ['own', 'partial'],
   'DELETE /v1/projects/:id': ['own', 'allowed'],
   'POST /v1/projects/:id/visuals': ['own', 'refused'],
   'DELETE /v1/projects/:id/visuals/:visualId': ['own', 'allowed'],
@@ -317,6 +327,136 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   },
 }
 
+/**
+ * R9 (relecture de sécurité du plan) : chaque route qui montre le contenu d'un autre membre (toute
+ * lecture classée « hidesBlocked », et les fichiers) cite le test qui prouve qu'une partie retirée
+ * par la modération (photo, couverture, description, prompt, démo, outils, bio, outils favoris,
+ * photo de profil) n'y paraît plus pour les autres ; ou, avec `none`, dit pourquoi elle n'en montre
+ * aucune. Le test cité montre la différence : un témoin voit la partie avant le retrait.
+ */
+const PART_PROOFS: Record<string, { file: string; test: string } | { none: string }> = {
+  'GET /media/:folder/:file': {
+    file: 'parts-visibility.test.ts',
+    test: 'serves a removed avatar, photo, portrait cover, update photo or capture to its author only, with the 404 of an unknown file',
+  },
+  'GET /v1/projects/:id': {
+    file: 'parts-visibility.test.ts',
+    test: 'hides a removed description and prompt from the page of the project, and gives them to its author only',
+  },
+  'GET /v1/projects/:id/updates': {
+    file: 'parts-visibility.test.ts',
+    test: 'hides a removed update photo from the timeline and the page of the project, and keeps it for its author',
+  },
+  'GET /v1/projects/:id/testers': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/projects/:id/calls': {
+    file: 'parts-visibility.test.ts',
+    test: 'hides a removed call photo from the testers, and keeps the call and its photo for its author',
+  },
+  'GET /v1/projects/:id/threads': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/projects/:id/threads/:testerId/messages': {
+    file: 'parts-visibility.test.ts',
+    test: 'hides a removed capture from the other person of the thread, and keeps it for its author',
+  },
+  'GET /v1/projects/:id/comments': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/comments/:commentId/context': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/members/mentionable': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/members/:id': {
+    file: 'parts-visibility.test.ts',
+    test: 'hides a removed bio and removed favorite tools from the page of the member, and gives them back to her in removedParts',
+  },
+  'GET /v1/tags/:slug': {
+    file: 'parts-visibility.test.ts',
+    test: 'does not list a project on the page of a tool removed from it',
+  },
+  'GET /v1/feed/following': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/feed/discover': {
+    file: 'parts-visibility.test.ts',
+    test: 'drops a project from the testable feed and refuses a new tester once its demo link is removed',
+  },
+  'GET /v1/suggestions/members': {
+    file: 'parts-visibility.test.ts',
+    test: 'never shows a removed avatar to another member, on any route that shows the member',
+  },
+  'GET /v1/search': {
+    file: 'parts-visibility.test.ts',
+    test: 'hides a removed description from the search, in the results and in the excerpt',
+  },
+  'GET /v1/tools': {
+    file: 'parts-visibility.test.ts',
+    test: 'does not list a project on the page of a tool removed from it',
+  },
+  'GET /v1/notifications': {
+    file: 'parts-visibility.test.ts',
+    test: 'shows the next photo as the cover of the card, the page and the notification when the cover is removed',
+  },
+  'GET /v1/reports/target': {
+    file: 'parts-visibility.test.ts',
+    test: 'does not offer a removed photo in the report sheet of another member',
+  },
+  'GET /v1/categories': {
+    none: 'des nombres de projets par catégorie : la catégorie ne se retire pas seule, elle se range (R6b)',
+  },
+  'GET /v1/notifications/unread': { none: 'un nombre seul, sans aucun contenu' },
+}
+
+/** Les routes qui montrent le contenu d'un autre membre : les lectures « hidesBlocked », les fichiers. */
+const showsOthers = (route: string) =>
+  route === 'GET /media/:folder/:file' ||
+  (route.startsWith('GET ') && blockClass(route) === 'hidesBlocked')
+
+/**
+ * R9 (relecture de sécurité du plan, P7) : les tests qui prouvent chaque écriture permise « en
+ * partie » à un compte suspendu : ce qu'il peut encore envoyer, et le refus du reste.
+ */
+const SUSPENSION_PROOFS: Record<string, readonly { file: string; test: string }[]> = {
+  'PATCH /v1/me': [
+    {
+      file: 'suspension.r9.test.ts',
+      test: 'lets a suspended member empty her bio and her tools, and refuses any other value',
+    },
+    {
+      file: 'suspension.r9.test.ts',
+      test: 'lets a suspended member choose a new name or handle only while it is provisional',
+    },
+    {
+      file: 'suspension.r9.test.ts',
+      test: 'judges a key sent twice on the value that would be written',
+    },
+  ],
+  'PATCH /v1/projects/:id': [
+    {
+      file: 'suspension.r9.test.ts',
+      test: 'lets a suspended member send only { visibility: private } on her own project',
+    },
+    {
+      file: 'suspension.r9.test.ts',
+      test: 'refuses with 403 suspended visibility public, another field, or both with private',
+    },
+    {
+      file: 'suspension.r9.test.ts',
+      test: 'judges a key sent twice on the value that would be written',
+    },
+  ],
+}
+
 /** Échappe un texte pour qu'une expression régulière le lise mot pour mot (« ( », « . »…). */
 const literally = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -391,6 +531,39 @@ describe('the inventory of routes', () => {
 
     expect(refused).toEqual([])
   })
+
+  it('cites a removed-part proof for every route that shows the content of another member', () => {
+    const showing = Object.keys(ROUTES).filter(showsOthers)
+    const withoutProof = showing.filter((route) => PART_PROOFS[route] === undefined)
+    const notShowing = Object.keys(PART_PROOFS).filter((route) => !showsOthers(route))
+    const notFound = Object.entries(PART_PROOFS).flatMap(([route, proof]) =>
+      'none' in proof || hasTest(proof.file, proof.test)
+        ? []
+        : [`${route}: ${proof.file} « ${proof.test} »`],
+    )
+
+    expect(withoutProof.join('\n')).toBe('')
+    expect(notShowing.join('\n')).toBe('')
+    expect(notFound.join('\n')).toBe('')
+    // Témoin : la page d'un projet et les fichiers sont bien comptés parmi ces routes.
+    expect(showing).toEqual(
+      expect.arrayContaining(['GET /v1/projects/:id', 'GET /media/:folder/:file']),
+    )
+  })
+
+  it('cites the tests of each write a suspended member may send only in part', () => {
+    const partial = Object.entries(ROUTES)
+      .filter(([, [, during]]) => during === 'partial')
+      .map(([route]) => route)
+    const notFound = Object.entries(SUSPENSION_PROOFS).flatMap(([route, proofs]) =>
+      proofs
+        .filter((proof) => !hasTest(proof.file, proof.test))
+        .map((proof) => `${route}: ${proof.file} « ${proof.test} »`),
+    )
+
+    expect(partial.sort()).toEqual(Object.keys(SUSPENSION_PROOFS).sort())
+    expect(notFound.join('\n')).toBe('')
+  })
 })
 
 // ─── S2 : la garde des comptes suspendus, route par route ─────────────────────────────────────────
@@ -450,6 +623,8 @@ describe('the guard of a suspended account', () => {
 
       const wrong: string[] = []
       for (const [route, [, during]] of Object.entries(ROUTES)) {
+        // Une écriture permise en partie (R9) dépend de son corps : SUSPENSION_PROOFS la prouve.
+        if (during === 'partial') continue
         const [method = 'GET', path = '/'] = route.split(' ')
         // Un corps invalide pour toute route : une chaîne JSON là où un objet est attendu.
         const body = method === 'GET' || method === 'DELETE' ? undefined : 'x'
