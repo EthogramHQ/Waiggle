@@ -115,6 +115,8 @@ function ThemedChrome() {
       {/* R9 : « Signaler » est une feuille posée sur la page du contenu signalé (le Retour du
           navigateur la ferme, la page d'où l'on vient reste dessinée dessous). */}
       <Stack.Screen name="report" options={sheetRoute} />
+      {/* R9 : « Suspendre » aussi, posée sur la page du membre ou sur la file de la modération. */}
+      <Stack.Screen name="suspend" options={sheetRoute} />
     </Stack>
   )
   return (
