@@ -8,6 +8,7 @@ import {
   MODERATION_PAGE_SIZE,
   ModerationAction,
   RemovalGround,
+  ReportPartField,
   StoredReportTarget,
   SuspensionDuration,
 } from '@ruche/contracts'
@@ -15,6 +16,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, desc, eq, isNull, type SQL, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
+import { photoRankSql } from './part-rank'
 import { targetUuid } from './target'
 
 const d = schema.moderationDecision
@@ -65,6 +67,11 @@ export const loadDecisionHistory = async (
       duration: d.duration,
       liftCause: d.liftCause,
       afterReport: d.afterReport,
+      // R9 : la partie visée, sa photo et le rang de celle-ci (part-rank.ts). La colonne est écrite
+      // avec sa table : la sous-requête lit project_media et tester_media.
+      partField: d.partField,
+      partMediaId: d.partMediaId,
+      partPosition: photoRankSql(sql.raw('"moderation_decision"."part_media_id"')),
       adminId: admin.id,
       adminName: admin.name,
       adminHandle: adminHandle.handle,
@@ -115,12 +122,14 @@ export const loadDecisionHistory = async (
     const ground = RemovalGround.nullable().safeParse(row.ground)
     const duration = SuspensionDuration.nullable().safeParse(row.duration)
     const liftCause = LiftCause.nullable().safeParse(row.liftCause)
+    const partField = ReportPartField.nullable().safeParse(row.partField)
     if (
       !action.success ||
       !target.success ||
       !ground.success ||
       !duration.success ||
-      !liftCause.success
+      !liftCause.success ||
+      !partField.success
     ) {
       console.warn(`Moderation history: invalid decision row ${row.id} left out`)
       return []
@@ -135,8 +144,15 @@ export const loadDecisionHistory = async (
             ? { id: row.adminId, name: row.adminName, handle: row.adminHandle }
             : null,
         target: target.data,
-        // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-        part: null,
+        // R9 : la partie d'une décision sur une partie (la 2e photo, la bio…) ; null : tout le contenu.
+        part:
+          partField.data === null
+            ? null
+            : {
+                field: partField.data,
+                mediaId: row.partMediaId,
+                position: row.partMediaId === null ? null : row.partPosition,
+              },
         projectId:
           row.projectId ??
           row.updateProjectId ??
