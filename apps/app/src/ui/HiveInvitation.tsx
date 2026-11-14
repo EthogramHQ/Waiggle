@@ -21,7 +21,7 @@
 // qu'au rendu suivant, trop tard pour la seconde tape. Le bouton touché tourne pendant l'écriture
 // (`loading`, qui garde le focus) ; l'échec, l'écran le dit, et l'on peut réessayer.
 import { layout, radii, space } from '@ruche/brand'
-import type { HiveIcon, HiveInvitation as Invitation } from '@ruche/contracts'
+import type { HiveInvitation as Invitation } from '@ruche/contracts'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
@@ -30,7 +30,7 @@ import { ActionMenu } from './ActionMenu'
 import { Button } from './Button'
 import { ButtonPair } from './ButtonPair'
 import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from './focus'
-import { Icon } from './Icon'
+import { HiveBadge } from './HiveBadge'
 import { useRelativeDate } from './RelativeTime'
 import { Stack } from './Stack'
 import { Surface } from './Surface'
@@ -144,7 +144,7 @@ export function HiveInvitation({
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.md }}>
           {/* Un décor : la phrase nomme déjà la ruche. */}
           <View {...hiddenFromReaders} style={{ flexShrink: 0 }}>
-            <Badge icon={hive.icon} name={hive.name} size={44} />
+            <HiveBadge icon={hive.icon} name={hive.name} size={44} />
           </View>
           <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: space.xxs }}>
             <Text variant="callout" weight={700} breakAnywhere>
@@ -247,29 +247,6 @@ function PromiseLine({ text }: { text: string }) {
       <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
         <Text variant="callout">{text}</Text>
       </View>
-    </View>
-  )
-}
-
-/**
- * Provisoire (R10) : la place de l'alvéole de la ruche, au format de `ui/HiveBadge` (même nom,
- * mêmes props), écrite en même temps ailleurs. À l'assemblage, cette fonction part et `HiveBadge`
- * la remplace. En attendant : un carré arrondi de miel doux et l'icône de la ruche.
- */
-function Badge({ icon, size }: { icon: HiveIcon; name: string | null; size: 28 | 44 | 64 }) {
-  const { colors } = useTheme()
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radii.small,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.honeySoft,
-      }}
-    >
-      <Icon name={icon} size={size / 2} tone="amber" />
     </View>
   )
 }

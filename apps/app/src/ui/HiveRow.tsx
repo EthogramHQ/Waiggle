@@ -17,16 +17,15 @@
 // - `animator` null : plus d'animateur à montrer (compte supprimé, ou un blocage entre lui et le
 //   lecteur) : « animée par » disparaît, à l'œil comme à l'oreille.
 import { radii, space } from '@ruche/brand'
-import type { HiveIcon, HiveSummary } from '@ruche/contracts'
+import type { HiveSummary } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { AvatarStack } from './AvatarStack'
-import { Icon } from './Icon'
+import { HiveBadge } from './HiveBadge'
 import type { ImageSource } from './image'
 import { Pressed } from './Pressed'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
-import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
   hive: HiveSummary
@@ -81,7 +80,7 @@ export function HiveRow({ hive, onPress, compact = false, toSource }: Props) {
         }}
       >
         <View {...hiddenFromReaders} style={{ flexShrink: 0 }}>
-          <Badge icon={hive.icon} name={hive.name} size={compact ? 28 : 44} />
+          <HiveBadge icon={hive.icon} name={hive.name} size={compact ? 28 : 44} />
         </View>
         {/* Le texte et les nouveautés, dans une rangée qui passe à la ligne : quand la place manque,
             les nouveautés vont sous le texte (jamais `flex: 1`, qui vaut une base nulle sur le
@@ -150,28 +149,5 @@ export function HiveRow({ hive, onPress, compact = false, toSource }: Props) {
         </View>
       </View>
     </Pressed>
-  )
-}
-
-/**
- * Provisoire (R10) : la place de l'alvéole de la ruche, au format de `ui/HiveBadge` (même nom,
- * mêmes props), écrite en même temps ailleurs. À l'assemblage, cette fonction part et `HiveBadge`
- * la remplace. En attendant : un carré arrondi de miel doux et l'icône de la ruche.
- */
-function Badge({ icon, size }: { icon: HiveIcon; name: string | null; size: 28 | 44 | 64 }) {
-  const { colors } = useTheme()
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radii.small,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.honeySoft,
-      }}
-    >
-      <Icon name={icon} size={size / 2} tone="amber" />
-    </View>
   )
 }
