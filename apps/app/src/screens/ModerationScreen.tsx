@@ -1,49 +1,54 @@
-// La page « Modération » (tranche 7a, « /moderation »), réservée aux administrateurs. Deux onglets :
-// « En attente », les signalements regroupés par contenu, du plus ancien au plus récent ; et
-// « Retirés », les contenus retirés, qu'on peut rétablir.
+// La page « Modération » (« /moderation »), réservée aux administrateurs. Refaite en R9 (planches
+// `R9-Moderation-Desktop`, `R9-Moderation-Telephone` et `R9-Moderation-Detail-Telephone`).
 //
-// Sur un signalement, deux décisions :
-// - « Retirer » ouvre une fenêtre qui demande le fondement (la loi, ou les règles de l'appli) puis
-//   une explication, montrée à l'auteur (règle 21 de la relecture du plan) ;
-// - « Classer sans suite » se fait en un geste.
-// Une carte décidée reste à sa place jusqu'au changement d'onglet, avec le résultat à la place de
-// ses boutons (« Signalement classé sans suite. ») : la carte suivante ne remonte pas sous le doigt
-// (relecture de la tranche 7a : une seconde tape, 700 ms après, classait un signalement non lu).
-// En plus, un appui arrivé moins de 600 ms après une décision est ignoré (charte du design, 6c).
-// Un administrateur ne décide jamais de ce qui le concerne (son contenu, son profil) : la carte le
-// dit, sans bouton (règle 11). Un profil ne se « retire » pas : seulement « Classer sans suite ».
+// Sur un grand écran, trois colonnes : la file (« À traiter (N) » / « Retirés », avec « Outils » et
+// « Catégories » en tête), le détail de l'élément choisi (`moderation/ModerationDetail`), et
+// l'historique récent, une ligne colorée par décision. Sur téléphone, la file seule, avec un bouton
+// « Historique » ; toucher un élément ouvre son détail en page.
+//
+// L'élément choisi vit dans l'adresse (`?item=`, une clé par cible **et** par partie, voir
+// `moderation/present.ts`) : le projet entier et sa 2e photo sont deux éléments, jamais confondus.
+// Sur ordinateur, sans `?item=`, le premier élément est montré. Une clé inconnue (un signalement
+// déjà traité ailleurs, une adresse gardée) dit « Ce signalement n'est plus dans la file. », avec
+// « Retour à la file ».
+//
+// Les décisions :
+// - « Retirer » ouvre la feuille `RemoveSheet` (la partie seule ou tout le contenu, le fondement,
+//   l'explication montrée à l'auteur, le mot de passe si l'API le redemande) ;
+// - « Classer sans suite » et « Rétablir » se font en un geste ;
+// - « Suspendre », sur la fiche de l'auteur, ouvre la feuille `SuspendSheet` à son adresse
+//   (`/suspend`), posée sur cette page, en disant de quel signalement on part (J2).
+// Un élément décidé garde son résultat dans le détail, à la place des boutons, jusqu'au choix
+// suivant ; il garde aussi sa place dans la file : rien ne remonte sous le doigt (relecture 7a). Un
+// appui arrivé moins de 600 ms après une décision est ignoré (charte du design, 6c).
+// Un administrateur ne décide jamais de ce qui le concerne (son contenu, son profil) : le détail le
+// dit, sans bouton (règle 11). Un profil entier ne se « retire » pas : il se suspend.
+//
+// L'historique complet (7c) reste une vue de la page (`?tab=history`, filtrable sur un membre :
+// `&member=<id>`, depuis sa page ou « Voir ses décisions ») : « Voir tout l'historique » y mène.
 //
 // Pour tout autre membre, la page n'existe pas (« Page introuvable ») : l'appli lit `me.isAdmin`,
 // et l'API, qui refait la vérification à chaque requête, répond 404 comme à une adresse inconnue.
-//
-// Tranche 7c :
-// - chaque carte rappelle ce que la modération a déjà décidé pour le membre visé (« 2 retraits,
-//   1 suspension ») et propose « Suspendre le compte », qui mène à la page « Suspendre » en disant
-//   de quel signalement on part (J2) ;
-// - un troisième onglet, « Historique », liste toutes les décisions, ou celles qui visent un membre
-//   (`?tab=history&member=<id>`, depuis la page du membre) ;
-// - l'API peut redemander le mot de passe (`password_required`) : la fenêtre « Retirer » le demande
-//   alors, puis renvoie la même décision avec lui ;
-// - la limite de décisions par jour (J15) a sa propre phrase.
-import {
-  IMAGE_INPUT_FIELDS,
-  type ModerationDecisionInput,
-  type ModerationQueueItem,
-  REMOVAL_EXPLANATION_MAX,
-  REMOVALS_BEFORE_PASSWORD,
-  RemovalExplanation,
-  type RemovalGround,
-  type RemovedItem,
-  type ReportSnapshotEntry,
-  type SnapshotImage,
-  SUSPENSIONS_BEFORE_PASSWORD,
+import type {
+  ModerationDecisionInput,
+  ModerationQueueItem,
+  PartOut,
+  RemovedItem,
+  ReportPart,
+  StoredReportTarget,
 } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
+import {
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
-import { useMediaSources } from '../api/media'
 import {
   useDecide,
   useDecisionHistory,
@@ -51,31 +56,39 @@ import {
   useRemovedItems,
 } from '../moderation/api'
 import { decisionFailure } from '../moderation/failure'
-import { reasonTextKey, targetKey, viewHref } from '../moderation/present'
+import {
+  detailTitle,
+  firstText,
+  ModerationDetail,
+  type Outcome,
+} from '../moderation/ModerationDetail'
+import { itemKey, partText, reasonTextKey, viewHref } from '../moderation/present'
+import { RemoveSheet } from '../moderation/RemoveSheet'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { useMe } from '../profile/hooks'
 import { shortDate } from '../projects/format'
+import { isRecentAccount } from '../ui/AuthorRecord'
 import { Button } from '../ui/Button'
-import { Choices } from '../ui/Choices'
+import { Columns } from '../ui/Columns'
 import { excerpt } from '../ui/CommentAction'
 import { DecisionCard } from '../ui/DecisionCard'
-import { Dialog } from '../ui/Dialog'
 import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
-import type { ImageSource } from '../ui/image'
+import type { IconName } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
-import { Notice } from '../ui/Notice'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
+import { relativeDate } from '../ui/relativeDate'
 import { Screen } from '../ui/Screen'
-import { Segmented, type SegmentedHandle } from '../ui/Segmented'
+import { Segmented } from '../ui/Segmented'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
+import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
-import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
+import { useLayout } from '../ui/theme/layout'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -85,89 +98,61 @@ import {
 } from './states'
 
 /**
- * Le temps de lire ce qui vient de changer : pendant ces 600 ms après une décision, la liste vient
- * de bouger sous le doigt, et un appui sur une carte est ignoré (charte du design, 6c).
+ * Le temps de lire ce qui vient de changer : pendant ces 600 ms après une décision, un appui sur
+ * une décision (ou, sur ordinateur, sur la file) est ignoré (charte du design, 6c).
  */
 const SETTLE_MS = 600
 
+/** Le nombre de décisions de l'historique récent, à côté du détail. */
+const RECENT_DECISIONS = 6
+
+/**
+ * Le début de la copie montré dans la file, en caractères : la ligne se coupe de toute façon à la
+ * largeur de la colonne ; le détail, à côté, donne la copie entière (une seule fois sur la page).
+ */
+const QUEUE_EXCERPT = 64
+
 type Tab = 'pending' | 'removed' | 'history'
 
-/**
- * Les champs d'une copie qui sont des images : la copie n'en garde que la clé, jamais le texte. La
- * file les dit à part (`images`), seulement par leur état ; ils n'ont pas de libellé de champ.
- */
-type ImageField = (typeof IMAGE_INPUT_FIELDS)[number]
-const imageFields: ReadonlySet<string> = new Set(IMAGE_INPUT_FIELDS)
-const isTextEntry = (
-  entry: ReportSnapshotEntry,
-): entry is ReportSnapshotEntry & { field: Exclude<ReportSnapshotEntry['field'], ImageField> } =>
-  !imageFields.has(entry.field)
-
-/** Le premier texte d'une copie (le titre d'un projet, le nom d'un profil) : de quoi la reconnaître. */
-const firstText = (snapshot: readonly ReportSnapshotEntry[]): string =>
-  snapshot.find(isTextEntry)?.value ?? ''
-
-type T = ReturnType<typeof useTranslation>['t']
-
-/**
- * L'état de chaque image d'une copie, en une phrase (« Couverture : toujours affichée »). Un projet
- * peut avoir plusieurs photos : dès qu'il y en a deux, chacune porte son rang (« Photo 2 : supprimée
- * ou remplacée depuis »), sinon deux lignes identiques ne diraient pas laquelle est partie
- * (relecture 7b). Une photo seule reste « Photo ».
- */
-const imageLines = (images: readonly SnapshotImage[], t: T): string[] => {
-  const photos = images.filter(({ field }) => field === 'photo').length
-  let rank = 0
-  return images.map(({ field, state }) => {
-    const image =
-      field === 'photo' && photos > 1
-        ? t(($) => $.moderation.images.photoNumbered, { n: ++rank })
-        : t(($) => $.moderation.images[field])
-    return t(($) => $.moderation.images[state], { image })
-  })
+/** L'icône de chaque sorte de contenu, dans la tuile d'un élément de la file. */
+const kindIcon: Record<StoredReportTarget['kind'], IconName> = {
+  project: 'squares-four',
+  update: 'squares-four',
+  note: 'chat-circle',
+  comment: 'chat-circle',
+  member: 'user',
+  call: 'squares-four',
+  message: 'chat-circle',
 }
 
-/**
- * R7b : l'image d'une capture ou d'une photo d'appel, quand l'API en donne l'adresse (un signalement
- * ouvert vise son message ou son appel). Son nom lu est le libellé du champ (« Photo »), le seul texte
- * existant qui lui convienne. Une image sans adresse, ou déjà partie, reste dite par son état seul.
- */
-const pictures = (
-  images: readonly SnapshotImage[],
-  t: T,
-  mediaSource: (url: string) => ImageSource | null,
-): { name: string; source: ImageSource }[] =>
-  images.flatMap(({ field, state, url }) => {
-    const source = state === 'present' && url ? mediaSource(url) : null
-    return source ? [{ name: t(($) => $.moderation.images[field]), source }] : []
-  })
-
-/** Le résultat d'une décision, posé sur sa carte : une confirmation, ou « déjà décidé ». */
-type Outcome = { message: string; ok: boolean }
+/** La partie telle que l'API l'attend : sans `mediaId` pour une partie sans photo (schéma strict). */
+const sentPart = (part: PartOut | null): { part: ReportPart } | null =>
+  part
+    ? { part: { field: part.field, ...(part.mediaId ? { mediaId: part.mediaId } : null) } }
+    : null
 
 /**
- * Une carte décidée : la liste de React Query l'a déjà ôtée, l'écran la garde à la place qu'elle
- * avait (`index`, son rang parmi les cartes affichées), avec son résultat.
+ * Un élément décidé : la liste de React Query l'a peut-être déjà ôté, l'écran le garde à la place
+ * qu'il avait (`index`, son rang parmi les éléments affichés), avec son résultat.
  */
 type Decided<Item> = { key: string; index: number; item: Item; outcome: Outcome }
 
-/** Une carte affichée : un élément de la liste, et son résultat s'il a été décidé. */
+/** Un élément affiché : un élément de la liste, et son résultat s'il a été décidé. */
 type Shown<Item> = { key: string; index: number; item: Item; outcome?: Outcome }
 
 /**
- * Les cartes affichées : celles de la liste reçue, et les cartes décidées remises à leur rang.
- * Une carte décidée encore présente dans la liste (la réponse n'a pas encore été appliquée) n'y
- * figure qu'une fois, avec son résultat.
+ * Les éléments affichés : ceux de la liste reçue, et les éléments décidés remis à leur rang. Un
+ * élément décidé encore présent dans la liste n'y figure qu'une fois, avec son résultat.
  */
-const keepDecided = <Item extends { target: ModerationQueueItem['target'] }>(
+const keepDecided = <Item extends { target: StoredReportTarget; part: PartOut | null }>(
   items: readonly Item[],
   decided: readonly Decided<Item>[],
 ): Shown<Item>[] => {
   const done = new Set(decided.map((entry) => entry.key))
   const shown: Omit<Shown<Item>, 'index'>[] = items
-    .map((item) => ({ key: targetKey(item.target), item }))
+    .map((item) => ({ key: itemKey(item.target, item.part), item }))
     .filter((entry) => !done.has(entry.key))
-  // Du plus petit rang au plus grand : chaque carte retrouve sa place parmi celles déjà posées.
+  // Du plus petit rang au plus grand : chaque élément retrouve sa place parmi ceux déjà posés.
   for (const entry of [...decided].sort((a, b) => a.index - b.index)) {
     shown.splice(Math.min(entry.index, shown.length), 0, {
       key: entry.key,
@@ -178,7 +163,7 @@ const keepDecided = <Item extends { target: ModerationQueueItem['target'] }>(
   return shown.map((entry, index) => ({ ...entry, index }))
 }
 
-/** Les refus qui rendent une décision sans objet : la file est relue, la carte le dit. */
+/** Les refus qui rendent une décision sans objet : la file est relue, le détail le dit. */
 const settledElsewhere: ReadonlySet<string> = new Set(['alreadyDecided', 'notFound'])
 
 export function ModerationScreen() {
@@ -202,56 +187,74 @@ export function ModerationScreen() {
 function AdminModeration() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
-  // Les images privées du coin des testeurs voyagent avec la session (cookie sur téléphone).
-  const mediaSource = useMediaSources()
   const back = useGoBack('/settings')
-  // L'adresse peut ouvrir l'historique, filtré sur un membre (`?tab=history&member=<id>`, depuis la
-  // page du membre). Elle n'est connue que dans le navigateur : la page pré-rendue l'ignore, et
-  // l'onglet s'ouvre une fois hydratée (ui/theme/hydration.ts).
+  // Sur téléphone, le détail est une page : on revient à la file (ou on y va, sans page d'avant).
+  const backToQueue = useGoBack('/moderation')
+  // La file et le détail côte à côte (ordinateur, grande tablette) ; sinon, l'un puis l'autre.
+  const { columns } = useLayout()
+  // L'adresse (l'élément choisi, l'historique et son filtre) n'est connue que dans le navigateur :
+  // la page pré-rendue l'ignore, et la lit une fois hydratée (ui/theme/hydration.ts).
   const hydrated = useHydrated()
-  const params = useLocalSearchParams<{ tab?: string | string[]; member?: string | string[] }>()
+  const params = useLocalSearchParams<{
+    tab?: string | string[]
+    member?: string | string[]
+    item?: string | string[]
+  }>()
   const tabParam = hydrated ? firstParam(params.tab) : undefined
   const memberFilter = (hydrated ? firstParam(params.member) : undefined) || undefined
-  const [tab, setTab] = useState<Tab>(() => (tabParam === 'history' ? 'history' : 'pending'))
+  const itemParam = (hydrated ? firstParam(params.item) : undefined) || undefined
+  const [tab, setTab] = useState<Tab>(() =>
+    tabParam === 'history' || tabParam === 'removed' ? tabParam : 'pending',
+  )
   useEffect(() => {
-    if (tabParam === 'history') setTab('history')
+    if (tabParam === 'history' || tabParam === 'removed') setTab(tabParam)
   }, [tabParam])
   const queue = useModerationQueue()
-  // Les retirés et l'historique ne sont demandés qu'une fois leur onglet ouvert.
+  // Les retirés ne sont demandés qu'une fois leur onglet ouvert ; l'historique, quand il se voit
+  // (sa vue, ou la colonne de droite sur ordinateur).
   const removed = useRemovedItems(tab === 'removed')
-  const history = useDecisionHistory(memberFilter, tab === 'history')
+  const history = useDecisionHistory(
+    tab === 'history' ? memberFilter : undefined,
+    tab === 'history' || columns,
+  )
   const { decide } = useDecide()
-  // Les onglets : « Tout voir » y rend le focus, une fois son lien disparu.
-  const tabsRef = useRef<SegmentedHandle>(null)
+  // Le titre de l'historique : le focus y va quand on l'ouvre depuis la fiche d'un auteur.
+  const historyTitleRef = useRef<Focusable>(null)
 
-  // Les cartes décidées de chaque onglet, gardées à leur place jusqu'au changement d'onglet.
+  // Les éléments décidés de chaque onglet, gardés à leur place jusqu'au choix suivant.
   const [decidedQueue, setDecidedQueue] = useState<Decided<ModerationQueueItem>[]>([])
   const [decidedRemoved, setDecidedRemoved] = useState<Decided<RemovedItem>[]>([])
-  // Les pannes, carte par carte : le message reste jusqu'à la réponse suivante (charte du design :
-  // il ne disparaît pas pendant l'envoi, sinon les boutons sautent sous le doigt).
+  // Les pannes, élément par élément : le message reste jusqu'à la réponse suivante (charte du
+  // design : il ne disparaît pas pendant l'envoi, sinon les boutons sautent sous le doigt).
   const [failures, setFailures] = useState<Readonly<Record<string, string>>>({})
-  // La dernière carte décidée. Le focus du clavier va à son résultat : le bouton touché a laissé
-  // la place à ce résultat, et le bouton suivant n'est pas la suite logique (désinscription, 6c).
+  // Le dernier élément décidé. Le focus du clavier va à son résultat : le bouton touché a laissé
+  // la place à ce résultat (désinscription, 6c).
   const [lastDecided, setLastDecided] = useState<string | null>(null)
   const outcomeRef = useRef<Focusable>(null)
   const focusOutcome = useRef(false)
   useEffect(() => {
     if (lastDecided && focusOutcome.current) {
       focusOutcome.current = false
-      focusWithoutScroll(outcomeRef.current)
+      // Le temps que la feuille « Retirer » quitte la page : avant, elle garderait le focus.
+      requestAnimationFrame(() => focusWithoutScroll(outcomeRef.current))
     }
   }, [lastDecided])
 
-  /** Changer d'onglet est le geste qui range les cartes décidées : la liste repart de zéro. */
-  const changeTab = (next: Tab) => {
-    setTab(next)
+  /** Oublie les éléments décidés et leurs pannes : la liste repart de ce que dit l'API. */
+  const forgetDecided = () => {
     setDecidedQueue([])
     setDecidedRemoved([])
     setFailures({})
     setLastDecided(null)
   }
 
-  /** Garde la carte décidée à sa place, avec son résultat, et oublie sa dernière panne. */
+  /** Changer d'onglet est un geste qui range les éléments décidés. */
+  const changeTab = (next: Tab) => {
+    setTab(next)
+    forgetDecided()
+  }
+
+  /** Garde l'élément décidé à sa place, avec son résultat, et oublie sa dernière panne. */
   const settle = <Item,>(
     record: Dispatch<SetStateAction<Decided<Item>[]>>,
     entry: Decided<Item>,
@@ -263,43 +266,27 @@ function AdminModeration() {
     setLastDecided(entry.key)
   }
 
-  // L'heure où la liste a bougé pour la dernière fois (une décision arrivée), et la décision en
-  // cours. Des refs (useRef) : lues au moment de l'appui, sans attendre que l'écran se redessine.
+  // L'heure où une décision est arrivée pour la dernière fois, et la décision en cours. Des refs :
+  // lues au moment de l'appui, sans attendre que l'écran se redessine.
   const settledAt = useRef(0)
   const deciding = useRef(false)
-  // La cible en cours d'envoi, pour montrer la roue sur son bouton.
+  // L'élément en cours d'envoi, pour montrer la roue sur son bouton.
   const [pending, setPending] = useState<string | null>(null)
 
-  // La fenêtre « Retirer » : ouverte ou non, la carte visée (gardée pendant le fondu de fermeture,
-  // pour que le texte rappelé ne disparaisse pas avant la fenêtre), le fondement choisi,
-  // l'explication, et les erreurs.
+  // La feuille « Retirer » : ouverte ou non, et l'élément visé (gardé pendant le fondu de
+  // fermeture, pour que le texte rappelé ne disparaisse pas avant la feuille).
   const [removeOpen, setRemoveOpen] = useState(false)
-  const [removing, setRemoving] = useState<{ item: ModerationQueueItem; index: number } | null>(
-    null,
-  )
-  const [ground, setGround] = useState<RemovalGround | null>(null)
-  const [explanation, setExplanation] = useState('')
-  const [fieldError, setFieldError] = useState<string | null>(null)
-  const [dialogError, setDialogError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const focusAfterClose = useRef(false)
-  // La fenêtre de retrait s'ouvre sur sa première question, le groupe « Fondement » (contre-visite
-  // du design de R6a, S1). Une fenêtre sans champ s'ouvre sur « Annuler » (une Entrée distraite ne
-  // supprime rien, H3) ; ici, « Retirer » reste inactif tant que le fondement et l'explication
-  // manquent : « Annuler » ne protégeait de rien, et coûtait un Tab de plus avant le formulaire.
-  const groundRef = useRef<Focusable>(null)
-  // Le mot de passe, quand l'API le redemande (`password_required`, au-delà de
-  // REMOVALS_BEFORE_PASSWORD retraits en une heure) : le champ apparaît, et « Confirmer » renvoie la
-  // même décision avec lui. Le focus va au champ (autoFocus), que l'on tape aussitôt : le bouton
-  // touché, lui, a laissé la place à « Confirmer ».
-  const [passwordAsked, setPasswordAsked] = useState(false)
-  const [password, setPassword] = useState('')
+  const [removing, setRemoving] = useState<{
+    key: string
+    index: number
+    item: ModerationQueueItem
+  } | null>(null)
 
   // « Réessayer » sur une file en erreur : React Query efface l'erreur pendant la relecture ; on
   // garde l'écran d'erreur (et le focus sur son bouton) jusqu'à la réponse.
   const [retrying, setRetrying] = useState(false)
 
-  /** Un appui sur une carte, ignoré pendant une décision, et juste après que la liste a bougé. */
+  /** Un appui sur une décision, ignoré pendant une décision, et juste après qu'une est arrivée. */
   const guarded = (action: () => void) => () => {
     if (deciding.current || Date.now() - settledAt.current < SETTLE_MS) return
     action()
@@ -307,16 +294,15 @@ function AdminModeration() {
 
   /**
    * Envoie une décision en un geste (classer, rétablir). Réussie, ou rendue sans objet par une
-   * décision prise ailleurs, elle se pose sur sa carte (`onSettled`) ; une panne s'affiche au-dessus
-   * des boutons, qui restent pour réessayer.
+   * décision prise ailleurs, elle se pose dans le détail (`onSettled`) ; une panne s'affiche
+   * au-dessus des boutons, qui restent pour réessayer.
    */
   const run = async (
-    // Les décisions en un geste portent sur une cible (classer, rétablir) ; la suspension a sa page.
+    key: string,
     input: Extract<ModerationDecisionInput, { target: unknown }>,
     done: string,
     onSettled: (outcome: Outcome) => void,
   ) => {
-    const key = targetKey(input.target)
     deciding.current = true
     setPending(key)
     const result = await decide(input)
@@ -335,74 +321,10 @@ function AdminModeration() {
     }
   }
 
-  const openRemove = (item: ModerationQueueItem, index: number) => {
-    setGround(null)
-    setExplanation('')
-    setFieldError(null)
-    setDialogError(null)
-    setPasswordAsked(false)
-    setPassword('')
-    setRemoving({ item, index })
-    setRemoveOpen(true)
-  }
-
-  const closeRemove = () => {
-    // Pendant l'envoi, la fenêtre reste ouverte (charte : le focus prévu après se perdrait).
-    if (!submitting) setRemoveOpen(false)
-  }
-
-  const confirmRemove = async () => {
-    const target = removing?.item.target
-    const text = explanation.trim()
-    // Le bouton est inactif tant qu'il manque le fondement ou l'explication ; on vérifie quand même.
-    if (!removing || !target || !ground || text === '' || deciding.current) return
-    if (!RemovalExplanation.safeParse(text).success) {
-      setFieldError(t(($) => $.profile.errors.invalidCharacters))
-      return
-    }
-    // Le champ du mot de passe ouvert : rien ne part tant qu'il est vide.
-    if (passwordAsked && password === '') return
-    setFieldError(null)
-    deciding.current = true
-    setSubmitting(true)
-    const result = await decide({
-      action: 'remove',
-      target,
-      ground,
-      explanation: text,
-      ...(passwordAsked ? { password } : null),
-    })
-    deciding.current = false
-    setSubmitting(false)
-    if (!result.ok && result.error === 'passwordRequired') {
-      // L'API redemande le mot de passe : le champ apparaît, ce qui a été choisi et écrit reste.
-      setDialogError(passwordAsked ? t(($) => $.errors.passwordRequired) : null)
-      setPasswordAsked(true)
-      return
-    }
-    if (result.ok || settledElsewhere.has(result.error)) {
-      settledAt.current = Date.now()
-      focusAfterClose.current = true
-      settle(setDecidedQueue, {
-        key: targetKey(target),
-        index: removing.index,
-        item: removing.item,
-        outcome: result.ok
-          ? { message: t(($) => $.moderation.removedDone), ok: true }
-          : { message: t(($) => $.errors[result.error]), ok: false },
-      })
-      setRemoveOpen(false)
-    } else {
-      // Une panne (réseau, serveur), un mot de passe faux, la limite du jour : la fenêtre reste,
-      // avec ce qui a été tapé, pour réessayer.
-      setDialogError(decisionFailure(t, result.error, { passwordSent: passwordAsked }))
-    }
-  }
-
   // La lecture de la liste affichée, et ses refus qui changent toute la page.
   const list = tab === 'pending' ? queue : tab === 'removed' ? removed : history
   const fatal = !list.data && list.isError ? errorKey(list.error) : null
-  // Les cartes affichées de chaque onglet (lues avant les refus ci-dessous : le hook qui suit doit
+  // Les éléments affichés de chaque onglet (lus avant les refus ci-dessous : le hook qui suit doit
   // être appelé à chaque affichage, dans le même ordre).
   const queueItems = queue.data?.pages.flatMap((page) => page.items) ?? []
   const removedItems = removed.data?.pages.flatMap((page) => page.items) ?? []
@@ -415,8 +337,8 @@ function AdminModeration() {
       : tab === 'removed'
         ? shownRemoved.length
         : decisions.length
-  // La première carte arrivée avec la dernière page de l'onglet : le focus du clavier y va quand
-  // « Afficher la suite » disparaît, la liste finissant sans phrase (jur-RF2).
+  // Le premier élément arrivé avec la dernière page : le focus du clavier y va quand « Afficher la
+  // suite » disparaît, la liste finissant sans phrase (jur-RF2).
   const arrived = useFirstArrived(count, list.isFetchingNextPage)
   // Un administrateur révoqué : l'API ne connaît plus la page.
   if (fatal === 'notFound') return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
@@ -428,47 +350,53 @@ function AdminModeration() {
     setRetrying(false)
   }
 
-  /** Ce qui est commun à toutes les cartes : la description lue, le résultat, la panne. */
-  const cardState = (key: string, kind: string, text: string, outcome: Outcome | undefined) => ({
-    // « Commentaire : Envoie-moi le code… », lu après « Retirer », « Voir »… : de quelle carte il
-    // s'agit, quand toutes ont les mêmes boutons.
-    description: t(($) => $.moderation.describe, { kind, excerpt: excerpt(text) }),
-    decided: outcome,
-    decidedRef: key === lastDecided ? outcomeRef : undefined,
-    error: failures[key],
-  })
+  // L'élément montré dans le détail : celui de l'adresse ; sur ordinateur, sans adresse, le premier.
+  const shownList: readonly Shown<ModerationQueueItem | RemovedItem>[] =
+    tab === 'removed' ? shownRemoved : shownQueue
+  const chosenKey = itemParam ?? (columns ? shownList[0]?.key : undefined)
+  const chosen = chosenKey ? shownList.find(({ key }) => key === chosenKey) : undefined
+  // Une clé qui ne désigne rien de la liste reçue : traité ailleurs, ou une adresse fabriquée.
+  const unknown = itemParam !== undefined && !chosen && Boolean(list.data)
 
   /**
-   * Ce que la modération a déjà décidé pour le membre visé, en lignes : les retraits, les
-   * suspensions, la suspension en cours ; « aucune décision » sinon. Rien si son compte est parti.
+   * Choisir un élément de la file : sur ordinateur, l'adresse change sur place (le détail suit) ;
+   * sur téléphone, le détail s'ouvre en page. C'est le geste qui range les éléments décidés.
    */
-  const recordOf = ({ authorRecord }: ModerationQueueItem) => {
-    if (!authorRecord) return undefined
-    const { removals, suspensions, suspendedNow } = authorRecord
-    const lines = [
-      ...(removals > 0 ? [t(($) => $.moderation.record.removals, { count: removals })] : []),
-      ...(suspensions > 0
-        ? [t(($) => $.moderation.record.suspensions, { count: suspensions })]
-        : []),
-      ...(suspendedNow ? [t(($) => $.moderation.record.suspendedNow)] : []),
-    ]
-    return {
-      label: t(($) => $.moderation.record.title),
-      lines: lines.length > 0 ? lines : [t(($) => $.moderation.record.none)],
-      // Le titre mène au détail de ces décisions : l'onglet « Historique » filtré sur ce membre,
-      // sur place (la même adresse que « Historique de modération » depuis sa page). Comme
-      // « Tout voir », le focus va aux onglets : la carte touchée a disparu avec la file.
-      onPress: () => {
-        router.setParams({ tab: 'history', member: authorRecord.memberId })
-        changeTab('history')
-        requestAnimationFrame(() => tabsRef.current?.focusChecked())
-      },
+  const choose = (key: string) => {
+    // Sur ordinateur, la file vient peut-être de perdre un élément décidé : la seconde tape d'une
+    // double tape ne choisit pas l'élément remonté sous le doigt.
+    if (columns && (deciding.current || Date.now() - settledAt.current < SETTLE_MS)) return
+    const target = tab === 'removed' ? { tab: 'removed', item: key } : { item: key }
+    if (columns) {
+      forgetDecided()
+      router.setParams(target)
+    } else {
+      router.push({ pathname: '/moderation', params: target })
     }
   }
 
+  /** « Retour à la file » : sur ordinateur, le détail revient au premier élément. */
+  const leaveItem = () => {
+    if (columns) router.setParams({ item: undefined })
+    else backToQueue()
+  }
+
+  /** Ouvre l'historique complet, filtré ou non sur un membre ; le focus va à son titre. */
+  const openHistory = (member?: string) => {
+    router.setParams({ tab: 'history', member, item: undefined })
+    changeTab('history')
+    requestAnimationFrame(() => focusWithoutScroll(historyTitleRef.current))
+  }
+
+  /** Quitte l'historique pour la file. */
+  const closeHistory = () => {
+    router.setParams({ tab: undefined, member: undefined })
+    changeTab('pending')
+  }
+
   /**
-   * La page « Suspendre » pour le membre visé par une carte, en disant de quel signalement on part
-   * (J2) : l'API vérifie qu'il est ouvert et vise ce membre.
+   * La feuille « Suspendre » pour le membre visé, posée sur cette page à son adresse, en disant de
+   * quel signalement on part (J2) : l'API vérifie qu'il est ouvert et vise ce membre.
    */
   const openSuspend = (item: ModerationQueueItem, memberId: string) =>
     router.push({
@@ -476,166 +404,134 @@ function AdminModeration() {
       params: { member: memberId, fromKind: item.target.kind, fromId: item.target.id },
     })
 
-  const queueCard = ({ key, index, item, outcome }: Shown<ModerationQueueItem>) => {
-    const kind = t(($) => $.moderation.kinds[item.target.kind])
-    const actions: ReportCardAction[] = []
+  // --- La file ---
+
+  /** La ligne « de qui, où » d'un élément : « Gains Rapides (@gains_rapides), sur Décollage ! ». */
+  const contextOf = (item: ModerationQueueItem) => {
     const record = item.authorRecord
-    if (!item.concernsMe) {
-      // Un profil ne se retire pas (l'API le refuse) ; un contenu déjà retiré ou disparu non plus.
-      if (item.target.kind !== 'member' && item.state === 'present') {
-        actions.push({
-          label: t(($) => $.moderation.remove),
-          tone: 'danger',
-          onPress: guarded(() => openRemove(item, index)),
-        })
-      }
-      actions.push({
-        label: t(($) => $.moderation.dismiss),
-        loading: pending === key,
-        onPress: guarded(
-          () =>
-            void run(
-              { action: 'dismiss', target: item.target },
-              t(($) => $.moderation.dismissed),
-              (done) => settle(setDecidedQueue, { key, index, item, outcome: done }),
-            ),
-        ),
-      })
-      // Suspendre l'auteur (ou le membre lui-même, pour un profil), quand l'API le permet : pas
-      // l'administrateur qui regarde, ni un autre administrateur, ni un membre déjà suspendu.
-      if (record?.canSuspend) {
-        const memberId = record.memberId
-        actions.push({
-          label: t(($) => $.moderation.suspendAction),
-          onPress: guarded(() => openSuspend(item, memberId)),
-        })
-      }
-    }
-    const { state } = item
-    // Ce qui explique les boutons absents : un contenu qui concerne l'administrateur, déjà retiré
-    // ou disparu ; un profil, qui ne se retire pas en entier (relecture de design 7a).
-    const status = item.concernsMe
-      ? t(($) => $.moderation.concernsMe)
-      : state !== 'present'
-        ? t(($) => $.moderation.state[state])
-        : item.target.kind === 'member'
-          ? t(($) => $.moderation.profileNoRemove)
-          : undefined
+    const author = record ? `${record.name} (@${record.handle})` : null
+    const where = item.context?.title ?? null
+    if (author && where) return t(($) => $.moderation.authorOn, { name: author, title: where })
+    return author ?? where ?? undefined
+  }
+
+  // L'heure qu'il est, lue une fois la page hydratée (sinon le pré-rendu et le navigateur
+  // écriraient deux textes différents, #418).
+  const now = hydrated ? new Date() : null
+
+  const queueEntry = ({ key, item }: Shown<ModerationQueueItem>) => {
+    const kind = t(($) => $.moderation.kinds[item.target.kind])
+    const when = now ? relativeDate(item.firstReportedAt, i18n.language, now) : null
+    const record = item.authorRecord
+    const status = item.concernsMe ? t(($) => $.moderation.concernsMe) : undefined
     return (
       <ReportCard
         key={key}
-        {...cardState(key, kind, firstText(item.snapshot), outcome)}
-        // Ce qui concerne l'administrateur lui-même : il n'en décide pas, le rappel de ses propres
-        // décisions n'aurait rien à éclairer.
-        record={item.concernsMe ? undefined : recordOf(item)}
-        detailsLabel={t(($) => $.moderation.detailsLabel)}
         kind={kind}
+        part={item.part ? partText(item.part, t, item.target.kind) : null}
+        icon={kindIcon[item.target.kind]}
         count={item.count}
-        // Tranche 7b : la copie champ par champ, chacun sous son libellé ; une copie d'avant 7b
-        // n'a qu'un champ, « Texte ». Les images ne sont dites que par leur état.
-        snapshot={item.snapshot.filter(isTextEntry).map(({ field, value }) => ({
-          label: t(($) => $.moderation.fields[field]),
-          value,
-        }))}
-        snapshotLabel={t(($) => $.moderation.snapshot)}
-        snapshotNote={item.snapshotsDiffer ? t(($) => $.moderation.snapshotsDiffer) : undefined}
-        images={imageLines(item.images, t)}
-        pictures={pictures(item.images, t, mediaSource)}
-        reasons={item.reasons.map(({ reason, count }) =>
-          t(($) => $.moderation.reasonCount, {
-            reason: t(($) => $.report.reasons[reasonTextKey[reason]]),
-            count,
-          }),
+        reportedAt={when ? { relative: when.label, exact: when.full } : undefined}
+        snapshot={excerpt(firstText(item.snapshot), QUEUE_EXCERPT)}
+        reasons={item.reasons.map(({ reason }) =>
+          t(($) => $.report.reasons[reasonTextKey[reason]]),
         )}
-        details={item.details}
-        when={t(($) => $.moderation.since, {
-          date: shortDate(item.firstReportedAt, i18n.language),
-        })}
+        context={contextOf(item)}
+        recentAccount={Boolean(now && record && isRecentAccount(record.joinedAt, now))}
         {...(status ? { status } : null)}
-        viewLabel={t(($) => $.moderation.view)}
-        onView={() => router.push(viewHref(item.target, item.projectId))}
-        actions={actions}
+        description={t(($) => $.moderation.describe, {
+          kind,
+          excerpt: detailTitle(item, t),
+        })}
+        when=""
+        href={`/moderation?item=${encodeURIComponent(key)}`}
+        current={key === chosen?.key}
+        onSelect={() => choose(key)}
       />
     )
   }
 
-  const removedCard = ({ key, index, item, outcome }: Shown<RemovedItem>) => {
+  const removedEntry = ({ key, item }: Shown<RemovedItem>) => {
     const kind = t(($) => $.moderation.kinds[item.target.kind])
     return (
       <ReportCard
         key={key}
-        {...cardState(key, kind, item.text, outcome)}
         kind={kind}
-        snapshot={item.text}
+        part={item.part ? partText(item.part, t, item.target.kind) : null}
+        icon={kindIcon[item.target.kind]}
+        snapshot={excerpt(item.text, QUEUE_EXCERPT)}
         reasons={[t(($) => $.moderation.grounds[item.ground])]}
-        details={[item.explanation]}
-        when={t(($) => $.moderation.removedOn, { date: shortDate(item.removedAt, i18n.language) })}
+        context={t(($) => $.moderation.removedOn, {
+          date: shortDate(item.removedAt, i18n.language),
+        })}
         {...(item.concernsMe ? { status: t(($) => $.moderation.concernsMe) } : null)}
-        // Un projet retiré n'a plus de page, même pour l'administrateur : pas de lien. Une note ou
-        // un commentaire retiré : on va voir le projet qui le portait (le contenu n'y est plus).
-        {...(item.target.kind === 'project'
-          ? null
-          : {
-              viewLabel: t(($) => $.moderation.viewProject),
-              onView: () => router.push(viewHref(item.target, item.projectId)),
-            })}
-        actions={
-          item.concernsMe
-            ? []
-            : [
-                {
-                  label: t(($) => $.moderation.restore),
-                  loading: pending === key,
-                  onPress: guarded(
-                    () =>
-                      void run(
-                        { action: 'restore', target: item.target },
-                        t(($) => $.moderation.restoredDone),
-                        (done) => settle(setDecidedRemoved, { key, index, item, outcome: done }),
-                      ),
-                  ),
-                },
-              ]
-        }
+        description={t(($) => $.moderation.describe, { kind, excerpt: detailTitle(item, t) })}
+        when=""
+        href={`/moderation?tab=removed&item=${encodeURIComponent(key)}`}
+        current={key === chosen?.key}
+        onSelect={() => choose(key)}
       />
     )
   }
 
   const showsError = (!list.data && list.isError) || (retrying && !list.data)
 
-  // Le membre filtré, nommé par son pseudo tel que les décisions le donnent ; un compte parti
-  // n'a plus de pseudo : « ce membre ».
-  const filteredHandle = decisions.find(({ member }) => member?.id === memberFilter)?.member?.handle
-
-  /** « Tout voir » : l'adresse perd son filtre ; le focus revient aux onglets (le lien disparaît). */
-  const seeAll = () => {
-    router.setParams({ member: undefined })
-    requestAnimationFrame(() => tabsRef.current?.focusChecked())
-  }
-
-  /** « Voir » d'une décision : la page du membre, ou celle du projet qui porte le contenu. */
-  const viewDecision = (decision: (typeof decisions)[number]) =>
-    decision.target.kind === 'member'
-      ? decision.member && router.push(viewHref(decision.target, null))
-      : decision.projectId && router.push(viewHref(decision.target, decision.projectId))
-
-  return (
-    <Screen header={<TopNav />} onBack={back} title={t(($) => $.moderation.title)}>
-      <Segmented<Tab>
-        label={t(($) => $.moderation.list)}
-        options={[
-          { value: 'pending', label: t(($) => $.moderation.pending) },
-          { value: 'removed', label: t(($) => $.moderation.removed) },
-          { value: 'history', label: t(($) => $.moderation.history) },
+  /** L'état de la liste : erreur, chargement, vide, ou la liste et sa suite. */
+  const listBody = (entries: () => ReactNode) =>
+    showsError ? (
+      <StateMessage
+        kind="error"
+        title={t(($) => $.moderation.errorTitle)}
+        message={t(($) => $.errors[errorKey(list.error)])}
+        actions={[
+          { label: t(($) => $.common.retry), onPress: () => void onRetry(), loading: retrying },
         ]}
-        value={tab}
-        onChange={changeTab}
-        handle={tabsRef}
       />
+    ) : !list.data ? (
+      <StateMessage kind="loading" message={t(($) => $.common.loading)} />
+    ) : count === 0 ? (
+      <StateMessage
+        kind="empty"
+        message={
+          tab === 'pending'
+            ? t(($) => $.moderation.empty)
+            : tab === 'removed'
+              ? t(($) => $.moderation.emptyRemoved)
+              : t(($) => $.moderation.emptyHistory)
+        }
+      />
+    ) : (
+      <Stack gap="lg">
+        {/* Une liste annoncée : « liste, 4 éléments », et on saute d'un élément à l'autre. */}
+        <Stack gap="sm" accessibilityRole="list" firstArrived={arrived}>
+          {entries()}
+        </Stack>
+        <FeedEnd
+          state={
+            list.isFetchingNextPage
+              ? 'loading'
+              : list.isFetchNextPageError
+                ? 'error'
+                : list.hasNextPage
+                  ? 'more'
+                  : 'end'
+          }
+          moreLabel={t(($) => $.moderation.more)}
+          errorLabel={t(($) => $.moderation.moreError)}
+          retryLabel={t(($) => $.common.retry)}
+          firstArrived={arrived.ref}
+          // Une seule demande à la fois, même après un double clic.
+          onMore={() => {
+            if (!list.isFetchingNextPage) void list.fetchNextPage()
+          }}
+        />
+      </Stack>
+    )
 
-      {/* R6b : les pages du catalogue, sous les onglets (relecture du plan, point 15). Chaque
-          ligne est un vrai lien (`href`, un `<a>` sur le web), et dit ce qu'on trouve derrière :
-          la précision se voit sous le nom, et se lit après lui (`hint`). */}
+  const queueColumn = (
+    <Stack gap="lg">
+      {/* R6b : les pages du catalogue, en tête de la file. Chaque ligne est un vrai lien (`href`,
+          un `<a>` sur le web), et dit ce qu'on trouve derrière (`hint`). */}
       <ListGroup>
         <ListRow
           label={t(($) => $.moderation.toolsLink)}
@@ -662,168 +558,285 @@ function AdminModeration() {
           }}
         />
       </ListGroup>
+      <Segmented<Tab>
+        label={t(($) => $.moderation.list)}
+        options={[
+          {
+            value: 'pending',
+            label: t(($) => $.moderation.pendingCount, { count: queueItems.length }),
+          },
+          { value: 'removed', label: t(($) => $.moderation.removed) },
+        ]}
+        value={tab}
+        onChange={(next) => {
+          // L'élément choisi appartient à l'autre onglet : l'adresse l'oublie.
+          if (itemParam || tabParam) router.setParams({ tab: undefined, item: undefined })
+          changeTab(next)
+        }}
+      />
+      {listBody(() =>
+        tab === 'removed' ? shownRemoved.map(removedEntry) : shownQueue.map(queueEntry),
+      )}
+    </Stack>
+  )
 
-      {/* Le filtre de l'historique, sous les onglets : qui il vise, et comment l'enlever. */}
-      {tab === 'history' && memberFilter && history.data ? (
+  // --- Le détail ---
+
+  /** Les décisions possibles sur un élément de la file. */
+  const queueActions = ({ key, index, item }: Shown<ModerationQueueItem>): ReportCardAction[] => {
+    if (item.concernsMe) return []
+    const actions: ReportCardAction[] = []
+    // Un profil entier ne se retire pas (l'API le refuse) ; un contenu déjà retiré ou disparu non
+    // plus. La partie d'un profil (sa bio, sa photo), si.
+    if ((item.target.kind !== 'member' || item.part) && item.state === 'present') {
+      actions.push({
+        label: t(($) => $.moderation.remove),
+        tone: 'danger',
+        onPress: guarded(() => {
+          setRemoving({ key, index, item })
+          setRemoveOpen(true)
+        }),
+      })
+    }
+    actions.push({
+      label: t(($) => $.moderation.dismiss),
+      loading: pending === key,
+      onPress: guarded(
+        () =>
+          void run(
+            key,
+            { action: 'dismiss', target: item.target, ...sentPart(item.part) },
+            t(($) => $.moderation.dismissed),
+            (done) => settle(setDecidedQueue, { key, index, item, outcome: done }),
+          ),
+      ),
+    })
+    return actions
+  }
+
+  /** « Rétablir » un contenu retiré. */
+  const removedActions = ({ key, index, item }: Shown<RemovedItem>): ReportCardAction[] =>
+    item.concernsMe
+      ? []
+      : [
+          {
+            label: t(($) => $.moderation.restore),
+            loading: pending === key,
+            onPress: guarded(
+              () =>
+                void run(
+                  key,
+                  { action: 'restore', target: item.target, ...sentPart(item.part) },
+                  t(($) => $.moderation.restoredDone),
+                  (done) => settle(setDecidedRemoved, { key, index, item, outcome: done }),
+                ),
+            ),
+          },
+        ]
+
+  const detailOf = (entry: Shown<ModerationQueueItem | RemovedItem>) => {
+    const shared = {
+      outcome: entry.outcome,
+      outcomeRef: entry.key === lastDecided ? outcomeRef : undefined,
+      error: failures[entry.key],
+    }
+    const item = entry.item
+    if (!('authorRecord' in item)) {
+      const removedEntryShown = { ...entry, item }
+      return (
+        <ModerationDetail
+          key={entry.key}
+          tab="removed"
+          item={item}
+          actions={removedActions(removedEntryShown)}
+          // Un projet retiré n'a plus de page, même pour l'administrateur : pas de lien. Une note ou
+          // un commentaire retiré : on va voir le projet qui le portait (le contenu n'y est plus).
+          onView={
+            item.target.kind === 'project'
+              ? null
+              : () => router.push(viewHref(item.target, item.projectId))
+          }
+          {...shared}
+        />
+      )
+    }
+    const record = item.authorRecord
+    const memberId = record?.memberId
+    return (
+      <ModerationDetail
+        key={entry.key}
+        tab="pending"
+        item={item}
+        actions={queueActions({ ...entry, item })}
+        onView={() => router.push(viewHref(item.target, item.projectId))}
+        // Suspendre l'auteur (ou le membre lui-même, pour un profil), quand l'API le permet : pas
+        // l'administrateur qui regarde, ni un autre administrateur, ni un membre déjà suspendu.
+        onSuspend={
+          record?.canSuspend && !item.concernsMe && memberId
+            ? guarded(() => openSuspend(item, memberId))
+            : null
+        }
+        onSeeDecisions={memberId ? () => openHistory(memberId) : null}
+        {...shared}
+      />
+    )
+  }
+
+  const detailColumn = unknown ? (
+    <StateMessage
+      kind="empty"
+      level={2}
+      message={t(($) => $.moderation.detail.unknown)}
+      actions={[{ label: t(($) => $.moderation.detail.backToQueue), onPress: leaveItem }]}
+    />
+  ) : chosen ? (
+    detailOf(chosen)
+  ) : !list.data && !columns ? (
+    listBody(() => null)
+  ) : null
+
+  // --- L'historique ---
+
+  /** « Voir » d'une décision : la page du membre, ou celle du projet qui porte le contenu. */
+  const viewDecision = (decision: (typeof decisions)[number]) =>
+    decision.target.kind === 'member'
+      ? decision.member && router.push(viewHref(decision.target, null))
+      : decision.projectId && router.push(viewHref(decision.target, decision.projectId))
+
+  // Les dernières décisions, une ligne colorée chacune, à droite du détail (ordinateur).
+  const recentColumn = (
+    <Stack gap="md">
+      <Stack gap="xxs">
+        <Text variant="headline" heading={2}>
+          {t(($) => $.moderation.recent.title)}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {t(($) => $.moderation.recent.order)}
+        </Text>
+      </Stack>
+      {history.data ? (
+        decisions.length > 0 ? (
+          <Stack gap="sm" accessibilityRole="list">
+            {decisions.slice(0, RECENT_DECISIONS).map((decision) => (
+              <DecisionCard key={decision.id} decision={decision} compact />
+            ))}
+          </Stack>
+        ) : (
+          <Text variant="callout" tone="secondary">
+            {t(($) => $.moderation.emptyHistory)}
+          </Text>
+        )
+      ) : history.isError ? (
+        <Text variant="callout" tone="secondary">
+          {t(($) => $.errors[errorKey(history.error)])}
+        </Text>
+      ) : null}
+      <TextLink label={t(($) => $.moderation.recent.all)} onPress={() => openHistory()} />
+    </Stack>
+  )
+
+  // Le membre filtré, nommé par son pseudo tel que les décisions le donnent ; un compte parti
+  // n'a plus de pseudo : « ce membre ».
+  const filteredHandle = decisions.find(({ member }) => member?.id === memberFilter)?.member?.handle
+
+  const historyView = (
+    <Stack gap="lg">
+      <Text variant="title2" heading={2} focusRef={historyTitleRef}>
+        {t(($) => $.moderation.recent.title)}
+      </Text>
+      {/* Le filtre de l'historique : qui il vise, et comment l'enlever. */}
+      {memberFilter && history.data ? (
         <Stack direction="row" wrap align="center" justify="between" gap="md">
           <Text variant="callout" weight={600}>
             {filteredHandle
               ? t(($) => $.moderation.historyFor, { handle: filteredHandle })
               : t(($) => $.moderation.historyForGone)}
           </Text>
-          <TextLink role="button" label={t(($) => $.moderation.historyAll)} onPress={seeAll} />
-        </Stack>
-      ) : null}
-
-      {showsError ? (
-        <StateMessage
-          kind="error"
-          title={t(($) => $.moderation.errorTitle)}
-          message={t(($) => $.errors[errorKey(list.error)])}
-          actions={[
-            { label: t(($) => $.common.retry), onPress: () => void onRetry(), loading: retrying },
-          ]}
-        />
-      ) : !list.data ? (
-        <StateMessage kind="loading" message={t(($) => $.common.loading)} />
-      ) : count === 0 ? (
-        <StateMessage
-          kind="empty"
-          message={
-            tab === 'pending'
-              ? t(($) => $.moderation.empty)
-              : tab === 'removed'
-                ? t(($) => $.moderation.emptyRemoved)
-                : t(($) => $.moderation.emptyHistory)
-          }
-        />
-      ) : (
-        <Stack gap="lg">
-          {/* Une liste annoncée : « liste, 4 éléments », et on saute d'une carte à l'autre. */}
-          <Stack gap="md" accessibilityRole="list" firstArrived={arrived}>
-            {tab === 'pending'
-              ? shownQueue.map(queueCard)
-              : tab === 'removed'
-                ? shownRemoved.map(removedCard)
-                : decisions.map((decision) => (
-                    <DecisionCard
-                      key={decision.id}
-                      decision={decision}
-                      onView={() => viewDecision(decision)}
-                    />
-                  ))}
-          </Stack>
-          <FeedEnd
-            state={
-              list.isFetchingNextPage
-                ? 'loading'
-                : list.isFetchNextPageError
-                  ? 'error'
-                  : list.hasNextPage
-                    ? 'more'
-                    : 'end'
-            }
-            moreLabel={t(($) => $.moderation.more)}
-            errorLabel={t(($) => $.moderation.moreError)}
-            retryLabel={t(($) => $.common.retry)}
-            firstArrived={arrived.ref}
-            // Une seule demande à la fois, même après un double clic.
-            onMore={() => {
-              if (!list.isFetchingNextPage) void list.fetchNextPage()
+          <TextLink
+            role="button"
+            label={t(($) => $.moderation.historyAll)}
+            onPress={() => {
+              router.setParams({ member: undefined })
+              requestAnimationFrame(() => focusWithoutScroll(historyTitleRef.current))
             }}
           />
         </Stack>
-      )}
-
-      <Dialog
-        visible={removeOpen}
-        title={t(($) => $.moderation.removeTitle)}
-        // Le contenu visé, rappelé sous le titre : la fenêtre couvre la carte qu'on a touchée.
-        quote={
-          removing
-            ? {
-                label: t(($) => $.moderation.kinds[removing.item.target.kind]),
-                text: firstText(removing.item.snapshot),
-              }
-            : undefined
-        }
-        message={t(($) => $.moderation.removeMessage)}
-        // La fenêtre s'ouvre sous le doigt qui vient de toucher « Retirer » : ses boutons ignorent
-        // la seconde tape d'une double tape (design 7b).
-        guardTaps
-        onDismiss={closeRemove}
-        initialFocusRef={groundRef}
-        onClosed={() => {
-          if (!focusAfterClose.current) return
-          focusAfterClose.current = false
-          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
-          // Le focus va au résultat posé sur la carte, à la place de ses boutons.
-          requestAnimationFrame(() => focusWithoutScroll(outcomeRef.current))
-        }}
-      >
-        <Choices<RemovalGround>
-          label={t(($) => $.moderation.groundLabel)}
-          options={[
-            { value: 'illegal', label: t(($) => $.moderation.grounds.illegal) },
-            { value: 'rules', label: t(($) => $.moderation.grounds.rules) },
-          ]}
-          value={ground}
-          onChange={setGround}
-          entryRef={groundRef}
-        />
-        <TextField
-          label={t(($) => $.moderation.explanation)}
-          value={explanation}
-          onChangeText={setExplanation}
-          hint={t(($) => $.moderation.explanationHint)}
-          error={fieldError ?? undefined}
-          multiline
-          maxLength={REMOVAL_EXPLANATION_MAX}
-          showCount
-        />
-        {/* Le mot de passe redemandé par l'API : le champ arrive au-dessus du bouton, qui devient
-            « Confirmer », inactif tant que rien n'est tapé (une double tape sur « Retirer » ne
-            confirme rien). */}
-        {passwordAsked ? (
-          <TextField
-            label={t(($) => $.moderation.password.label)}
-            value={password}
-            onChangeText={setPassword}
-            hint={t(($) => $.moderation.password.hint, {
-              suspensions: SUSPENSIONS_BEFORE_PASSWORD,
-              removals: REMOVALS_BEFORE_PASSWORD,
-            })}
-            secureTextEntry
-            autoComplete="current-password"
-            textContentType="password"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoFocus
+      ) : null}
+      {listBody(() =>
+        decisions.map((decision) => (
+          <DecisionCard
+            key={decision.id}
+            decision={decision}
+            onView={() => viewDecision(decision)}
           />
-        ) : null}
-        {dialogError ? <Notice message={dialogError} /> : null}
-        <Button
-          key={passwordAsked ? 'password' : 'remove'}
-          label={
-            passwordAsked
-              ? t(($) => $.moderation.password.confirm)
-              : t(($) => $.moderation.confirmRemove)
+        )),
+      )}
+      <TextLink
+        role="button"
+        label={t(($) => $.moderation.detail.backToQueue)}
+        onPress={closeHistory}
+      />
+    </Stack>
+  )
+
+  // --- La page ---
+
+  // Sur téléphone, le détail ouvert (ou l'historique) occupe la page ; son « Retour » revient à
+  // la file.
+  const phoneDetail = !columns && tab !== 'history' && itemParam !== undefined
+  const body =
+    tab === 'history' ? (
+      historyView
+    ) : columns ? (
+      <Columns sideFirst side={queueColumn} main={detailColumn} aside={recentColumn} />
+    ) : phoneDetail ? (
+      detailColumn
+    ) : (
+      queueColumn
+    )
+
+  return (
+    <Screen
+      header={<TopNav />}
+      onBack={tab === 'history' ? closeHistory : phoneDetail ? backToQueue : back}
+      title={t(($) => $.moderation.title)}
+      // Toute la largeur, pour les trois colonnes sur ordinateur (une colonne sur téléphone).
+      width="page"
+      {...(phoneDetail ? null : { subtitle: t(($) => $.moderation.subtitle) })}
+      titleAside={<StatusPill label={t(($) => $.moderation.adminOnly)} />}
+      // Sur téléphone, l'historique a son bouton en haut de la file (planche R9-Moderation-Telephone).
+      {...(!columns && tab !== 'history' && !phoneDetail
+        ? {
+            topAction: (
+              <Button
+                label={t(($) => $.moderation.recent.title)}
+                variant="secondary"
+                size="compact"
+                onPress={() => openHistory()}
+              />
+            ),
           }
-          variant="confirm"
-          onPress={() => void confirmRemove()}
-          loading={submitting}
-          // Impossible de retirer sans fondement ni explication (l'auteur doit savoir pourquoi).
-          disabled={
-            ground === null || explanation.trim() === '' || (passwordAsked && password === '')
-          }
+        : null)}
+    >
+      {body}
+      {removing ? (
+        <RemoveSheet
+          item={removing.item}
+          open={removeOpen}
+          onClose={() => setRemoveOpen(false)}
+          onDone={() => {
+            settledAt.current = Date.now()
+            focusOutcome.current = true
+            settle(setDecidedQueue, {
+              key: removing.key,
+              index: removing.index,
+              item: removing.item,
+              outcome: { message: t(($) => $.moderation.removedDone), ok: true },
+            })
+            setRemoveOpen(false)
+          }}
         />
-        <Button
-          label={t(($) => $.moderation.cancel)}
-          variant="secondary"
-          onPress={closeRemove}
-          disabled={submitting}
-        />
-      </Dialog>
+      ) : null}
     </Screen>
   )
 }

@@ -4,7 +4,7 @@
 // « Annuler » coûtait un Tab de plus, entendu avant le formulaire. Une fenêtre à champs obligatoires
 // s'ouvre donc sur son premier champ : le groupe « Fondement », par son premier choix. Mêmes
 // simulations que ModerationScreen.test.tsx, en plus court.
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import {
   useDecide,
   useDecisionHistory,
@@ -21,7 +21,7 @@ import {
   scamCommentItem,
 } from '../testing/moderation'
 import { watchOpeningFocus } from '../testing/openingFocus'
-import { mockSession, renderWithProviders } from '../testing/render'
+import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import { ModerationScreen } from './ModerationScreen'
 
@@ -92,15 +92,19 @@ afterEach(() => {
 
 describe('the « Retirer » window opening focus', () => {
   it('opens on the first choice of « Fondement », not on « Annuler » or « Retirer »', async () => {
-    await renderWithProviders(<ModerationScreen />)
-    await screen.findByText(firstTextOf(scamCommentItem))
-    const focused = watchOpeningFocus()
+    // R9 (test adapté à l'écran refait) : « Retirer » est dans le détail de l'élément ; sur un grand
+    // écran, le détail montre le premier élément de la file, le commentaire de Sam.
+    const restoreWindow = setDesktopWindow()
+    try {
+      await renderWithProviders(<ModerationScreen />)
+      await screen.findByText(firstTextOf(scamCommentItem))
+      const focused = watchOpeningFocus()
 
-    let card = screen.getByText(firstTextOf(scamCommentItem)).parent
-    while (card && within(card).queryAllByRole('link').length === 0) card = card.parent
-    if (!card) throw new Error('no card')
-    await fireEvent.press(within(card).getByRole('button', { name: 'Retirer' }))
+      await fireEvent.press(screen.getByRole('button', { name: 'Retirer' }))
 
-    await waitFor(() => expect(focused()).toBe(fr.t(($) => $.moderation.grounds.illegal)))
+      await waitFor(() => expect(focused()).toBe(fr.t(($) => $.moderation.grounds.illegal)))
+    } finally {
+      restoreWindow()
+    }
   })
 })

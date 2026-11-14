@@ -35,6 +35,7 @@ import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useMember } from '../members/api'
 import { useSignInAgain } from '../navigation/signInAgain'
+import { isRecentAccount } from '../ui/AuthorRecord'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
@@ -226,18 +227,17 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
 
 /** La photo du membre sous le titre : la taille d'une ligne de liste (SearchScreen), 48 points. */
 const AVATAR_SIZE = 48
-/** « Compte récent » : inscrit depuis moins de 14 jours (la fiche de l'auteur, contrat de la file). */
-const RECENT_ACCOUNT_DAYS = 14
-const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
- * Hook : vrai si le compte a moins de 14 jours. La date du jour ne se lit qu'une fois la page
- * hydratée (web) : `Date.now()` au pré-rendu différerait du navigateur (#418).
+ * Hook : vrai si le compte a moins de 14 jours (« Compte récent », la règle et son seuil vivent
+ * dans `ui/AuthorRecord.tsx`, un seul endroit pour la fiche, la file et cette fenêtre). La date du
+ * jour ne se lit qu'une fois la page hydratée (web) : `Date.now()` au pré-rendu différerait du
+ * navigateur (#418).
  */
 const useRecentAccount = (joinedAt: string | undefined): boolean => {
   const hydrated = useHydrated()
   if (!joinedAt || !hydrated) return false
-  return Date.now() - Date.parse(joinedAt) < RECENT_ACCOUNT_DAYS * DAY_MS
+  return isRecentAccount(joinedAt, new Date())
 }
 
 /** Le sous-titre de la planche, ou rien sans la fiche de l'auteur. */

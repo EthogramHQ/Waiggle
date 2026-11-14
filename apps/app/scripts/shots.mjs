@@ -3594,14 +3594,31 @@ const pages = [
     signedIn: true,
     admin: true,
     fullPage: true,
+    // R9 : la file des retirés ; sur ordinateur, le détail du premier, avec « Rétablir ».
     prepare: async (page) => {
       await page.getByRole('radio', { name: 'Retirés' }).click()
-      await page.getByRole('button', { name: 'Rétablir' }).first().waitFor()
+      await page
+        .getByRole('link', { name: /Retiré le/ })
+        .first()
+        .waitFor()
     },
   },
+  // R9 : le détail d'un élément de la file (planche R9-Moderation-Detail-Telephone) : en page sur
+  // téléphone, au milieu des trois colonnes sur ordinateur.
+  {
+    name: 'moderation-detail',
+    path: `/moderation?item=comment:${scamCommentItem.target.id}`,
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Classer sans suite' }).waitFor()
+    },
+  },
+  // R9 : la feuille « Retirer » ouverte depuis le détail (planche R9-Retirer).
   {
     name: 'moderation-retirer',
-    path: '/moderation',
+    path: `/moderation?item=comment:${scamCommentItem.target.id}`,
     signedIn: true,
     admin: true,
     prepare: async (page) => {
