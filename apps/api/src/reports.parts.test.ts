@@ -164,7 +164,8 @@ const expectError = async (res: Response, status: number, code: string) => {
 const expectSameNotFound = async (res: Response, reference: Response) => {
   expect(res.status).toBe(404)
   expect(reference.status).toBe(404)
-  expect(await res.json()).toEqual(await reference.json())
+  // clone : la même référence sert à chaque tour de boucle, son corps ne se lit qu'une fois.
+  expect(await res.json()).toEqual(await reference.clone().json())
 }
 
 /** Les signalements gardés en base, du plus ancien au plus récent. */
