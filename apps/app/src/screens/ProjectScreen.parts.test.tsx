@@ -38,6 +38,7 @@ import { pathOf } from '../testing/navigation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import { ToastProvider } from '../ui/theme/toast'
 import { ProjectScreen } from './ProjectScreen'
 import {
   dialogTitled,
@@ -197,12 +198,23 @@ const T = {
 /** Ouvre la page du projet et attend son titre. */
 const openProject = async (project: Project) => {
   jest.mocked(getProject).mockResolvedValue(project)
-  await renderWithProviders(<ProjectScreen id={id} />)
+  // ToastProvider : la bulle « Projet passé en privé » n'apparaît qu'avec lui (comme ProjectScreen.testers).
+  await renderWithProviders(
+    <ToastProvider>
+      <ProjectScreen id={id} />
+    </ToastProvider>,
+  )
   await screen.findByRole('header', { name: T.title })
 }
 
 /** La notice d'une partie retirée : le groupe nommé par son titre. */
-const part = (title: string) => within(screen.getByRole('group', { name: title }))
+// Cherché par son nom, puis son rôle vérifié : getByRole exigerait une vue accessible, qui sur iOS
+// cacherait à VoiceOver les boutons et le lien de la notice (comme RemovedPart.test.tsx).
+const part = (title: string) => {
+  const found = screen.getByLabelText(title)
+  expect(found.props.role ?? found.props.accessibilityRole).toBe('group')
+  return within(found)
+}
 
 /** Vrai si ce texte est écrit dans la notice, blancs de la typographie française compris. */
 const inPart = (title: string, text: string) =>

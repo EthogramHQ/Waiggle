@@ -3808,6 +3808,14 @@ const pages = [
   { name: 'modifier', path: `${project}/edit`, signedIn: true, fullPage: true },
   // Le projet avec ses photos : couverture verticale sur téléphone, vignettes, éditeur des photos.
   { name: 'projet-photos', path: `/projects/${photosProject.id}`, signedIn: true, fullPage: true },
+  // R9 : la 2e photo retirée seule ; Léa, son autrice, la voit avec la notice et « Contester ».
+  {
+    name: 'projet-partie-retiree',
+    path: `/projects/${photosProject.id}`,
+    signedIn: true,
+    moderation: 'part-removed',
+    fullPage: true,
+  },
   {
     name: 'modifier-photos',
     path: `/projects/${photosProject.id}/edit`,
