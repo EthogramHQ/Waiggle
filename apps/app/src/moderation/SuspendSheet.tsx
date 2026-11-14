@@ -25,6 +25,7 @@ import {
   RemovalExplanation,
   type RemovalGround,
   type ReportTarget,
+  SUSPENSION_DAYS,
   SUSPENSIONS_BEFORE_PASSWORD,
   type SuspensionDuration,
 } from '@ruche/contracts'
@@ -43,7 +44,8 @@ import { Choices } from '../ui/Choices'
 import { DiscardDialog } from '../ui/DiscardDialog'
 import { Hint } from '../ui/Hint'
 import { parisDateTime } from '../ui/parisTime'
-import { Sheet, type SheetNotice } from '../ui/Sheet'
+import { RemovalNotice } from '../ui/RemovalNotice'
+import { Sheet, type SheetNotice, useSheetAside } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
@@ -102,9 +104,13 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
     : t(($) => $.moderation.suspendAction)
 
   // Le sous-titre de la planche : le pseudo, l'inscription, ce qui a déjà été décidé ; sans la
-  // fiche de la file (ouverte depuis la page du membre), le pseudo seul.
+  // fiche de la file (aucune carte de la file ne vise ce membre, voir app/suspend.tsx), le pseudo
+  // seul.
   const authorLine = useAuthorLine(author)
   const recent = useRecentAccount(author?.joinedAt)
+  // La feuille posera-t-elle sa colonne `aside` à côté du formulaire ? (Sinon l'aperçu va dessous,
+  // comme dans RemoveSheet.)
+  const besideRoom = useSheetAside()
 
   // Ce que la fenêtre peut offrir : un formulaire, ou la raison pour laquelle il n'y en a pas.
   const failureKey = member.error ? errorKey(member.error) : null
@@ -139,6 +145,7 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
   // ne s'animerait pas, et le focus posé dans la première se perdrait).
   const form = useDecisionForm({
     open,
+    besideRoom,
     onClose,
     mode,
     member: body === 'form' ? (data ?? null) : null,
@@ -181,6 +188,9 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
         // La fenêtre s'ouvre sous le doigt de « Suspendre » : ses boutons ignorent une double tape.
         guardTaps
         {...(form ? form.sheet : null)}
+        // Sur ordinateur, l'aperçu « Ce que lira … » dans la colonne à droite du formulaire ; quand
+        // la fenêtre n'a pas la place de la poser (téléphone, fenêtre étroite), il vient dessous.
+        {...(form?.preview && besideRoom ? { aside: form.preview } : null)}
       >
         {form ? (
           <Stack gap="lg">
@@ -271,12 +281,15 @@ const useAuthorLine = (author: SuspendSheetAuthor | undefined): string | undefin
  */
 function useDecisionForm({
   open,
+  besideRoom,
   onClose,
   mode,
   member,
   fromReport,
 }: {
   open: boolean
+  /** La feuille pose sa colonne `aside` à côté du formulaire : l'aperçu y va, pas dessous. */
+  besideRoom: boolean
   onClose: () => void
   mode: Mode
   member: Member | null
@@ -290,6 +303,8 @@ function useDecisionForm({
     onClose: () => void
   }
   content: ReactNode
+  /** L'aperçu « Ce que lira … », pour la colonne `aside` (sinon il est déjà dans `content`). */
+  preview: ReactNode
   /** La fenêtre « Abandonner ? », posée par-dessus la feuille. */
   layers: ReactNode
 } | null {
@@ -432,8 +447,40 @@ function useDecisionForm({
         })
     : null
 
+  // « Ce que lira Sam » (planche R9-Suspendre, comme la feuille « Retirer ») : la notification que
+  // le membre recevra, telle que le formulaire la remplit (notifications/present.ts, `suspended`) :
+  // la mesure et sa fin, qui a décidé et après quoi, le fondement et l'explication quand ils sont
+  // choisis et écrits, puis comment contester. La fin est celle d'une suspension posée maintenant
+  // (l'API la compte de l'heure de la pose, à la minute près la même). Pas d'aperçu pour une levée :
+  // le membre n'y lit que la fin de sa suspension.
+  const end = duration && duration !== 'indefinite' ? suspensionEnd(duration, i18n.language) : null
+  const preview =
+    member && suspending ? (
+      <Stack gap="md">
+        <Text variant="callout" weight={600} heading={3}>
+          {t(($) => $.moderation.removeSheet.preview, { name: member.name })}
+        </Text>
+        <RemovalNotice
+          title={
+            end
+              ? t(($) => $.notifications.suspended, { date: end.date, time: end.time })
+              : duration === 'indefinite'
+                ? t(($) => $.notifications.suspendedIndefinite)
+                : t(($) => $.suspension.title)
+          }
+          lines={[
+            fromReport ? t(($) => $.suspension.afterReport) : t(($) => $.suspension.direct),
+            ...(ground ? [t(($) => $.removal.grounds[ground])] : []),
+            ...(text ? [t(($) => $.suspension.explanation, { explanation: text })] : []),
+            t(($) => $.suspension.contest),
+          ]}
+        />
+      </Stack>
+    ) : null
+
   if (!member) return null
   return {
+    preview,
     sheet: {
       busy: sending,
       notice,
@@ -574,7 +621,19 @@ function useDecisionForm({
             }
           />
         ) : null}
+
+        {besideRoom ? null : preview}
       </Stack>
     ),
   }
 }
+
+/** Un jour, en millisecondes. */
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * La fin d'une suspension de `duration` posée maintenant, à l'heure de Paris, comme la notification
+ * l'écrira (l'API ajoute les jours à l'heure de la pose, apps/api/src/moderation/suspend.ts).
+ */
+const suspensionEnd = (duration: keyof typeof SUSPENSION_DAYS, language: string) =>
+  parisDateTime(new Date(Date.now() + SUSPENSION_DAYS[duration] * DAY_MS).toISOString(), language)

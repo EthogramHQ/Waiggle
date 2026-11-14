@@ -824,6 +824,11 @@ function AdminModeration() {
           item={removing.item}
           open={removeOpen}
           onClose={() => setRemoveOpen(false)}
+          // Après un retrait, le focus va au résultat (« Contenu retiré. ») : le bouton « Retirer »
+          // qui a ouvert la feuille a disparu, et la feuille, qui rend le focus à son ouvreur à la
+          // fermeture puis encore à la fin de son fondu, le laissait sur la page (R9, C8). Sans
+          // décision, aucun résultat n'est monté (null) : le focus revient à « Retirer ».
+          returnFocusTo={() => outcomeRef.current}
           onDone={() => {
             settledAt.current = Date.now()
             focusOutcome.current = true

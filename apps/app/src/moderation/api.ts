@@ -77,6 +77,36 @@ export const useModerationQueue = (enabled = true) =>
     refetchOnReconnect: false,
   })
 
+/**
+ * Hook : ce que la file sait du membre `memberId` (`authorRecord` : pseudo, inscription, retraits et
+ * suspensions déjà décidés), ou `undefined` si aucune de ses cartes lues ne le vise. La fenêtre
+ * « Suspendre » en écrit son sous-titre (R9, C10) : elle a sa propre adresse (`/suspend`), et ne
+ * recevait pas la fiche que la file a pourtant en main. Elle la retrouve ici, quel que soit le
+ * chemin : la file déjà lue (la fenêtre ouverte depuis la modération), ou lue pour elle (un lien
+ * direct, la page du membre). Une file déjà lue ne se relit pas à l'ouverture de la fenêtre
+ * (`refetchOnMount: false`) : elle est affichée dessous, et rien ne doit y bouger. `enabled` : faux
+ * avant l'hydratation et sans session (rien n'est demandé).
+ */
+export const useQueueAuthor = (memberId: string, enabled: boolean) => {
+  const queue = useInfiniteQuery({
+    queryKey: queueKey,
+    queryFn: ({ pageParam }) => getQueuePage(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: enabled && memberId !== '',
+    retry,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+  if (!enabled) return undefined
+  for (const page of queue.data?.pages ?? []) {
+    const found = page.items.find((item) => item.authorRecord?.memberId === memberId)
+    if (found?.authorRecord) return found.authorRecord
+  }
+  return undefined
+}
+
 /** Hook : les contenus retirés, du plus récent au plus ancien, pour pouvoir les rétablir. */
 export const useRemovedItems = (enabled = true) =>
   useInfiniteQuery({
@@ -223,8 +253,12 @@ export const useDecide = (): {
     async (input: ModerationDecisionInput) => {
       const result = await postDecision(input)
       if (result.ok) {
-        // L'historique se relira à sa prochaine ouverture, avec cette décision en tête.
-        void queryClient.invalidateQueries({ queryKey: historyKey, refetchType: 'none' })
+        // La décision entre en tête de l'historique. Monté et lu (la colonne de droite, sur
+        // ordinateur), il se relit tout de suite : sinon la décision qu'on vient de prendre n'y
+        // paraissait qu'après un rechargement (R9, C9). Fermé (sur téléphone, sa lecture est
+        // coupée), il est seulement marqué périmé et se relira à son ouverture. `active` : seules
+        // les lectures en service (montées, `enabled`) repartent.
+        void queryClient.invalidateQueries({ queryKey: historyKey, refetchType: 'active' })
       }
       if (input.action === 'suspend' || input.action === 'lift') {
         if (result.ok) {
