@@ -16,10 +16,15 @@
 //
 // La capture est gardée en mémoire seulement (`cachePolicy="memory"`, relecture de sécurité A4) :
 // une image d'un fil privé ne s'écrit pas dans le cache disque de l'appareil.
+//
+// R9 (décision L2) : une capture retirée seule par la modération reste sous les yeux de qui l'a
+// envoyée, dans la bulle, suivie de sa notice (`RemovedPart` : fondement, explication, date,
+// « Contester ») ; le texte du retour reste au-dessus. L'autre personne du fil ne la reçoit plus.
 import { borders, layout, radii, space } from '@ruche/brand'
 import type {
   FeedbackDevice,
   FeedbackOutcome,
+  Removal,
   TesterMessageKind,
   TesterRole,
 } from '@ruche/contracts'
@@ -35,6 +40,7 @@ import type { ImageSource } from './image'
 import { OpenableImage, PICTURE_MAX_HEIGHT } from './OpenableImage'
 import { OutcomePill } from './OutcomePill'
 import { RelativeTime, useRelativeDate } from './RelativeTime'
+import { RemovedPart } from './RemovedPart'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -68,6 +74,11 @@ type Props = {
    * proportions dès le premier dessin ; absentes, elles se lisent au chargement de l'image.
    */
   capture?: { source: ImageSource; description: string; width?: number; height?: number } | null
+  /**
+   * La capture retirée seule par la modération, pour qui l'a envoyée (R9) : la décision du contrat
+   * et l'objet de « Contester », écrit par l'écran. Null ou absent : la capture n'est pas retirée.
+   */
+  captureRemoval?: { removal: Removal; contestSubject: string } | null
   /** « Réglé dans la v1.3 », déjà écrit par l'écran ; null : à traiter. */
   settled?: string | null
   /** L'encadré d'un message retiré par la modération, pour qui l'a écrit (`RemovalNotice`). */
@@ -118,6 +129,7 @@ export function MessageBubble({
   device = null,
   deviceKind = null,
   capture = null,
+  captureRemoval = null,
   settled = null,
   removal,
   menu = [],
@@ -228,6 +240,17 @@ export function MessageBubble({
     </View>
   ) : null
 
+  // Entière, à ses proportions, dans un carré de 240 points au plus ; un appui l'ouvre en grand
+  // (relecture de design B1). En mémoire seulement (sécurité A4).
+  const picture = capture ? (
+    <OpenableImage
+      source={capture.source}
+      label={capture.description}
+      size={capture}
+      maxWidth={PICTURE_MAX_HEIGHT}
+    />
+  ) : null
+
   const bubble = (
     <View
       style={{
@@ -259,16 +282,21 @@ export function MessageBubble({
           {text}
         </Text>
       ) : null}
-      {capture ? (
-        // Entière, à ses proportions, dans un carré de 240 points au plus ; un appui l'ouvre en
-        // grand (relecture de design B1). En mémoire seulement (sécurité A4).
-        <OpenableImage
-          source={capture.source}
-          label={capture.description}
-          size={capture}
-          maxWidth={PICTURE_MAX_HEIGHT}
-        />
-      ) : null}
+      {captureRemoval ? (
+        // La capture retirée, toujours sous les yeux de qui l'a envoyée, puis sa notice : un
+        // groupe nommé « La capture a été retirée par la modération ».
+        <RemovedPart
+          title={t(($) => $.removal.part.titles.capture)}
+          removal={captureRemoval.removal}
+          contestSubject={captureRemoval.contestSubject}
+          onReplace={null}
+          onDelete={null}
+        >
+          {picture}
+        </RemovedPart>
+      ) : (
+        picture
+      )}
       {settledLine}
     </View>
   )

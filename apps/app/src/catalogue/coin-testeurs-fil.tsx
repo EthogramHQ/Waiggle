@@ -55,6 +55,10 @@ const fr = {
   settledIn: 'v1.3',
   removedTitle: 'Retiré par la modération',
   removedLine: 'Ce message n’est plus visible pour Papi Jean.',
+  // R9 : la capture retirée seule, vue par le testeur qui l'a envoyée.
+  captureRemoved: 'Capture retirée seule par la modération (vue par le testeur qui l’a envoyée)',
+  captureWhy: 'La capture montre l’adresse e-mail d’une autre personne.',
+  captureSubject: 'Contestation : retrait de la capture de « Décollage ! » du 12 novembre',
   day: 'jour',
   night: 'nuit',
 }
@@ -90,6 +94,9 @@ const en: typeof fr = {
   settledIn: 'v1.3',
   removedTitle: 'Removed by moderation',
   removedLine: 'This message is no longer visible to Grandpa Jean.',
+  captureRemoved: 'Screenshot removed alone by moderation (seen by the tester who sent it)',
+  captureWhy: 'The screenshot shows another person’s email address.',
+  captureSubject: 'Appeal: removal of the screenshot of “Lift-off!” of November 12',
   day: 'day',
   night: 'night',
 }
@@ -293,6 +300,33 @@ function Bubbles({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] })
             outcome={outcome('partly')}
             settled={t(($) => $.project.testers.thread.settled)}
             pending={t(($) => $.project.testers.thread.settling)}
+            menu={own}
+          />
+        </Example>
+        <Example caption={at(l.captureRemoved)}>
+          <MessageBubble
+            from="tester"
+            kind="feedback"
+            mine
+            name={l.ines}
+            text={l.partly}
+            at={LATER}
+            outcome={outcome('partly')}
+            device={device('phone')}
+            deviceKind="phone"
+            capture={{
+              source: capture,
+              description: t(($) => $.project.testers.feedback.captureNameMine),
+            }}
+            captureRemoval={{
+              removal: {
+                ground: 'illegal',
+                explanation: l.captureWhy,
+                at: '2026-11-12T11:00:00.000Z',
+                afterReport: true,
+              },
+              contestSubject: l.captureSubject,
+            }}
             menu={own}
           />
         </Example>

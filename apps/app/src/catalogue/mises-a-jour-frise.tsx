@@ -45,6 +45,9 @@ const fr = {
   after: 'La fusée de nuit, le décompte affiché',
   thirdDescription: 'La fusée en vol, au-dessus des nuages',
   explanation: 'Les photos montraient l’adresse d’un autre membre.',
+  // R9 : la photo 2 retirée seule, vue par l'auteur ; le reste de la mise à jour reste affiché.
+  photoRemoved: 'La photo 2 retirée seule par la modération : la notice que seul l’auteur voit',
+  photoWhy: 'La photo montre la plaque d’immatriculation d’une voiture, lisible.',
 } as const
 
 const en = {
@@ -73,6 +76,8 @@ const en = {
   after: 'The rocket by night, the countdown shown',
   thirdDescription: 'The rocket in flight, above the clouds',
   explanation: 'The photos showed another member’s address.',
+  photoRemoved: 'Photo 2 removed alone by moderation: the notice only the author sees',
+  photoWhy: 'The photo shows a car’s number plate, readable.',
 } as const
 
 type Labels = typeof fr | typeof en
@@ -212,6 +217,33 @@ export function UpdateEntryCatalogue() {
               at: hoursAgo(1),
               afterReport: true,
             },
+          }}
+          toSource={toSource}
+          now={NOW}
+          onDelete={() => {}}
+        />
+      ),
+    },
+    {
+      caption: l.photoRemoved,
+      entry: (
+        <UpdateEntry
+          update={{
+            ...base,
+            removedParts: [
+              {
+                field: 'photo',
+                mediaId: base.photos[1]?.id ?? null,
+                value: null,
+                imageUrl: null,
+                removal: {
+                  ground: 'illegal',
+                  explanation: l.photoWhy,
+                  at: '2026-11-12T11:00:00.000Z',
+                  afterReport: true,
+                },
+              },
+            ],
           }}
           toSource={toSource}
           now={NOW}
