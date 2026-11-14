@@ -2492,7 +2492,13 @@ export const fr = {
       handOverError: 'L’animation n’a pas pu être confiée. Réessaie.',
     },
     // Le sélecteur du Fil (F-Fil13) : des onglets.
-    pills: { label: 'Ruches du fil', all: 'Tout' },
+    pills: {
+      label: 'Ruches du fil',
+      all: 'Tout',
+      // R10 : ce que montre le Fil sous la pastille d'une ruche (la phrase de « Tout » est
+      // `feed.followingCaption`). Sans nom : `unnamedInline` (« de la ruche sans nom »).
+      caption: 'Les nouveaux projets et les mises à jour des membres de la ruche {{hive}}.',
+    },
     // La colonne de droite du Fil, sur ordinateur (F-Fil11).
     side: 'Tes ruches',
   },

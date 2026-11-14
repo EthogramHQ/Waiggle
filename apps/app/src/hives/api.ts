@@ -41,7 +41,9 @@ import { meQueryKey } from '../profile/hooks'
 import { suggestionsQueryKey } from '../suggestions/api'
 
 // La tête commune des clés de « Proches à suivre » : invalider `['suggestions']` relit la liste.
-const suggestionsRootKey = suggestionsQueryKey.slice(0, 1)
+// Lue à l'appel, jamais au chargement du module : les tests du Fil remplacent suggestions/api par un
+// faux module sans cette clé, et le Fil charge ce fichier (les pastilles, « Tes ruches »).
+const suggestionsRootKey = () => suggestionsQueryKey.slice(0, 1)
 
 /** Toutes les clés de cache des ruches commencent par « hives » : on peut les invalider d'un coup. */
 export const hivesQueryKey = ['hives'] as const
@@ -350,7 +352,7 @@ export const useSetHideFromSuggestions = () => {
     onSettled: () => {
       if (queryClient.isMutating({ mutationKey: ['hide-from-suggestions'] }) > 1) return
       void queryClient.invalidateQueries({ queryKey: meQueryKey })
-      void queryClient.invalidateQueries({ queryKey: suggestionsRootKey })
+      void queryClient.invalidateQueries({ queryKey: suggestionsRootKey() })
     },
   })
   const { mutateAsync } = mutation
