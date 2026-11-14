@@ -372,6 +372,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'text', on: 'glass', min: 4.5, base: ['#000000', '#FFFFFF'] },
   // Le bandeau d'erreur d'un formulaire et la tuile de miel (icône ou initiale brune).
   { text: 'dangerText', on: 'errorBand', min: 4.5 },
+  // L'encadré d'une partie retirée par la modération (R9, ui/RemovedPart.tsx) : ses phrases en
+  // `textSecondary`, le lien de l'adresse de contact à l'encre (`text`).
+  { text: 'textSecondary', on: 'errorBand', min: 4.5 },
+  { text: 'text', on: 'errorBand', min: 4.5 },
   { text: 'onHoneyTile', on: 'honey', min: 4.5 },
   // La barre fixe des formulaires sur téléphone (fond « feuille »).
   { text: 'text', on: 'sheet', min: 4.5 },
