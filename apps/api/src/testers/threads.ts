@@ -12,6 +12,7 @@ import {
   OPEN_FEEDBACK_MAX,
   type OpenFeedback,
   type Removal,
+  type RemovedPart,
   TESTER_EXCERPT_MAX,
   type TesterMessage,
   type TesterMessagePage,
@@ -24,7 +25,9 @@ import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { avatarUrlOf } from '../profile/me'
+import { visibleMedia } from '../projects/media-visibility'
 import { removalsOf } from '../removals/load'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { type TesterMediaRow, toTesterMedia } from './media'
 
 type Reader = Pick<Database, 'select'>
@@ -75,6 +78,8 @@ export const toTesterMessage = (
     capture: TesterMediaRow | undefined
     updates: ReadonlyMap<string, SettledUpdateRow>
     removals: ReadonlyMap<string, Removal>
+    /** Les parties retirées seules de l'expéditeur (`removedPartsOf`) ; absent : aucune. */
+    parts?: ReadonlyMap<string, RemovedPart[]>
     publicApiUrl: string
   },
 ): TesterMessage => {
@@ -103,33 +108,50 @@ export const toTesterMessage = (
       row.removedAt !== null && row.senderId === context.viewerId
         ? (context.removals.get(row.removalId ?? '') ?? null)
         : null,
-    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-    removedParts: [],
+    // Les parties retirées seules (la capture) : seulement pour l'expéditeur ; vide sans `parts`
+    // (un message tout neuf).
+    removedParts: context.parts?.get(partOwnerKey('message', row.id)) ?? [],
     mine: row.senderId === context.viewerId,
   }
 }
 
 /**
- * Les captures, les mises à jour de règlement et les retraits d'une liste de messages, en trois
- * requêtes quel que soit leur nombre (une seule par sorte, et aucune s'il n'y a rien à lire) :
- * - `tester_media where message_id in (…)` : l'index tester_media_message_idx (message_id) ;
+ * Les captures, les mises à jour de règlement, les retraits et les parties retirées d'une liste de
+ * messages, en quatre requêtes quel que soit leur nombre (une seule par sorte, et aucune s'il n'y a
+ * rien à lire) :
+ * - `tester_media where message_id in (…) and (removal_id is null or owner_id = $lecteur)` :
+ *   l'index tester_media_message_idx (message_id) ; une capture retirée seule n'est lue que par son
+ *   auteur (R9, `visibleMedia`) ;
+ * - les parties retirées des messages du lecteur (`removedPartsOf`) :
+ *   content_part_removal_author_idx (author_id) ;
  * - `project_update where id in (…)` : la clé primaire de project_update ;
  * - les décisions de retrait (removals/load.ts) : la clé primaire de moderation_decision.
  */
-const loadMessageParts = async (db: Reader, rows: MessageRow[], viewerId: string) => {
+const loadMessageParts = async (
+  db: Reader,
+  rows: MessageRow[],
+  viewerId: string,
+  publicApiUrl: string,
+) => {
   const updateIds = [
     ...new Set(rows.flatMap((row) => (row.settledUpdateId ? [row.settledUpdateId] : []))),
   ]
-  const [captures, updates, removals] = await Promise.all([
+  const [captures, updates, removals, parts] = await Promise.all([
     rows.length === 0
       ? []
       : db
           .select()
           .from(schema.testerMedia)
           .where(
-            inArray(
-              schema.testerMedia.messageId,
-              rows.map((row) => row.id),
+            and(
+              inArray(
+                schema.testerMedia.messageId,
+                rows.map((row) => row.id),
+              ),
+              visibleMedia(schema.testerMedia.removalId, {
+                ownerId: schema.testerMedia.ownerId,
+                viewerId,
+              }),
             ),
           ),
     updateIds.length === 0
@@ -150,11 +172,19 @@ const loadMessageParts = async (db: Reader, rows: MessageRow[], viewerId: string
         row.removedAt !== null && row.senderId === viewerId ? row.removalId : null,
       ),
     ),
+    // Seul l'expéditeur relit ses parties retirées : `removedPartsOf` écarte les autres messages.
+    removedPartsOf(
+      db,
+      rows.map((row) => ({ kind: 'message' as const, id: row.id, authorId: row.senderId })),
+      viewerId,
+      publicApiUrl,
+    ),
   ])
   return {
     captures: new Map(captures.flatMap((c) => (c.messageId ? [[c.messageId, c] as const] : []))),
     updates: new Map(updates.map((u) => [u.id, u])),
     removals,
+    parts,
   }
 }
 
@@ -194,7 +224,7 @@ export const loadMessagePage = async (
     .orderBy(desc(m.createdAt), desc(m.id))
     .limit(MESSAGES_PAGE_SIZE + 1)
   const page = rows.slice(0, MESSAGES_PAGE_SIZE)
-  const parts = await loadMessageParts(db, page, args.viewerId)
+  const parts = await loadMessageParts(db, page, args.viewerId, args.publicApiUrl)
   const last = page.at(-1)
   return {
     items: page.map((row) =>
@@ -204,6 +234,7 @@ export const loadMessagePage = async (
         capture: parts.captures.get(row.id),
         updates: parts.updates,
         removals: parts.removals,
+        parts: parts.parts,
         publicApiUrl: args.publicApiUrl,
       }),
     ),
