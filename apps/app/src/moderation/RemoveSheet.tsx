@@ -53,6 +53,13 @@ type Props = {
   onClose: () => void
   /** Le retrait est fait : l'écran ferme la feuille et dit le résultat. */
   onDone: () => void
+  /**
+   * Web : où rendre le focus à la fermeture (voir `Sheet`), lu au moment de fermer. Après un
+   * retrait, le bouton « Retirer » qui a ouvert la feuille a laissé la place au résultat
+   * (« Contenu retiré. ») : rendu à cet ouvreur parti, le focus tombait sur la page (R9, C8). Rien
+   * (null) : l'ouvreur, toujours là quand rien n'a été décidé.
+   */
+  returnFocusTo?: () => unknown
 }
 
 /** Que retirer : la partie seule, ou tout le contenu. */
@@ -73,7 +80,7 @@ const sentPart = (part: NonNullable<ModerationQueueItem['part']>): ReportPart =>
   ...(part.mediaId ? { mediaId: part.mediaId } : null),
 })
 
-export function RemoveSheet({ item, open, onClose, onDone }: Props) {
+export function RemoveSheet({ item, open, onClose, onDone, returnFocusTo }: Props) {
   const { t } = useTranslation()
   const signInAgain = useSignInAgain()
   const { decide } = useDecide()
@@ -214,6 +221,7 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
       // Le focus d'ouverture : la première question (« Fondement »), ni « Annuler » ni « Retirer »
       // (R6a S1 : « Retirer » est inactif tant que le formulaire est vide).
       initialFocusRef={groundRef}
+      {...(returnFocusTo ? { returnFocusTo } : null)}
       guardTaps
       notice={notice}
       footer={
