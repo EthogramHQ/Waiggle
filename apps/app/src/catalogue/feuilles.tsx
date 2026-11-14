@@ -43,6 +43,13 @@ const fr = {
   spokenNone: '0 commentaire',
   comment: 'Super idée, je teste ce soir.',
   send: 'Envoyer le commentaire',
+  backPhone:
+    'Feuille de téléphone à deux étapes (R9) : « Retour » à gauche, « Annuler » à droite, ni l’un ni l’autre ne ferme à la place de l’autre',
+  backDesktop: 'La même sur ordinateur : « Retour » à gauche, la croix à droite',
+  backBusy: 'La même pendant son envoi (busy) : « Retour » inactif comme « Fermer »',
+  back: 'Retour',
+  cancel: 'Annuler',
+  reason: 'Quel est le motif ?',
 }
 const en: typeof fr = {
   title: 'Account sheets',
@@ -66,6 +73,13 @@ const en: typeof fr = {
   spokenNone: '0 comments',
   comment: 'Great idea, I’ll try it tonight.',
   send: 'Send the comment',
+  backPhone:
+    'Two-step phone sheet (R9): “Back” on the left, “Cancel” on the right, neither closes in place of the other',
+  backDesktop: 'The same on a computer: “Back” on the left, the cross on the right',
+  backBusy: 'The same while sending (busy): “Back” disabled like “Close”',
+  back: 'Back',
+  cancel: 'Cancel',
+  reason: 'What is the reason?',
 }
 
 /** La hauteur d'une feuille de téléphone montrée dans la page (comme dans compte.tsx). */
@@ -218,6 +232,39 @@ export function SheetsCatalogue() {
               footer={<Button label={l.send} onPress={noop} />}
             >
               <Text>{l.comment}</Text>
+            </SheetPanel>
+          </View>
+        </Stack>
+      ))}
+
+      {/* R9 : « Retour » dans la tête d'une feuille à deux étapes, sur téléphone, sur ordinateur, et
+          pendant un envoi (inactif). */}
+      {(['phone', 'desktop', 'busy'] as const).map((state) => (
+        <Stack key={state} gap="lg">
+          <Text tone="secondary">
+            {state === 'phone' ? l.backPhone : state === 'desktop' ? l.backDesktop : l.backBusy}
+          </Text>
+          <View
+            style={{
+              ...(state === 'desktop' ? null : { height: PHONE_SHEET_HEIGHT }),
+              maxWidth: state === 'desktop' ? undefined : layout.formWidth,
+              backgroundColor: colors.scrim,
+              borderRadius: radii.tile,
+              overflow: 'hidden',
+              ...(state === 'desktop' ? { paddingVertical: space.xxxl } : null),
+            }}
+          >
+            <SheetPanel
+              layout={state === 'desktop' ? 'desktop' : 'phone'}
+              title={l.reason}
+              closeLabel={l.close}
+              onClose={noop}
+              busy={state === 'busy'}
+              back={{ label: l.back, onPress: noop }}
+              {...(state === 'desktop' ? null : { cancelLabel: l.cancel })}
+              footer={<Button label={l.send} onPress={noop} />}
+            >
+              <Text>{l.body}</Text>
             </SheetPanel>
           </View>
         </Stack>

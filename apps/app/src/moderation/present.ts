@@ -7,9 +7,7 @@ import {
   type ReportReason,
   StoredReportTarget,
 } from '@ruche/contracts'
-import type { Translation } from '@ruche/i18n'
 import type { Href } from 'expo-router'
-import type { useTranslation } from 'react-i18next'
 
 /**
  * Le nom de chaque motif dans les textes (`report.reasons.*`) : l'API écrit les motifs en
@@ -50,27 +48,8 @@ export const viewHref = (target: StoredReportTarget, projectId: string | null): 
 /** Une clé stable pour une cible (« comment:c0d1… »), pour les listes et l'action en cours. */
 export const targetKey = (target: StoredReportTarget) => `${target.kind}:${target.id}`
 
-/** Le nom de chaque partie dans les textes (`moderation.parts.*`) : le champ de l'API lui-même. */
-type PartTextKey = keyof Translation['moderation']['parts']
-
-type T = ReturnType<typeof useTranslation>['t']
-
-/**
- * La partie en minuscules, après le genre du contenu (« la photo 2 », « le titre »). Une photo dit
- * son rang dans sa galerie (`position`) ; si la photo n'est plus là (rang inconnu), « la photo »
- * tout court, plutôt qu'un « {{n}} » écrit tel quel. `kind` : la sorte du contenu, pour nommer la
- * seule image d'un message (« la capture ») ou d'un appel (« la photo »).
- */
-export const partText = (part: PartOut, t: T, kind?: StoredReportTarget['kind']): string => {
-  const field: PartTextKey = part.field
-  if (field === 'photo' && kind === 'message') return t(($) => $.moderation.parts.capture)
-  if (field === 'photo' && kind === 'call') return t(($) => $.moderation.parts.callPhoto)
-  if ((field === 'photo' || field === 'photoDescription') && part.position === null) {
-    return t(($) => $.moderation.parts.callPhoto)
-  }
-  const n = part.position ?? undefined
-  return t(($) => $.moderation.parts[field], { n })
-}
+/** Le nom d'une partie en minuscules : écrit dans `ui/partText.ts` (la carte compacte le lit aussi). */
+export { partText } from '../ui/partText'
 
 // Une clé d'élément tient dans une adresse (`?item=`) : seulement des lettres, chiffres, « : », « - »
 // et « _ ». Forme : `sorte:id` pour le contenu entier, `sorte:id:champ` pour une partie,
