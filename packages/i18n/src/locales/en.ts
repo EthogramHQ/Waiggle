@@ -2077,6 +2077,9 @@ export const en: Translation = {
       handOver: 'Hand over hosting',
       handOverHint: 'Choose the member who will host the hive. You will stay a member.',
       delete: 'Delete the hive',
+      handOverDetail: 'You become a member again.',
+      handOverNone: 'Nobody else is a member of the hive yet.',
+      iconError: 'The icon could not be saved. Try again.',
     },
     dialogs: {
       cancel: 'Cancel',
