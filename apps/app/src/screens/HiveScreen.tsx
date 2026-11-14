@@ -139,7 +139,8 @@ function HivePageView({ page }: { page: HivePage }) {
   // Sur ordinateur, trois colonnes (les membres à gauche, la planche R10-Ruche-Desktop) ; `useLayout`
   // attend déjà l'hydratation : la page pré-rendue est celle du téléphone.
   const desktop = columns
-  // Une seule garde de double tape pour les liens de la page qui mènent ailleurs.
+  // La garde de double tape des boutons « Inviter » (en haut, « Inviter un proche », « Inviter des
+  // proches ») : une double tape n'ouvre pas deux fois la feuille.
   const guard = useTapGuard()
 
   // --- L'onglet ---------------------------------------------------------------------------------
@@ -162,12 +163,13 @@ function HivePageView({ page }: { page: HivePage }) {
   // --- Les gestes qui mènent ailleurs ------------------------------------------------------------
 
   const openInvite = guard(() => router.push(`/hives/${id}/invite`))
-  // La garde ne prend qu'une action sans argument : on l'enveloppe à chaque appel (elle garde son
-  // état dans un `ref`, commun à toutes ces actions).
+  // Sans garde de page ici : chaque ligne (membre, testeur, actualité) et chaque tuile a la sienne.
+  // Une garde commune à toute la page bloquait le lien suivant pendant 600 ms après un retour sur
+  // la page (mesuré au clavier à 1440 px : Entrée sur le membre suivant ne faisait rien).
   const openProject = (projectId: string) =>
-    guard(() => router.push({ pathname: '/projects/[id]', params: { id: projectId } }))()
+    router.push({ pathname: '/projects/[id]', params: { id: projectId } })
   const openMember = (member: HiveMember) =>
-    guard(() => router.push({ pathname: '/members/[id]', params: { id: member.face.id } }))()
+    router.push({ pathname: '/members/[id]', params: { id: member.face.id } })
 
   // --- Quitter la ruche, retirer un membre -----------------------------------------------------
 
@@ -629,6 +631,8 @@ function HiveProjects({
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const projects = useHiveProjects(id)
+  // Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas deux pages.
+  const guard = useTapGuard()
   if (!projects.data) {
     if (projects.isError)
       return (
@@ -665,7 +669,7 @@ function HiveProjects({
                     }
                   : null
               }
-              onPress={() => onOpen(project.id)}
+              onPress={guard(() => onOpen(project.id))}
             />
           )
         })}
