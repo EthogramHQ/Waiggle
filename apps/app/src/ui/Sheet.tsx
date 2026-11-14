@@ -1600,7 +1600,10 @@ export function SheetPanel({
         <View
           style={{
             paddingHorizontal: actionOnTop ? space.md : space.xl,
-            paddingTop: actionOnTop ? space.xs : space.md,
+            // Sans la rangée du haut (ni croix ni « Retour » : feuille sans croix sur ordinateur),
+            // plus de 44 points d'air au-dessus du titre : il prendrait 12 points du coin arrondi,
+            // moins que les 20 du côté. La marge du haut vaut alors celle du côté.
+            paddingTop: actionOnTop ? space.xs : topRow ? space.md : space.xl,
             paddingBottom: space.sm,
             ...(actionOnTop
               ? { borderBottomWidth: borders.hairline, borderBottomColor: colors.line }
