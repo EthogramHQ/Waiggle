@@ -30,9 +30,24 @@ type Props = {
   title?: string
   /** Le texte sous le titre (les photos ajoutées seront perdues…) ; par défaut `common.discardBody`. */
   message?: string
+  /**
+   * Les libellés des deux boutons, quand la feuille a les siens (« Continuer » / « Abandonner » du
+   * signalement, R9 : en anglais « Continue » / « Abandon », pas « Keep editing » / « Discard ») ;
+   * par défaut `common.keepEditing` et `common.discard`.
+   */
+  keepLabel?: string
+  discardLabel?: string
 }
 
-export function DiscardDialog({ visible, onKeep, onDiscard, title, message }: Props) {
+export function DiscardDialog({
+  visible,
+  onKeep,
+  onDiscard,
+  title,
+  message,
+  keepLabel,
+  discardLabel,
+}: Props) {
   const { t } = useTranslation()
   const keepRef = useRef<Focusable>(null)
   return (
@@ -46,11 +61,15 @@ export function DiscardDialog({ visible, onKeep, onDiscard, title, message }: Pr
     >
       <Button
         ref={keepRef}
-        label={t(($) => $.common.keepEditing)}
+        label={keepLabel ?? t(($) => $.common.keepEditing)}
         variant="secondary"
         onPress={onKeep}
       />
-      <Button label={t(($) => $.common.discard)} variant="danger" onPress={onDiscard} />
+      <Button
+        label={discardLabel ?? t(($) => $.common.discard)}
+        variant="danger"
+        onPress={onDiscard}
+      />
     </Dialog>
   )
 }

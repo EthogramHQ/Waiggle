@@ -3714,6 +3714,54 @@ const pages = [
       await page.getByText(/^Merci, ton signalement a été envoyé/).waitFor()
     },
   },
+  // R9 : la feuille « Signaler » sur « Météo », le projet d'Inès : « Quelle partie ? » (planche
+  // R9-Signaler-Partie), le motif illégal et son 112 (R9-Signaler-Danger), « Merci » après
+  // « Bloquer aussi » (R9-Signaler-Envoye), la limite du jour dès l'ouverture (R9-Signaler-Etats).
+  {
+    name: 'signaler-partie',
+    path: `/report?kind=project&id=${meteoProjectId}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: /^La 2e photo/ }).click()
+    },
+  },
+  {
+    name: 'signaler-danger',
+    path: `/report?kind=project&id=${meteoProjectId}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: /^La 2e photo/ }).click()
+      await page.getByRole('button', { name: 'Continuer' }).click()
+      await page.getByRole('radio', { name: /^Contenu illégal/ }).click()
+      await page
+        .getByText(/appelle le 112/)
+        .first()
+        .waitFor()
+    },
+  },
+  {
+    name: 'signaler-envoye-bloque',
+    path: `/report?kind=project&id=${meteoProjectId}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: /^La 2e photo/ }).click()
+      await page.getByRole('button', { name: 'Continuer' }).click()
+      await page.getByRole('radio', { name: /^Lien, démo ou prompt dangereux/ }).click()
+      await page.getByRole('checkbox', { name: /^Bloquer aussi/ }).click()
+      // « Envoyer » ignore les tapes juste après « Continuer » (600 ms).
+      await page.waitForTimeout(800)
+      await page.getByRole('button', { name: 'Envoyer le signalement' }).click()
+      await page.waitForTimeout(800)
+      await page.getByRole('button', { name: 'Bloquer', exact: true }).click()
+      await page.getByText(/^Tu as aussi bloqué/).waitFor()
+    },
+  },
+  {
+    name: 'signaler-limite',
+    path: `/report?kind=project&id=${meteoProjectId}`,
+    signedIn: true,
+    moderation: 'limit',
+  },
   {
     name: 'projet-commentaires-bloques',
     path: `/projects/${gardenProject.id}`,

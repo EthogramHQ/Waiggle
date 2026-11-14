@@ -44,7 +44,7 @@ import { NotificationsScreen } from './NotificationsScreen'
 import { ProfileScreen } from './ProfileScreen'
 import { ProjectFormScreen } from './ProjectFormScreen'
 import { ProjectScreen } from './ProjectScreen'
-import { ReportScreen } from './ReportScreen'
+import { ReportSheet } from './ReportSheet'
 import { SettingsScreen } from './SettingsScreen'
 import { TagScreen } from './TagScreen'
 
@@ -123,7 +123,7 @@ jest.mock('../moderation/api', () => ({
   useDecide: jest.fn(),
   useDecisionHistory: jest.fn(),
 }))
-// Le signalement : la lecture de la cible par un vrai React Query, comme dans ReportScreen.test.tsx.
+// Le signalement : la lecture de la cible par un vrai React Query, comme dans ReportSheet.test.tsx.
 jest.mock('../reports/api', () => {
   const { useQuery } = jest.requireActual('@tanstack/react-query')
   const getReportTarget = jest.fn()
@@ -163,6 +163,9 @@ jest.mock('expo-router', () => {
       canGoBack: () => true,
     }),
     useLocalSearchParams: jest.fn(),
+    // R9 : la feuille « Signaler » garde une précision écrite contre le retour (useLeaveGuard, qui
+    // écoute `beforeRemove`) ; ici, aucun retour n'arrive.
+    useNavigation: () => ({ addListener: () => () => {}, dispatch: jest.fn() }),
     Link: ({ href, children, ...rest }: { href: string; children: unknown }) =>
       createElement(Text, { role: 'link', href, ...rest }, children),
   }
@@ -266,9 +269,10 @@ const screens: [string, () => ReactElement, string][] = [
     () => <ProjectFormScreen id={recipesProject.id} />,
     '/page/actuelle',
   ],
+  // R9 : la page `/report` est devenue la feuille « Signaler » (ReportSheet), mêmes props.
   [
-    'ReportScreen',
-    () => <ReportScreen kind="comment" id="c0d1e2f3-0415-4a26-8b37-48596a7b8c9d" />,
+    'ReportSheet',
+    () => <ReportSheet kind="comment" id="c0d1e2f3-0415-4a26-8b37-48596a7b8c9d" />,
     '/report',
   ],
   // R9 : la page `/suspend` est devenue la fenêtre « Suspendre » (moderation/SuspendSheet), ouverte

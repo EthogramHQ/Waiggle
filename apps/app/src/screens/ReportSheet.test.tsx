@@ -142,8 +142,14 @@ const mediaPart = (field: ReportPartField, mediaId: string, position: number): P
   reportedByMe: false,
 })
 
-const ines = { id: 'u-ines', name: 'Inès Haddad', handle: 'ines_haddad', isBlocked: false }
-const sam = { id: 'u-sam', name: 'Sam Petit', handle: 'sam', isBlocked: false }
+const ines = {
+  id: 'u-ines',
+  name: 'Inès Haddad',
+  handle: 'ines_haddad',
+  isBlocked: false,
+  isAdmin: false,
+}
+const sam = { id: 'u-sam', name: 'Sam Petit', handle: 'sam', isBlocked: false, isAdmin: false }
 
 const projectTarget: ReportTarget = { kind: 'project', id: projectId }
 /** Ce que rend GET /v1/reports/target pour « Météo » (ReportTargetPreview). */
@@ -368,7 +374,13 @@ describe('what is reported', () => {
       target: { kind: 'member', id: 'u7' },
       text: 'Lucas Martin (@lucas_martin)',
       projectId: null,
-      author: { id: 'u7', name: 'Lucas Martin', handle: 'lucas_martin', isBlocked: false },
+      author: {
+        id: 'u7',
+        name: 'Lucas Martin',
+        handle: 'lucas_martin',
+        isBlocked: false,
+        isAdmin: false,
+      },
       head: { title: null, authorName: 'Lucas Martin', image: null },
       parts: [textPart('name'), textPart('bio')],
     }
@@ -867,6 +879,17 @@ describe('blocking the author too', () => {
     await toReason()
 
     // Témoin : le motif est là.
+    expect(screen.getByRole('radio', { name: /^Arnaque ou spam/ })).toBeTruthy()
+    expect(screen.queryByRole('checkbox', { name: /Bloquer aussi/ })).toBeNull()
+  })
+
+  // R9 (`ReportTargetPreview.author.isAdmin`) : on ne bloque pas un administrateur (l'API le
+  // refuserait) ; la case n'est donc pas proposée, le signalement reste possible.
+  it('offers no « Bloquer aussi » box when the author is an administrator', async () => {
+    await openSheet({ ...meteo, author: { ...ines, isAdmin: true } })
+    await toReason()
+
+    // Témoin : le motif est là, on peut signaler.
     expect(screen.getByRole('radio', { name: /^Arnaque ou spam/ })).toBeTruthy()
     expect(screen.queryByRole('checkbox', { name: /Bloquer aussi/ })).toBeNull()
   })

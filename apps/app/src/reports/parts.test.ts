@@ -50,7 +50,13 @@ const mediaPart = (field: ReportPartField, mediaId: string, position: number): P
   reportedByMe: false,
 })
 
-const ines = { id: 'u-ines', name: 'Inès Haddad', handle: 'ines_haddad', isBlocked: false }
+const ines = {
+  id: 'u-ines',
+  name: 'Inès Haddad',
+  handle: 'ines_haddad',
+  isBlocked: false,
+  isAdmin: false,
+}
 
 const meteo: ReportTargetPreview = {
   target: { kind: 'project', id: projectId },
