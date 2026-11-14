@@ -81,8 +81,9 @@ describe('ReportTarget', () => {
 describe('CreateReport', () => {
   const report = { target: { kind: 'project', id: projectId }, reason: 'scam_spam' }
 
-  // Règle 8 : sept motifs, dont « privacy », le cas le plus probable entre proches.
-  it('offers seven reasons, in order, privacy included', () => {
+  // Règle 8 : sept motifs, dont « privacy », le cas le plus probable entre proches. R9 (A6) : un
+  // huitième, « Lien, démo ou prompt dangereux » (`dangerous_link`), juste avant « Autre chose ».
+  it('offers eight reasons, in order, privacy and a dangerous link included', () => {
     expect(ReportReason.options).toEqual([
       'illegal',
       'harassment',
@@ -90,9 +91,11 @@ describe('CreateReport', () => {
       'scam_spam',
       'impersonation',
       'privacy',
+      'dangerous_link',
       'other',
     ])
     expect(CreateReport.safeParse({ ...report, reason: 'privacy' }).success).toBe(true)
+    expect(CreateReport.safeParse({ ...report, reason: 'dangerous_link' }).success).toBe(true)
     expect(CreateReport.safeParse({ ...report, reason: 'boring' }).success).toBe(false)
   })
 
@@ -145,6 +148,10 @@ describe('CreateReport', () => {
 describe('ModerationQueueItem', () => {
   const item = {
     target: { kind: 'comment', id: commentId },
+    // R9 : le contenu entier (null), le projet qui le porte et la date de sa publication.
+    part: null,
+    context: { projectId, title: 'Météo', image: null },
+    contentCreatedAt: '2026-10-20T09:30:00.000Z',
     projectId,
     // Tranche 7b : la copie champ par champ, ses images, et si les copies diffèrent.
     snapshot: [{ field: 'body', value: 'Le texte au moment du signalement' }],
@@ -160,8 +167,14 @@ describe('ModerationQueueItem', () => {
     count: 3,
     firstReportedAt: '2026-10-21T09:30:00.000Z',
     lastReportedAt: at,
+    // R9 : la fiche de l'auteur porte aussi son nom, son pseudo, sa date d'inscription et ses nombres.
     authorRecord: {
       memberId: 'u7',
+      name: 'Léa',
+      handle: 'lea',
+      joinedAt: '2026-09-01T09:30:00.000Z',
+      projectCount: 2,
+      commentCount: 5,
       removals: 1,
       suspensions: 0,
       suspendedNow: false,
@@ -171,6 +184,23 @@ describe('ModerationQueueItem', () => {
 
   it('describes a target with its reasons counted, its details and its dates', () => {
     expect(ModerationQueueItem.parse(item)).toEqual(item)
+  })
+
+  // R9 : une partie signalée (« La 2e photo ») est un élément à part ; la partie reste stricte, sans
+  // qui a signalé.
+  it('describes a reported part, its photo and its rank, and nothing about who reported', () => {
+    const part = { field: 'photo', mediaId: projectId, position: 2 }
+    const photo = { ...item, target: { kind: 'project', id: projectId }, part }
+    expect(ModerationQueueItem.parse(photo)).toEqual(photo)
+    expect(
+      ModerationQueueItem.safeParse({ ...photo, part: { ...part, reporterId: 'zoe-id' } }).success,
+    ).toBe(false)
+    expect(
+      ModerationQueueItem.safeParse({
+        ...item,
+        authorRecord: { ...item.authorRecord, reporterId: 'zoe-id' },
+      }).success,
+    ).toBe(false)
   })
 
   // Règle 14 : un schéma strict, sans qui a signalé ; une clé de plus est refusée.
@@ -212,6 +242,7 @@ describe('RemovedItem', () => {
   it('describes a removed content with its ground and explanation, and no administrator', () => {
     const item = {
       target: { kind: 'project', id: projectId },
+      part: null, // R9 : le contenu entier
       projectId,
       text: 'Météo — Une appli de météo.',
       ground: 'rules',
@@ -221,6 +252,13 @@ describe('RemovedItem', () => {
     }
     expect(RemovedItem.parse(item)).toEqual(item)
     expect(RemovedItem.safeParse({ ...item, adminId: 'louis-id' }).success).toBe(false)
+    // R9 : une partie retirée seule se liste aussi, avec son champ.
+    const bio = { ...item, target: { kind: 'member', id: 'u7' }, projectId: null }
+    const part = { field: 'bio', mediaId: null, position: null }
+    expect(RemovedItem.parse({ ...bio, part })).toEqual({ ...bio, part })
+    expect(RemovedItem.safeParse({ ...bio, part: { ...part, adminId: 'louis-id' } }).success).toBe(
+      false,
+    )
   })
 })
 
@@ -269,6 +307,7 @@ describe('the two notifications of moderation', () => {
     targetKind: 'project',
     // R8 : la miniature du projet, null sans photo.
     project: { id: projectId, title: 'Météo', cover: null },
+    part: null, // R9 : le contenu entier
     excerpt: null,
     ground: 'rules',
     explanation: 'Publicité déguisée.',
@@ -294,6 +333,9 @@ describe('the two notifications of moderation', () => {
     expect(text).not.toContain('zoe-id')
     // Un profil ne se retire pas : il se classe seulement.
     expect(Notification.safeParse({ ...removed, targetKind: 'member' }).success).toBe(false)
+    // R9 : une partie retirée seule est nommée par son champ et son rang (« La 2e photo »).
+    const photo = { ...removed, part: { field: 'photo', position: 2 } }
+    expect(Notification.parse(photo)).toEqual(photo)
   })
 
   // Règle 2 : la sorte de cible et l'issue, rien d'autre ; un lien seulement si la cible se voit.
@@ -321,6 +363,7 @@ describe('the reports in the export', () => {
     const report = {
       targetKind: 'project',
       targetId: projectId,
+      part: null, // R9 : le contenu entier
       reason: 'privacy',
       details: null,
       createdAt: at,
@@ -328,6 +371,9 @@ describe('the reports in the export', () => {
       decidedAt: at,
     }
     expect(ReportExport.parse(report)).toEqual(report)
+    // R9 : une partie signalée, avec sa photo.
+    const photo = { ...report, part: { field: 'photo', mediaId: commentId } }
+    expect(ReportExport.parse(photo)).toEqual(photo)
     const text = JSON.stringify(
       ReportExport.parse({ ...report, snapshot: 'Le texte visé', explanation: 'Pas contraire.' }),
     )
