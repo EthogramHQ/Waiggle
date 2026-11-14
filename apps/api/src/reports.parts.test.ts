@@ -28,6 +28,7 @@ import {
   REPORTS_PER_DAY,
   type ReportPartField,
   ReportSnapshot,
+  type ReportTarget,
   ReportTargetPreview,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -591,13 +592,15 @@ describe('the preview of a target, its head and its parts', () => {
 describe('reporting again a removed part', () => {
   const DEMO = 'https://meteo.example.com/'
   const demoPart: Part = { field: 'demoUrl' }
+  // `decide` veut une cible typée par sa sorte (« project »), pas un `kind: string`.
+  const projectTarget = (): ReportTarget => ({ kind: 'project', id: meteo.id })
 
   const removeDemo = async () => {
     expect((await postReport(max, projectOf(), demoPart)).status).toBe(201)
     later()
     await act.decide(louis, {
       action: 'remove',
-      target: projectOf(),
+      target: projectTarget(),
       part: demoPart,
       ground: 'rules',
       explanation: 'Lien d’hameçonnage.',
@@ -618,7 +621,7 @@ describe('reporting again a removed part', () => {
   it('still refuses a part the moderation examined and restored, unchanged', async () => {
     await removeDemo()
     later()
-    await act.decide(louis, { action: 'restore', target: projectOf(), part: demoPart })
+    await act.decide(louis, { action: 'restore', target: projectTarget(), part: demoPart })
 
     await expectError(await postReport(max, projectOf(), demoPart), 409, 'already_examined')
   })
