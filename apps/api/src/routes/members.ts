@@ -266,7 +266,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // (removals/parts.ts ne cherche que les contenus dont le lecteur est l'auteur).
     const removedParts = await removedPartsOf(
       db,
-      [{ kind: 'member', id: row.id, authorId: row.id }],
+      // `current` : son nom et son pseudo d'aujourd'hui, pour retrouver ceux que la modération a
+      // retirés et qui sont encore provisoires (DSA art. 17).
+      [{ kind: 'member', id: row.id, authorId: row.id, current: { name: row.name, handle } }],
       viewer.id,
       publicApiUrl,
     )

@@ -5,7 +5,7 @@
 // requête ; le contenu se montre alors comme si la partie n'avait jamais été là.
 import { type RemovedPart, ReportPartField } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 import { mediaUrl } from '../profile/me'
 import { afterReportSql, toRemoval } from './load'
 
@@ -18,7 +18,16 @@ export type PartOwnerKind = 'project' | 'update' | 'member' | 'call' | 'message'
  * Un contenu dont on veut les parties retirées : sa sorte, son identifiant (celui du membre pour un
  * profil) et son auteur. Seuls ceux dont le lecteur est l'auteur sont cherchés.
  */
-export type PartOwner = { kind: PartOwnerKind; id: string; authorId: string }
+export type PartOwner = {
+  kind: PartOwnerKind
+  id: string
+  authorId: string
+  /**
+   * Pour un profil seulement : son nom et son pseudo d'aujourd'hui. Donnés, ils font chercher le nom
+   * ou le pseudo retiré qui est encore provisoire (`removedIdentityParts`) ; absents, rien de tel.
+   */
+  current?: { name: string; handle: string }
+}
 
 /** La clé d'un contenu dans la carte rendue par `removedPartsOf`. */
 export const partOwnerKey = (kind: PartOwnerKind, id: string) => `${kind}:${id}`
@@ -63,6 +72,73 @@ const ownerKeyOf = (row: {
     default:
       return null
   }
+}
+
+/**
+ * Le nom ou le pseudo retiré d'un membre, tant qu'il est provisoire (R9, DSA art. 17) : le dernier
+ * retrait de chacun, si la valeur d'aujourd'hui est encore celle que ce retrait a mise d'office. Un
+ * nom ou un pseudo n'a pas de ligne `content_part_removal` : l'ancienne valeur et le fondement sont
+ * dans la décision elle-même, d'où cette lecture à part. `value` est l'ancienne valeur, que son seul
+ * propriétaire relit.
+ *
+ * En SQL : select …, exists (…) as after_report from moderation_decision where target_kind =
+ * 'member' and target_id = $membre and action = 'remove' and part_field in ('name', 'handle')
+ * order by created_at desc, id desc. L'index moderation_decision_target_idx (sorte, cible, date) ne
+ * lit que les décisions de ce membre, liées en paramètres ; on garde ensuite, en JS, la plus
+ * récente de chaque champ (quelques lignes au plus : un retrait par signalement).
+ */
+const removedIdentityParts = async (
+  db: Reader,
+  memberId: string,
+  current: { name: string; handle: string },
+): Promise<RemovedPart[]> => {
+  const d = schema.moderationDecision
+  const rows = await db
+    .select({
+      field: d.partField,
+      previousValue: d.previousValue,
+      provisionalValue: d.provisionalValue,
+      ground: d.ground,
+      explanation: d.explanation,
+      createdAt: d.createdAt,
+      afterReport: afterReportSql({
+        id: sql.raw('moderation_decision.id'),
+        targetKind: sql.raw('moderation_decision.target_kind'),
+        targetId: sql.raw('moderation_decision.target_id'),
+        adminId: sql.raw('moderation_decision.admin_id'),
+      }),
+    })
+    .from(d)
+    .where(
+      and(
+        eq(d.targetKind, 'member'),
+        eq(d.targetId, memberId),
+        eq(d.action, 'remove'),
+        inArray(d.partField, ['name', 'handle']),
+      ),
+    )
+    .orderBy(desc(d.createdAt), desc(d.id))
+  const parts: RemovedPart[] = []
+  const seen = new Set<string>()
+  for (const row of rows) {
+    // Du plus récent au plus ancien : le premier retrait de chaque champ est le dernier en date.
+    if (row.field === null || seen.has(row.field)) continue
+    seen.add(row.field)
+    const field = ReportPartField.safeParse(row.field)
+    const removal = toRemoval(row)
+    if (!field.success || removal === null || row.previousValue === null) continue
+    // Provisoire : la valeur d'aujourd'hui est encore celle que le retrait a mise (profile/provisional.ts).
+    const now = field.data === 'name' ? current.name : current.handle
+    if (row.provisionalValue === null || row.provisionalValue !== now) continue
+    parts.push({
+      field: field.data,
+      mediaId: null,
+      value: row.previousValue,
+      imageUrl: null,
+      removal,
+    })
+  }
+  return parts
 }
 
 /**
@@ -156,6 +232,15 @@ export const removedPartsOf = async (
     const list = byOwner.get(key) ?? []
     list.push(part)
     byOwner.set(key, list)
+  }
+  // Le nom et le pseudo retirés de son propre profil, après les autres parties (R9, DSA art. 17).
+  const own = mine.find((owner) => owner.kind === 'member' && owner.id === viewerId)
+  if (own?.current) {
+    const identity = await removedIdentityParts(db, viewerId, own.current)
+    if (identity.length > 0) {
+      const key = partOwnerKey('member', viewerId)
+      byOwner.set(key, [...(byOwner.get(key) ?? []), ...identity])
+    }
   }
   return byOwner
 }
