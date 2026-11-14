@@ -20,7 +20,7 @@
 // qu'une promesse. La garde est un `ref`, lu et posé au toucher : un état React ne serait à jour
 // qu'au rendu suivant, trop tard pour la seconde tape. Le bouton touché tourne pendant l'écriture
 // (`loading`, qui garde le focus) ; l'échec, l'écran le dit, et l'on peut réessayer.
-import { radii, space } from '@ruche/brand'
+import { layout, radii, space } from '@ruche/brand'
 import type { HiveIcon, HiveInvitation as Invitation } from '@ruche/contracts'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -185,15 +185,16 @@ export function HiveInvitation({
           ))}
         </Stack>
 
-        {refused ? (
-          // À la place des boutons, au moins aussi haut qu'eux : rien ne remonte sous le doigt.
-          <View style={{ minHeight: space.huge, justifyContent: 'center' }}>
-            <Text tone="secondary" focusRef={refusedText}>
-              {t(($) => $.hives.invitations.refused)}
-            </Text>
-          </View>
-        ) : (
-          <Stack gap="sm">
+        <Stack gap="sm">
+          {refused ? (
+            // À la place des boutons, aussi haut qu'eux côte à côte, et « Refuser ne prévient
+            // personne. » reste dessous : la carte garde sa hauteur, rien ne remonte sous le doigt.
+            <View style={{ minHeight: layout.controlHeight.regular, justifyContent: 'center' }}>
+              <Text tone="secondary" focusRef={refusedText}>
+                {t(($) => $.hives.invitations.refused)}
+              </Text>
+            </View>
+          ) : (
             <ButtonPair>
               <Button
                 label={t(($) => $.hives.invitations.accept)}
@@ -214,13 +215,13 @@ export function HiveInvitation({
                   : { describedById: hintId, hint: t(($) => $.hives.invitations.refuseHint) })}
               />
             </ButtonPair>
-            {preview ? null : (
-              <Text variant="caption" tone="muted" nativeID={hintId}>
-                {t(($) => $.hives.invitations.refuseHint)}
-              </Text>
-            )}
-          </Stack>
-        )}
+          )}
+          {preview ? null : (
+            <Text variant="caption" tone="muted" nativeID={hintId}>
+              {t(($) => $.hives.invitations.refuseHint)}
+            </Text>
+          )}
+        </Stack>
       </Surface>
     </View>
   )

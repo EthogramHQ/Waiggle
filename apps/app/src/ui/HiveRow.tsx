@@ -23,7 +23,6 @@ import { View } from 'react-native'
 import { AvatarStack } from './AvatarStack'
 import { Icon } from './Icon'
 import type { ImageSource } from './image'
-import { MetaLine } from './MetaLine'
 import { Pressed } from './Pressed'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
@@ -47,7 +46,7 @@ type Props = {
  * La largeur de base du texte de la ligne, en points : en dessous (téléphone étroit, texte agrandi
  * à 200 %), les nouveautés passent sous le texte au lieu de l'écraser contre l'alvéole.
  */
-const TEXT_BASIS = { regular: 160, compact: 120 } as const
+const TEXT_BASIS = { regular: 120, compact: 100 } as const
 
 /** Cache une vue et ce qu'elle contient aux lecteurs d'écran : web, iOS et Android. */
 const hiddenFromReaders = {
@@ -115,16 +114,13 @@ export function HiveRow({ hive, onPress, compact = false, toSource }: Props) {
             </Text>
             {compact ? null : (
               <>
-                <MetaLine>
-                  <Text variant="caption" tone="secondary">
-                    {members}
-                  </Text>
-                  {animator ? (
-                    <Text variant="caption" tone="secondary" breakAnywhere>
-                      {t(($) => $.hives.animatedBy, { name: animator.name })}
-                    </Text>
-                  ) : null}
-                </MetaLine>
+                {/* Un seul texte, qui passe à la ligne comme une phrase (« 4 membres · animée par /
+                    Papi Jean », la planche) : en morceaux séparés, le point commençait la ligne. */}
+                <Text variant="caption" tone="secondary" breakAnywhere>
+                  {animator
+                    ? `${members} · ${t(($) => $.hives.animatedBy, { name: animator.name })}`
+                    : members}
+                </Text>
                 {hive.faces.length > 0 ? (
                   <View style={{ marginTop: space.xs }}>
                     {/* Sans nom : un décor, caché tout entier (le nom du lien compte les membres). */}
