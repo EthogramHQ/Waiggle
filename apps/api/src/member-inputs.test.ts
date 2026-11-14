@@ -47,6 +47,7 @@ import {
 } from './moderation/inputs'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
+import { hiveRows } from './testing/hive-rows'
 import { avatarForm, jpegImage, visualForm } from './testing/images'
 import { addCatalogueTool, clearCatalogue } from './testing/tool-catalogue'
 
@@ -506,6 +507,78 @@ describe('the register of member inputs', () => {
     expect(wrong).toEqual([])
   })
 
+  // Tranche R10, migration 0023 : les ruches (plan R10, « Le modèle de données »). Le nom d'une
+  // ruche est une saisie d'un membre : signalable, retirable seul (REMOVABLE_PARTS.hive), copié dans
+  // un signalement et exporté. Tout le reste est écrit par l'API (dates, liens, la copie du nom dans
+  // `hive_notice`, vidée au retrait) ou choisi dans une liste fermée (l'icône, qui peut inviter, le
+  // réglage « Ruches », « Ne pas me proposer aux autres ») ; chaque texte a sa raison écrite.
+  const SLICE_R10 = {
+    hive: [
+      'id',
+      'name',
+      'name_removal_id',
+      'name_set_by',
+      'icon',
+      'animator_id',
+      'invite_policy',
+      'pinned_project_id',
+      'pinned_by',
+      'pinned_at',
+      'created_by',
+      'created_at',
+      'updated_at',
+    ],
+    hive_member: ['hive_id', 'user_id', 'invited_by', 'joined_at', 'seen_at'],
+    hive_invitation: ['id', 'hive_id', 'invitee_id', 'inviter_id', 'created_at', 'refused_at'],
+    hive_notice: ['id', 'recipient_id', 'kind', 'hive_id', 'hive_name', 'created_at'],
+    project: ['hive_id'],
+    profile: ['hide_from_suggestions'],
+    email_preference: ['email_hives'],
+  }
+
+  it('reads the tables and columns of slice R10', () => {
+    for (const [table, columns] of Object.entries(SLICE_R10)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+  })
+
+  it('classes the hive name as an input of the hive, copied when reported, exported and removable alone', () => {
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        object: 'hive',
+        table: 'hive',
+        column: 'name',
+        field: 'name',
+        kind: 'text',
+        snapshot: true,
+        export: true,
+        removable: true,
+      }),
+    )
+    expect(notAnInput('hive', 'name')).toBe(false)
+  })
+
+  it('classes the rest of slice R10 as written by the API or a closed choice, with a reason for each text', () => {
+    const wrong = Object.entries(SLICE_R10).flatMap(([table, columns]) => {
+      const entry = NOT_MEMBER_INPUTS[table]
+      const type = (column: string) =>
+        tables.find((t) => t.name === table)?.columns.find((c) => c.name === column)?.type ?? ''
+      return columns
+        .filter((column) => !(table === 'hive' && column === 'name'))
+        .filter(
+          (column) =>
+            inRegister(table, column) ||
+            !notAnInput(table, column) ||
+            entry === '*' ||
+            (isFreeType(type(column)) && (entry?.[column] ?? '').trim().length < 10),
+        )
+        .map((column) => `${table}.${column}`)
+    })
+
+    expect(wrong).toEqual([])
+  })
+
   // R9 (scénario, « Les parties ») : « le registre des entrées dit, pour chaque champ, s'il se retire
   // seul ; un test échoue si un champ n'y est pas classé ». La colonne `removable` du registre suit
   // le contrat (REMOVABLE_PARTS) : un champ qui n'est pas une partie (la version, une ligne d'une mise
@@ -695,6 +768,8 @@ const WITNESSES: Record<string, string> = {
   'call.tester_call.text': 'Appel témoin, unique.',
   'call.tester_media.description': 'Légende d’appel témoin, unique.',
   'message.tester_message.text': 'Retour de testeur témoin, unique.',
+  // R10 : le nom d'une ruche (40 signes au plus), écrit par Inès.
+  'hive.hive.name': 'Ruche témoin, unique',
 }
 const keyOf = (input: MemberInput) => `${input.object}.${input.table}.${input.column}`
 const witnessOf = (input: MemberInput) => {
@@ -704,8 +779,13 @@ const witnessOf = (input: MemberInput) => {
 }
 
 /** L'objet du registre et la sorte de cible signalée qui le porte. */
+// R10 : `hive` écrit à côté d'InputObject, pour que ce fichier se compile avant que le registre
+// connaisse l'objet « ruche ».
 const REPORTED_AS: Partial<
-  Record<InputObject, 'member' | 'project' | 'update' | 'comment' | 'call' | 'message'>
+  Record<
+    InputObject | 'hive',
+    'member' | 'project' | 'update' | 'comment' | 'call' | 'message' | 'hive'
+  >
 > = {
   member: 'member',
   project: 'project',
@@ -714,6 +794,8 @@ const REPORTED_AS: Partial<
   // R7b : un appel et un message se signalent sous leur propre sorte.
   call: 'call',
   message: 'message',
+  // R10 : une ruche, signalée par un de ses membres.
+  hive: 'hive',
 }
 
 describe('every field of the register', () => {
@@ -735,6 +817,8 @@ describe('every field of the register', () => {
   let callPhotoKey: string
   let messageId: string
   let captureKey: string
+  /** R10 : la ruche d'Inès. */
+  let hiveId: string
   /** Les signalements de Malik (et de Zoé pour le coin des testeurs), par sorte de cible. */
   const reportIds: Record<string, string> = {}
 
@@ -883,6 +967,14 @@ describe('every field of the register', () => {
     )
     expect(message.status).toBe(201)
     messageId = TesterMessage.parse(await message.json()).id
+
+    // R10 : Inès anime une ruche dont elle a écrit le nom ; Zoé en est membre, et peut la signaler.
+    // Écrite en base : la route qui crée une ruche n'est pas l'objet de ce fichier.
+    hiveId = await hiveRows(ctx).create({
+      name: WITNESSES['hive.hive.name'] ?? '',
+      animatorId: inesId,
+      members: [{ id: (await act.me(zoe)).id }],
+    })
   })
 
   /** Rejoint les testeurs d'un projet. */
@@ -942,6 +1034,9 @@ describe('every field of the register', () => {
       later()
       reportIds[kind] = (await act.report(zoe, { kind, id })).id
     }
+    // R10 : Zoé, membre de la ruche d'Inès, la signale.
+    later()
+    reportIds.hive = (await act.report(zoe, { kind: 'hive', id: hiveId })).id
   }
 
   const snapshotOf = async (kind: string) => {
@@ -1090,6 +1185,8 @@ describe('every field of the register', () => {
       // fil seulement (le fil d'Inès chez Zoé : Malik n'en est pas, blocage ou non).
       call: [`/v1/projects/${projectId}/calls`],
       message: [`/v1/projects/${zoeProjectId}/threads/${inesId}/messages`],
+      // R10 : Malik n'est pas de la ruche d'Inès : ni sa liste ni la page de la ruche ne la montrent.
+      hive: ['/v1/hives', `/v1/hives/${hiveId}`],
     }
     for (const object of new Set(MEMBER_INPUTS.map((i) => i.object))) {
       if (object === 'report') continue

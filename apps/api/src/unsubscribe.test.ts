@@ -65,11 +65,14 @@ const DEFAULTS = {
   follows: 'digest',
   updates: 'digest',
   testers: 'digest',
+  // R10 : « Ruches » vaut « Tout de suite » par défaut ; un lien « tout de suite » le baisse comme
+  // les autres types « Tout de suite » (INSTANT_EMAIL_TYPES).
+  hives: 'now',
 } as const
 
 /**
- * Les réglages d'Inès au départ : deux types sur « Tout de suite », le coin des testeurs sur
- * « Jamais » (aucun lien ne doit le remonter), le reste par défaut.
+ * Les réglages d'Inès au départ : deux types sur « Tout de suite », plus « Ruches » par défaut, le
+ * coin des testeurs sur « Jamais » (aucun lien ne doit le remonter), le reste par défaut.
  */
 const INES = { ...DEFAULTS, comments: 'now', replies: 'now', testers: 'never' } as const
 /** Ceux de Malik : « Réponses et mentions » sur « Tout de suite ». */
@@ -142,11 +145,12 @@ describe('unsubscribing from a link', () => {
 
     expect(res.status).toBe(204)
     expect(await res.text()).toBe('')
-    // Les deux types « Tout de suite » passent « Dans le récap » ; le récap reste, « Jamais » reste.
+    // Les trois types « Tout de suite » passent « Dans le récap » ; le récap reste, « Jamais » reste.
     expect(await act.preferences(ines)).toEqual({
       ...INES,
       comments: 'digest',
       replies: 'digest',
+      hives: 'digest',
     })
   })
 
@@ -154,13 +158,23 @@ describe('unsubscribing from a link', () => {
     expect((await unsubscribe({ token: tokenOf(inesId, 'instant'), choice: 'never' })).status).toBe(
       204,
     )
-    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'never', replies: 'never' })
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      comments: 'never',
+      replies: 'never',
+      hives: 'never',
+    })
 
-    await setAll(ines, { comments: 'now', replies: 'now' })
+    await setAll(ines, { comments: 'now', replies: 'now', hives: 'now' })
     expect(
       (await unsubscribe({ token: tokenOf(inesId, 'instant'), choice: 'digest' })).status,
     ).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'digest', replies: 'digest' })
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      comments: 'digest',
+      replies: 'digest',
+      hives: 'digest',
+    })
   })
 
   it('never raises a "never" type on an instant unsubscribe', async () => {
@@ -219,7 +233,7 @@ describe('unsubscribing from a link', () => {
 
   it('turns the recap off and the « now » types to the given choice with scope=all, whatever the kind of the link', async () => {
     for (const kind of ['recap', 'mentions', 'instant'] as const) {
-      await setAll(ines, { weeklyRecap: true, comments: 'now', replies: 'now' })
+      await setAll(ines, { weeklyRecap: true, comments: 'now', replies: 'now', hives: 'now' })
 
       const res = await unsubscribe({ token: tokenOf(inesId, kind), scope: 'all' })
 
@@ -229,11 +243,12 @@ describe('unsubscribing from a link', () => {
         weeklyRecap: false,
         comments: 'digest',
         replies: 'digest',
+        hives: 'digest',
       })
     }
 
     // Avec « Jamais » choisi sur la page d'un lien « tout de suite ».
-    await setAll(ines, { weeklyRecap: true, comments: 'now', replies: 'now' })
+    await setAll(ines, { weeklyRecap: true, comments: 'now', replies: 'now', hives: 'now' })
     const res = await unsubscribe({
       token: tokenOf(inesId, 'instant'),
       scope: 'all',
@@ -245,6 +260,7 @@ describe('unsubscribing from a link', () => {
       weeklyRecap: false,
       comments: 'never',
       replies: 'never',
+      hives: 'never',
     })
   })
 
@@ -253,13 +269,14 @@ describe('unsubscribing from a link', () => {
     await setAll(ines, { comments: 'now' })
 
     // Le même lien du récap, ouvert de nouveau : le récap reste coupé, les commentaires restent
-    // « Tout de suite », les réponses « Dans le récap ».
+    // « Tout de suite », les réponses et les ruches « Dans le récap ».
     expect((await unsubscribe({ token: tokenOf(inesId, 'recap') })).status).toBe(204)
     expect(await act.preferences(ines)).toEqual({
       ...INES,
       weeklyRecap: false,
       comments: 'now',
       replies: 'digest',
+      hives: 'digest',
     })
 
     // Un lien « tout de suite » sur des types déjà « Jamais » : ils y restent.
@@ -270,6 +287,7 @@ describe('unsubscribing from a link', () => {
       weeklyRecap: false,
       comments: 'never',
       replies: 'digest',
+      hives: 'digest',
     })
   })
 
@@ -281,14 +299,15 @@ describe('unsubscribing from a link', () => {
     })
     const zoeId = (await act.me(zoe)).id
 
-    // Rien sur « Tout de suite » chez Zoé : le lien « tout de suite » ne change rien.
+    // Chez Zoé, seul « Ruches » est sur « Tout de suite » (son défaut, R10) : le lien « tout de
+    // suite » ne baisse que lui.
     expect((await unsubscribe({ token: tokenOf(zoeId, 'instant'), choice: 'never' })).status).toBe(
       204,
     )
-    expect(await act.preferences(zoe)).toEqual(DEFAULTS)
+    expect(await act.preferences(zoe)).toEqual({ ...DEFAULTS, hives: 'never' })
 
     expect((await unsubscribe({ token: tokenOf(zoeId, 'recap') })).status).toBe(204)
-    expect(await act.preferences(zoe)).toEqual({ ...DEFAULTS, weeklyRecap: false })
+    expect(await act.preferences(zoe)).toEqual({ ...DEFAULTS, hives: 'never', weeklyRecap: false })
   })
 
   it('acts on the member of the link only, never on the member signed in', async () => {
@@ -304,6 +323,7 @@ describe('unsubscribing from a link', () => {
       weeklyRecap: false,
       comments: 'digest',
       replies: 'digest',
+      hives: 'digest',
     })
     expect(await act.preferences(malik)).toEqual(MALIK)
   })
@@ -336,7 +356,12 @@ describe('the one-click unsubscribe of a mail app (RFC 8058)', () => {
     })
 
     expect(res.status).toBe(204)
-    expect(await act.preferences(ines)).toEqual({ ...INES, comments: 'digest', replies: 'digest' })
+    expect(await act.preferences(ines)).toEqual({
+      ...INES,
+      comments: 'digest',
+      replies: 'digest',
+      hives: 'digest',
+    })
   })
 
   it('accepts the same form in multipart, as the RFC prefers', async () => {
