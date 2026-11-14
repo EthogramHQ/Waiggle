@@ -88,8 +88,8 @@ export const moderationDecision = pgTable(
     // la décision pour un rétablissement ; null sinon. Vidé quand le compte part (relecture de
     // sécurité P2). Pour un pseudo, `explanation` reste celle montrée au membre.
     previousValue: text('previous_value'),
-    // R9 : le pseudo provisoire donné par ce retrait, pour savoir au rétablissement si le membre en a
-    // choisi un autre depuis (relecture de sécurité P3) ; null sinon.
+    // R9 : le pseudo provisoire (ou le nom « Membre ») donné par ce retrait, pour savoir au
+    // rétablissement si le membre en a choisi un autre depuis (relecture de sécurité P3) ; null sinon.
     provisionalValue: text('provisional_value'),
   },
   (t) => [

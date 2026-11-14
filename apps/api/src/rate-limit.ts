@@ -25,6 +25,13 @@ export type RateLimiter = {
    * essais lancés en même temps : chacun prend sa place avant d'être vérifié.
    */
   refund(key: string): Promise<void>
+  /**
+   * Ce qu'il reste à `key` dans sa fenêtre actuelle, sans rien compter (R9 : la feuille « Signaler »
+   * le dit dès son ouverture). Un simple `select`, jamais une écriture (relecture de sécurité P8) :
+   * lire ne compte pas, et n'ouvre pas de fenêtre. Une fenêtre finie se lit comme vide, avec la même
+   * expiration que `hit`.
+   */
+  peek(key: string, rule: RateRule): Promise<{ remaining: number }>
 }
 
 /**
@@ -74,6 +81,17 @@ export const createRateLimiter = (
       .update(t)
       .set({ count: sql`${t.count} - 1` })
       .where(and(eq(t.key, key), gt(t.count, 0)))
+  },
+  async peek(key, { windowMs, max }) {
+    const t = schema.apiRateLimit
+    // Lu par la clé primaire (key). La fenêtre est finie si elle a commencé il y a `windowMs` ou
+    // plus : la condition exacte de `hit`, qui repartirait alors à 1.
+    const [row] = await db
+      .select({ count: t.count, windowStart: t.windowStart })
+      .from(t)
+      .where(eq(t.key, key))
+    if (!row || row.windowStart <= clock() - windowMs) return { remaining: max }
+    return { remaining: Math.max(0, max - row.count) }
   },
 })
 

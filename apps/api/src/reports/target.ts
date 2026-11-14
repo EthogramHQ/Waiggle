@@ -11,23 +11,34 @@
 // (moderation/inputs.ts) ; une image n'y est que sa clé de stockage, jamais le fichier (règle 15).
 // Et le blocage : un contenu d'un membre bloqué avec moi, dans un sens ou l'autre, est introuvable,
 // sauf trois cas de la relecture du plan (précision 2, règles 1 et 2, plus bas).
-import type {
-  MemberInputField,
-  ReportSnapshot,
-  ReportTarget,
-  ReportTargetPreview,
-  StoredReportTarget,
+//
+// R9 (7d) : on signale aussi une PARTIE (« La 2e photo », la description, la bio). La lecture donne
+// donc aussi les parties présentes sur la page, dans l'ordre de la feuille (REPORTABLE_PARTS), chacune
+// avec la copie qu'en garde son signalement (ce seul champ), et le rappel de tête de la feuille
+// (`head`). Une photo retirée par la modération n'est plus sur la page des autres : elle n'est ni une
+// partie, ni dans la copie, et la photo suivante devient la couverture.
+import {
+  type MemberInputField,
+  type ReportPartField,
+  type ReportSnapshot,
+  type ReportTarget,
+  type ReportTargetPreview,
+  type StoredReportTarget,
+  Thumbhash,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm'
+import { rgbaToThumbHash } from 'thumbhash'
 
 import { type Blocks, blocksOf } from '../blocks/visibility'
 import { sees, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
+import { mediaUrl } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
 import { projectVisibleTo } from '../projects/visibility'
+import { type MediaRow, toVisual } from '../projects/visual'
 import { cornerAccess } from '../testers/access'
 import { photosOfUpdates, readLines, updateShownTo } from '../updates/load'
 import { isActiveAdmin } from './admin'
@@ -53,6 +64,87 @@ export type Reportable = {
   snapshot: ReportSnapshot
   /** L'auteur, pour « Bloquer aussi @x » après l'envoi ; `isBlocked` : je l'ai déjà bloqué. */
   author: ReportTargetPreview['author']
+  /** R9 : le rappel en tête de la feuille, sans le nom de l'auteur (pris dans `author`). */
+  head: Omit<ReportTargetPreview['head'], 'authorName'>
+  /** R9 : les parties présentes sur la page, dans l'ordre de la feuille. */
+  parts: ReportablePart[]
+}
+
+/** Une miniature : l'adresse de l'image et son résumé flou (contrat ProjectVisual). */
+type Thumb = { url: string; thumbhash: string }
+
+/**
+ * R9 : une partie qu'on peut signaler, telle que la feuille la propose (sa photo, son rang à partir
+ * de 1, sa miniature), avec la copie que garde un signalement de cette seule partie.
+ */
+export type ReportablePart = {
+  field: ReportPartField
+  mediaId: string | null
+  position: number | null
+  thumb: Thumb | null
+  copy: ReportSnapshot
+}
+
+/** Une partie de texte : ni photo, ni rang, ni miniature. */
+const textPart = (field: ReportPartField, copy: ReportSnapshot): ReportablePart => ({
+  field,
+  mediaId: null,
+  position: null,
+  thumb: null,
+  copy,
+})
+
+/**
+ * Une photo de profil n'a pas de résumé flou en base, mais le contrat en demande un pour chaque
+ * miniature : un gris clair uni, calculé une fois au chargement, qui ne montre rien de la photo.
+ */
+const NEUTRAL_THUMBHASH = Thumbhash.parse(
+  Buffer.from(
+    rgbaToThumbHash(
+      4,
+      4,
+      Uint8Array.from({ length: 4 * 4 * 4 }, (_, i) => (i % 4 === 3 ? 255 : 224)),
+    ),
+  ).toString('base64'),
+)
+
+/** La miniature d'une photo d'un projet ou d'une mise à jour. */
+const thumbOf = (media: MediaRow, publicApiUrl: string): Thumb => {
+  const { url, thumbhash } = toVisual(media, publicApiUrl)
+  return { url, thumbhash }
+}
+
+/**
+ * Une photo de la page est-elle visible des autres ? Retirée seule par la modération (R9), elle ne
+ * l'est plus (`removal_id`). Le prédicat commun de toutes les lectures viendra de
+ * projects/media-visibility.ts ; la règle est la même.
+ */
+const shownMedia = <T extends { removalId: string | null }>(rows: T[]) =>
+  rows.filter((row) => row.removalId === null)
+
+/**
+ * La couverture visible d'un projet, pour la tête de la feuille d'un contenu qui y vit (mise à
+ * jour, commentaire, appel, message) : sa première photo visible, sinon sa couverture verticale.
+ * Index project_media_project_idx (projet, emplacement, position).
+ */
+const projectCover = async (
+  db: Database,
+  projectId: string,
+  publicApiUrl: string,
+): Promise<Thumb | null> => {
+  const rows = await db
+    .select()
+    .from(m)
+    .where(
+      and(
+        eq(m.projectId, projectId),
+        inArray(m.slot, ['gallery', 'portrait']),
+        isNull(m.removalId),
+      ),
+    )
+    .orderBy(asc(m.slot), asc(m.position))
+  const cover = rows.find((row) => row.slot === 'gallery') ?? rows[0]
+  return cover ? thumbOf(cover, publicApiUrl) : null
 }
 
 /** Le texte d'un projet : son titre, puis son pitch. */
@@ -76,12 +168,18 @@ const oneLine = (values: string[]) => values.join(', ')
 const filled = (field: MemberInputField, value: string | null | undefined): ReportSnapshot =>
   value === null || value === undefined || value === '' ? [] : [{ field, value }]
 
-/**
- * Une image d'un projet, nommée comme au registre : la couverture (la première photo de la
- * galerie, ou la couverture verticale), ou une autre photo.
- */
-const imageField = (media: { slot: string; position: number }): MemberInputField =>
-  media.slot === 'portrait' || media.position === 0 ? 'cover' : 'photo'
+/** La photo d'un appel ou la capture d'un message du coin (R7b), seule partie qu'ils ont (R9). */
+const testerPhotoPart = (
+  photo: { id: string; key: string; thumbhash: string },
+  copy: ReportSnapshot,
+  publicApiUrl: string,
+): ReportablePart => ({
+  field: 'photo',
+  mediaId: photo.id,
+  position: 1,
+  thumb: { url: mediaUrl(publicApiUrl, photo.key), thumbhash: Thumbhash.parse(photo.thumbhash) },
+  copy,
+})
 
 /**
  * Le nom et le pseudo actuel de l'auteur, pour l'aperçu (une requête par la clé primaire de user,
@@ -123,22 +221,38 @@ export const loadReportable = async (
   db: Database,
   viewerId: string,
   target: ReportTarget,
+  publicApiUrl: string,
 ): Promise<Reportable | null> => {
   // Les blocages posés par ce membre et ceux qui le visent, en une requête (blocks/visibility.ts) :
   // les règles propres au signalement (précision 2, règles 1 et 2) se lisent ensuite en JavaScript.
   const blocks = await blocksOf(db, viewerId)
-  const found = await loadVisible(db, viewerId, target, blocks)
+  const found = await loadVisible(db, viewerId, target, blocks, publicApiUrl)
   if (!found) return null
   const author = await authorOf(db, found.authorId, blocks)
   if (!author) return null
   return { ...found, author }
 }
 
+/**
+ * R9 : la partie demandée parmi celles de la page, ou null si elle n'y est pas (un prompt sur un
+ * projet qui n'en a pas, une photo d'un autre contenu, une photo retirée) : la route répond alors
+ * le 404 d'un contenu inconnu. Une couverture se cherche aussi par sa photo.
+ */
+export const findPart = (
+  found: Pick<Reportable, 'parts'>,
+  part: { field: ReportPartField; mediaId?: string | undefined },
+) =>
+  found.parts.find(
+    (candidate) =>
+      candidate.field === part.field && candidate.mediaId === (part.mediaId?.toLowerCase() ?? null),
+  ) ?? null
+
 const loadVisible = async (
   db: Database,
   viewerId: string,
   target: ReportTarget,
   blocks: Blocks,
+  publicApiUrl: string,
 ): Promise<Omit<Reportable, 'author'> | null> => {
   switch (target.kind) {
     case 'project': {
@@ -152,6 +266,8 @@ const loadVisible = async (
           description: p.description,
           prompts: p.prompts,
           demoUrl: p.demoUrl,
+          primaryCategory: p.primaryCategory,
+          secondaryCategory: p.secondaryCategory,
         })
         .from(p)
         .where(and(eq(p.id, target.id), projectVisibleTo(viewerId)))
@@ -160,38 +276,91 @@ const loadVisible = async (
       // l'ancienne colonne `project.tools`.
       const tools = (await toolsOfProjects(db, [target.id])).get(target.id) ?? []
       // Les images du projet, dans l'ordre de la page (index project_media_project_idx : projet,
-      // emplacement, position). Seule leur clé est lue : aucun fichier n'est copié.
-      const media = await db
-        .select({
-          slot: m.slot,
-          position: m.position,
-          key: m.storageKey,
-          description: m.description,
-        })
-        .from(m)
-        // Seules les photos du projet (galerie, couverture verticale) : celles d'une mise à jour
-        // ou en attente (jamais publiées) n'entrent pas dans sa copie (relecture de sécurité A8).
-        .where(and(eq(m.projectId, target.id), inArray(m.slot, ['gallery', 'portrait'])))
-        .orderBy(asc(m.slot), asc(m.position))
+      // emplacement, position). Seule leur clé est copiée : aucun fichier ne l'est.
+      const media = shownMedia(
+        await db
+          .select()
+          .from(m)
+          // Seules les photos du projet (galerie, couverture verticale) : celles d'une mise à jour
+          // ou en attente (jamais publiées) n'entrent pas dans sa copie (relecture de sécurité A8).
+          .where(and(eq(m.projectId, target.id), inArray(m.slot, ['gallery', 'portrait'])))
+          .orderBy(asc(m.slot), asc(m.position)),
+      )
+      const gallery = media.filter((item) => item.slot === 'gallery')
+      const portrait = media.find((item) => item.slot === 'portrait')
+      // La couverture est la 1re photo visible de la galerie ; la couverture verticale (téléphone)
+      // en est une aussi (une seule partie « cover », chacune par sa photo).
+      const covers = [...gallery.slice(0, 1), ...(portrait ? [portrait] : [])]
+      // Le rang d'une photo dans la galerie visible, à partir de 1 ; null pour la verticale.
+      const rankOf = (item: MediaRow) =>
+        item.slot === 'gallery' ? gallery.indexOf(item) + 1 : null
+      const photoPart = (field: ReportPartField, item: MediaRow, copy: ReportSnapshot) => ({
+        field,
+        mediaId: item.id,
+        position: rankOf(item),
+        thumb: thumbOf(item, publicApiUrl),
+        copy,
+      })
+      const toolLine = filled('tools', oneLine(tools.map((tool) => tool.label)))
+      const promptLines = row.prompts.flatMap((prompt) => filled('prompt', prompt))
+      // La catégorie n'est pas une saisie du registre : sa copie est un texte (`text`), ses codes.
+      const categories = [row.primaryCategory, row.secondaryCategory].filter(
+        (code): code is string => code !== null,
+      )
+      // Chaque image, suivie de sa description si elle en a une (R6a, jur-J13) : la modération
+      // sait ainsi quelle photo est décrite.
+      const imageCopy = (item: MediaRow): ReportSnapshot => [
+        { field: covers.includes(item) ? 'cover' : 'photo', value: item.storageKey },
+        ...filled('photoDescription', item.description),
+      ]
       const snapshot: ReportSnapshot = [
         { field: 'title', value: row.title },
         { field: 'pitch', value: row.pitch },
         ...filled('description', row.description),
-        ...row.prompts.flatMap((prompt) => filled('prompt', prompt)),
-        ...filled('tools', oneLine(tools.map((tool) => tool.label))),
+        ...promptLines,
+        ...toolLine,
         ...filled('demoUrl', row.demoUrl),
-        // Chaque image, suivie de sa description si elle en a une (R6a, jur-J13) : la modération
-        // sait ainsi quelle photo est décrite.
-        ...media.flatMap((item) => [
-          { field: imageField(item), value: item.key },
-          ...filled('photoDescription', item.description),
-        ]),
+        ...media.flatMap(imageCopy),
       ]
+      // L'ordre de la feuille (REPORTABLE_PARTS), les photos par rang ; seulement ce qui est là.
+      const parts: ReportablePart[] = [
+        textPart('title', [{ field: 'title', value: row.title }]),
+        textPart('pitch', [{ field: 'pitch', value: row.pitch }]),
+        ...(row.description === ''
+          ? []
+          : [textPart('description', filled('description', row.description))]),
+        ...(categories.length === 0
+          ? []
+          : [textPart('category', [{ field: 'text', value: categories.join(', ') }])]),
+        ...(toolLine.length === 0 ? [] : [textPart('tools', toolLine)]),
+        ...(row.demoUrl ? [textPart('demoUrl', filled('demoUrl', row.demoUrl))] : []),
+        ...covers.map((item) =>
+          photoPart('cover', item, [{ field: 'cover', value: item.storageKey }]),
+        ),
+        ...gallery.map((item) =>
+          photoPart(
+            'photo',
+            item,
+            imageCopy(item).map((entry) =>
+              entry.field === 'cover' ? { ...entry, field: 'photo' as const } : entry,
+            ),
+          ),
+        ),
+        ...media
+          .filter((item) => item.description !== null && item.description !== '')
+          .map((item) =>
+            photoPart('photoDescription', item, filled('photoDescription', item.description)),
+          ),
+        ...(promptLines.length === 0 ? [] : [textPart('prompt', promptLines)]),
+      ]
+      const head = gallery[0] ?? portrait
       return {
         authorId: row.authorId,
         projectId: target.id,
         text: projectText(row.title, row.pitch),
         snapshot,
+        head: { title: row.title, image: head ? thumbOf(head, publicApiUrl) : null },
+        parts,
       }
     }
     case 'update': {
@@ -215,19 +384,35 @@ const loadVisible = async (
       const lines = readLines(row.lines)
       // Ses photos rattachées, dans l'ordre (index project_media_update_idx) : une photo en attente
       // n'a pas de mise à jour, elle n'y est donc jamais. Chacune est suivie de sa description.
-      const photos = (await photosOfUpdates(db, [target.id])).get(target.id) ?? []
+      // R9 : une photo retirée seule n'y est plus.
+      const photos = shownMedia((await photosOfUpdates(db, [target.id])).get(target.id) ?? [])
+      const textCopy: ReportSnapshot = [
+        ...filled('title', row.title),
+        ...filled('version', row.version),
+        ...lines.map((line) => ({ field: 'line' as const, value: line.text })),
+      ]
+      const photoCopy = (photo: MediaRow): ReportSnapshot => [
+        { field: 'photo', value: photo.storageKey },
+        ...filled('photoDescription', photo.description),
+      ]
       return {
         authorId: row.authorId,
         projectId: row.projectId,
         text: updateText(row.title, lines),
-        snapshot: [
-          ...filled('title', row.title),
-          ...filled('version', row.version),
-          ...lines.map((line) => ({ field: 'line' as const, value: line.text })),
-          ...photos.flatMap((photo) => [
-            { field: 'photo' as const, value: photo.storageKey },
-            ...filled('photoDescription', photo.description),
-          ]),
+        snapshot: [...textCopy, ...photos.flatMap(photoCopy)],
+        head: {
+          title: row.title === null || row.title === '' ? null : row.title,
+          image: await projectCover(db, row.projectId, publicApiUrl),
+        },
+        parts: [
+          textPart('text', textCopy),
+          ...photos.map((photo, i) => ({
+            field: 'photo' as const,
+            mediaId: photo.id,
+            position: i + 1,
+            thumb: thumbOf(photo, publicApiUrl),
+            copy: photoCopy(photo),
+          })),
         ],
       }
     }
@@ -274,6 +459,9 @@ const loadVisible = async (
         projectId: row.projectId,
         text: row.body,
         snapshot: [{ field: 'body', value: row.body }],
+        // Un commentaire se signale en entier : il n'a pas de parties, ni de titre.
+        head: { title: null, image: await projectCover(db, row.projectId, publicApiUrl) },
+        parts: [],
       }
     }
     case 'call': {
@@ -298,24 +486,27 @@ const loadVisible = async (
       if (!isAuthor && access !== 'tester') return null
       if (row.removedAt !== null && !isAuthor) return null
       // Sa photo (index tester_media_call_idx) : la clé, puis sa description. Jamais le fichier.
+      // R9 : retirée seule par la modération, elle n'y est plus (removal_id).
       const [photo] = await db
-        .select({ key: tm.storageKey, description: tm.description })
+        .select({
+          id: tm.id,
+          key: tm.storageKey,
+          thumbhash: tm.thumbhash,
+          description: tm.description,
+        })
         .from(tm)
-        .where(eq(tm.callId, target.id))
+        .where(and(eq(tm.callId, target.id), isNull(tm.removalId)))
         .orderBy(asc(tm.createdAt), asc(tm.id))
+      const photoCopy: ReportSnapshot = photo
+        ? [{ field: 'photo', value: photo.key }, ...filled('photoDescription', photo.description)]
+        : []
       return {
         authorId: row.authorId,
         projectId: row.projectId,
         text: row.text,
-        snapshot: [
-          ...filled('body', row.text),
-          ...(photo
-            ? [
-                { field: 'photo' as const, value: photo.key },
-                ...filled('photoDescription', photo.description),
-              ]
-            : []),
-        ],
+        snapshot: [...filled('body', row.text), ...photoCopy],
+        head: { title: null, image: await projectCover(db, row.projectId, publicApiUrl) },
+        parts: photo ? [testerPhotoPart(photo, photoCopy, publicApiUrl)] : [],
       }
     }
     case 'message': {
@@ -345,17 +536,17 @@ const loadVisible = async (
       if (!inThread) return null
       if (row.removedAt !== null && row.senderId !== viewerId) return null
       const [capture] = await db
-        .select({ key: tm.storageKey })
+        .select({ id: tm.id, key: tm.storageKey, thumbhash: tm.thumbhash })
         .from(tm)
-        .where(eq(tm.messageId, target.id))
+        .where(and(eq(tm.messageId, target.id), isNull(tm.removalId)))
+      const captureCopy: ReportSnapshot = capture ? [{ field: 'photo', value: capture.key }] : []
       return {
         authorId: row.senderId,
         projectId: row.projectId,
         text: row.text ?? '',
-        snapshot: [
-          ...filled('body', row.text),
-          ...(capture ? [{ field: 'photo' as const, value: capture.key }] : []),
-        ],
+        snapshot: [...filled('body', row.text), ...captureCopy],
+        head: { title: null, image: await projectCover(db, row.projectId, publicApiUrl) },
+        parts: capture ? [testerPhotoPart(capture, captureCopy, publicApiUrl)] : [],
       }
     }
     case 'member': {
@@ -382,6 +573,14 @@ const loadVisible = async (
       if (handle === null) return null
       // R6b : ses outils favoris, par profile_tool, avec le nom qu'il a tapé pour un « Autre ».
       const favoriteTools = (await favoriteToolsOf(db, row.id)).map((tool) => tool.label)
+      // R9 : une photo de profil retirée par la modération porte une clé « withheld/… », que seul
+      // son auteur relit : pour les autres, il n'a pas de photo.
+      const avatarKey = row.avatarKey?.startsWith('withheld/') ? null : row.avatarKey
+      const avatar = avatarKey
+        ? { url: mediaUrl(publicApiUrl, avatarKey), thumbhash: NEUTRAL_THUMBHASH }
+        : null
+      const bio = filled('bio', row.bio)
+      const tools = filled('favoriteTools', oneLine(favoriteTools))
       return {
         authorId: row.id,
         projectId: null,
@@ -389,9 +588,19 @@ const loadVisible = async (
         snapshot: [
           { field: 'name', value: row.name },
           { field: 'handle', value: handle },
-          ...filled('bio', row.bio),
-          ...filled('favoriteTools', oneLine(favoriteTools)),
-          ...filled('avatar', row.avatarKey),
+          ...bio,
+          ...tools,
+          ...filled('avatar', avatarKey),
+        ],
+        head: { title: null, image: avatar },
+        parts: [
+          textPart('name', [{ field: 'name', value: row.name }]),
+          textPart('handle', [{ field: 'handle', value: handle }]),
+          ...(bio.length === 0 ? [] : [textPart('bio', bio)]),
+          ...(tools.length === 0 ? [] : [textPart('favoriteTools', tools)]),
+          ...(avatar && avatarKey
+            ? [{ ...textPart('avatar', filled('avatar', avatarKey)), thumb: avatar }]
+            : []),
         ],
       }
     }

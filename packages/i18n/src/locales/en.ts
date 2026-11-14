@@ -1710,6 +1710,7 @@ export const en: Translation = {
       profilePart: 'removal of {{part}} of my profile',
       suspension: 'suspension of my account',
     },
+    provisionalNameValue: 'Member',
   },
   member: {
     // {{nameOf}}: “Inès’s” (nameOf from @ruche/i18n, slice 6c).
