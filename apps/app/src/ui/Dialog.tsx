@@ -46,8 +46,16 @@
 // 1440 × 900. Sur un écran bas (téléphone en paysage), toute la couche défile, comme avant : un pied
 // collé y mangerait presque toute la hauteur.
 import { borders, layout, space } from '@ruche/brand'
-import { type ReactNode, type RefObject, useEffect, useId, useRef } from 'react'
-import { Modal, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native'
+import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react'
+import {
+  type LayoutChangeEvent,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from './focus'
 import { openModalLayer, sameLayer } from './modalLayers'
 import { Notice } from './Notice'
@@ -155,12 +163,18 @@ const webScrim = (onPress: (() => void) | undefined): object => ({
 const QUOTE_LINES = 3
 
 /**
- * La hauteur d'écran (points) à partir de laquelle les boutons restent collés en bas de la fenêtre.
- * En dessous (un téléphone en paysage : 390 points), deux boutons, leur marge et un message d'échec
- * prendraient presque tout : le texte n'aurait plus qu'une fente pour défiler. 480 couvre le plus
- * petit téléphone tenu droit (320 × 568), même à 200 % de texte.
+ * La hauteur d'écran (points) à partir de laquelle les boutons peuvent rester collés en bas de la
+ * fenêtre. En dessous (un téléphone en paysage : 390 points), deux boutons et leur marge
+ * prendraient presque tout : le texte n'aurait plus qu'une fente pour défiler.
+ *
+ * Cette hauteur ne suffit pas : à 320 × 568 avec le texte à 200 %, les boutons font à eux seuls
+ * plus de la moitié de l'écran et la zone du texte tombait à 198 points (contre-visite de R9). Les
+ * boutons ne sont donc collés que si leur hauteur **mesurée** laisse à la zone du texte au moins la
+ * moitié de l'écran (`PINNED_TEXT_SHARE`) ; sinon toute la couche défile, titre et boutons ensemble.
  */
 const PINNED_MIN_HEIGHT = 480
+/** La part de l'écran que la zone du texte doit garder pour que les boutons soient collés. */
+const PINNED_TEXT_SHARE = 0.5
 /** La marge autour de la fenêtre (celle de la couche qui défile). */
 const DIALOG_MARGIN = space.xl
 
@@ -232,10 +246,27 @@ export function Dialog({
   initialFocusRef,
 }: Props) {
   const { colors } = useTheme()
-  // La hauteur de l'écran : assez haut, les boutons restent collés en bas de la fenêtre, qui ne
-  // dépasse jamais (voir `PINNED_MIN_HEIGHT`).
+  // La hauteur de l'écran : assez haut, et des boutons assez courts, ils restent collés en bas de
+  // la fenêtre, qui ne dépasse jamais (voir `PINNED_MIN_HEIGHT`). `buttonsFit` : la mesure des
+  // boutons dit qu'ils laissent la moitié de l'écran au texte (`null` : pas encore mesurés, on
+  // colle comme avant). Décidé **une fois** par ouverture : si l'avis changeait en route (le
+  // message d'échec qui apparaît), le haut de la fenêtre serait remonté ailleurs et un champ de
+  // `body` perdrait sa saisie et son focus.
   const screenHeight = useWindowDimensions().height
-  const pinned = screenHeight >= PINNED_MIN_HEIGHT
+  const [buttonsFit, setButtonsFit] = useState<boolean | null>(null)
+  const pinned = screenHeight >= PINNED_MIN_HEIGHT && buttonsFit !== false
+  useEffect(() => {
+    if (!visible) setButtonsFit(null)
+  }, [visible])
+  const measureButtons = (event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height
+    // Une mesure à 0 (vue pas encore dessinée) ne dit rien.
+    if (buttonsFit !== null || height <= 0) return
+    // Ce qui reste à la zone du texte : l'écran, moins la marge autour de la fenêtre, le bas de
+    // son remplissage, l'écart au-dessus des boutons, et les boutons eux-mêmes.
+    const text = screenHeight - 2 * DIALOG_MARGIN - space.xxl - space.lg - height
+    setButtonsFit(text >= screenHeight * PINNED_TEXT_SHARE)
+  }
   // Le fondu du bas de la zone qui défile, tant qu'il reste du texte plus bas (celui des feuilles).
   const fold = useBelowFold()
   const tapsAllowed = useTapsAllowed(visible, guardTaps)
@@ -396,7 +427,10 @@ export function Dialog({
               {error ? <Notice message={error} /> : null}
               {/* pointerEvents « none » pendant la garde : une tape traverse les boutons et tombe
                   sur la fenêtre elle-même, qui n'en fait rien (sur le web comme sur téléphone). */}
-              <View style={{ gap: space.md, pointerEvents: tapsAllowed ? 'auto' : 'none' }}>
+              <View
+                onLayout={measureButtons}
+                style={{ gap: space.md, pointerEvents: tapsAllowed ? 'auto' : 'none' }}
+              >
                 {children}
               </View>
               {initialFocusRef ? <FocusOnShow target={initialFocusRef} /> : null}
