@@ -332,9 +332,9 @@ function useReportForm({
   const { author, head } = preview
   const kind: ReportTargetKind = preview.target.kind
   // « Bloquer aussi » : jamais pour un auteur déjà bloqué, ni quand un blocage nous sépare déjà
-  // (pseudo retenu, PUT block répondrait 404), ni pour un administrateur (l'API le refuserait).
-  const blockable =
-    !author.isBlocked && author.handle !== null && !author.isAdmin ? author.handle : null
+  // (pseudo retenu, PUT block répondrait 404). Un administrateur n'est pas écarté : l'aperçu ne dit
+  // jamais qui l'est, la case est la même pour tous.
+  const blockable = !author.isBlocked && author.handle !== null ? author.handle : null
 
   // --- Les gestes ---
   const goOn = () => {

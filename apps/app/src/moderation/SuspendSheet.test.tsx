@@ -60,6 +60,12 @@ jest.mock('../members/api', () => {
   }
 })
 jest.mock('./api', () => ({ useDecide: jest.fn() }))
+// Un test n'a pas de navigateur de pages : le vrai `useNavigation()` échoue. Une navigation inerte,
+// qui n'écoute rien : la garde de sortie `useLeaveGuard` de la feuille s'y pose sans rien arrêter.
+jest.mock('expo-router', () => ({
+  ...jest.requireActual('expo-router'),
+  useNavigation: () => ({ addListener: () => () => {}, dispatch: () => {} }),
+}))
 // Les messages brefs (« Compte suspendu. ») : relevés ici, la vraie file des messages n'est pas
 // montée par les tests.
 const mockToasts: string[] = []

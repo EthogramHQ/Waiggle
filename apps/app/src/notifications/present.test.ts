@@ -220,6 +220,27 @@ describe('the moderation and the updates (R7a)', () => {
     expect(sentenceOf(present(old))).toBe(fr.t(($) => $.notifications.reportHandled.note.dismissed))
     expect(present(old).target).toBeNull()
   })
+
+  // R9 (relectures, question 10) : un signalement qui ne visait qu'une partie le dit, quelle que
+  // soit la sorte de contenu ; sans `part`, le texte de la sorte reste.
+  it.each(['removed', 'dismissed'] as const)(
+    'says a handled report was about a part only (%s)',
+    (outcome) => {
+      const handled: Of<'report_handled'> = {
+        ...reportHandledNotification,
+        targetKind: 'project',
+        outcome,
+        part: true,
+      }
+
+      expect(sentenceOf(present(handled))).toBe(
+        fr.t(($) => $.notifications.reportHandled.part[outcome]),
+      )
+      expect(sentenceOf(present({ ...handled, part: false }))).toBe(
+        fr.t(($) => $.notifications.reportHandled.project[outcome]),
+      )
+    },
+  )
 })
 
 // --- R7b : le coin des testeurs ---

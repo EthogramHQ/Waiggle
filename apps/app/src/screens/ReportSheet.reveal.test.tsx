@@ -76,7 +76,7 @@ jest.mock('../ui/focus', () => {
 })
 
 const projectId = '6e7f8091-a2b3-4dc4-9ed5-e6f708192a3b'
-const sam = { id: 'u-sam', name: 'Sam Petit', handle: 'sam', isBlocked: false, isAdmin: false }
+const sam = { id: 'u-sam', name: 'Sam Petit', handle: 'sam', isBlocked: false }
 /** Le commentaire de Sam : pas de partie, la feuille commence au motif. */
 const samComment: ReportTargetPreview = {
   target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },

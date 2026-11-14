@@ -2659,7 +2659,6 @@ const fakeApi = (
             name: leaMe.name,
             handle: leaMe.handle,
             isBlocked: false,
-            isAdmin: false,
           },
           head: { title: recipesProject.title, authorName: leaMe.name, image: null },
           parts: ['description', 'tools', 'demoUrl', 'prompt'].map((field) => ({
@@ -2688,7 +2687,6 @@ const fakeApi = (
           name: comment.author.name,
           handle: comment.author.id === ines.id ? 'ines_haddad' : 'max_durand',
           isBlocked: blocked.has(comment.author.id),
-          isAdmin: false,
         },
         // R9 : le rappel en tête de la feuille ; un commentaire n'a ni titre, ni partie.
         head: { title: null, authorName: comment.author.name, image: null },

@@ -525,7 +525,6 @@ export const meteoPreview: ReportTargetPreview = {
     name: 'Inès Haddad',
     handle: 'ines_haddad',
     isBlocked: false,
-    isAdmin: false,
   },
   head: { title: 'Météo', authorName: 'Inès Haddad', image: null },
   parts: [

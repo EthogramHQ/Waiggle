@@ -653,7 +653,13 @@ export const presentNotification = (
       // Tranche 7a, règle 2 : la sorte de contenu et l'issue, et comment contester ; ni titre, ni
       // extrait, ni auteur. Un lien seulement si la cible est encore visible (l'API le décide).
       const { targetKind, outcome, link } = notification
-      const said = say({}, () => t(($) => $.notifications.reportHandled[targetKind][outcome]))
+      // R9 (relectures) : un signalement qui ne visait qu'une partie le dit (`part`), sans nommer
+      // laquelle ; les autres gardent le texte de leur sorte de contenu.
+      const said = say({}, () =>
+        notification.part
+          ? t(($) => $.notifications.reportHandled.part[outcome])
+          : t(($) => $.notifications.reportHandled[targetKind][outcome]),
+      )
       return {
         ...plain,
         ...said,

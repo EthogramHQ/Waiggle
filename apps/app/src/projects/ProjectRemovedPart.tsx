@@ -10,6 +10,8 @@
 //   (sorti de sa colonne, l'API le lui rend dans `value`). Un texte retiré s'écrit en texte simple,
 //   jamais en Markdown ni en lien : il a été retiré, ses liens ne s'ouvrent plus d'ici.
 //
+// « Supprimer » ouvre d'abord une fenêtre de confirmation (la photo part pour de bon).
+//
 // Et `useDeleteRemovedPhoto`, le « Supprimer » d'une photo retirée : la photo part pour de bon
 // (`deleteVisual`), une seule fois même sur une double tape.
 import type { Project, RemovedPart as RemovedPartData, ReportPartField } from '@ruche/contracts'
@@ -18,7 +20,10 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { Button } from '../ui/Button'
 import { partContestSubject } from '../ui/contestSubject'
+import { Dialog } from '../ui/Dialog'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { ProjectThumb } from '../ui/ProjectThumb'
 import { partText } from '../ui/partText'
@@ -127,6 +132,38 @@ export function ProjectRemovedPart({
     <RemovedText values={values} />
   ) : null
 
+  // « Supprimer » ne supprime pas tout de suite : la photo part pour de bon, une fenêtre le redit
+  // d'abord (R9, relectures). « Supprimer » de la fenêtre ferme celle-ci et envoie `onDelete` ; le
+  // bouton de l'encadré montre alors son chargement (`deleting`).
+  const [confirming, setConfirming] = useState(false)
+  // « Annuler » reçoit le focus à l'ouverture (supprimer ne se défait pas : Entrée à l'arrivée ne
+  // doit rien supprimer) et le rend à « Supprimer » en partant.
+  const cancelRef = useRef<Focusable>(null)
+  const deleteRef = useRef<Focusable>(null)
+  // Une ref en plus de l'état : deux tapes dans la même image voient toutes deux la fenêtre ouverte.
+  const confirmed = useRef(false)
+
+  // Chaque ouverture repart de zéro : sur Android, `onClosed` n'est pas appelé, et une suppression
+  // refusée doit pouvoir être renvoyée.
+  const open = () => {
+    confirmed.current = false
+    setConfirming(true)
+  }
+  const cancel = () => setConfirming(false)
+  const confirm = () => {
+    if (confirmed.current) return
+    confirmed.current = true
+    setConfirming(false)
+    onDelete?.()
+  }
+  // La fenêtre est tout à fait partie : sans suppression, le focus revient à « Supprimer ». Après
+  // une suppression, l'encadré s'en va (ou son titre a déjà le focus) : rien à rendre.
+  const closed = () => {
+    if (confirmed.current) return
+    const node = deleteRef.current
+    if (node && !focusWithoutScroll(node)) moveReaderTo(node)
+  }
+
   return (
     <Stack gap="md">
       <RemovedPart
@@ -134,13 +171,31 @@ export function ProjectRemovedPart({
         removal={part.removal}
         contestSubject={subject}
         onReplace={onReplace}
-        onDelete={onDelete}
+        onDelete={onDelete ? open : null}
         deleting={deleting}
+        deleteRef={deleteRef}
       >
         {content}
       </RemovedPart>
       {/* Sous l'encadré, près des boutons : le refus reste où le membre regarde. */}
       {error ? <Notice message={error} /> : null}
+      <Dialog
+        visible={confirming}
+        guardTaps
+        title={t(($) => $.removal.part.deleteConfirmTitle)}
+        message={t(($) => $.removal.part.deleteConfirmBody)}
+        onDismiss={cancel}
+        onClosed={closed}
+        initialFocusRef={cancelRef}
+      >
+        <Button label={t(($) => $.removal.part.delete)} variant="confirm" onPress={confirm} />
+        <Button
+          ref={cancelRef}
+          label={t(($) => $.common.cancel)}
+          variant="secondary"
+          onPress={cancel}
+        />
+      </Dialog>
     </Stack>
   )
 }

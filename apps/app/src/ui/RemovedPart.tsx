@@ -12,7 +12,7 @@
 // phrases de la décision sont écrites ici, à partir de la `Removal` du contrat.
 import { borders, radii, space } from '@ruche/brand'
 import type { Removal } from '@ruche/contracts'
-import { type ReactNode, useId, useRef } from 'react'
+import { type ReactNode, type RefObject, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from './Button'
@@ -45,6 +45,11 @@ type Props = {
    * le bouton montre son chargement, et « Remplacer » est inactif le temps de l'envoi.
    */
   deleting?: boolean
+  /**
+   * Le bouton « Supprimer », pour qui lui rend le focus : l'écran qui pose une confirmation avant
+   * de supprimer le reprend à « Annuler ».
+   */
+  deleteRef?: RefObject<Focusable | null>
 }
 
 export function RemovedPart({
@@ -55,6 +60,7 @@ export function RemovedPart({
   onDelete,
   children,
   deleting = false,
+  deleteRef,
 }: Props) {
   const { t, i18n } = useTranslation()
   const { colors } = useTheme()
@@ -180,6 +186,7 @@ export function RemovedPart({
           {remove ? (
             <Button
               key="delete"
+              ref={deleteRef}
               label={t(($) => $.removal.part.delete)}
               icon="trash"
               variant="danger"
