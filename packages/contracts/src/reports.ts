@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { PASSWORD_MAX_LENGTH } from './accounts'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
+import { HiveIcon } from './hives'
 import { MemberId } from './members'
 import { ProjectId } from './projects'
 import {
@@ -119,6 +120,10 @@ export type SnapshotImage = z.infer<typeof SnapshotImage>
 
 /** Ce qu'on peut signaler. Une réponse est un commentaire. R7a : `update` remplace `note`. */
 /** R7b : un appel à tester (`call`) et un message d'un fil de testeur (`message`), en fin de liste. */
+/**
+ * R10 : une ruche (`hive`), signalée par un membre ou un invité depuis sa page ou l'invitation : son
+ * nom et son icône. Elle ne se retire pas entière : seul son nom se retire (« Ruche sans nom »).
+ */
 export const ReportTargetKind = z.enum([
   'project',
   'update',
@@ -126,6 +131,7 @@ export const ReportTargetKind = z.enum([
   'member',
   'call',
   'message',
+  'hive',
 ])
 export type ReportTargetKind = z.infer<typeof ReportTargetKind>
 
@@ -152,6 +158,7 @@ export const ReportTarget = z
     z.object({ kind: z.literal('member'), id: MemberId }),
     z.object({ kind: z.literal('call'), id: z.uuid() }),
     z.object({ kind: z.literal('message'), id: z.uuid() }),
+    z.object({ kind: z.literal('hive'), id: z.uuid() }),
   ])
   .meta({ id: 'ReportTarget' })
 export type ReportTarget = z.infer<typeof ReportTarget>
@@ -206,13 +213,15 @@ export const REPORTABLE_PARTS = {
   member: ['name', 'handle', 'bio', 'favoriteTools', 'avatar'],
   call: ['photo'],
   message: ['photo'],
+  hive: ['name'],
 } as const satisfies Record<ReportTargetKind, readonly ReportPartField[]>
 
 /**
  * R9 : les parties que la modération peut retirer seules. Le titre et le pitch d'un projet, le
  * texte d'une mise à jour : on retire tout le contenu (l'API répond 422 `part_whole_only`). La
  * catégorie : la modération la range depuis « Catégories » (R6b), sans retrait. Un profil ne se
- * retire pas entier (il se suspend) : chacune de ses parties se retire seule.
+ * retire pas entier (il se suspend) : chacune de ses parties se retire seule. R10 : une ruche non
+ * plus : son nom se retire seul (la décision vise le membre qui l'a écrit, `hive.name_set_by`).
  */
 export const REMOVABLE_PARTS = {
   project: ['description', 'tools', 'demoUrl', 'cover', 'photo', 'photoDescription', 'prompt'],
@@ -221,6 +230,7 @@ export const REMOVABLE_PARTS = {
   member: ['name', 'handle', 'bio', 'favoriteTools', 'avatar'],
   call: ['photo'],
   message: ['photo'],
+  hive: ['name'],
 } as const satisfies Record<ReportTargetKind, readonly ReportPartField[]>
 
 /** Vrai si `field` est une partie qu'on peut signaler sur une cible de cette sorte. */
@@ -374,6 +384,20 @@ export const ModerationQueueItem = z
       })
       .strict()
       .nullable(),
+    /**
+     * R10 : pour une ruche seulement, ce que la modération en voit en plus de son nom (dans la copie) :
+     * son icône, son animateur et son nombre de membres ; jamais son actualité ni ses projets
+     * réservés. Absent pour toute autre cible ; null pour une ruche supprimée depuis.
+     */
+    hive: z
+      .object({
+        icon: HiveIcon,
+        animatorName: z.string().nullable(),
+        memberCount: z.int().nonnegative(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     /** R9 : la date de publication de la cible ; null si elle a disparu. */
     contentCreatedAt: z.iso.datetime().nullable(),
     /** Le projet de la cible, pour le lien « Voir » ; null pour un profil. */

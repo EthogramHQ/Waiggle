@@ -31,6 +31,9 @@ export const emailPreference = pgTable(
     emailFollows: choice('email_follows'),
     emailUpdates: choice('email_updates'),
     emailTesters: choice('email_testers'),
+    // R10 : les ruches (invitations, partie « Dans tes ruches » du récap). « now » par défaut, seul
+    // type à l'être (scénario, « Le réglage Ruches ») : une invitation attend une réponse.
+    emailHives: text('email_hives').notNull().default('now'),
     // Le dernier récap envoyé (heure UTC, sans fuseau, comme les autres tables) ; null : jamais.
     recapSentAt: timestamp('recap_sent_at'),
     // Le nombre de récaps envoyés de suite sans visite du membre (0 à 3) : à 3, plus de récap
@@ -58,13 +61,14 @@ export const emailPreference = pgTable(
     index('email_preference_instant_idx')
       .on(t.userId)
       .where(
-        sql`${t.emailComments} = 'now' or ${t.emailReplies} = 'now' or ${t.emailTesters} = 'now'`,
+        sql`${t.emailComments} = 'now' or ${t.emailReplies} = 'now' or ${t.emailTesters} = 'now' or ${t.emailHives} = 'now'`,
       ),
     check(
       'email_preference_choices_check',
       sql`${t.emailComments} in ('now', 'digest', 'never')
         and ${t.emailReplies} in ('now', 'digest', 'never')
         and ${t.emailTesters} in ('now', 'digest', 'never')
+        and ${t.emailHives} in ('now', 'digest', 'never')
         and ${t.emailReactions} in ('digest', 'never')
         and ${t.emailFollows} in ('digest', 'never')
         and ${t.emailUpdates} in ('digest', 'never')`,

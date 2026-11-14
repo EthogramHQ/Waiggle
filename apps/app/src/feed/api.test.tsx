@@ -23,6 +23,7 @@ const summary: ProjectSummary = {
   pitch: 'Un menu avec ce qu’il y a au frigo.',
   status: 'idea',
   visibility: 'public',
+  hive: null,
   tools: [],
   cover: null,
   demoUrl: null,

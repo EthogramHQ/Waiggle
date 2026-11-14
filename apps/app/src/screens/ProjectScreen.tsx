@@ -713,7 +713,8 @@ function ProjectView({ project }: { project: Project }) {
           onClose={() => setSharing(false)}
           title={project.title}
           target={{ kind: 'project', id: project.id }}
-          visibility={project.visibility}
+          // Provisoire (R10) : un projet réservé se partage comme un privé, jusqu'à sa phrase.
+          visibility={project.visibility === 'hive' ? 'private' : project.visibility}
           image={project.visuals[0] ? toSource(project.visuals[0].url) : null}
         />
       ) : null}

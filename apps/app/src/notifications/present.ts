@@ -181,6 +181,25 @@ export const presentNotification = (
     quote: null,
     thumb: null,
   } as const
+  // Provisoire (R10) : les lignes des ruches et le retrait du nom d'une ruche, avant leur vraie
+  // présentation (icône, lien, seconde ligne) : la phrase seule, qui ne mène nulle part.
+  if (
+    notification.kind === 'hive_invited' ||
+    notification.kind === 'hive_joined' ||
+    notification.kind === 'hive_removed' ||
+    notification.kind === 'hive_animator' ||
+    notification.kind === 'hive_deleted' ||
+    ((notification.kind === 'removed' || notification.kind === 'restored') &&
+      notification.targetKind === 'hive')
+  ) {
+    return {
+      ...plain,
+      ...say({}, () => t(($) => $.notifications.removed.hive)),
+      icon: 'hexagon',
+      leading: iconLeading('hexagon'),
+      target: null,
+    }
+  }
   switch (notification.kind) {
     case 'reactions': {
       const { counts, total, project } = notification
@@ -494,6 +513,15 @@ export const presentNotification = (
         afterReport,
         projectHidden,
       } = notification
+      // Provisoire (R10) : seul le nom d'une ruche n'a pas de projet ; il est présenté plus haut.
+      if (targetKind === 'hive' || project === null)
+        return {
+          ...plain,
+          ...say({}, () => ''),
+          icon: 'prohibit',
+          leading: iconLeading('prohibit', 'danger'),
+          target: null,
+        }
       const elsewhere = targetKind === 'comment' && projectHidden
       // R9 : une partie retirée seule se nomme (« La 2e photo de Météo… ») ; une partie que
       // l'auteur ne voit pas comme telle retombe sur la phrase du contenu entier.

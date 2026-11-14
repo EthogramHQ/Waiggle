@@ -18,6 +18,7 @@ export const recipesProject: Project = {
   description: '## Comment ça marche\n\nOn **photographie** le frigo.',
   status: 'testable',
   visibility: 'public',
+  hive: null,
   demoUrl: 'https://recettes.example.com',
   tools: [
     { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
@@ -89,6 +90,7 @@ export const summaryOf = ({ visuals, ...project }: Project): ProjectSummary => (
   pitch: project.pitch,
   status: project.status,
   visibility: project.visibility,
+  hive: project.hive,
   tools: project.tools,
   cover: visuals[0] ?? null,
   demoUrl: project.demoUrl,

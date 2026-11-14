@@ -171,6 +171,8 @@ const toProjectBase = (
     // mieux vaut le signaler que renvoyer une donnée incohérente).
     status: ProjectStatus.parse(project.status),
     visibility: ProjectVisibility.parse(project.visibility),
+    // Provisoire (R10) : la ruche d'un projet réservé (id et nom), lue avec la règle d'accès.
+    hive: null,
     demoUrl: project.demoUrl,
     // R6b : lus par `project_tool` (toolsOfProjects) ; les anciennes colonnes ne sont plus lues.
     tools,
@@ -337,6 +339,7 @@ const toSummary = (
   pitch: project.pitch,
   status: project.status,
   visibility: project.visibility,
+  hive: project.hive,
   tools: project.tools,
   cover: visuals[0] ?? null,
   // R3 : le lien de la démo sur la carte (« Tester » sans ouvrir la page du projet).

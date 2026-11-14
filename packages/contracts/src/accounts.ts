@@ -164,6 +164,12 @@ export const Me = z
      * choisir un (une feuille une fois par visite, un bandeau sur « Moi »).
      */
     provisional: z.object({ name: z.boolean(), handle: z.boolean() }).strict(),
+    /**
+     * R10 : « Ne pas me proposer aux autres » : vrai, il n'apparaît plus dans « Proches à suivre »,
+     * chez personne. Il reste dans la recherche et dans les membres de ses ruches. Un seul réglage,
+     * pour toutes ses ruches ; il se change par PATCH /v1/me (`ProfileUpdate`).
+     */
+    hideFromSuggestions: z.boolean(),
   })
   .meta({ id: 'Me' })
 export type Me = z.infer<typeof Me>

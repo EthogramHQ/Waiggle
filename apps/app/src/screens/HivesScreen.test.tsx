@@ -51,9 +51,8 @@ describe('HivesScreen', () => {
   it('says that hives are coming, with the waving bee and two sentences', async () => {
     await renderWithProviders(<HivesScreen />)
 
-    expect(screen.getByText(containing(fr.t(($) => $.hives.soonTitle)))).toBeTruthy()
-    expect(screen.getByText(containing(fr.t(($) => $.hives.soonBody1)))).toBeTruthy()
-    expect(screen.getByText(containing(fr.t(($) => $.hives.soonBody2)))).toBeTruthy()
+    expect(screen.getByText(containing(fr.t(($) => $.hives.emptyTitle)))).toBeTruthy()
+    expect(screen.getByText(containing(fr.t(($) => $.hives.intro)))).toBeTruthy()
     expect(
       screen.getByLabelText(
         fr.t(($) => $.mascot.wave),
@@ -67,12 +66,8 @@ describe('HivesScreen', () => {
   it('lines up the coming-soon state on the left, its title a section of the page', async () => {
     await renderWithProviders(<HivesScreen />)
 
-    const title = screen.getByRole('header', { name: fr.t(($) => $.hives.soonTitle) })
-    for (const text of [
-      title,
-      screen.getByText(fr.t(($) => $.hives.soonBody1)),
-      screen.getByText(fr.t(($) => $.hives.soonBody2)),
-    ]) {
+    const title = screen.getByRole('header', { name: fr.t(($) => $.hives.emptyTitle) })
+    for (const text of [title, screen.getByText(fr.t(($) => $.hives.intro))]) {
       const align = (StyleSheet.flatten(text.props.style) as { textAlign?: string }).textAlign
       expect(align ?? 'auto').not.toBe('center')
     }
@@ -84,7 +79,7 @@ describe('HivesScreen', () => {
     await renderWithProviders(<HivesScreen />)
 
     // Témoin : la page est bien dessinée.
-    expect(screen.getByText(containing(fr.t(($) => $.hives.soonTitle)))).toBeTruthy()
+    expect(screen.getByText(containing(fr.t(($) => $.hives.emptyTitle)))).toBeTruthy()
     // Ni champ, ni bouton, ni case : rien à remplir ni à demander (pas de « Préviens-moi »).
     expect(fields(screen.root as unknown as Node)).toEqual([])
     expect(screen.queryAllByRole('button')).toEqual([])

@@ -34,6 +34,9 @@ export const ProfileUpdate = z
       .transform(uniqueTools)
       .optional(),
     language: LanguageSchema.optional(),
+    // R10 : « Ne pas me proposer aux autres » (voir `Me.hideFromSuggestions`). Permis à un membre
+    // suspendu : ce réglage ne publie rien.
+    hideFromSuggestions: z.boolean().optional(),
   })
   .meta({ id: 'ProfileUpdate' })
 export type ProfileUpdate = z.infer<typeof ProfileUpdate>

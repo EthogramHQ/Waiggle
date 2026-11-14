@@ -15,6 +15,7 @@ export const leaEmailPreferences: EmailPreferences = {
   follows: 'digest',
   updates: 'digest',
   testers: 'digest',
+  hives: 'now',
 }
 
 /**

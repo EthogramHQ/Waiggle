@@ -666,6 +666,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         feed: { readAt: feedReadAt?.toISOString() ?? null },
         dismissedSuggestions,
         emailPreferences,
+        // Provisoire (R10) : ses ruches et ses invitations reçues et envoyées.
+        hives: { hives: [], invitationsReceived: [], invitationsSent: [] },
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
           ...s,

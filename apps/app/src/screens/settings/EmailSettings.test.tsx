@@ -54,6 +54,7 @@ const TYPE: Record<EmailType, string> = {
   follows: fr.t(($) => $.notificationSettings.types.follows),
   updates: fr.t(($) => $.notificationSettings.types.updates),
   testers: fr.t(($) => $.notificationSettings.types.testers),
+  hives: fr.t(($) => $.notificationSettings.types.hives),
 }
 const CHOICE = {
   now: fr.t(($) => $.notificationSettings.choices.now),
@@ -81,6 +82,8 @@ const leaChoices: EmailPreferences = {
   follows: 'digest',
   updates: 'never',
   testers: 'digest',
+  // R10 : « Ruches » (Tout de suite par défaut) mis au récap, pour garder ce que ces tests vérifient.
+  hives: 'digest',
 }
 
 const emailPath = '/v1/me/email-preferences'

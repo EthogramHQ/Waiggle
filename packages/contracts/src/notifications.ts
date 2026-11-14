@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { CategoryCode } from './categories'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
+import { HiveIcon, HiveId, HiveInvitationId } from './hives'
 import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
 import { RemovalGround, ReportPartField } from './removal'
@@ -51,6 +52,19 @@ const NotifiedPart = z.object({
 })
 /** Un jour, en heure de Paris (« 2026-10-20 ») : les groupes vont par jour. */
 const Day = z.iso.date()
+
+/**
+ * R10 : la ruche dont parle une notification. `id` : null quand la ruche a été supprimée depuis (la
+ * ligne ne mène alors nulle part) ; `name` : la copie gardée avec la ligne, ou null quand la
+ * modération a retiré ce nom (« Ruche sans nom », y compris dans les lignes d'avant le retrait) ;
+ * `icon` : null pour une ruche supprimée. Un ancien membre ne lit jamais le nom actuel d'une ruche :
+ * seulement la copie du moment.
+ */
+const NotifiedHive = z.object({
+  id: HiveId.nullable(),
+  name: z.string().nullable(),
+  icon: HiveIcon.nullable(),
+})
 
 // Ce que toutes les notifications ont en commun.
 const Common = {
@@ -224,10 +238,14 @@ export const RemovedNotification = z.object({
   kind: z.literal('removed'),
   /**
    * R7a : `update` remplace `note` (les notes ont été effacées avec le Journal). R7b : un appel à
-   * tester (`call`) ou un message d'un fil de testeur (`message`).
+   * tester (`call`) ou un message d'un fil de testeur (`message`). R10 : le nom d'une ruche
+   * (`hive`, partie `name`), pour l'animateur.
    */
-  targetKind: z.enum(['project', 'update', 'comment', 'call', 'message']),
-  project: NotifiedProject,
+  targetKind: z.enum(['project', 'update', 'comment', 'call', 'message', 'hive']),
+  /** Le projet du contenu ; null seulement pour une ruche. */
+  project: NotifiedProject.nullable(),
+  /** R10 : la ruche dont le nom est retiré (`targetKind` vaut `hive`) ; absent pour tout le reste. */
+  hive: NotifiedHive.optional(),
   /**
    * L'extrait d'un commentaire, ou la première ligne d'une mise à jour, retirés ; null pour un
    * projet.
@@ -277,8 +295,10 @@ export const ProfileRemovedNotification = z.object({
 export const RestoredNotification = z.object({
   ...Common,
   kind: z.literal('restored'),
-  targetKind: z.enum(['project', 'update', 'comment', 'call', 'message', 'member']),
+  targetKind: z.enum(['project', 'update', 'comment', 'call', 'message', 'member', 'hive']),
   project: NotifiedProject.nullable(),
+  /** R10 : la ruche dont le nom est rétabli (`targetKind` vaut `hive`) ; absent pour tout le reste. */
+  hive: NotifiedHive.optional(),
   part: NotifiedPart.nullable(),
   valueBack: z.boolean(),
   handle: z.string().nullable(),
@@ -338,6 +358,45 @@ export const ReportHandledNotification = z.object({
   link: z.object({ projectId: ProjectId.nullable(), memberId: z.string().nullable() }).nullable(),
 })
 
+/**
+ * R10 : une invitation reçue dans une ruche (« Inès Haddad t'invite dans la ruche Famille ») ; la
+ * ligne ouvre l'onglet Ruches. Calculée depuis l'invitation : acceptée, refusée ou expirée (30
+ * jours), elle disparaît. `inviter` : null si son compte a été supprimé. Jamais d'un membre bloqué
+ * dans un sens ou dans l'autre (bloquer efface les invitations entre eux).
+ */
+export const HiveInvitedNotification = z.object({
+  ...Common,
+  kind: z.literal('hive_invited'),
+  invitation: z.object({ id: HiveInvitationId }),
+  hive: NotifiedHive,
+  inviter: ProjectAuthor.nullable(),
+})
+
+/**
+ * R10 : un membre qu'il a invité a rejoint la ruche (« Max a rejoint Famille », seulement à qui l'a
+ * invité) ; la ligne ouvre les membres de la ruche. Calculée depuis l'entrée du membre ; cachée à un
+ * inviteur qui n'est plus dans la ruche, et si l'un a bloqué l'autre.
+ */
+export const HiveJoinedNotification = z.object({
+  ...Common,
+  kind: z.literal('hive_joined'),
+  hive: NotifiedHive,
+  member: ProjectAuthor,
+})
+
+/**
+ * R10 : les trois lignes gardées (une trace par geste, `hive_notice`, effacée au bout de 90 jours) :
+ * retiré de la ruche (`hive_removed`, sans dire par qui ; un départ volontaire n'en fait pas),
+ * l'animation confiée à lui (`hive_animator`, la ligne ouvre la ruche), la ruche supprimée
+ * (`hive_deleted`). Les lignes du retrait et de la suppression ne mènent nulle part, et disent que
+ * ses projets réservés à la ruche sont redevenus privés.
+ */
+const hiveNotice = <K extends 'hive_removed' | 'hive_animator' | 'hive_deleted'>(kind: K) =>
+  z.object({ ...Common, kind: z.literal(kind), hive: NotifiedHive })
+export const HiveRemovedNotification = hiveNotice('hive_removed')
+export const HiveAnimatorNotification = hiveNotice('hive_animator')
+export const HiveDeletedNotification = hiveNotice('hive_deleted')
+
 /** La première notification : le pseudo qu'il a reçu, tiré de son nom, qu'il peut changer. */
 export const HandleNotification = z.object({
   ...Common,
@@ -367,6 +426,11 @@ export const Notification = z
     FeedbackSettledNotification,
     ProjectCategoryNotification,
     ToolAddedNotification,
+    HiveInvitedNotification,
+    HiveJoinedNotification,
+    HiveRemovedNotification,
+    HiveAnimatorNotification,
+    HiveDeletedNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

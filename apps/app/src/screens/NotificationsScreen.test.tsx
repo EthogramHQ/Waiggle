@@ -570,7 +570,10 @@ describe('a content of mine removed by the moderation', () => {
     // venait avec `projectHidden: false`, un état que l'API n'envoie plus).
     const elsewhere = {
       ...removedCommentNotification,
-      project: { ...removedCommentNotification.project, title: '' },
+      project: removedCommentNotification.project && {
+        ...removedCommentNotification.project,
+        title: '',
+      },
       projectHidden: true,
     }
     mockPages([notificationPageOf([elsewhere])])

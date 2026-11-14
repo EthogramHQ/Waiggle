@@ -1,6 +1,6 @@
 // Le profil public d'un membre : bio, outils favoris, avatar.
 // Table séparée de `user` (gérée par Better Auth) : chacun ses colonnes, pas de mélange.
-import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 import { user } from './auth'
 
 export const profile = pgTable('profile', {
@@ -14,6 +14,8 @@ export const profile = pgTable('profile', {
   // favorite_tools est effacée par la migration 0018 (R7a).
   // Nom du fichier de l'avatar dans le stockage (par ex. "3f2a….webp"), null s'il n'y en a pas.
   avatarKey: text('avatar_key'),
+  // R10 : « Ne pas me proposer aux autres » : vrai, il n'apparaît plus dans « Proches à suivre ».
+  hideFromSuggestions: boolean('hide_from_suggestions').notNull().default(false),
   updatedAt: timestamp('updated_at')
     .defaultNow()
     .$onUpdate(() => new Date())

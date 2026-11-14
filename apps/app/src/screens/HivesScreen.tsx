@@ -27,8 +27,8 @@ export function HivesScreen() {
           (choix de Louis du 30/10/2026 ; relecture R3 : la page était centrée, à la main). */}
       <StateMessage
         kind="soon"
-        title={t(($) => $.hives.soonTitle)}
-        message={[t(($) => $.hives.soonBody1), t(($) => $.hives.soonBody2)]}
+        title={t(($) => $.hives.emptyTitle)}
+        message={[t(($) => $.hives.intro)]}
       />
     </Screen>
   )

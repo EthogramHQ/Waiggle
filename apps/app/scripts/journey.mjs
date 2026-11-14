@@ -979,8 +979,7 @@ try {
     await byRole(mainNav, 'link', tab).click()
     await malik.page.waitForURL((url) => url.pathname === path)
     await mainNav.locator(`[aria-current="page"]`).filter({ hasText: tab }).first().waitFor()
-    if (tab === 'Ruches')
-      await malik.page.getByText('Les ruches arrivent bientôt').first().waitFor()
+    if (tab === 'Ruches') await malik.page.getByText('Pas encore de ruche').first().waitFor()
   }
   console.log('  ok : chaque onglet ouvre sa page et devient l’onglet actif')
 

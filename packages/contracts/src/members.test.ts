@@ -10,6 +10,7 @@ const summary = {
   pitch: 'Un menu avec ce qu’il y a au frigo.',
   status: 'idea',
   visibility: 'public',
+  hive: null,
   tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
   cover: null,
   demoUrl: null,

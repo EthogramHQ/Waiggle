@@ -86,6 +86,7 @@ const Choices = z.object({
   email_follows: z.string(),
   email_updates: z.string(),
   email_testers: z.string(),
+  email_hives: z.string(),
 })
 type Choices = z.infer<typeof Choices>
 const choiceOf = (choices: Choices, type: EmailType) => choices[`email_${type}`] as EmailChoice
@@ -97,7 +98,8 @@ const choiceColumns = sql`
   coalesce(ep.email_replies, 'digest') as email_replies,
   coalesce(ep.email_follows, 'digest') as email_follows,
   coalesce(ep.email_updates, 'digest') as email_updates,
-  coalesce(ep.email_testers, 'digest') as email_testers`
+  coalesce(ep.email_testers, 'digest') as email_testers,
+  coalesce(ep.email_hives, 'now') as email_hives`
 
 const Candidate = Choices.extend({
   id: z.string(),

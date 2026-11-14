@@ -29,6 +29,7 @@ const allTypes = (choice: 'digest' | 'never', weeklyRecap = true): EmailPreferen
   follows: choice,
   updates: choice,
   testers: choice,
+  hives: choice,
 })
 
 describe('emailSummary', () => {

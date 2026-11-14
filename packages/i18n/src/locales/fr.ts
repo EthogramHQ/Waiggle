@@ -217,7 +217,8 @@ export const fr = {
     },
     // Les réglages d'e-mail vivent au profil : « Mon compte » y mène (design, 24/10/2026).
     emails: { title: 'E‑mails', row: 'Choisir les e‑mails reçus' },
-    data: { title: 'Mes données' },
+    // R10 : « Ce que les autres voient », le sous-titre du réglage « Ne pas me proposer aux autres ».
+    data: { title: 'Mes données', othersSee: 'Ce que les autres voient' },
     safety: { title: 'Sécurité' },
     export: {
       button: 'Télécharger mes données',
@@ -316,8 +317,14 @@ export const fr = {
       sheetTitle: 'Supprimer ton compte',
       blocksItem: 'Les membres que tu as bloqués',
       blocksDetail: 'Tes blocages partent avec ton compte, et ceux qui te visaient aussi.',
+      // R10 (relecture du plan, juridique C5) : les ruches, ce qui part et ce qui reste.
+      hivesItem: 'Tes ruches',
+      hivesDetail:
+        'Tu quittes chacune de tes ruches. Si tu animes une ruche, l’animation passe à son membre le plus ancien ; si tu en es le dernier membre, elle est supprimée. Tes invitations partent aussi.',
       remains: {
         title: 'Ce qui reste',
+        hiveNames:
+          'Le nom des ruches que tu as créées reste, tant qu’elles ont des membres : elles ne disparaissent pas avec ton compte',
         reports: 'Tes signalements restent, sans ton nom, jusqu’à un an après leur traitement',
         removals: 'Une trace des retraits de tes contenus reste un an',
         // Tranche 7b (relecture juridique, J11) : au conditionnel, l'écran s'affiche pour tous.
@@ -571,6 +578,14 @@ export const fr = {
       audience: 'Qui peut le voir ?',
       members: 'Membres de {{appName}}',
       membersHint: 'Toute personne qui a un compte.',
+      // R10 (F-Pub6) : « Une ruche », seulement pour un membre d'au moins une ruche.
+      hive: 'Une ruche',
+      hiveHint: 'Seulement les membres d’une de tes ruches.',
+      hiveChoice: 'Quelle ruche ?',
+      hiveRequired: 'Choisis la ruche qui verra ce projet.',
+      // Le futur avant l'enregistrement (nouveau projet, ou passage dans une autre ruche).
+      audienceHive: 'Seuls les membres de {{hive}} verront ce projet.',
+      audienceHiveEdit: 'Seuls les membres de {{hive}} voient ce projet.',
       private: 'Privé',
       // juridique (jur-J6).
       privateHint: 'Un brouillon : aucun autre membre ne le voit.',
@@ -1211,6 +1226,8 @@ export const fr = {
     // R7b : un appel à tester, un message d'un fil de testeur.
     call: 'Signaler cet appel',
     message: 'Signaler ce message',
+    // R10 : le nom et l'icône d'une ruche, depuis sa page ou une invitation.
+    hive: 'Signaler la ruche',
     target: {
       project: 'Le projet signalé',
       note: 'La note signalée',
@@ -1219,6 +1236,7 @@ export const fr = {
       member: 'Le profil signalé',
       call: 'L’appel signalé',
       message: 'Le message signalé',
+      hive: 'La ruche signalée',
     },
     reasonLabel: 'Qu’est-ce qui ne va pas ?',
     reasons: {
@@ -1277,6 +1295,7 @@ export const fr = {
       member: 'Le profil {{nameOf}}',
       call: 'Un appel à tester {{nameOf}}',
       message: 'Un message {{nameOf}}',
+      hive: 'Une ruche {{nameOf}}',
     },
     // Le premier choix, « tout le contenu », choisi d'avance.
     whole: {
@@ -1285,6 +1304,7 @@ export const fr = {
       member: 'Tout le profil',
       call: 'Tout l’appel',
       message: 'Tout le message',
+      hive: 'Toute la ruche (son nom et son icône)',
     },
     // Les parties, dans l'ordre de la feuille ; une photo se nomme par son rang (« La 2e photo »).
     parts: {
@@ -1340,6 +1360,7 @@ export const fr = {
       member: 'C’est ton profil : tu peux le modifier dans Mon profil.',
       call: 'C’est ton appel à tester : tu peux le supprimer.',
       message: 'C’est ton message : tu peux le supprimer.',
+      hive: 'C’est le nom que tu as donné à cette ruche : tu peux le changer dans ses réglages.',
       edit: 'Modifier',
     },
     alreadyReportedWhole: 'Tu as déjà signalé ce contenu. La modération va le regarder.',
@@ -1432,6 +1453,7 @@ export const fr = {
       member: 'Profil',
       call: 'Appel à tester',
       message: 'Message d’un fil de testeur',
+      hive: 'Ruche',
     },
     // Tranche 7b : la copie champ par champ, et ses images (jamais copiées, seulement suivies).
     fields: {
@@ -1795,6 +1817,7 @@ export const fr = {
         member: 'Profil créé',
         call: 'Appel lancé',
         message: 'Message écrit',
+        hive: 'Ruche créée',
       },
       snapshotAt: 'Copie gardée à {{time}}',
       reasons: 'Motifs',
@@ -1834,6 +1857,7 @@ export const fr = {
         member: 'un profil',
         call: 'un appel à tester',
         message: 'un message',
+        hive: 'une ruche',
       },
       remove: 'a retiré {{what}}',
       removePart: 'a retiré {{part}} d’{{what}}',
@@ -1858,6 +1882,7 @@ export const fr = {
         member: 'Le reste du profil reste affiché.',
         call: 'Le reste de l’appel reste affiché.',
         message: 'Le reste du message reste affiché.',
+        hive: 'La ruche garde son icône et ses membres ; elle s’appelle « Ruche sans nom » jusqu’à ce que son animateur en choisisse un autre.',
       },
       whole: {
         project: 'Tout le projet',
@@ -1988,6 +2013,7 @@ export const fr = {
         member: 'Le reste de ton profil reste affiché.',
         call: 'Le reste de l’appel reste affiché.',
         message: 'Le reste du message reste affiché.',
+        hive: 'Ta ruche garde son icône et ses membres : choisis-lui un autre nom dans ses réglages.',
       },
       date: 'Retiré le {{date}}',
       contestLead: 'Pour contester :',
@@ -2246,13 +2272,220 @@ export const fr = {
     otherSpoken: '{{name}}, autre outil, pas encore dans le catalogue',
     errorTitle: 'Cet outil n’a pas pu se charger',
   },
-  // R3 : l'onglet Ruches existe avant les ruches (R10 ; Louis, 30/10/2026). Ni date, ni promesse,
-  // ni « Préviens-moi » (relecture juridique, jur-J9).
+  // R10 : les ruches, des groupes de proches (scénario R10, planches R10-*). Le nom d'une ruche est
+  // écrit par un membre : il passe toujours en paramètre ({{hive}}), jamais dans une phrase traduite.
   hives: {
     title: 'Ruches',
-    soonTitle: 'Les ruches arrivent bientôt',
-    soonBody1: 'Une ruche, c’est un groupe de proches, comme « Ma ruche Famille ».',
-    soonBody2: 'On y suit les projets des siens, on les teste et on s’encourage.',
+    mine: 'Mes ruches',
+    intro:
+      'Une ruche, c’est un groupe de proches. On y entre par une invitation ; ses membres se voient entre eux et partagent des projets réservés à la ruche.',
+    emptyTitle: 'Pas encore de ruche',
+    create: 'Créer une ruche',
+    // Sous « Créer une ruche » grisé (scénario : « au-delà, le bouton explique pourquoi »).
+    createdLimit:
+      'Tu as créé 10 ruches, le plus possible. Supprimes-en une pour en créer une autre.',
+    joinedLimit:
+      'Tu fais partie de 20 ruches, le plus possible. Quittes-en une pour en créer ou en rejoindre une autre.',
+    loadError: 'Tes ruches n’ont pas pu se charger.',
+    // Le nom retiré par la modération.
+    unnamed: 'Ruche sans nom',
+    // Le nom lu de l'alvéole ; l'icône est décorative.
+    badge: 'Ruche {{hive}}',
+    myHive: 'Ma ruche',
+    myHiveNamed: 'Ma ruche {{hive}}',
+    members_one: '{{count}} membre',
+    members_other: '{{count}} membres',
+    animatedBy: 'animée par {{name}}',
+    news_one: '{{count}} nouveauté',
+    news_other: '{{count}} nouveautés',
+    newsNone: 'rien de neuf',
+    // Le nom lu d'une ligne : « Famille, 4 membres, animée par Papi Jean, 2 nouveautés ».
+    rowName: '{{hive}}, {{members}}, animée par {{animator}}, {{news}}',
+    rowNameNoAnimator: '{{hive}}, {{members}}, {{news}}',
+    // Les icônes de l'alvéole, nommées par leur sens (jamais par leur code).
+    icons: {
+      'house-line': 'Maison',
+      heart: 'Cœur',
+      'users-three': 'Groupe',
+      baby: 'Bébé',
+      coffee: 'Café',
+      'book-open': 'Livre',
+      'game-controller': 'Manette de jeu',
+      'music-notes': 'Musique',
+      'rocket-launch': 'Fusée',
+      leaf: 'Feuille',
+      camera: 'Appareil photo',
+      code: 'Code',
+    },
+    invitations: {
+      title: 'Invitations',
+      count_one: '{{count}} invitation',
+      count_other: '{{count}} invitations',
+      line: '{{name}} t’invite dans la ruche {{hive}}',
+      // L'inviteur a supprimé son compte : l'invitation reste valable.
+      lineNoInviter: 'Une invitation t’attend dans la ruche {{hive}}',
+      when: '{{members}} · {{relative}}',
+      accept: 'Rejoindre la ruche',
+      acceptNamed: 'Rejoindre la ruche {{hive}}',
+      refuse: 'Refuser',
+      // {{nameOf}} : « de Nora Benali », « d’Inès » (nameOf de @ruche/i18n).
+      refuseNamed: 'Refuser l’invitation {{nameOf}}',
+      refuseNamedNoInviter: 'Refuser l’invitation dans la ruche {{hive}}',
+      refuseHint: 'Refuser ne prévient personne.',
+      // Elle reste à sa place jusqu'au prochain passage (relecture du plan, interface 14).
+      refused: 'Invitation refusée.',
+      // Les trois promesses, sur l'invitation reçue (relecture du plan, juridique C1).
+      promiseFaces: 'Les membres de la ruche verront ton nom et ta photo dans la ruche.',
+      promiseProjects: 'Tu verras les projets réservés à la ruche.',
+      promiseLeave: 'Tu pourras quitter la ruche quand tu veux.',
+      more: 'Plus d’options pour l’invitation dans la ruche {{hive}}',
+      report: 'Signaler la ruche {{hive}}',
+      expiredTitle: 'Cette invitation n’est plus valable.',
+      expired: 'Elle a expiré après 30 jours.',
+      close: 'Fermer',
+      acceptError: 'L’invitation n’a pas pu être acceptée. Réessaie.',
+      refuseError: 'L’invitation n’a pas pu être refusée. Réessaie.',
+    },
+    createSheet: {
+      title: 'Créer une ruche',
+      name: 'Nom de la ruche',
+      namePlaceholder: 'Famille',
+      nameHint: '40 caractères au plus.',
+      nameRequired: 'Donne un nom à la ruche.',
+      icon: 'Icône de la ruche',
+      preview: 'Aperçu',
+      submit: 'Créer',
+      cancel: 'Annuler',
+      error: 'La ruche n’a pas pu être créée. Réessaie.',
+    },
+    // La ruche juste créée, seule, sur « Inviter des proches » (planche R10-Creer).
+    ready: {
+      title: 'Ta ruche est prête',
+      body: 'Invite des proches : ils deviennent membres s’ils acceptent.',
+      action: 'Inviter des proches',
+    },
+    page: {
+      tabsLabel: 'Parties de la ruche',
+      activity: 'Actualité',
+      projects: 'Projets',
+      // « Projets · 5 » à l'écran, « Projets, 5 projets » à l'oreille.
+      projectsCount: 'Projets · {{count}}',
+      projectsSpoken_one: 'Projets, {{count}} projet',
+      projectsSpoken_other: 'Projets, {{count}} projets',
+      members: 'Membres',
+      invite: 'Inviter',
+      // La ruche pleine (option 9 des planches).
+      full: '50 membres au plus, invitations comprises.',
+      membersAndInvited: '{{members}} et {{invited}}',
+      invited_one: '{{count}} invité',
+      invited_other: '{{count}} invités',
+      animatorOnly: 'Dans cette ruche, seul l’animateur invite.',
+      menu: 'Plus d’options pour la ruche {{hive}}',
+      settings: 'Réglages de la ruche',
+      report: 'Signaler la ruche',
+      leave: 'Quitter la ruche',
+      pinnedBy: 'Épinglé par {{name}}',
+      pinned: 'Épinglé',
+      pin: 'Épingler',
+      pinNamed: 'Épingler {{title}}',
+      unpin: 'Retirer l’épingle',
+      pinError: 'L’épingle n’a pas pu changer. Réessaie.',
+      seekingOne: '{{name}} cherche des testeurs',
+      seekingMany: 'Ils cherchent des testeurs',
+      test: 'Tester',
+      testNamed: 'Tester {{title}}',
+      // La pastille d'un projet réservé.
+      reserved: 'Réservé à {{hive}}',
+      published: '<b>{{name}}</b> a publié <b>{{title}}</b>',
+      updated: '<b>{{name}}</b> a mis à jour <b>{{title}}</b>',
+      updatedVersion: '<b>{{name}}</b> a mis à jour <b>{{title}}</b> · {{version}}',
+      pinnedLine: '<b>{{name}}</b> a épinglé <b>{{title}}</b>',
+      activityEmpty: 'Rien de neuf dans la ruche ces 30 derniers jours.',
+      projectsEmpty: 'Aucun projet réservé à la ruche pour l’instant.',
+      more: 'Afficher la suite',
+      moreError: 'La suite n’a pas pu se charger.',
+      membersPhrase:
+        'L’animateur épingle un projet, choisit qui peut inviter et peut retirer un membre. Les membres d’une ruche se voient entre eux, jamais les autres membres de {{appName}}.',
+      animator: 'Animateur',
+      you: 'toi',
+      inviteOne: 'Inviter un proche',
+      remove: 'Retirer de la ruche',
+      removeNamed: 'Retirer {{name}} de la ruche',
+      suggestions: 'Mes suggestions',
+      desktopNote:
+        'Une partie de la ruche arrive dans ton récap du dimanche. Les défis viendront plus tard.',
+      loadError: 'Cette ruche n’a pas pu se charger.',
+    },
+    // « Ne pas me proposer aux autres » : dans l'onglet Membres et dans Mes données.
+    hideFromSuggestions: 'Ne pas me proposer aux autres',
+    hideFromSuggestionsHint:
+      'Tu n’apparais plus dans « Proches à suivre ». Tu restes dans la recherche et dans les membres de tes ruches.',
+    hideFromSuggestionsError: 'Ce choix n’a pas pu s’enregistrer. Réessaie.',
+    invite: {
+      title: 'Inviter dans {{hive}}',
+      search: 'Chercher un membre',
+      searchPlaceholder: 'Nom ou pseudo',
+      searchHint: 'Tape au moins 2 lettres.',
+      phrase:
+        'Tu invites des membres de {{appName}}. Ils deviennent membres seulement s’ils acceptent ; un refus ne prévient personne.',
+      invite: 'Inviter',
+      inviteNamed: 'Inviter {{name}}',
+      sent: 'Invitation envoyée',
+      member: 'Déjà membre',
+      empty: 'Aucun membre trouvé.',
+      searchError: 'La recherche n’a pas pu se faire. Réessaie.',
+      error: 'L’invitation n’a pas pu partir. Réessaie.',
+      previewTitle: 'Ce que reçoit {{name}}',
+      previewTitleAnyone: 'Ce que reçoit la personne invitée',
+      close: 'Fermer',
+    },
+    settings: {
+      title: 'Réglages de la ruche',
+      name: 'Nom',
+      nameError: 'Le nom n’a pas pu s’enregistrer. Réessaie.',
+      icon: 'Icône',
+      changeIcon: 'Changer l’icône',
+      iconSheet: 'Choisir une icône',
+      policy: 'Qui peut inviter ?',
+      policyMembers: 'Tous les membres',
+      policyAnimator: 'Seulement moi',
+      policyError: 'Ce choix n’a pas pu s’enregistrer. Réessaie.',
+      handOver: 'Confier l’animation',
+      handOverHint: 'Choisis le membre qui animera la ruche. Tu en resteras membre.',
+      delete: 'Supprimer la ruche',
+    },
+    dialogs: {
+      cancel: 'Annuler',
+      quitTitle: 'Quitter la ruche {{hive}} ?',
+      quitBody: 'Tes projets réservés à la ruche redeviennent privés.',
+      // Q2 de la relecture du plan (choix de Louis du 14/11/2026).
+      quitComments: 'Tes commentaires sur ses projets restent lisibles par ses membres.',
+      quitSuccessor: '{{name}} animera la ruche.',
+      quitLast: 'Tu en es le dernier membre : la ruche sera supprimée.',
+      quit: 'Quitter',
+      quitError: 'Tu n’as pas pu quitter la ruche. Réessaie.',
+      removeTitle: 'Retirer {{name}} de la ruche ?',
+      // Option 5 des planches.
+      removeBody:
+        'Ses projets réservés à la ruche redeviennent privés. Son Activité le lui dira, sans dire qui.',
+      remove: 'Retirer',
+      removeError: 'Ce membre n’a pas pu être retiré. Réessaie.',
+      deleteTitle: 'Supprimer la ruche {{hive}} ?',
+      deleteBody_one: 'Son projet réservé redevient privé, pour son auteur. Ça ne s’annule pas.',
+      deleteBody_other:
+        'Ses {{count}} projets réservés redeviennent privés, pour leurs auteurs. Ça ne s’annule pas.',
+      deleteBodyNone: 'Ça ne s’annule pas.',
+      delete: 'Supprimer',
+      deleteError: 'La ruche n’a pas pu être supprimée. Réessaie.',
+      handOverTitle: 'Confier l’animation à {{name}} ?',
+      handOverBody: '{{name}} animera la ruche ; tu en resteras membre.',
+      handOver: 'Confier',
+      handOverError: 'L’animation n’a pas pu être confiée. Réessaie.',
+    },
+    // Le sélecteur du Fil (F-Fil13) : des onglets.
+    pills: { label: 'Ruches du fil', all: 'Tout' },
+    // La colonne de droite du Fil, sur ordinateur (F-Fil11).
+    side: 'Tes ruches',
   },
   // R3 : l'onglet Moi, sa propre page de membre (planche R3-Moi).
   me: {
@@ -2339,10 +2572,12 @@ export const fr = {
     action: 'Partager',
     title: '{{title}} sur {{appName}}',
     membersOnly: 'Seuls les membres de {{appName}} pourront l’ouvrir.',
+    hiveOnly: 'Seuls les membres de {{hive}} pourront l’ouvrir.',
     privateOnly: 'Ce projet est privé : le lien ne s’ouvrira que pour toi.',
     system: 'Partager…',
     copy: 'Copier le lien',
     copiedMembers: 'Lien copié : seuls les membres de {{appName}} pourront l’ouvrir.',
+    copiedHive: 'Lien copié : seuls les membres de {{hive}} pourront l’ouvrir.',
     copiedPrivate: 'Lien copié : il ne s’ouvrira que pour toi.',
     copyFailed: 'Impossible de copier le lien. Réessaie.',
     // Le menu de l'appareil a échoué (pas une annulation) : on propose l'autre chemin.
@@ -2420,11 +2655,24 @@ export const fr = {
       testers_other: '« {{title}} » : {{count}} nouveautés dans le coin des testeurs',
       testersMore_one: 'Et {{count}} autre projet',
       testersMore_other: 'Et {{count}} autres projets',
+      // R10 (planche R10-Recap) : le nom de la ruche en texte simple, jamais en lien ; aucune
+      // vignette d'un projet réservé ; une invitation sans le nom de la ruche.
+      hivesTitle: 'Dans tes ruches',
+      hiveName: 'Ruche {{hive}}',
+      hiveUnnamed: 'Ruche sans nom',
+      hivePublished: '{{name}} a publié « {{title}} »',
+      hiveUpdated: '{{name}} a mis à jour « {{title}} »',
+      hiveMore_one: 'Et {{count}} autre nouveauté',
+      hiveMore_other: 'Et {{count}} autres nouveautés',
+      hiveInvitationsTitle: 'Invitations en attente',
+      hiveInvitation: '{{name}} t’invite dans une ruche',
+      hiveInvitationNoInviter: 'Une invitation dans une ruche t’attend',
+      viewHives: 'Voir mes ruches',
       button: 'Voir mes notifications',
       last: 'Ce récap est le dernier pour l’instant : le prochain partira après ta prochaine visite.',
       // Juridique (relecture du plan R8), tel quel.
       reason:
-        'Tu reçois ce récap le dimanche, parce qu’il est activé dans tes réglages. Il ne parle que de projets visibles des membres.',
+        'Tu reçois ce récap le dimanche, parce qu’il est activé dans tes réglages. Il ne parle que de projets que tu peux voir dans l’appli.',
       unsubscribe: 'Ne plus recevoir ce récap',
     },
     mentions: {
@@ -2445,6 +2693,7 @@ export const fr = {
       subjectReply: '{{name}} a répondu à ton commentaire sur « {{title}} »',
       subjectMention: '{{name}} parle de toi dans un commentaire sur « {{title}} »',
       subjectTesterCall: '{{name}} lance un appel à tester « {{title}} »',
+      subjectHiveInvited: '{{name}} t’invite dans une ruche',
       subjectMore_one: '{{first}} et {{count}} autre nouveauté',
       subjectMore_other: '{{first}} et {{count}} autres nouveautés',
       // Quand la première ligne est un message du coin : un objet sans nom ni titre.
@@ -2458,6 +2707,7 @@ export const fr = {
         reply: 'Réponse',
         mention: 'Mention',
         testers: 'Coin des testeurs',
+        hives: 'Ruches',
       },
       // « Commentaire · 18 h 02 » : l'heure de Paris.
       when: '{{label}} · {{time}}',
@@ -2469,6 +2719,11 @@ export const fr = {
       testerReplyToTester: '{{name}} (@{{handle}}) a répondu à ton retour sur « {{title}} ».',
       testerReplyToAuthor: '{{name}} (@{{handle}}) a répondu sur « {{title}} ».',
       feedbackSettled: '{{name}} (@{{handle}}) a réglé ton retour sur « {{title}} ».',
+      // R10 : jamais le nom de la ruche, écrit par un membre (choix 7 du scénario).
+      hiveInvited: '{{name}} (@{{handle}}) t’invite dans une ruche sur {{appName}}.',
+      hiveInvitedExplain:
+        'Une ruche, c’est un groupe de proches. Son nom et ses membres se lisent dans l’appli, avant que tu acceptes ou refuses.',
+      openHives: 'Voir l’invitation',
       private: 'Le fil du coin des testeurs est privé : son texte reste dans l’appli.',
       callPrivate: 'L’appel reste dans le coin des testeurs : son texte ne sort pas de l’appli.',
       seeInContext: 'Voir en contexte',
@@ -2650,6 +2905,7 @@ export const fr = {
       follows: 'Nouveaux abonnés',
       updates: 'Mises à jour suivies',
       testers: 'Coin des testeurs',
+      hives: 'Ruches',
     },
     choices: { now: 'Tout de suite', digest: 'Dans le récap', never: 'Jamais' },
     // Le nom lu d'une ligne de choix : son libellé, puis son choix actuel.
@@ -2724,7 +2980,7 @@ export const fr = {
   // nombre d'abonnés : jur-J5). « Suivre » reprend follow.member et follow.memberFollowing.
   suggestions: {
     title: 'Proches à suivre',
-    caption: 'Des membres qui ont publié récemment',
+    caption: 'Des membres de tes ruches et des membres qui ont publié récemment',
     /** Le nom lu du « × » d'une ligne. */
     dismiss: 'Ne plus suggérer {{name}}',
     /** Le texte du bouton une fois le membre suivi, avec sa coche. */
@@ -2809,6 +3065,15 @@ export const fr = {
       'L’équipe de {{appName}} a rangé « <b>{{title}}</b> » dans <b>{{category}}</b>',
     toolAdded: '« <b>{{name}}</b> » fait maintenant partie des outils de {{appName}}',
     toolMerged: '« <b>{{name}}</b> » s’affiche maintenant comme « <b>{{tool}}</b> »',
+    // R10 : les lignes des ruches (planche R10-Activite).
+    hiveInvited: '<b>{{name}}</b> t’invite dans la ruche <b>{{hive}}</b>',
+    hiveInvitedNoInviter: 'Une invitation t’attend dans la ruche <b>{{hive}}</b>',
+    hiveJoined: '<b>{{name}}</b> a rejoint <b>{{hive}}</b>',
+    hiveRemoved: 'Tu ne fais plus partie de la ruche <b>{{hive}}</b>.',
+    hiveAnimator: 'Tu animes maintenant la ruche <b>{{hive}}</b>.',
+    hiveDeleted: 'La ruche <b>{{hive}}</b> a été supprimée.',
+    // Option 7 des planches : la seconde ligne du retrait et de la suppression.
+    hivePrivateAgain: 'Tes projets réservés à la ruche sont redevenus privés.',
     // R8 : la colonne de droite sur ordinateur.
     emailColumn: {
       title: 'Ce que tu reçois par e‑mail',
@@ -2839,6 +3104,7 @@ export const fr = {
         follows: 'les nouveaux abonnés',
         updates: 'les mises à jour suivies',
         testers: 'le coin des testeurs',
+        hives: 'les ruches',
       },
     },
     more: 'Afficher la suite',
@@ -2882,6 +3148,7 @@ export const fr = {
       // R7b.
       call: 'Ton appel à tester <b>{{title}}</b> a été retiré par la modération',
       message: 'Ton message sur <b>{{title}}</b> a été retiré par la modération',
+      hive: 'Le nom de ta ruche a été retiré par la modération',
     },
     reportHandled: {
       // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).
@@ -2914,6 +3181,11 @@ export const fr = {
       message: {
         removed: 'Ton signalement d’un message a été traité : le message a été retiré.',
         dismissed: 'Ton signalement d’un message a été traité : nous ne l’avons pas retiré.',
+      },
+      // R10.
+      hive: {
+        removed: 'Ton signalement d’une ruche a été traité : son nom a été retiré.',
+        dismissed: 'Ton signalement d’une ruche a été traité : nous n’avons rien changé.',
       },
       // R9 (relectures, 14/11/2026) : le signalement ne visait qu'une partie du contenu.
       part: {
@@ -2966,6 +3238,7 @@ export const fr = {
       commentElsewhere: 'Ton commentaire est de nouveau visible',
       call: 'Ton appel à tester <b>{{title}}</b> est de nouveau visible',
       message: 'Ton message sur <b>{{title}}</b> est de nouveau visible',
+      hive: 'Le nom de ta ruche <b>{{hive}}</b> est de nouveau visible',
       part: '{{part}} de <b>{{title}}</b> est de nouveau visible',
       bio: 'Ta bio est de nouveau visible',
       favoriteTools: 'Tes outils favoris sont de nouveau visibles',
@@ -3038,5 +3311,15 @@ export const fr = {
     // Tranche R9.
     partWholeOnly: 'Cette partie ne se retire pas seule : retire tout le contenu.',
     partNotReported: 'Aucun signalement ouvert ne vise cette partie.',
+    // Tranche R10.
+    hiveFull: 'Cette ruche est pleine : 50 membres au plus, invitations comprises.',
+    hivesCreatedLimit:
+      'Tu as créé 10 ruches, le plus possible. Supprimes-en une pour en créer une autre.',
+    hivesJoinedLimit:
+      'Tu fais partie de 20 ruches, le plus possible. Quittes-en une pour en rejoindre une autre.',
+    alreadyHiveMember: 'Ce membre fait déjà partie de la ruche.',
+    alreadyInvited: 'Ce membre a déjà une invitation dans cette ruche.',
+    invitationExpired: 'Cette invitation n’est plus valable.',
+    pinNotVisible: 'Ce projet ne peut pas être épinglé : toute la ruche ne peut pas le voir.',
   },
 } as const

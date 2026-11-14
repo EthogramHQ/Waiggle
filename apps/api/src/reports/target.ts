@@ -603,6 +603,9 @@ const loadVisible = async (
         ],
       }
     }
+    case 'hive':
+      // Provisoire (R10) : une ruche ne se signale pas encore ; répondre comme une cible inconnue.
+      return null
   }
 }
 
@@ -706,6 +709,9 @@ export const loadDecidable = async (
         .where(eq(schema.user.id, target.id))
       return row ? { authorId: row.id, removed: false } : null
     }
+    case 'hive':
+      // Provisoire (R10) : la ruche signalée, son animateur et son nom retiré.
+      return null
   }
 }
 

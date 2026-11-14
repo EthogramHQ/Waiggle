@@ -547,7 +547,7 @@ describe('the right side of a line (R8)', () => {
     ['a filed project', projectCategoryNotification],
     ['a removed project', removedProjectNotification],
   ])('shows the thumbnail of the project for %s', (_kind, notification) => {
-    const title = 'project' in notification ? notification.project.title : ''
+    const title = 'project' in notification ? (notification.project?.title ?? '') : ''
 
     expect(present(notification).thumb).toMatchObject({ kind: 'project', title })
   })

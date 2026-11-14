@@ -205,6 +205,7 @@ describe('SearchResults', () => {
     pitch: 'Chaque café goûté, noté.',
     status: 'testable',
     visibility: 'public',
+    hive: null,
     tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
     cover: null,
     demoUrl: null,

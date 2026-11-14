@@ -56,9 +56,35 @@ export const ProjectStatus = z.enum(['idea', 'building', 'testable', 'done', 'pa
 export type ProjectStatus = z.infer<typeof ProjectStatus>
 
 // « public » reste le code stable ; l'appli l'affiche « Membres de Waiggle » (R6a) : seuls les
-// membres connectés voient un projet, jamais le web ouvert.
-export const ProjectVisibility = z.enum(['public', 'private'])
+// membres connectés voient un projet, jamais le web ouvert. R10 : `hive`, « Une ruche » : seuls
+// les membres de la ruche choisie (`hiveId`), son auteur, et la modération quand il est signalé.
+export const ProjectVisibility = z.enum(['public', 'hive', 'private'])
 export type ProjectVisibility = z.infer<typeof ProjectVisibility>
+
+/**
+ * R10 : la ruche d'un projet réservé, telle que l'API la rend (la pastille « Réservé à Famille », la
+ * phrase du partage). `name` vaut null quand la modération l'a retiré (« Ruche sans nom »). L'uuid
+ * est écrit ici plutôt que repris de hives.ts, qui importe ce fichier (sinon les deux s'attendraient
+ * au chargement).
+ */
+export const ProjectHive = z.object({ id: z.uuid(), name: z.string().nullable() })
+export type ProjectHive = z.infer<typeof ProjectHive>
+
+/**
+ * R10 : la ruche et la visibilité vont ensemble. « Une ruche » demande la ruche (`hiveId`) ; une
+ * ruche sans « Une ruche » est refusée. Dans une modification, la règle ne vaut que si le corps porte
+ * l'un des deux : passer d'une ruche à une autre envoie les deux.
+ */
+const hiveMatchesVisibility = (value: {
+  visibility?: ProjectVisibility | undefined
+  hiveId?: string | undefined
+}) =>
+  (value.visibility === undefined && value.hiveId === undefined) ||
+  (value.visibility === 'hive') === (value.hiveId !== undefined)
+const HIVE_WITH_VISIBILITY = {
+  message: 'a hive goes with the visibility « hive », and only with it',
+  path: ['hiveId'],
+}
 
 /**
  * Les seize catégories de départ (R6a), dans l'ordre de la feuille de publication. Depuis R6b, les
@@ -158,6 +184,9 @@ const fields = {
   description: FreeText(PROJECT_DESCRIPTION_MAX), // Markdown, affiché assaini par l'appli
   status: ProjectStatus,
   visibility: ProjectVisibility,
+  // R10 : la ruche d'un projet « Une ruche » ; il faut en être membre (sinon 404, comme une ruche
+  // qui n'existe pas).
+  hiveId: z.uuid(),
   demoUrl: DemoUrl.nullable(), // null : pas (ou plus) de démo
   // Des noms : l'API rattache chacun à l'outil du catalogue qui porte ce nom ou cet alias, sinon à
   // un « Autre » (R6b). Un même outil écrit deux fois (« Chat GPT », « ChatGPT ») n'en fait qu'un.
@@ -195,6 +224,7 @@ export const ProjectInput = z
     description: fields.description.optional(),
     status: fields.status.optional(),
     visibility: fields.visibility.optional(),
+    hiveId: fields.hiveId.optional(),
     demoUrl: fields.demoUrl.optional(),
     tools: fields.tools.optional(),
     prompts: fields.prompts.optional(),
@@ -203,6 +233,7 @@ export const ProjectInput = z
     startedOn: fields.startedOn.optional(),
   })
   .refine(secondDiffers, { ...SAME_CATEGORY, path: ['secondaryCategory'] })
+  .refine(hiveMatchesVisibility, HIVE_WITH_VISIBILITY)
   .meta({ id: 'ProjectInput' })
 export type ProjectInput = z.infer<typeof ProjectInput>
 
@@ -227,6 +258,7 @@ export const ProjectChanges = z
   .strictObject({ ...fields, visualOrder: VisualOrder })
   .partial()
   .refine(secondDiffers, { ...SAME_CATEGORY, path: ['secondaryCategory'] })
+  .refine(hiveMatchesVisibility, HIVE_WITH_VISIBILITY)
   .meta({ id: 'ProjectChanges' })
 export type ProjectChanges = z.infer<typeof ProjectChanges>
 
@@ -247,6 +279,8 @@ export const Project = z
     description: z.string(),
     status: ProjectStatus,
     visibility: ProjectVisibility,
+    /** R10 : la ruche d'un projet réservé (`visibility` vaut `hive`) ; null pour tout autre projet. */
+    hive: ProjectHive.nullable(),
     demoUrl: z.string().nullable(),
     tools: z.array(ProjectTool),
     prompts: z.array(z.string()),
@@ -332,6 +366,7 @@ export const ProjectSummary = Project.pick({
   pitch: true,
   status: true,
   visibility: true,
+  hive: true,
   tools: true,
   demoUrl: true,
   portraitCover: true,
