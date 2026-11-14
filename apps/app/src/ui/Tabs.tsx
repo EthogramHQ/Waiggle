@@ -19,7 +19,7 @@
 //   large que la place (huit ruches sur un téléphone), et la bande amène toujours l'onglet choisi
 //   entièrement en vue (`scrollToShow`, celui de Segmented et de FilterPills).
 import { layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useEffect, useId, useRef } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -175,9 +175,15 @@ export function Tabs<K extends string>({
     pending.current = true
     reveal(true)
   }, [selected, scroll])
-  const measured = () => {
-    if (pending.current) reveal(false)
+  // Une mesure arrivée : la bande montre l'onglet choisi s'il ne l'a pas encore été, ou si une
+  // taille a changé (le texte agrandi dans les réglages, la fenêtre tournée) : l'onglet choisi,
+  // élargi, sortait alors de la bande. Le membre qui fait glisser la bande ne change aucune taille.
+  const measured = (resized: boolean) => {
+    if (pending.current || resized) reveal(false)
   }
+  // La largeur visible de la bande, aussi en état : un onglet n'est jamais plus large qu'elle (un
+  // nom long, à 200 %, passe à la ligne dans sa pastille au lieu de sortir de la bande).
+  const [bandWidth, setBandWidth] = useState(0)
 
   // Choisir l'onglet de rang `index` et lui donner le focus (flèches, Début, Fin).
   const go = (index: number) => {
@@ -248,8 +254,10 @@ export function Tabs<K extends string>({
       onLayout={
         scroll
           ? (event: LayoutChangeEvent) => {
-              rowX.current = event.nativeEvent.layout.x
-              measured()
+              const { x } = event.nativeEvent.layout
+              const resized = x !== rowX.current
+              rowX.current = x
+              measured(resized)
             }
           : undefined
       }
@@ -281,8 +289,12 @@ export function Tabs<K extends string>({
               scroll
                 ? (event: LayoutChangeEvent) => {
                     const { x, width } = event.nativeEvent.layout
+                    const before = places.current.get(tab.key)
                     places.current.set(tab.key, { x, width })
-                    if (chosen) measured()
+                    // L'onglet choisi, ou un onglet avant lui qui change de taille (il le pousse).
+                    const resized =
+                      before !== undefined && (before.x !== x || before.width !== width)
+                    if (chosen || (resized && index < tabStop)) measured(resized)
                   }
                 : undefined
             }
@@ -296,6 +308,7 @@ export function Tabs<K extends string>({
               // sa ligne entière. Dans la bande, chacun garde la taille de son texte.
               flexGrow: scroll ? 0 : 1,
               flexShrink: 0,
+              ...(scroll && bandWidth > 0 ? { maxWidth: bandWidth } : null),
               flexBasis: large ? '100%' : 'auto',
               alignItems: 'center',
               justifyContent: 'center',
@@ -341,8 +354,11 @@ export function Tabs<K extends string>({
           horizontal
           showsHorizontalScrollIndicator={false}
           onLayout={(event: LayoutChangeEvent) => {
-            viewport.current = event.nativeEvent.layout.width
-            measured()
+            const { width } = event.nativeEvent.layout
+            const resized = viewport.current > 0 && width !== viewport.current
+            viewport.current = width
+            setBandWidth(width)
+            measured(resized)
           }}
           onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
             offset.current = event.nativeEvent.contentOffset.x
