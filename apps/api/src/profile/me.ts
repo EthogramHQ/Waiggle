@@ -8,6 +8,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { loadActiveSuspension } from '../suspension/load'
+import { provisionalOf } from './provisional'
 import { favoriteToolsOf } from './tools'
 
 const isLanguage = (value: unknown): value is Language =>
@@ -74,7 +75,8 @@ export const loadMe = async (
     // n'en est plus un tant que dure sa suspension (S19, reports/admin.ts) : l'entrée disparaît.
     isAdmin: row.adminSince !== null && suspension === null,
     suspension,
-    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (nom et pseudo mis d'office).
-    provisional: { name: false, handle: false },
+    // R9 (7d) : le nom ou le pseudo mis d'office par la modération, tant qu'il n'en a pas choisi
+    // d'autre (profile/provisional.ts) ; une requête de plus, par l'index des décisions d'une cible.
+    provisional: await provisionalOf(db, user.id, { name: user.name, handle }),
   }
 }
