@@ -117,6 +117,7 @@ import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
 import { AdminGesturesCatalogue } from './outils-gestes'
 import { ToolPageSheetsCatalogue } from './outils-page'
+import { HivePillsCatalogue } from './pastilles'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectCategoryCatalogue } from './projet-categorie'
@@ -845,6 +846,8 @@ export function CatalogueScreen() {
       <InvalidChoicesCatalogue />
       <ToolTagsCatalogue />
       <ToolFiltersCatalogue />
+      {/* Tranche R10 : le sélecteur de ruches du Fil (pastilles.tsx). */}
+      <HivePillsCatalogue />
       <ToolFieldCatalogue />
       <ToolHeaderCatalogue />
       <AdminCardsCatalogue />
