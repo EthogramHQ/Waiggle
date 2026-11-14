@@ -41,6 +41,12 @@ export type HiveDialogProps = {
   onDone: () => void
   /** Le membre visé par « Retirer » et « Confier ». */
   member?: HiveMember
+  /**
+   * La fenêtre a fini de partir (web et iOS, après son fondu ; voir `Dialog`). La page d'une ruche
+   * garde sa liste des membres figée jusque-là : le focus revient d'abord sur « Retirer », puis la
+   * liste perd le membre et `HiveMemberList` donne le focus au voisin. Android ne l'appelle pas.
+   */
+  onClosed?: () => void
 }
 
 /** Les refus qui ont leur propre phrase, plus juste que « Réessaie ». */
@@ -69,6 +75,7 @@ type ActionProps = {
    * appareil), ce que voulait le membre.
    */
   goneIsDone: boolean
+  onClosed?: (() => void) | undefined
 }
 
 /** La fenêtre commune : l'action, son attente, son refus. */
@@ -76,6 +83,7 @@ function HiveActionDialog({
   open,
   onClose,
   onDone,
+  onClosed,
   title,
   message,
   confirmLabel,
@@ -147,6 +155,7 @@ function HiveActionDialog({
       message={message}
       error={refusal && refusal !== 'unauthorized' ? refusalMessage : undefined}
       onDismiss={cancel}
+      {...(onClosed ? { onClosed } : null)}
       initialFocusRef={cancelRef}
     >
       {expired}
@@ -211,7 +220,14 @@ export function QuitHiveDialog({ hive, open, onClose, onDone }: HiveDialogProps)
 }
 
 /** « Retirer Tante Odile de la ruche ? » (option 5 des planches), pour l'animateur. */
-export function RemoveMemberDialog({ hive, open, onClose, onDone, member }: HiveDialogProps) {
+export function RemoveMemberDialog({
+  hive,
+  open,
+  onClose,
+  onDone,
+  onClosed,
+  member,
+}: HiveDialogProps) {
   const { t } = useTranslation()
   const remove = useRemoveMember(hive.summary.id)
   const memberName = member?.face.name ?? ''
@@ -220,6 +236,7 @@ export function RemoveMemberDialog({ hive, open, onClose, onDone, member }: Hive
       open={open && member !== undefined}
       onClose={onClose}
       onDone={onDone}
+      onClosed={onClosed}
       title={t(($) => $.hives.dialogs.removeTitle, { name: memberName })}
       message={[t(($) => $.hives.dialogs.removeBody)]}
       confirmLabel={t(($) => $.hives.dialogs.remove)}
