@@ -173,8 +173,14 @@ function MemberRow({ member, removable, onOpen, onRemove, toSource, targetRef }:
             <Icon name="user" size={20} tone="muted" />
           </View>
         ) : (
-          // Décorative : le nom, écrit juste à côté, dit déjà de qui il s'agit.
-          <View style={{ flexShrink: 0 }}>
+          // Décorative : le nom, écrit juste à côté, dit déjà de qui il s'agit. Cachée partout (web,
+          // iOS, Android) : sans cela, ses initiales se lisaient dans le lien (« img PJ »).
+          <View
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ flexShrink: 0 }}
+          >
             <Avatar
               name={name}
               source={toSource ? toSource(member.face.avatarUrl) : null}
