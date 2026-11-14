@@ -21,7 +21,13 @@ type Props = {
   wrap?: boolean
   /** Prend toute la place disponible dans son parent. */
   grow?: boolean
-  accessibilityRole?: 'list' | 'radiogroup' | 'none'
+  /**
+   * `group` (R10, l'aperçu de « Créer une ruche ») : un groupe nommé par `accessibilityLabel`, lu
+   * d'un seul nom (« Ma ruche Famille ») avant ses parties. React Native ne connaît pas ce rôle
+   * dans `accessibilityRole` : la pile le pose par `role`, comme `RemovalNotice`, sans `accessible`
+   * (sur iOS, VoiceOver atteint encore chaque partie).
+   */
+  accessibilityRole?: 'list' | 'radiogroup' | 'group' | 'none'
   accessibilityLabel?: string
   /**
    * Pour faire venir la pile dans l'écran (`revealWithoutJump`, ui/focus.ts) : la section
@@ -103,7 +109,11 @@ export function Stack({
     <View
       ref={ref}
       style={style}
-      {...(accessibilityRole ? { accessibilityRole } : null)}
+      {...(accessibilityRole === 'group'
+        ? { role: 'group' as const }
+        : accessibilityRole
+          ? { accessibilityRole }
+          : null)}
       {...(accessibilityLabel ? { accessibilityLabel } : null)}
       {...(nativeID ? { nativeID } : null)}
     >

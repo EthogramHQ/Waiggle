@@ -4213,7 +4213,17 @@ const pages = [
     signedIn: true,
     fullPage: true,
   },
-  { name: 'ruche-creer', path: '/hives/new', signedIn: true },
+  // Le nom tapé, comme sur la planche R10-Creer : le compteur « 7 / 40 » et l'aperçu « Ma ruche
+  // Famille ».
+  {
+    name: 'ruche-creer',
+    path: '/hives/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('textbox', { name: fr.hives.createSheet.name }).fill('Famille')
+      await page.getByText('Famille', { exact: true }).last().waitFor()
+    },
+  },
   {
     name: 'ruche-inviter',
     path: `/hives/${familleId}/invite`,
