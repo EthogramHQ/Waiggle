@@ -15,6 +15,12 @@
 //   couverture d'une carte ou d'une notification. Une photo retirée n'y est jamais, pas même pour
 //   son auteur : la couverture est la 1re photo VISIBLE (relecture de sécurité P6), et l'auteur voit
 //   sa carte comme les autres la voient.
+//
+// Cette règle ne dit que « retirée ou non ». Qui voit le projet de la photo (public, réservé à une
+// ruche dont il est membre aujourd'hui, R10, ou le sien) est décidé avant elle, par la règle commune
+// de projects/visibility.ts (`projectVisibleTo`, lue par `isVisualVisibleTo` de projects/load.ts) ;
+// pour le coin des testeurs, par `cornerAccess` (testers/access.ts). Un ancien membre de la ruche
+// reçoit donc le même 404 qu'un fichier inconnu, sans que cette règle-ci ait à le savoir.
 import { type AnyColumn, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
 
 /** Ce que la règle lit d'une photo : sa marque de retrait. */

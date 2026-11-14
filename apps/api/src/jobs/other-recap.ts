@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { languageOfMember } from '../email/language'
 import { otherRecapEmail } from '../email/templates'
 import { utc } from '../notifications/load'
+import { listedVerifiedProject } from '../projects/visibility'
 import { activeSuspensionSql } from '../suspension/load'
 import { type JobDeps, logMemberFailure } from './shared'
 
@@ -26,12 +27,14 @@ const RESEND_DAYS = 6
 
 /**
  * Un projet que les membres peuvent voir (public, pas retiré, d'un auteur vérifié), sans filtre de
- * blocage (décision 1) : la même règle que `listedVerifiedProject` de projects/visibility.ts, écrite
- * ici en SQL brut sur l'alias `p`, parce que les requêtes de cette tâche sont en SQL brut.
+ * blocage (décision 1) : `listedVerifiedProject` de projects/visibility.ts, la règle commune. Avant
+ * R10, elle était recopiée ici en SQL brut ; elle vient maintenant de là-bas (plan de R10, choix 2),
+ * pour qu'un changement de la règle ne puisse plus l'oublier. Elle ne prend jamais un projet
+ * réservé à une ruche (relecture de sécurité du plan de R10, B5) : le récap ne compte pas ce que
+ * l'administrateur ne pourrait pas ranger. Elle écrit ses colonnes `"project"."…"` : les requêtes
+ * ci-dessous nomment donc la table project sans alias.
  */
-const listed = (p: string) =>
-  sql.raw(`${p}.visibility = 'public' and ${p}.removed_at is null
-    and (select u.email_verified from "user" u where u.id = ${p}.author_id) is true`)
+const listed = () => listedVerifiedProject()
 
 const Count = z.object({ rows: z.array(z.object({ n: z.coerce.number() })) })
 
@@ -53,8 +56,8 @@ const pendingTools = (period: SQL) => sql`
   select count(*)::int as n from tool t
   where t.status = 'other' and ${period}
     and (
-      (select 1 from project_tool pt join project p on p.id = pt.project_id
-        where pt.tool_id = t.id and ${listed('p')} limit 1) is not null
+      (select 1 from project_tool pt join project on project.id = pt.project_id
+        where pt.tool_id = t.id and ${listed()} limit 1) is not null
       or (select 1 from profile_tool pf join "user" u on u.id = pf.user_id
         where pf.tool_id = t.id and u.email_verified limit 1) is not null
     )`
@@ -67,12 +70,12 @@ const pendingTools = (period: SQL) => sql`
  * quelques lignes par jour.
  */
 const pendingProjects = (period: SQL) => sql`
-  select count(*)::int as n from project p
-  where (p.primary_category = ${OTHER_CATEGORY} or p.secondary_category = ${OTHER_CATEGORY})
-    and ${listed('p')} and ${period}
+  select count(*)::int as n from project
+  where (project.primary_category = ${OTHER_CATEGORY} or project.secondary_category = ${OTHER_CATEGORY})
+    and ${listed()} and ${period}
     and not exists (
       select 1 from catalogue_change c
-      where c.project_id = p.id and c.action = 'project_recategorize'
+      where c.project_id = project.id and c.action = 'project_recategorize'
     )`
 
 /** Les quatre nombres du récap, à l'heure `now` : deux lectures bornées des deux côtés. */
@@ -83,10 +86,10 @@ const counts = async (db: Database, now: Date) => {
   const older = (column: string) => sql`${sql.raw(column)} <= ${utc(since)}`
   return {
     tools: await countOf(db, pendingTools(recent('t.created_at'))),
-    projects: await countOf(db, pendingProjects(recent('p.published_at'))),
+    projects: await countOf(db, pendingProjects(recent('project.published_at'))),
     older:
       (await countOf(db, pendingTools(older('t.created_at')))) +
-      (await countOf(db, pendingProjects(older('p.published_at')))),
+      (await countOf(db, pendingProjects(older('project.published_at')))),
   }
 }
 

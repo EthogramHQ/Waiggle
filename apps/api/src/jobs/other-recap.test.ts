@@ -33,6 +33,7 @@ import {
   TEST_AUTH_SECRET,
   type TestContext,
 } from '../testing/context'
+import { hiveRows } from '../testing/hive-rows'
 import { addCatalogueTool, clearCatalogue } from '../testing/tool-catalogue'
 import { otherRecap } from './other-recap'
 
@@ -341,6 +342,24 @@ describe('what the recap counts', () => {
     await publish(await act.signInAgain(zoeAccount), 'Tri')
     await runAt(new Date(MONDAY_8H.getTime() + 7 * DAY))
     expect(louisRecap()).toContain(projectsLine(1))
+  })
+
+  // R10 (relecture de sécurité du plan, B5) : la tâche lit la règle commune
+  // (`listedVerifiedProject`), qui ne prend jamais un projet réservé à une ruche, pas même quand
+  // l'administrateur est membre de cette ruche : il ne pourrait pas le ranger.
+  it('never counts a hive-reserved project, nor an « other » tool it cites, even for an admin in the hive', async () => {
+    const famille = await hiveRows(ctx).createHive('Famille', louisId, [maxId])
+    // Le projet de Max, classé « Autre », cite un outil « Autre » ; il est réservé à Famille.
+    const carnet = await publish(max, 'Carnet', ['Outil Ruche'])
+    await hiveRows(ctx).reserve(carnet.id, famille)
+    // Témoin : un « Autre » sur un projet « Membres », rangé en cuisine, compte.
+    await publish(lea, 'Potager', ['Outil Visible'], { primaryCategory: 'cooking' })
+
+    await runAt(MONDAY_8H)
+
+    const text = louisRecap()
+    expect(text).toContain(toolsLine(1))
+    expect(text).not.toContain(fill(fr.otherRecap.projects_one, { count: '1' }))
   })
 
   it('leaves out of the pending tools, and of the older count, an other tool cited only by private projects', async () => {

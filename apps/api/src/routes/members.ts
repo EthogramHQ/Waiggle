@@ -20,6 +20,7 @@ import { searchMentionable } from '../mentions/search'
 import { avatarUrlOf } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { loadSummaries, visibleTo } from '../projects/load'
+import { inViewerHiveColumn } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { isActiveAdmin } from '../reports/admin'
@@ -164,6 +165,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           visibility: schema.project.visibility,
           // Un projet retiré compte comme privé pour la recherche (viewerOf, comments/load.ts).
           removedAt: schema.project.removedAt,
+          // R10 : sa ruche est-elle l'une de celles du membre ? (viewerOf, projects/visibility.ts)
+          inViewerHive: inViewerHiveColumn(user.id),
         })
         .from(schema.project)
         .where(and(eq(schema.project.id, projectId), visibleTo(user.id))),

@@ -37,7 +37,13 @@ import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
 import { avatarUrlOf } from '../profile/me'
-import { listedProject, projectVisibleTo } from '../projects/visibility'
+import {
+  inViewerHiveColumn,
+  listedProject,
+  projectVisibleTo,
+  reservedProject,
+  sharedWith,
+} from '../projects/visibility'
 import { removalsOf } from '../removals/load'
 
 type Reader = Pick<Database, 'select'>
@@ -94,15 +100,23 @@ export type Viewer = {
  * sans bruit les commentaires d'un membre bloqué (relecture de sécurité A3). Une lecture qui n'a
  * vraiment pas à les cacher écrit donc `noBlocks` elle-même, en le disant. `seesSql`, elle, lit
  * les blocages dans la base et ne dépend pas de ce paramètre.
+ *
+ * R10 : un projet réservé à une ruche se lit comme un projet public par les membres actuels de sa
+ * ruche (ils lisent les commentaires de tous, ceux d'un ancien membre compris : « Tes commentaires
+ * restent lisibles par ses membres », scénario « Quitter une ruche »), et comme un projet privé par
+ * tout autre, son auteur hors de la ruche ou un ancien membre venu effacer le sien (décision Q2).
+ * `inViewerHive` le dit, lu en SQL avec le projet (`inViewerHiveColumn`, projects/visibility.ts) ;
+ * obligatoire pour la même raison que `blocks` : l'oublier montrerait ou cacherait sans bruit.
+ * La règle elle-même est `sharedWith`, écrite à côté de sa version SQL.
  */
 export const viewerOf = (
   memberId: string,
-  project: { authorId: string; visibility: string; removedAt: Date | null },
+  project: { authorId: string; visibility: string; removedAt: Date | null; inViewerHive: boolean },
   blocks: Blocks,
 ): Viewer => ({
   id: memberId,
   isProjectAuthor: project.authorId === memberId,
-  projectIsPrivate: project.visibility !== 'public' || project.removedAt !== null,
+  projectIsPrivate: !sharedWith(project),
   blocks,
 })
 
@@ -654,6 +668,9 @@ export const loadCommentContext = async (
       authorId: schema.project.authorId,
       visibility: schema.project.visibility,
       removedAt: schema.project.removedAt,
+      // R10 : sa ruche est-elle l'une de celles du membre (viewerOf) ? Ses ruches par l'index
+      // hive_member_user_idx, une fois pour la requête.
+      inViewerHive: inViewerHiveColumn(viewerId),
     })
     .from(schema.project)
     .where(and(eq(schema.project.id, target.projectId), projectVisibleTo(viewerId)))
@@ -678,12 +695,18 @@ export const loadCommentContext = async (
  * tous, les deux auteurs compris. Sur un projet privé ou retiré, que seul son auteur voit, il ne
  * compte que ses propres commentaires : ceux des autres sont cachés à tous (voir `sees`).
  *
+ * R10 : un projet réservé à une ruche (`reservedProject`) compte comme un projet public. Ce nombre
+ * n'est montré qu'à qui voit déjà le projet (ses membres et son auteur : les listes et la page
+ * passent par `projectVisibleTo` avant de le demander), et tous ceux-là lisent les commentaires de
+ * tous, ceux d'un ancien membre compris (viewerOf) : le nombre est celui qu'ils lisent.
+ *
  * En SQL :
  *   select project_comment.project_id, count(*)::int from project_comment
  *   inner join project on project.id = project_comment.project_id
  *   where project_comment.project_id in (…) and hidden_at is null and deleted_at is null
  *     and project_comment.removed_at is null and project_comment.author_id is not null
  *     and ((project.visibility = 'public' and project.removed_at is null)
+ *       or (project.visibility = 'hive' and project.removed_at is null)
  *       or project_comment.author_id = project.author_id)
  *   group by project_comment.project_id
  * La jointure (« inner join ») met à côté de chaque commentaire la ligne de son projet, trouvée
@@ -707,7 +730,7 @@ export const commentCountsOf = async (
         isNull(c.deletedAt),
         isNull(c.removedAt),
         isNotNull(c.authorId),
-        or(listedProject(), eq(c.authorId, p.authorId)),
+        or(listedProject(), reservedProject(), eq(c.authorId, p.authorId)),
       ),
     )
     .groupBy(c.projectId)
