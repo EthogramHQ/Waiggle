@@ -90,6 +90,19 @@ const fr = {
     'Un profil ne se retire pas en entier : classe le signalement, ou suspends le compte.',
   history: 'Historique des décisions',
   historyCompact: 'Historique récent, version compacte (R9)',
+  // R9 : le geste d'une notification (« Contester », « Choisir un pseudo »). Le détail ne dit plus
+  // « Pour contester » : le lien le fait.
+  actions: 'Notifications avec un geste (R9)',
+  notifRemovedNoContest: [
+    'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
+    'Après un signalement, une personne de la modération a décidé de le retirer.',
+    `Fondement : les règles de ${appName}.`,
+  ].join('\n'),
+  notifPhotoRemoved: 'La photo 2 de « Le ciel de ce soir » a été retirée par la modération',
+  notifRenamed:
+    'Ton pseudo a été remplacé par la modération. En attendant, tu es provisoirement @membre-4821.',
+  subjectDate: '12 nov.',
+  subjectTitle: 'Le ciel de ce soir',
 }
 
 const en: typeof fr = {
@@ -166,6 +179,17 @@ const en: typeof fr = {
     'A profile is not removed as a whole: dismiss the report, or suspend the account.',
   history: 'History of decisions',
   historyCompact: 'Recent history, compact version (R9)',
+  actions: 'Notifications with a gesture (R9)',
+  notifRemovedNoContest: [
+    'Only you can see it now, until it is restored, if it ever is.',
+    'After a report, a person from the moderation decided to remove it.',
+    `Ground: the rules of ${appName}.`,
+  ].join('\n'),
+  notifPhotoRemoved: 'Photo 2 of “Tonight’s sky” was removed by the moderation',
+  notifRenamed:
+    'Your username was replaced by the moderation. Until then, you are temporarily @member-4821.',
+  subjectDate: 'Nov 12',
+  subjectTitle: 'Tonight’s sky',
 }
 
 // Les décisions d'exemple de l'historique (DecisionCard écrit lui-même ses textes, dans la langue
@@ -321,8 +345,18 @@ const compactDecisions: DecisionHistoryItem[] = [
 const noop = () => {}
 
 export function ModerationCatalogue() {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
+  // Les vrais textes de l'appli pour les gestes et l'objet de l'e-mail (« Contestation : retrait de
+  // la photo 2 de « Le ciel de ce soir » du 12 nov. ») : le catalogue montre ce que lira le membre.
+  const contest = t(($) => $.notifications.contest)
+  const subject = t(($) => $.removal.contestSubject, {
+    decision: t(($) => $.removal.contestDecision.part, {
+      part: t(($) => $.moderation.parts.photo, { n: 2 }),
+      title: l.subjectTitle,
+    }),
+    date: l.subjectDate,
+  })
   // La fenêtre « Retirer » d'exemple, ouverte par un bouton.
   const [dialog, setDialog] = useState(false)
   return (
@@ -515,6 +549,41 @@ export function ModerationCatalogue() {
           when={l.yesterday}
           isNew={false}
           onPress={noop}
+        />
+      </Stack>
+      {/* R9 : le geste d'une notification, sous la phrase et la citation, hors du lien de la
+          ligne : « Contester » sur une ligne nouvelle qui mène au contenu ; sur une ligne qui ne
+          mène nulle part (une photo retirée) ; « Choisir un pseudo », un geste de l'écran. */}
+      <Text variant="headline" heading={3}>
+        {l.actions}
+      </Text>
+      <Stack gap="sm" accessibilityRole="list">
+        <NotificationCard
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifRemoved }]}
+          detail={l.notifRemovedNoContest}
+          quote={l.notifRemovedQuote}
+          when={l.today}
+          isNew
+          onPress={noop}
+          action={{ label: contest, contact: { subject } }}
+        />
+        <NotificationCard
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifPhotoRemoved }]}
+          detail={l.notifRemovedNoContest}
+          when={l.yesterday}
+          isNew={false}
+          onPress={null}
+          action={{ label: contest, contact: { subject } }}
+        />
+        <NotificationCard
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifRenamed }]}
+          when={l.today}
+          isNew
+          onPress={noop}
+          action={{ label: t(($) => $.notifications.chooseHandle), onPress: noop }}
         />
       </Stack>
       {/* L'historique (tranche 7c) : chaque sorte de décision ; « Voir » vers le membre ou le
