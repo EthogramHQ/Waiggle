@@ -884,7 +884,9 @@ describe('blocking the author too', () => {
   // R9 (relectures, 14/11/2026) : l'aperçu ne dit jamais qui est administrateur ; la case est donc
   // proposée pour tout auteur, administrateur compris (c'est l'API qui décide, sans le dire).
   it('offers « Bloquer aussi » for an administrator author too', async () => {
-    await openSheet({ ...meteo, author: { ...ines, isAdmin: true } })
+    // Un auteur « administrateur », comme l'ancienne API l'aurait dit : la feuille n'en tient plus compte.
+    const administrator = { ...ines, isAdmin: true }
+    await openSheet({ ...meteo, author: administrator })
     await toReason()
 
     expect(screen.getByRole('checkbox', { name: /Bloquer aussi/ })).toBeTruthy()
