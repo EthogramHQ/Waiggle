@@ -46,6 +46,8 @@ const fr = {
   sheetPhone:
     'Feuille, disposition téléphone : poignée, « Fermer », titre, contenu qui défile, pied collé',
   sheetDesktop: 'Feuille, disposition ordinateur : panneau centré',
+  sheetCloseInFooter: 'Feuille dont le pied porte « Fermer » (closeInFooter) : pas de croix',
+  sheetDone: 'Merci, ton signalement a été envoyé.',
   sheetOpen: 'Ouvrir la feuille',
   partialPhone:
     'Feuille à mi-hauteur sur téléphone (R8, voir en contexte), collée en bas d’un écran de 844 points',
@@ -98,6 +100,8 @@ const en: typeof fr = {
   about: 'About',
   sheetPhone: 'Sheet, phone layout: handle, “Close”, title, scrolling content, pinned footer',
   sheetDesktop: 'Sheet, desktop layout: centred panel',
+  sheetCloseInFooter: 'Sheet whose footer carries “Close” (closeInFooter): no cross',
+  sheetDone: 'Thanks, your report was sent.',
   sheetOpen: 'Open the sheet',
   partialPhone:
     'Partial-height sheet on a phone (R8, see in context), at the bottom of an 844-point screen',
@@ -266,6 +270,33 @@ export function AccountCatalogue() {
             keyboardType="email-address"
           />
         </SheetPanel>
+      </View>
+
+      {/* R9 : le pied porte déjà « Fermer » (« Merci » de la feuille « Signaler ») : la tête n'a pas
+          de croix du même nom. Téléphone (la poignée reste) et ordinateur (pas de rangée vide). */}
+      <Text tone="secondary">{l.sheetCloseInFooter}</Text>
+      <View
+        style={{
+          backgroundColor: colors.scrim,
+          borderRadius: radii.tile,
+          paddingVertical: space.xxxl,
+          gap: space.xl,
+        }}
+      >
+        {(['phone', 'desktop'] as const).map((disposition) => (
+          <SheetPanel
+            key={disposition}
+            layout={disposition}
+            compact
+            title={l.sheetTitle}
+            closeLabel={l.close}
+            closeInFooter
+            onClose={() => {}}
+            footer={<Button label={l.close} onPress={() => {}} />}
+          >
+            <Text>{l.sheetDone}</Text>
+          </SheetPanel>
+        ))}
       </View>
       <View style={{ alignSelf: 'flex-start' }}>
         <Button label={l.sheetOpen} variant="secondary" onPress={() => setSheetOpen(true)} />

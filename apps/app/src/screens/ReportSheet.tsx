@@ -42,7 +42,7 @@ import { Button } from '../ui/Button'
 import { Checkbox } from '../ui/Checkbox'
 import { ContactLink, contactMailto } from '../ui/ContactLink'
 import { DiscardDialog } from '../ui/DiscardDialog'
-import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
@@ -54,9 +54,10 @@ import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
-import { TextField } from '../ui/TextField'
+import { TextField, type TextFieldInput } from '../ui/TextField'
 import { TAP_GUARD_MS } from '../ui/tapGuard'
 import { useHydrated } from '../ui/theme/hydration'
+import { useCalmMotion } from '../ui/theme/motion'
 import { useNameOf } from '../useNameOf'
 
 type ReasonKey = keyof Translation['report']['reasons']
@@ -209,7 +210,9 @@ export function ReportSheet({ kind, id }: { kind: string; id: string }) {
         // La feuille s'ouvre sous le doigt de « Signaler » (un menu) : la seconde tape d'une double
         // tape ne tombe ni sur « Continuer » ni sur « Annuler ».
         guardTaps
-        {...(form ? form.sheet : footer ? { footer } : null)}
+        // Les états sans formulaire (introuvable, son propre contenu) ont « Fermer » au pied : la
+        // tête n'a pas de croix du même nom (relecture de R9).
+        {...(form ? form.sheet : footer ? { footer, closeInFooter: true } : null)}
       >
         {content}
       </Sheet>
@@ -268,16 +271,25 @@ function useReportForm({
   const missingRef = useRef<Focusable>(null)
   const alreadyRef = useRef<Focusable>(null)
   const sentRef = useRef<Focusable>(null)
-  // Ce qui doit recevoir le focus au prochain dessin (après un geste seulement).
-  const [focusNext, setFocusNext] = useState<{ current: Focusable | null } | null>(null)
+  // La saisie de la précision : obligatoire pour un contenu dit illégal, le focus y va.
+  const whyRef = useRef<TextFieldInput>(null)
+  const calm = useCalmMotion()
+  // Ce qui doit recevoir le focus au prochain dessin (après un geste seulement). `reveal` : il
+  // vient aussi dans la zone qui défile (un envoi refusé avant de partir, voir `submit`).
+  const [focusNext, setFocusNext] = useState<{
+    ref: { current: unknown }
+    reveal?: boolean
+  } | null>(null)
   useEffect(() => {
     if (!focusNext) return
-    const node = focusNext.current
-    // Sur le web, sans défilement ; sur téléphone, le lecteur d'écran y va aussi (code-appli.md).
-    focusWithoutScroll(node)
+    const node = focusNext.ref.current
+    // Sur le web, sans défilement, ou en le faisant venir au milieu de la zone qui défile (au-dessus
+    // du pied collé) ; sur téléphone, le lecteur d'écran y va aussi (code-appli.md).
+    if (focusNext.reveal) focusAndReveal(node, calm)
+    else focusWithoutScroll(node)
     moveReaderTo(node)
     setFocusNext(null)
-  }, [focusNext])
+  }, [focusNext, calm])
 
   const choices = useMemo(() => (preview ? partChoices(preview, t) : []), [preview, t])
   // « Tout … » seul (un message sans capture, un profil sans rien d'autre) : rien à choisir, pas
@@ -340,18 +352,18 @@ function useReportForm({
     const reported = part ? entry?.reportedByMe === true : preview.reportedByMe
     if (reported) {
       setStep('already')
-      setFocusNext(alreadyRef)
+      setFocusNext({ ref: alreadyRef })
       return
     }
     shownAt.current = Date.now()
     setStep('reason')
-    setFocusNext(reasonTitleRef)
+    setFocusNext({ ref: reasonTitleRef })
   }
   const goBack = () => {
     setStep('part')
     setMissingReason(false)
     // Le focus revient au choix coché (ui-P5), pas en haut de la feuille.
-    setFocusNext(checkedRef)
+    setFocusNext({ ref: checkedRef })
   }
 
   const choose = (value: ReportReason) => {
@@ -403,21 +415,26 @@ function useReportForm({
       : null
     setRecap({ text: recapOf(sentReason), image, blocked })
     setStep('sent')
-    setFocusNext(sentRef)
+    setFocusNext({ ref: sentRef })
   }
 
   const submit = async () => {
     if (inFlight.current || current !== 'reason') return
     // Juste après « Continuer », la tape est la seconde d'une double tape : ignorée.
     if (Date.now() - shownAt.current < TAP_GUARD_MS) return
+    // Un envoi refusé avant de partir se voit (relecture de design de R9) : le message, ou le champ,
+    // reçoit le focus et vient au milieu de la zone qui défile. Sans cela, « Choisis un motif »
+    // restait sous le pied collé, et l'erreur de la précision plus bas encore, hors de l'écran.
     if (reason === null) {
       setMissingReason(true)
-      setFocusNext(missingRef)
+      setFocusNext({ ref: missingRef, reveal: true })
       return
     }
-    // Pour un contenu dit illégal, la précision est obligatoire (article 16 du DSA).
+    // Pour un contenu dit illégal, la précision est obligatoire (article 16 du DSA) : le focus va
+    // dans son champ, où l'on écrit aussitôt ; son erreur se lit dessous, et à l'arrivée.
     if (reason === 'illegal' && details.trim() === '') {
       setMissingWhy(true)
+      setFocusNext({ ref: whyRef, reveal: true })
       return
     }
     // « Bloquer aussi » : la fenêtre de blocage d'abord ; « Bloquer » y envoie, puis bloque.
@@ -634,6 +651,7 @@ function useReportForm({
           label={illegal ? t(($) => $.report.illegalDetails) : t(($) => $.report.details)}
           value={details}
           onChangeText={changeDetails}
+          inputRef={whyRef}
           // L'aide reste sous l'erreur : on la lit encore en corrigeant.
           error={illegal && missingWhy ? t(($) => $.report.illegalRequired) : undefined}
           keepHint
@@ -691,8 +709,9 @@ function useReportForm({
       notice,
       busy: sending,
       ...back,
-      // « Annuler » tant qu'on remplit ; « Merci » et les états n'ont que « Fermer ».
-      ...(filling ? { cancelLabel: t(($) => $.report.cancel) } : null),
+      // « Annuler » tant qu'on remplit ; « Merci » et les états n'ont que « Fermer », au pied : la
+      // tête n'a pas alors de croix du même nom (un seul « Fermer » par étape, relecture de R9).
+      ...(filling ? { cancelLabel: t(($) => $.report.cancel) } : { closeInFooter: true }),
       closeGuard: requestClose,
       onClose: requestClose,
     },
@@ -720,7 +739,7 @@ function useReportForm({
           }}
           onClosed={() => {
             // La fenêtre partie : le focus va à « Merci » (avant, elle le gardait pour elle).
-            if (recap) setFocusNext(sentRef)
+            if (recap) setFocusNext({ ref: sentRef })
           }}
         />
       </>
