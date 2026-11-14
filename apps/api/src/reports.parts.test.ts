@@ -28,6 +28,7 @@ import {
   REPORTS_PER_DAY,
   type ReportPartField,
   ReportSnapshot,
+  type ReportTarget,
   ReportTargetPreview,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -582,5 +583,46 @@ describe('the preview of a target, its head and its parts', () => {
     expect((await postReport(max, projectOf(), { field: 'description' })).status).toBe(201)
     expect((await readPreview(max, 'project', meteo.id)).remainingToday).toBe(REPORTS_PER_DAY - 1)
     expect((await readPreview(zoe, 'project', meteo.id)).remainingToday).toBe(REPORTS_PER_DAY)
+  })
+})
+
+// Relecture de sécurité R9 (sec-A1) : une partie retirée que son auteur a remise lui-même (le même
+// lien de démo renvoyé par un PATCH) est signalable de nouveau ; « déjà examiné » ne vaut que si la
+// modération a examiné la partie telle qu'elle est (classée, ou rétablie).
+describe('reporting again a removed part', () => {
+  const DEMO = 'https://meteo.example.com/'
+  const demoPart: Part = { field: 'demoUrl' }
+  // `decide` veut une cible typée par sa sorte (« project »), pas un `kind: string`.
+  const projectTarget = (): ReportTarget => ({ kind: 'project', id: meteo.id })
+
+  const removeDemo = async () => {
+    expect((await postReport(max, projectOf(), demoPart)).status).toBe(201)
+    later()
+    await act.decide(louis, {
+      action: 'remove',
+      target: projectTarget(),
+      part: demoPart,
+      ground: 'rules',
+      explanation: 'Lien d’hameçonnage.',
+    })
+  }
+
+  it('lets the first reporter report again a removed part its author wrote back', async () => {
+    await removeDemo()
+    later()
+    const patch = await act.send('PATCH', `/v1/projects/${meteo.id}`, lea, { demoUrl: DEMO })
+    expect(patch.status).toBe(200)
+
+    expect((await postReport(max, projectOf(), demoPart)).status).toBe(201)
+    expect((await storedReports()).map((r) => r.status)).toEqual(['removed', 'open'])
+  })
+
+  // Témoin : rétablie par la modération, la partie a été examinée telle qu'elle est.
+  it('still refuses a part the moderation examined and restored, unchanged', async () => {
+    await removeDemo()
+    later()
+    await act.decide(louis, { action: 'restore', target: projectTarget(), part: demoPart })
+
+    await expectError(await postReport(max, projectOf(), demoPart), 409, 'already_examined')
   })
 })
