@@ -247,25 +247,23 @@ export function Dialog({
 }: Props) {
   const { colors } = useTheme()
   // La hauteur de l'écran : assez haut, et des boutons assez courts, ils restent collés en bas de
-  // la fenêtre, qui ne dépasse jamais (voir `PINNED_MIN_HEIGHT`). `buttonsFit` : la mesure des
-  // boutons dit qu'ils laissent la moitié de l'écran au texte (`null` : pas encore mesurés, on
-  // colle comme avant). Décidé **une fois** par ouverture : si l'avis changeait en route (le
-  // message d'échec qui apparaît), le haut de la fenêtre serait remonté ailleurs et un champ de
-  // `body` perdrait sa saisie et son focus.
+  // la fenêtre, qui ne dépasse jamais (voir `PINNED_MIN_HEIGHT`). `buttonsHeight` : la hauteur
+  // mesurée du bloc des boutons (`null` : pas encore mesuré, on colle comme avant). Elle suit la
+  // taille du texte ; elle ne dépend ni du message d'échec (hors du bloc), ni du mode (la largeur
+  // des boutons est la même collés ou non) : aucune boucle.
   const screenHeight = useWindowDimensions().height
-  const [buttonsFit, setButtonsFit] = useState<boolean | null>(null)
-  const pinned = screenHeight >= PINNED_MIN_HEIGHT && buttonsFit !== false
-  useEffect(() => {
-    if (!visible) setButtonsFit(null)
-  }, [visible])
+  const [buttonsHeight, setButtonsHeight] = useState<number | null>(null)
+  // Ce qui reste à la zone du texte : l'écran, moins la marge autour de la fenêtre, le bas de son
+  // remplissage, l'écart au-dessus des boutons, et les boutons eux-mêmes.
+  const textRoom =
+    buttonsHeight === null
+      ? screenHeight
+      : screenHeight - 2 * DIALOG_MARGIN - space.xxl - space.lg - buttonsHeight
+  const pinned = screenHeight >= PINNED_MIN_HEIGHT && textRoom >= screenHeight * PINNED_TEXT_SHARE
   const measureButtons = (event: LayoutChangeEvent) => {
-    const height = event.nativeEvent.layout.height
+    const { height } = event.nativeEvent.layout
     // Une mesure à 0 (vue pas encore dessinée) ne dit rien.
-    if (buttonsFit !== null || height <= 0) return
-    // Ce qui reste à la zone du texte : l'écran, moins la marge autour de la fenêtre, le bas de
-    // son remplissage, l'écart au-dessus des boutons, et les boutons eux-mêmes.
-    const text = screenHeight - 2 * DIALOG_MARGIN - space.xxl - space.lg - height
-    setButtonsFit(text >= screenHeight * PINNED_TEXT_SHARE)
+    if (height > 0) setButtonsHeight(height)
   }
   // Le fondu du bas de la zone qui défile, tant qu'il reste du texte plus bas (celui des feuilles).
   const fold = useBelowFold()
