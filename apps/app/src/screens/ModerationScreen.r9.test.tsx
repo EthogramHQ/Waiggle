@@ -37,6 +37,8 @@ import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/r
 import { containing, fr } from '../testing/text'
 import { ModerationScreen } from './ModerationScreen'
 
+// Sur le web, l'écran prend la langue de l'appareil : le français, comme sur ce PC (charte).
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 // Les images de l'API voyagent avec la session (api/media.ts) : ici, l'adresse suffit.
 jest.mock('../api/media', () => ({
