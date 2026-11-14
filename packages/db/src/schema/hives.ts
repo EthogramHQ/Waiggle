@@ -142,7 +142,8 @@ export const hiveNotice = pgTable(
     createdAt: timestamp('created_at').notNull(),
   },
   (t) => [
-    index('hive_notice_recipient_idx').on(t.recipientId, t.createdAt.desc()),
+    // nullsFirst : l'ordre exact de « order by … desc », sinon PostgreSQL n'utilise pas l'index.
+    index('hive_notice_recipient_idx').on(t.recipientId, t.createdAt.desc().nullsFirst()),
     // Les copies du nom d'une ruche, à vider quand la modération le retire.
     index('hive_notice_hive_idx').on(t.hiveId),
     check('hive_notice_kind_check', sql`${t.kind} in ('removed', 'animator', 'deleted')`),

@@ -75,7 +75,7 @@ CREATE INDEX "hive_invitation_invitee_idx" ON "hive_invitation" USING btree ("in
 CREATE INDEX "hive_invitation_inviter_idx" ON "hive_invitation" USING btree ("inviter_id","created_at");--> statement-breakpoint
 CREATE INDEX "hive_member_user_idx" ON "hive_member" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "hive_member_invited_by_idx" ON "hive_member" USING btree ("invited_by","joined_at");--> statement-breakpoint
-CREATE INDEX "hive_notice_recipient_idx" ON "hive_notice" USING btree ("recipient_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "hive_notice_recipient_idx" ON "hive_notice" USING btree ("recipient_id","created_at" DESC NULLS FIRST);--> statement-breakpoint
 CREATE INDEX "hive_notice_hive_idx" ON "hive_notice" USING btree ("hive_id");--> statement-breakpoint
 ALTER TABLE "project" ADD CONSTRAINT "project_hive_id_hive_id_fk" FOREIGN KEY ("hive_id") REFERENCES "public"."hive"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "project_hive_created_idx" ON "project" USING btree ("hive_id","created_at") WHERE "project"."visibility" = 'hive';--> statement-breakpoint
