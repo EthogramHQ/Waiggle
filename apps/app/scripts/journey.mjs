@@ -1062,21 +1062,23 @@ try {
     return find(json) ?? fail('commentaire de Sam introuvable dans l’API')
   })()
   expectEqual('commentaire visé', new URL(malik.page.url()).searchParams.get('id'), spamId)
-  await malik.page.getByText('Le commentaire signalé').waitFor()
-  await malik.page.getByText(spam, { exact: true }).last().waitFor()
+  // R9 : une feuille posée sur le projet. Un commentaire n'a pas de partie : elle commence au
+  // motif, sous le rappel de ce qui est signalé (« Un commentaire de Sam »).
+  await byRole(malik.page, 'heading', 'Signaler ce commentaire').waitFor()
+  await malik.page
+    .getByText(/^Un commentaire de Sam$/)
+    .filter({ visible: true })
+    .first()
+    .waitFor()
   await byRole(malik.page, 'radio', 'Arnaque ou spam').click()
   await malik.page
-    .getByLabel('Précision (facultatif)')
+    .getByLabel('Ajoute un détail, facultatif')
     .fill('Une offre d’argent facile, sans rapport avec le projet.')
-  await byRole(malik.page, 'button', 'Envoyer').click()
-  await malik.page
-    .getByText('Merci, ton signalement a été envoyé. La modération va le regarder.')
-    .waitFor()
-  console.log('  ok : Malik lit le remerciement')
 
-  // Tranche 7b : la confirmation propose de bloquer l'auteur, jamais d'office. Le dialogue est le
+  // Tranche 7b, refaite en R9 : la case « Bloquer aussi » (jamais cochée d'avance) ouvre la fenêtre
+  // de blocage avant l'envoi ; « Bloquer » y envoie le signalement, puis bloque. Le dialogue est le
   // plus petit bloc qui contient son titre et son « Annuler » : son « Bloquer » est le sien.
-  step('Depuis la confirmation, Malik bloque aussi Sam, après avoir lu ce qui change')
+  step('Malik coche « Bloquer aussi Sam » : la fenêtre dit ce qui change, puis tout part')
   /** Le dialogue ouvert dont le titre répond à `title` (une espace fine précède le « ? »). */
   const dialogOf = (someone, title) =>
     someone.page
@@ -1084,11 +1086,31 @@ try {
       .filter({ has: byRole(someone.page, 'heading', title) })
       .filter({ has: byRole(someone.page, 'button', 'Annuler') })
       .last()
-  await byRole(malik.page, 'button', `Bloquer aussi @${samHandle}`).click()
-  const blockDialog = dialogOf(malik, new RegExp(`^Bloquer @${samHandle}\\s*\\?$`))
+  const alsoBlock = byRole(malik.page, 'checkbox', `Bloquer aussi Sam (@${samHandle})`)
+  expectEqual('case « Bloquer aussi », à l’ouverture', await alsoBlock.isChecked(), false)
+  await alsoBlock.check()
+  await byRole(malik.page, 'button', 'Envoyer le signalement').click()
+  // « Bloquer Sam (@pseudo) ? » : le nom et le pseudo (une espace fine précède le « ? »).
+  const blockDialog = dialogOf(malik, new RegExp(`^Bloquer Sam \\(@${samHandle}\\)\\s*\\?$`))
   await blockDialog.getByText(/Bloquer ne prévient pas la modération\./).waitFor()
+  // Depuis « Bloquer aussi », le signalement part déjà : pas de case « Signaler aussi son profil ».
+  expectEqual(
+    'case « Signaler aussi son profil », depuis « Bloquer aussi »',
+    await blockDialog.getByText('Signaler aussi son profil').count(),
+    0,
+  )
   await byRole(blockDialog, 'button', 'Bloquer').click()
-  await malik.page.getByText(`Tu as bloqué @${samHandle}.`, { exact: true }).waitFor()
+  await malik.page
+    .getByText('Merci, ton signalement a été envoyé.', { exact: true })
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  await malik.page
+    .getByText('Tu as aussi bloqué Sam.', { exact: true })
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  console.log('  ok : Malik lit le remerciement, et que Sam est bloqué')
   const readSamForMalik = async () =>
     (await malik.request.get(`${apiUrl}/v1/members/${samMe.id}`)).json()
   await waitFor('blocage enregistré', async () => (await readSamForMalik()).isBlocked === true)
@@ -1166,6 +1188,45 @@ try {
   await shownText(lea.page, leaAnswer).waitFor()
   console.log('  ok : Léa a répondu au commentaire signalé')
 
+  // R9 : on signale une partie, pas seulement un tout. Malik choisit « La 2e photo » du projet de
+  // Léa (étape « Quelle partie ? »), puis le motif, puis envoie.
+  step('Malik signale la 2e photo du projet de Léa : « Lien, démo ou prompt dangereux »')
+  await open(malik.page, `${appUrl}/projects/${projectId}`)
+  await byRole(malik.page, 'button', 'Plus d’actions').first().click()
+  await byRole(malik.page, 'menuitem', 'Signaler ce projet').click()
+  await malik.page.waitForURL(/\/report\?/)
+  await byRole(malik.page, 'heading', 'Signaler ce projet').waitFor()
+  await byRole(malik.page, 'heading', 'Quelle partie ?').waitFor()
+  // « Tout le projet » est coché d'avance : la partie se choisit, jamais par défaut.
+  expectEqual(
+    '« Tout le projet », à l’ouverture',
+    await byRole(malik.page, 'radio', 'Tout le projet').isChecked(),
+    true,
+  )
+  await byRole(malik.page, 'radio', 'La 2e photo').click()
+  await byRole(malik.page, 'button', 'Continuer').click()
+  await byRole(malik.page, 'heading', 'Qu’est-ce qui ne va pas ?').waitFor()
+  // « Envoyer le signalement » prend la place de « Continuer » : il ignore une tape pendant
+  // 600 ms (la seconde d'une double tape). Une personne met plus de temps à lire les motifs.
+  await malik.page.waitForTimeout(700)
+  await byRole(malik.page, 'radio', 'Lien, démo ou prompt dangereux').click()
+  await malik.page
+    .getByLabel('Ajoute un détail, facultatif')
+    .fill('La photo montre un code QR qui mène vers un faux site.')
+  await byRole(malik.page, 'button', 'Envoyer le signalement').click()
+  await malik.page
+    .getByText('Merci, ton signalement a été envoyé.', { exact: true })
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  // « Merci » rappelle ce qui est parti : la partie, le contenu, le motif.
+  await malik.page
+    .getByText(/^La 2e photo de Mon agent de recettes, .+ · Lien, démo ou prompt dangereux$/)
+    .waitFor()
+  // Deux « Fermer » : la croix de la tête, et le bouton du pied ; on prend celui du pied.
+  await byRole(malik.page, 'button', 'Fermer').last().click()
+  console.log('  ok : Malik a signalé la 2e photo seule')
+
   step('Un administrateur ouvre « Modération » depuis ses réglages, et retire le commentaire')
   const { email: adminEmail } = await signUp(admin, 'Admin')
   // Le rôle ne se donne par aucune route de l'API. Sur la pile d'essai, le script de production
@@ -1179,24 +1240,25 @@ try {
   console.log('  ok : Admin est administrateur')
   // R2 : une rubrique de la colonne, pour un administrateur seulement, qui mène à sa propre page.
   await openSettings(admin, 'Modération', '/moderation')
-  // La carte du signalement : le texte copié au moment de l'envoi, le motif et son nombre, et la
-  // précision de Malik.
-  const reportCard = admin.page
-    .locator('div')
-    .filter({ has: admin.page.getByText(spam, { exact: true }) })
-    .filter({ has: byRole(admin.page, 'button', 'Retirer') })
-    .last()
-  await reportCard.getByText(/Arnaque ou spam\s*:\s*1/).waitFor()
-  await reportCard.getByText('Une offre d’argent facile, sans rapport avec le projet.').waitFor()
-  await byRole(reportCard, 'button', 'Retirer').click()
-  // La fenêtre « Retirer ce contenu ? » : le plus petit bloc qui contient son titre et le choix du
-  // fondement. Son bouton « Retirer » est le sien, pas celui de la carte, restée dessous.
-  const removeDialog = admin.page
-    .locator('div')
-    .filter({ has: byRole(admin.page, 'heading', /^Retirer ce contenu\s*\?$/) })
-    .filter({ has: byRole(admin.page, 'radiogroup', 'Fondement') })
-    .last()
-  await byRole(removeDialog, 'radio', /^Les règles de /).click()
+  // R9 : sur ordinateur, trois colonnes : la file (des liens, un par élément), le détail de
+  // l'élément choisi, l'historique. Le signalement de Malik est un lien de la file, nommé par son
+  // motif ; on le choisit, comme une personne, et le détail montre la copie gardée à l'envoi, le
+  // motif et son nombre, et la précision de Malik.
+  await byRole(admin.page, 'link', /^Arnaque ou spam, Commentaire/).click()
+  await admin.page.waitForURL(/\/moderation\?.*item=/)
+  await admin.page.getByText(/Arnaque ou spam\s*:\s*1/).waitFor()
+  await admin.page.getByText('Une offre d’argent facile, sans rapport avec le projet.').waitFor()
+  expectEqual(
+    'copie du commentaire, dans le détail',
+    (await admin.page.getByText(spam, { exact: true }).count()) >= 1,
+    true,
+  )
+  await byRole(admin.page, 'button', 'Retirer').click()
+  // La feuille « Retirer ce contenu ? » (une feuille nommée par son titre). Le fondement se choisit
+  // dans un menu, rien n'est choisi d'avance ; son bouton « Retirer » est le sien.
+  const removeDialog = admin.page.getByRole('dialog', { name: /^Retirer ce contenu\s*\?$/ })
+  await byRole(removeDialog, 'button', 'Fondement, À choisir').click()
+  await byRole(admin.page, 'menuitemradio', /^Les règles de /).click()
   const explanation = 'Les messages publicitaires ne sont pas admis dans les commentaires.'
   await removeDialog.getByLabel('Explication', { exact: true }).fill(explanation)
   await byRole(removeDialog, 'button', 'Retirer').click()
@@ -1227,6 +1289,78 @@ try {
   ).text()
   expectEqual('commentaire retiré, dans l’API pour Léa', leaComments.includes(spam), false)
 
+  // R9 : retirer la 2e photo seule. Le projet reste ; Léa, l'autrice, voit la photo marquée
+  // « retirée » avec de quoi contester ; les autres membres ne la voient plus.
+  step('L’administrateur retire la 2e photo seule, avec son fondement et son explication')
+  const greenUrl = (await readProject(lea, projectId)).visuals[1].url
+  const greenId = (await readProject(lea, projectId)).visuals[1].id
+  await open(admin.page, `${appUrl}/moderation`)
+  await byRole(
+    admin.page,
+    'link',
+    /^Lien, démo ou prompt dangereux, Projet\s·\s*la photo 2/,
+  ).click()
+  await admin.page.waitForURL(/\/moderation\?.*item=/)
+  await byRole(admin.page, 'heading', 'La photo 2 de Mon agent de recettes').waitFor()
+  await byRole(admin.page, 'button', 'Retirer').click()
+  const removePhoto = admin.page.getByRole('dialog', {
+    name: /^Retirer la photo 2 de « Mon agent de recettes »\s*\?$/,
+  })
+  // « Seulement cette partie » est choisi d'avance ; « Tout le projet » reste possible.
+  await byRole(removePhoto, 'radio', /^Seulement cette partie/).waitFor()
+  await byRole(removePhoto, 'radio', /^Tout le projet/).waitFor()
+  await byRole(removePhoto, 'button', 'Fondement, À choisir').click()
+  await byRole(admin.page, 'menuitemradio', 'La loi').click()
+  const photoExplanation = 'Le code QR de cette photo mène vers un site frauduleux.'
+  await removePhoto.getByLabel('Explication', { exact: true }).fill(photoExplanation)
+  await byRole(removePhoto, 'button', 'Retirer la photo 2').click()
+  await admin.page.getByText('Contenu retiré.', { exact: true }).waitFor()
+  await waitFor(
+    'photo 2 retirée, dans l’API pour Léa',
+    async () => (await readProject(lea, projectId)).removedParts.length === 1,
+  )
+  const [removedPart] = (await readProject(lea, projectId)).removedParts
+  expectEqual('partie retirée', `${removedPart.field}:${removedPart.mediaId}`, `photo:${greenId}`)
+  console.log('  ok : l’administrateur a retiré la 2e photo, le projet reste')
+
+  step('Léa voit la photo « Retirée par la modération » avec « Contester » ; Sam ne la voit plus')
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
+  const retiredPhoto = byRole(lea.page, 'group', 'La photo 2 a été retirée par la modération')
+  await retiredPhoto.waitFor()
+  await retiredPhoto.getByText('Pour contester :').waitFor()
+  await retiredPhoto.getByText(new RegExp(`^Explication\\s*: ${photoExplanation}$`)).waitFor()
+  await byRole(retiredPhoto, 'button', 'Remplacer').waitFor()
+  await byRole(retiredPhoto, 'button', 'Supprimer').waitFor()
+  // Dans son Activité, la notification porte « Contester » (un lien vers sa messagerie).
+  await open(lea.page, `${appUrl}/notifications`)
+  await lea.page
+    .getByText(/^La 2e photo de Mon agent de recettes a été retirée par la modération$/)
+    .first()
+    .waitFor()
+  await lea.page.getByText('Contester', { exact: true }).first().waitFor()
+  console.log('  ok : Léa lit la décision, « Contester », « Remplacer » et « Supprimer »')
+  const projectForSam = await readProject(sam, projectId)
+  expectEqual(
+    '2e photo, dans l’API pour Sam',
+    projectForSam.visuals.some((visual) => visual.id === greenId),
+    false,
+  )
+  expectEqual('parties retirées, vues par Sam', projectForSam.removedParts.length, 0)
+  expectEqual('2e photo retirée, adresse pour Sam', await statusFor(sam, greenUrl), 404)
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await sam.page.getByText('Mon agent de recettes').first().waitFor()
+  expectEqual(
+    'encadré « retirée », à l’écran de Sam',
+    await sam.page.getByText(/a été retirée par la modération/).count(),
+    0,
+  )
+  console.log('  ok : Sam ne voit plus la 2e photo, ni son encadré')
+
+  step('Malik voit son signalement de la photo traité, dans son Activité')
+  await open(malik.page, `${appUrl}/notifications`)
+  await malik.page.getByText(/^Ton signalement d’un projet a été traité\s*:/).waitFor()
+  console.log('  ok : Malik lit « traité » pour son signalement de la photo')
+
   // --- Tranche 7c : suspendre un compte, puis lever la suspension ---
   step('Karim s’inscrit : il a « Publier un projet » sur son accueil')
   await signUp(karim, 'Karim')
@@ -1242,12 +1376,14 @@ try {
   await byRole(admin.page, 'button', 'Plus d’actions').click()
   await byRole(admin.page, 'menuitem', 'Suspendre le compte').click()
   await admin.page.waitForURL(/\/suspend\?/)
-  await byRole(admin.page, 'heading', 'Suspendre le compte de Karim').waitFor()
-  await byRole(admin.page, 'radio', '7 jours').click()
-  await byRole(admin.page, 'radio', /^Les règles de /).click()
+  // R9 : une feuille posée sur la page du membre (à l'adresse /suspend), nommée par son titre.
+  const suspendSheet = admin.page.getByRole('dialog', { name: 'Suspendre le compte de Karim' })
+  await suspendSheet.waitFor()
+  await byRole(suspendSheet, 'radio', '7 jours').click()
+  await byRole(suspendSheet, 'radio', /^Les règles de /).click()
   const suspensionExplanation = 'Des messages publicitaires répétés sous les projets des autres.'
-  await admin.page.getByLabel('Explication', { exact: true }).fill(suspensionExplanation)
-  await byRole(admin.page, 'button', 'Suspendre le compte').click()
+  await suspendSheet.getByLabel('Explication', { exact: true }).fill(suspensionExplanation)
+  await byRole(suspendSheet, 'button', 'Suspendre le compte').click()
   await admin.page.getByText('Compte suspendu.', { exact: true }).waitFor()
   await waitFor(
     'suspension de Karim, dans l’API',
@@ -1281,12 +1417,13 @@ try {
   await byRole(admin.page, 'button', 'Plus d’actions').click()
   await byRole(admin.page, 'menuitem', 'Lever la suspension').click()
   await admin.page.waitForURL(/\/suspend\?/)
-  await byRole(admin.page, 'heading', 'Lever la suspension de Karim').waitFor()
-  await byRole(admin.page, 'radio', 'Plus tôt que prévu').click()
-  await admin.page
+  const liftSheet = admin.page.getByRole('dialog', { name: 'Lever la suspension de Karim' })
+  await liftSheet.waitFor()
+  await byRole(liftSheet, 'radio', 'Plus tôt que prévu').click()
+  await liftSheet
     .getByLabel('Explication', { exact: true })
     .fill('Karim a supprimé ses messages et s’est excusé.')
-  await byRole(admin.page, 'button', 'Lever la suspension').click()
+  await byRole(liftSheet, 'button', 'Lever la suspension').click()
   await admin.page.getByText('Suspension levée.', { exact: true }).waitFor()
   await waitFor(
     'levée de la suspension, dans l’API',
