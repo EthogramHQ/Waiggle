@@ -143,6 +143,7 @@ import { SettingsCatalogue } from './reglages'
 import { NotificationSettingsCatalogue } from './reglages-notifications'
 import { RemovalR9Catalogue } from './removal-r9'
 import { ReportSamples } from './reports'
+import { HiveNewsCatalogue } from './ruches-actualite'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
@@ -793,6 +794,8 @@ export function CatalogueScreen() {
       <NotificationsCatalogue />
       {/* Tranche R8, l'exemple et les lignes de choix des réglages (reglages-notifications.tsx). */}
       <NotificationSettingsCatalogue />
+      {/* Tranche R10, l'actualité et les membres d'une ruche, jour et nuit (ruches-actualite.tsx). */}
+      <HiveNewsCatalogue />
 
       {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions, le champ. */}
       <CommentCardCatalogue />

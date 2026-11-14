@@ -41,6 +41,8 @@ type Props = {
    * agi, et le résumé flou de la photo du projet.
    */
   toSource?: (url: string | null | undefined) => ImageSource | null
+  /** L'heure qu'il est, pour figer la date (catalogue) ; l'horloge de l'appareil sinon. */
+  now?: Date
 }
 
 /** La photo de qui a agi : 40 points, comme sur la page Activité et la planche. */
@@ -48,14 +50,14 @@ const LEADING = 40
 /** L'icône de la pastille : une alvéole, à la taille d'une petite lettre. */
 const PILL_ICON = 12
 
-export function HiveActivityRow({ item, hiveName, onPress, toSource }: Props) {
+export function HiveActivityRow({ item, hiveName, onPress, toSource, now }: Props) {
   const { t } = useTranslation()
   // Une garde contre la double tape (600 ms, comme les cartes) : la seconde tape n'ouvre pas deux
   // fois la page du projet.
   const guard = useTapGuard()
   // Un hook plutôt que `RelativeTime` : la date se pose dans la phrase, comme un mot. Il suit
   // l'horloge partagée et attend l'hydratation du web avant de parler de « maintenant ».
-  const { label: date } = useRelativeDate(item.at)
+  const { label: date } = useRelativeDate(item.at, now)
   const values = { name: item.actor.name, title: item.project.title, version: item.version ?? '' }
   // Le modèle de la phrase, ses {{…}} laissés en place : on le découpe en morceaux (gras ou non)
   // AVANT d'y mettre le nom et le titre, écrits par des membres (voir ui/marks.ts).
