@@ -185,6 +185,10 @@ export const mockServer = {
     // R6b : le catalogue des outils (vide) et les seize catégories de départ.
     if (method === 'GET' && path === '/v1/tools') return ok({ tools: [], others: [] })
     if (method === 'GET' && path === '/v1/categories') return ok(categoryList('fr'))
+    // R10 : le choix « Une ruche » lit les ruches de la personne ; par défaut, aucune (le choix
+    // n'est alors pas proposé). Les tests des ruches imposent leur réponse par `answer`.
+    if (method === 'GET' && path === '/v1/hives')
+      return ok({ hives: [], invitations: [], createdCount: 0 })
     if (method === 'POST' && path === '/v1/projects') {
       const created = applyChanges(
         { ...recipesProject, id: NEW_ID, visuals: [], portraitCover: null, prompts: [] },
