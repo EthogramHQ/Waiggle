@@ -23,8 +23,9 @@ import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { blockedWith, notBlockedWith } from '../blocks/visibility'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf, mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
+import { mediaOnCoversSql } from '../projects/media-visibility'
 import { listedProject, listedProjectFor } from '../projects/visibility'
 import { afterReportSql, toRemoval } from '../removals/load'
 // suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
@@ -771,7 +772,7 @@ export const excerptOf = (body: string) => {
 const authorOf = (row: ListRow, publicApiUrl: string) => ({
   id: row.author_id ?? '',
   name: row.author_name ?? '',
-  avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+  avatarUrl: avatarUrlOf(publicApiUrl, row.author_avatar_key),
 })
 
 /**
@@ -839,7 +840,7 @@ export const present = (
         author: {
           id: row.author_id,
           name: row.author_name,
-          avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+          avatarUrl: avatarUrlOf(publicApiUrl, row.author_avatar_key),
           handle: row.author_handle,
         },
       }
@@ -864,7 +865,7 @@ export const present = (
         author: {
           id: row.author_id,
           name: row.author_name,
-          avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+          avatarUrl: avatarUrlOf(publicApiUrl, row.author_avatar_key),
         },
         update: {
           id: row.update_id,
@@ -1129,6 +1130,8 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join lateral (
       select m.storage_key, m.thumbhash from project_media m
       where m.project_id = project.id and m.slot in ('gallery', 'portrait')
+        -- R9 : jamais une photo retirée seule par la modération (projects/media-visibility.ts).
+        and ${mediaOnCoversSql('m')}
         and not coalesce(hid.hidden, false)
       order by m.slot = 'portrait', m.position, m.created_at
       limit 1

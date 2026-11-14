@@ -23,7 +23,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { after, type CursorContent, encodeCursor } from '../cursor'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { removalsOf } from '../removals/load'
 import { type TesterMediaRow, toTesterMedia } from './media'
 
@@ -442,8 +442,7 @@ export const loadThreadPage = async (
             id: person.id,
             name: person.name,
             handle: hidden ? null : person.handle,
-            avatarUrl:
-              hidden || !person.avatarKey ? null : mediaUrl(args.publicApiUrl, person.avatarKey),
+            avatarUrl: hidden ? null : avatarUrlOf(args.publicApiUrl, person.avatarKey),
             current: since !== undefined,
             since: since ? since.toISOString() : null,
           },

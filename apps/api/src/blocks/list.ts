@@ -7,7 +7,7 @@ import { and, asc, desc, eq, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 
 const b = schema.memberBlock
 
@@ -103,7 +103,7 @@ export const loadBlockedPage = async (
         id: row.id,
         name: row.name,
         handle,
-        avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+        avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
       },
       blockedAt: row.blockedAt.toISOString(),
     })

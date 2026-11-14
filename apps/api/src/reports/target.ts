@@ -37,6 +37,7 @@ import { currentHandleOf } from '../handles/load'
 import { mediaUrl } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
+import { type MediaMark, mediaShownTo, visibleMedia } from '../projects/media-visibility'
 import { projectVisibleTo } from '../projects/visibility'
 import { type MediaRow, toVisual } from '../projects/visual'
 import { cornerAccess } from '../testers/access'
@@ -115,12 +116,11 @@ const thumbOf = (media: MediaRow, publicApiUrl: string): Thumb => {
 }
 
 /**
- * Une photo de la page est-elle visible des autres ? Retirée seule par la modération (R9), elle ne
- * l'est plus (`removal_id`). Le prédicat commun de toutes les lectures viendra de
- * projects/media-visibility.ts ; la règle est la même.
+ * Les photos de la page que les autres voient : une photo retirée seule par la modération (R9) n'y
+ * est plus. La règle commune de toutes les lectures (projects/media-visibility.ts), « à tous » : la
+ * feuille « Signaler » ne s'ouvre jamais sur son propre contenu.
  */
-const shownMedia = <T extends { removalId: string | null }>(rows: T[]) =>
-  rows.filter((row) => row.removalId === null)
+const shownMedia = <T extends MediaMark>(rows: T[]) => rows.filter((row) => mediaShownTo(row, null))
 
 /**
  * La couverture visible d'un projet, pour la tête de la feuille d'un contenu qui y vit (mise à
@@ -139,7 +139,7 @@ const projectCover = async (
       and(
         eq(m.projectId, projectId),
         inArray(m.slot, ['gallery', 'portrait']),
-        isNull(m.removalId),
+        visibleMedia(m.removalId, null),
       ),
     )
     .orderBy(asc(m.slot), asc(m.position))
@@ -495,7 +495,7 @@ const loadVisible = async (
           description: tm.description,
         })
         .from(tm)
-        .where(and(eq(tm.callId, target.id), isNull(tm.removalId)))
+        .where(and(eq(tm.callId, target.id), visibleMedia(tm.removalId, null)))
         .orderBy(asc(tm.createdAt), asc(tm.id))
       const photoCopy: ReportSnapshot = photo
         ? [{ field: 'photo', value: photo.key }, ...filled('photoDescription', photo.description)]
@@ -538,7 +538,7 @@ const loadVisible = async (
       const [capture] = await db
         .select({ id: tm.id, key: tm.storageKey, thumbhash: tm.thumbhash })
         .from(tm)
-        .where(and(eq(tm.messageId, target.id), isNull(tm.removalId)))
+        .where(and(eq(tm.messageId, target.id), visibleMedia(tm.removalId, null)))
       const captureCopy: ReportSnapshot = capture ? [{ field: 'photo', value: capture.key }] : []
       return {
         authorId: row.senderId,

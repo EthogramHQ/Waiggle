@@ -18,6 +18,16 @@ const isLanguage = (value: unknown): value is Language =>
 export const mediaUrl = (publicApiUrl: string, key: string) => `${publicApiUrl}/media/${key}`
 
 /**
+ * L'adresse de la photo de profil d'un membre, ou null : pas de photo, ou une photo retirée par la
+ * modération (R9). Une photo retirée garde sur le profil la clé `withheld/<id>` (moderation/parts.ts) :
+ * elle ne paraît plus nulle part à sa place, pas même pour son auteur, qui la relit dans
+ * `removedParts` de sa page (removals/parts.ts). Toute lecture qui montre la photo d'un membre passe
+ * par ici, pour qu'aucune n'écrive l'adresse `withheld/…`.
+ */
+export const avatarUrlOf = (publicApiUrl: string, key: string | null | undefined) =>
+  key && !key.startsWith('withheld/') ? mediaUrl(publicApiUrl, key) : null
+
+/**
  * Lit le membre, son profil et son pseudo actuel en une requête. `leftJoin` = « avec son profil
  * s'il en a un » : un membre tout juste inscrit n'a pas encore de ligne dans `profile`. Le pseudo
  * suit l'index partiel member_handle_current_idx (voir handles/load.ts).
@@ -69,7 +79,7 @@ export const loadMe = async (
     bio: profile?.bio ?? '',
     // R6b : lus par profile_tool ; « Mon profil » montre les noms que le membre a tapés.
     favoriteTools: (await favoriteToolsOf(db, user.id)).map((tool) => tool.label),
-    avatarUrl: profile?.avatarKey ? mediaUrl(publicApiUrl, profile.avatarKey) : null,
+    avatarUrl: avatarUrlOf(publicApiUrl, profile?.avatarKey),
     // Seulement pour que l'appli montre l'entrée « Modération » : les routes de modération relisent
     // elles-mêmes admin_member à chaque demande, sans croire l'appli. Un administrateur suspendu
     // n'en est plus un tant que dure sa suspension (S19, reports/admin.ts) : l'entrée disparaît.

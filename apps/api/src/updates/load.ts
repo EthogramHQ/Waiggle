@@ -13,8 +13,10 @@ import {
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { mediaShownTo } from '../projects/media-visibility'
 import { type MediaRow, toVisual } from '../projects/visual'
 import { removalsOf } from '../removals/load'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 
 type Reader = Pick<Database, 'select'>
 
@@ -81,6 +83,7 @@ export const toUpdate = (
   photos: MediaRow[],
   publicApiUrl: string,
   removal: ProjectUpdate['removal'] = null,
+  removedParts: ProjectUpdate['removedParts'] = [],
 ): ProjectUpdate => ({
   id: row.id,
   title: row.title,
@@ -90,8 +93,8 @@ export const toUpdate = (
   beforeAfter: row.beforeAfter,
   createdAt: row.createdAt.toISOString(),
   removal,
-  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
-  removedParts: [],
+  // R9 : ses photos retirées seules, pour l'auteur du projet (vide pour tout autre lecteur).
+  removedParts,
 })
 
 /**
@@ -115,13 +118,19 @@ export const photosOfUpdates = async (db: Reader, updateIds: string[]) => {
   return byUpdate
 }
 
-/** Des lignes de mises à jour en `ProjectUpdate`, avec leurs photos et leurs retraits (2 requêtes). */
+/**
+ * Des lignes de mises à jour en `ProjectUpdate`, telles que `viewerId` les voit, avec leurs photos
+ * et leurs retraits (2 requêtes, une 3e si le lecteur est l'auteur du projet : ses parties retirées,
+ * removals/parts.ts). `authorId` : l'auteur du projet de chaque mise à jour. Une photo retirée seule
+ * par la modération ne paraît que pour lui (projects/media-visibility.ts).
+ */
 const withPhotosAndRemovals = async (
   db: Reader,
-  rows: (UpdateRow & { removedAt: Date | null; removalId: string | null })[],
+  rows: (UpdateRow & { removedAt: Date | null; removalId: string | null; authorId: string })[],
+  viewerId: string,
   publicApiUrl: string,
 ): Promise<ProjectUpdate[]> => {
-  const [photos, removals] = await Promise.all([
+  const [photos, removals, removedParts] = await Promise.all([
     photosOfUpdates(
       db,
       rows.map((row) => row.id),
@@ -131,13 +140,22 @@ const withPhotosAndRemovals = async (
       db,
       rows.map((row) => (row.removedAt === null ? null : row.removalId)),
     ),
+    removedPartsOf(
+      db,
+      rows.map((row) => ({ kind: 'update', id: row.id, authorId: row.authorId })),
+      viewerId,
+      publicApiUrl,
+    ),
   ])
   return rows.map((row) =>
     toUpdate(
       row,
-      photos.get(row.id) ?? [],
+      (photos.get(row.id) ?? []).filter((photo) =>
+        mediaShownTo(photo, { ownerId: row.authorId, viewerId }),
+      ),
       publicApiUrl,
       row.removedAt === null ? null : (removals.get(row.removalId ?? '') ?? null),
+      removedParts.get(partOwnerKey('update', row.id)) ?? [],
     ),
   )
 }
@@ -204,11 +222,12 @@ export const latestUpdatesOf = async (
       createdAt: latest.createdAt,
       removedAt: latest.removedAt,
       removalId: latest.removalId,
+      authorId: schema.project.authorId,
     })
     .from(schema.project)
     .crossJoinLateral(latest)
     .where(inArray(schema.project.id, projectIds))
-  const updates = await withPhotosAndRemovals(db, rows, publicApiUrl)
+  const updates = await withPhotosAndRemovals(db, rows, viewerId, publicApiUrl)
   rows.forEach((row, index) => {
     const update = updates[index]
     if (update) latestByProject.set(row.projectId, update)
@@ -343,7 +362,7 @@ export const updatesPageOf = async (
   publicApiUrl: string,
 ): Promise<ProjectUpdate[]> => {
   const rows = await db
-    .select(updateColumns)
+    .select({ ...updateColumns, authorId: schema.project.authorId })
     .from(u)
     .innerJoin(schema.project, eq(schema.project.id, u.projectId))
     .where(
@@ -356,7 +375,7 @@ export const updatesPageOf = async (
     )
     .orderBy(desc(u.createdAt), desc(u.id))
     .limit(limit)
-  return withPhotosAndRemovals(db, rows, publicApiUrl)
+  return withPhotosAndRemovals(db, rows, viewerId, publicApiUrl)
 }
 
 /**
