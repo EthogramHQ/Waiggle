@@ -16,13 +16,15 @@
 // (`TopNav`) n'a qu'à le poser, une seule fois pour toutes les pages. Ce n'est pas une alerte : il
 // est là dès l'ouverture de la page, et se lit à son tour, sans couper le lecteur d'écran (rôle
 // « status »).
-import { contactEmail, radii, readableWidth, space } from '@ruche/brand'
+import { radii, readableWidth, space } from '@ruche/brand'
 import type { Suspension } from '@ruche/contracts'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Linking, View } from 'react-native'
+import { View } from 'react-native'
+import { ContactLink } from './ContactLink'
 import { Icon } from './Icon'
 import { parisDateTime } from './parisTime'
+import { shortDate } from './relativeDate'
 import { isNewSuspension, noteSuspensionSeen, suspensionSignature } from './suspensionMemory'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -104,6 +106,13 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
   const decisionLine = t(($) => $.suspension.decisionLine, {
     decision,
     ground: t(($) => $.removal.grounds[ground]),
+  })
+
+  // R9 (J12) : l'objet de « Contester » nomme la décision et sa date, à Paris comme les autres :
+  // « Contestation : suspension de mon compte du 27 oct. ».
+  const contestSubject = t(($) => $.removal.contestSubject, {
+    decision: t(($) => $.removal.contestDecision.suspension),
+    date: shortDate(suspension.since, i18n.language),
   })
 
   return (
@@ -191,11 +200,7 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
             {/* L'adresse, dans une ligne à elle (une donnée sans espace), en lien qui ouvre la
                 messagerie, sans la page « Tu quittes… » réservée aux sites tiers. */}
             <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
-              <TextLink
-                label={contactEmail}
-                breakAnywhere
-                onPress={() => void Linking.openURL(`mailto:${contactEmail}`)}
-              />
+              <ContactLink subject={contestSubject} />
             </View>
             <Text variant="callout" breakAnywhere>
               {t(($) => $.suspension.contestCourt)}
