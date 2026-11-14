@@ -1358,8 +1358,12 @@ try {
 
   step('Malik voit son signalement de la photo traité, dans son Activité')
   await open(malik.page, `${appUrl}/notifications`)
-  await malik.page.getByText(/^Ton signalement d’un projet a été traité\s*:/).waitFor()
-  console.log('  ok : Malik lit « traité » pour son signalement de la photo')
+  // Relectures de R9 (14/11/2026) : seule la photo a été retirée, Malik lit « la partie », jamais
+  // « le projet a été retiré ».
+  await malik.page
+    .getByText(/^Ton signalement a été traité\s*: la partie que tu as signalée a été retirée\.$/)
+    .waitFor()
+  console.log('  ok : Malik lit « la partie que tu as signalée a été retirée »')
 
   // --- Tranche 7c : suspendre un compte, puis lever la suspension ---
   step('Karim s’inscrit : il a « Publier un projet » sur son accueil')
