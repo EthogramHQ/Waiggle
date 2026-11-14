@@ -78,18 +78,20 @@ export function RemovalNotice({ title, lines, compact = false, contest }: Props)
           // « Pour contester : » puis l'adresse, comme dans RemovedPart : une rangée qui passe à la
           // ligne (à 320 points ou à 200 %, l'adresse descend sous le début). Le lien garde sa zone
           // de 44 points, plus haute qu'une ligne : une marge négative la laisse déborder sur l'air
-          // de la phrase voisine, pour que la ligne ne paraisse pas détachée des autres.
+          // des phrases voisines, pour que la ligne ne paraisse pas détachée des autres. Sur le
+          // lien seul, pas sur la rangée : les phrases d'ici sont plus serrées que dans
+          // RemovedPart, et « Pour contester : » passé seul sur sa ligne se collait à la phrase
+          // d'avant (capture à 320 points).
           <View
             style={{
               flexDirection: 'row',
               flexWrap: 'wrap',
               alignItems: 'center',
               columnGap: space.xs,
-              marginVertical: -space.sm,
             }}
           >
             <Text variant="callout">{t(($) => $.removal.part.contestLead)}</Text>
-            <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+            <View style={{ flexShrink: 1, maxWidth: '100%', marginVertical: -space.sm }}>
               <ContactLink subject={contest.subject} />
             </View>
           </View>
