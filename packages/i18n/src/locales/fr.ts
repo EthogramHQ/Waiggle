@@ -2289,6 +2289,8 @@ export const fr = {
     loadError: 'Tes ruches n’ont pas pu se charger.',
     // Le nom retiré par la modération.
     unnamed: 'Ruche sans nom',
+    // Dans une phrase qui dit déjà « la ruche » : « Rejoindre la ruche sans nom ».
+    unnamedInline: 'sans nom',
     // Le nom lu de l'alvéole ; l'icône est décorative.
     badge: 'Ruche {{hive}}',
     myHive: 'Ma ruche',

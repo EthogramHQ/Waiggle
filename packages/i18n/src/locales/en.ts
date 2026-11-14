@@ -1925,6 +1925,7 @@ export const en: Translation = {
     joinedLimit: 'You are in 20 hives, the most possible. Leave one to create or join another.',
     loadError: 'Your hives could not load.',
     unnamed: 'Unnamed hive',
+    unnamedInline: 'unnamed',
     badge: '{{hive}} hive',
     myHive: 'My hive',
     myHiveNamed: 'My {{hive}} hive',
