@@ -143,6 +143,7 @@ import { SettingsCatalogue } from './reglages'
 import { NotificationSettingsCatalogue } from './reglages-notifications'
 import { RemovalR9Catalogue } from './removal-r9'
 import { ReportSamples } from './reports'
+import { HiveRowsCatalogue } from './ruches-lignes'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
@@ -821,6 +822,8 @@ export function CatalogueScreen() {
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
       <RemovalR9Catalogue />
+      {/* Tranche R10, la ligne d'une ruche et la carte d'une invitation (ruches-lignes.tsx). */}
+      <HiveRowsCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
