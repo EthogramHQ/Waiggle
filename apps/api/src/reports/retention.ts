@@ -75,6 +75,14 @@ export const purgeModeration = async (db: Database, now: Date) => {
   // « not exists », un par colonne, pour que chacun lise son index (account_suspension_decision_idx,
   // account_suspension_lift_decision_idx) plutôt qu'un « or » qui lirait toute la table.
   //
+  // Tranche R9 (sécurité P2, juridique P1) : une décision encore citée par un retrait de partie
+  // (content_part_removal, index content_part_removal_removal_idx), une photo retirée
+  // (project_media, tester_media : removal_id) ou un appel ou un message du coin retiré reste aussi.
+  // Les clés de retrait de partie et de photo sont en « on delete restrict » : sans ces conditions,
+  // la base refuserait l'effacement (erreur 23001) et la purge entière planterait. Les médias n'ont
+  // pas d'index sur removal_id : la sous-requête les lit en entier, pour les rares décisions déjà
+  // vieilles d'un an (une purge par nuit) ; à indexer le jour où ces tables grandiront.
+  //
   // Relecture juridique de la branche (7c) : une suspension et sa levée ont leur propre durée de
   // garde, celle de leur ligne account_suspension (les deux derniers « not exists »). Elles restent
   // donc hors de la règle « une décision plus récente sur la même cible », dans les deux sens :
@@ -102,6 +110,16 @@ export const purgeModeration = async (db: Database, now: Date) => {
           select 1 from project_update u where u.id = ${id} and u.removal_id = moderation_decision.id)
         and not exists (
           select 1 from project_comment c where c.id = ${id} and c.removal_id = moderation_decision.id)
+        and not exists (
+          select 1 from tester_call tc where tc.id = ${id} and tc.removal_id = moderation_decision.id)
+        and not exists (
+          select 1 from tester_message tm where tm.id = ${id} and tm.removal_id = moderation_decision.id)
+        and not exists (
+          select 1 from content_part_removal cpr where cpr.removal_id = moderation_decision.id)
+        and not exists (
+          select 1 from project_media pm where pm.removal_id = moderation_decision.id)
+        and not exists (
+          select 1 from tester_media tmd where tmd.removal_id = moderation_decision.id)
         and not exists (
           select 1 from account_suspension kept where kept.decision_id = moderation_decision.id)
         and not exists (

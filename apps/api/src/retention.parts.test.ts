@@ -32,7 +32,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { purgeModeration } from './reports/retention'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
-import { jpegImage, visualForm } from './testing/images'
+import { avatarForm, jpegImage, visualForm } from './testing/images'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -417,5 +417,24 @@ describe('a deleted account and the decisions about it', () => {
     )
     expect(raw).not.toContain('lea_meteo')
     expect(raw).not.toContain('"Léa"')
+  })
+
+  it('deletes the real file of a removed profile photo when the member deletes her account', async () => {
+    later()
+    const upload = await ctx.request('/v1/me/avatar', {
+      method: 'POST',
+      headers: { cookie: lea },
+      body: avatarForm(await jpegImage(600, 600)),
+    })
+    expect(upload.status).toBe(200)
+    const files = () => [...ctx.storage.files.keys()].filter((key) => key.startsWith('avatars/'))
+    expect(files()).toHaveLength(1)
+    await remove({ kind: 'member', id: leaId }, { field: 'avatar' })
+    // Témoin : la photo retirée porte une clé « withheld/ » ; le vrai fichier est toujours gardé.
+    expect(files()).toHaveLength(1)
+
+    later()
+    await act.deleteAccount(lea, LEA_PASSWORD)
+    expect(files()).toEqual([])
   })
 })
