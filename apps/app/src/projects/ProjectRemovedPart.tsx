@@ -18,9 +18,9 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { partContestSubject } from '../ui/contestSubject'
 import { Notice } from '../ui/Notice'
 import { ProjectThumb } from '../ui/ProjectThumb'
-import { parisDateTime } from '../ui/parisTime'
 import { partText } from '../ui/partText'
 import { RemovedPart } from '../ui/RemovedPart'
 import { Row, Stack } from '../ui/Stack'
@@ -81,9 +81,10 @@ export function ProjectRemovedPart({ project, part, onReplace, onDelete, error =
   const title = t(($) => $.removal.part.titles[field], { n: position ?? undefined })
   // « la photo 2 », « la description » : le nom de la partie dans les phrases de la modération.
   const partName = partText({ field, mediaId: part.mediaId, position }, t, 'project')
-  const subject = t(($) => $.removal.contestSubject, {
-    decision: t(($) => $.removal.contestDecision.part, { part: partName, title: project.title }),
-    date: parisDateTime(part.removal.at, i18n.language).date,
+  const subject = partContestSubject(t, i18n.language, {
+    part: partName,
+    title: project.title,
+    at: part.removal.at,
   })
 
   // La partie elle-même. Une valeur en liste (outils, prompts) : un élément par ligne ou par

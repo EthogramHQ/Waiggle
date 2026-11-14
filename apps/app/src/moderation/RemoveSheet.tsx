@@ -32,6 +32,7 @@ import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey } from '../api/errors'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { Button } from '../ui/Button'
+import type { Focusable } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import { MenuField } from '../ui/MenuField'
 import { RadioGroup } from '../ui/Radio'
@@ -100,6 +101,8 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
   const [sending, setSending] = useState(false)
   // Un envoi à la fois : l'état `sending` n'est à jour qu'au dessin suivant, ce drapeau tout de suite.
   const busy = useRef(false)
+  // La ligne « Fondement », où la feuille pose le focus à l'ouverture.
+  const groundRef = useRef<Focusable>(null)
 
   // À chaque ouverture, un formulaire neuf : ce qui a été écrit ou refusé la fois d'avant part
   // (l'erreur d'un formulaire refermé ne revient pas à la réouverture).
@@ -208,6 +211,9 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
       // la place de la poser (téléphone, fenêtre étroite), il vient sous le formulaire.
       {...(preview && besideRoom ? { aside: preview } : null)}
       busy={sending}
+      // Le focus d'ouverture : la première question (« Fondement »), ni « Annuler » ni « Retirer »
+      // (R6a S1 : « Retirer » est inactif tant que le formulaire est vide).
+      initialFocusRef={groundRef}
       guardTaps
       notice={notice}
       footer={
@@ -254,6 +260,7 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
 
         <MenuField<RemovalGround>
           label={t(($) => $.moderation.groundLabel)}
+          triggerRef={groundRef}
           value={ground}
           options={[
             { value: 'illegal', label: t(($) => $.moderation.grounds.illegal) },

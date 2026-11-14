@@ -20,6 +20,19 @@ require('react-native-reanimated').setUpTests()
 jest.mock('./src/accounts/auth-client', () => ({ authClient: { getCookie: () => null } }))
 globalThis.fetch = jest.fn(() => Promise.reject(new Error('No network in tests')))
 
+// Un test n'a pas de navigateur de pages : le vrai `useNavigation()` d'Expo Router y échoue
+// (« Couldn't find a navigation object »). Par défaut, il rend donc une navigation inerte, qui
+// n'écoute rien (la garde de sortie `useLeaveGuard` des feuilles s'y pose sans rien arrêter). Un
+// test qui rejoue `beforeRemove` pose son propre `jest.mock('expo-router', …)`, qui l'emporte.
+// La fabrique ne s'exécute que si un fichier charge `expo-router`.
+jest.mock('expo-router', () => ({
+  ...jest.requireActual('expo-router'),
+  useNavigation: () => ({
+    addListener: () => () => {},
+    dispatch: () => {},
+  }),
+}))
+
 // La fenêtre des tests est celle d'un téléphone (390 × 844 points), comme les captures « téléphone ».
 // Par défaut, React Native prend 750 points de large, ce qui est déjà une tablette pour l'appli
 // (barre de navigation, colonnes) : les tests d'écran décrivent le téléphone, sauf mention contraire.

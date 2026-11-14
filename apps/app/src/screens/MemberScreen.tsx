@@ -39,6 +39,7 @@ import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { CountedTitle } from '../ui/CountedTitle'
+import { contestSubjectOf } from '../ui/contestSubject'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
@@ -91,14 +92,15 @@ function RemovedProfileParts({ member }: { member: Member }) {
         // Le champ, recopié dans une constante avant les sélecteurs de texte (clés fabriquées).
         const field = part.field
         const { value } = part
-        const date = parisDateTime(part.removal.at, i18n.language).date
-        // « Contestation : retrait de la bio de mon profil du 12 nov. » (J12).
-        const subject = t(($) => $.removal.contestSubject, {
-          decision: t(($) => $.removal.contestDecision.profilePart, {
+        // « Contestation : retrait de la bio de mon profil du 12 novembre » (J12).
+        const subject = contestSubjectOf(
+          t,
+          i18n.language,
+          t(($) => $.removal.contestDecision.profilePart, {
             part: t(($) => $.moderation.parts[field]),
           }),
-          date,
-        })
+          part.removal.at,
+        )
         // Ce qui a été retiré, relu par son auteur seul : de quoi savoir quoi remplacer.
         const removedValue =
           field === 'avatar' ? null : Array.isArray(value) ? value.join(', ') : value

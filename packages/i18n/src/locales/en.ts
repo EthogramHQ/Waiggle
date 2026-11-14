@@ -1619,6 +1619,14 @@ export const en: Translation = {
       // Nothing decided yet for this member: the subtitle without its record.
       subtitleNew: '@{{handle}} · joined on {{date}}',
     },
+    // Leaving the « Suspend » sheet with an explanation written or a duration chosen: the window
+    // asks first (same shape as `report.discard`).
+    discard: {
+      title: 'Abandon the decision?',
+      body: 'What you wrote or chose in this sheet will be lost.',
+      keep: 'Continue',
+      confirm: 'Abandon',
+    },
   },
   suspension: {
     title: 'Your account is suspended',
