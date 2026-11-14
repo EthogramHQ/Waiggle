@@ -117,8 +117,8 @@ export function RemovalR9Catalogue() {
           onReplace={noop}
           onDelete={noop}
         >
-          {/* La photo retirée, que l'auteur voit encore (ici, la couverture sans image). */}
-          <ProjectCover height={160} title={l.photoTitle} />
+          {/* La photo retirée, que l'auteur voit encore (ici, une couverture sans image). */}
+          <ProjectCover height={160} />
         </RemovedPart>
       </Stack>
       <Stack gap="sm">

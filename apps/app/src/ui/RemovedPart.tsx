@@ -124,13 +124,17 @@ export function RemovedPart({
         </Text>
         {/* « Pour contester : » puis l'adresse, écrite en clair (elle se lit et se recopie, même
             sans appli de messagerie) et en lien qui ouvre un brouillon avec l'objet prêt. Une
-            rangée qui passe à la ligne : à 320 points ou à 200 %, l'adresse descend sous le début. */}
+            rangée qui passe à la ligne : à 320 points ou à 200 %, l'adresse descend sous le début.
+            Le lien garde sa zone de 44 points, plus haute que la ligne : une marge négative la
+            laisse déborder sur l'air des phrases voisines (qu'on ne touche pas), pour que la ligne
+            ne paraisse pas détachée des autres. */}
         <View
           style={{
             flexDirection: 'row',
             flexWrap: 'wrap',
             alignItems: 'center',
             columnGap: space.xs,
+            marginVertical: -space.sm,
           }}
         >
           <Text variant="callout" tone="secondary">
