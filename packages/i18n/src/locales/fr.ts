@@ -1886,6 +1886,14 @@ export const fr = {
       // Rien encore de décidé pour ce membre : le sous-titre sans son rappel.
       subtitleNew: '@{{handle}} · inscription le {{date}}',
     },
+    // Quitter la feuille « Suspendre » avec une explication écrite ou une durée choisie : la
+    // fenêtre demande d'abord (même forme que `report.discard`).
+    discard: {
+      title: 'Abandonner la décision ?',
+      body: 'Ce que tu as écrit ou choisi dans cette feuille sera perdu.',
+      keep: 'Continuer',
+      confirm: 'Abandonner',
+    },
   },
   // Le compte suspendu, tel que son membre le lit (tranche 7c, article 17 du DSA) : la mesure, sa
   // durée, le fondement, l'explication, ce qui reste possible, et comment contester.

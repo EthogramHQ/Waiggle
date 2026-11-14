@@ -22,9 +22,9 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ContactLink } from './ContactLink'
+import { contestSubjectOf } from './contestSubject'
 import { Icon } from './Icon'
 import { parisDateTime } from './parisTime'
-import { shortDate } from './relativeDate'
 import { isNewSuspension, noteSuspensionSeen, suspensionSignature } from './suspensionMemory'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -109,11 +109,13 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
   })
 
   // R9 (J12) : l'objet de « Contester » nomme la décision et sa date, à Paris comme les autres :
-  // « Contestation : suspension de mon compte du 27 oct. ».
-  const contestSubject = t(($) => $.removal.contestSubject, {
-    decision: t(($) => $.removal.contestDecision.suspension),
-    date: shortDate(suspension.since, i18n.language),
-  })
+  // « Contestation : suspension de mon compte du 27 octobre ».
+  const contestSubject = contestSubjectOf(
+    t,
+    i18n.language,
+    t(($) => $.removal.contestDecision.suspension),
+    suspension.since,
+  )
 
   return (
     <View

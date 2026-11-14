@@ -12,7 +12,7 @@
 // Différent de Choices (pastilles toutes visibles) : ici, les choix ont des libellés longs, ou la
 // place manque (une feuille de téléphone), et la question tient sur une ligne.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { useId } from 'react'
+import { type Ref, useId } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { FieldError } from './FieldError'
@@ -36,6 +36,11 @@ type Props<T extends string> = {
   placeholder: string
   /** Une réponse manque : la phrase s'affiche sous la ligne, et son cadre passe au rouge. */
   error?: string | undefined
+  /**
+   * Reçoit la ligne (le bouton qui ouvre le menu), pour une feuille qui s'ouvre sur sa première
+   * question (`Sheet initialFocusRef`, le retrait de la modération).
+   */
+  triggerRef?: Ref<View>
 }
 
 export function MenuField<T extends string>({
@@ -45,6 +50,7 @@ export function MenuField<T extends string>({
   onChange,
   placeholder,
   error,
+  triggerRef,
 }: Props<T>) {
   const { colors } = useTheme()
   // useId : un identifiant stable (pré-rendu et navigateur), qui relie la ligne à sa phrase d'erreur.
@@ -64,6 +70,7 @@ export function MenuField<T extends string>({
       <ActionMenu
         items={items}
         label={label}
+        {...(triggerRef ? { ref: triggerRef } : null)}
         renderTrigger={({ onPress, expanded, ref }) => (
           <Pressable
             ref={ref}

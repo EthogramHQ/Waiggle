@@ -20,11 +20,11 @@ import {
 import type { Translation } from '@ruche/i18n'
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
+import { contestSubjectOf, partContestSubject } from '../ui/contestSubject'
 import type { IconName } from '../ui/Icon'
 import { type Part, splitMarks } from '../ui/marks'
 import { parisDateTime } from '../ui/parisTime'
 import { partText } from '../ui/partText'
-import { shortDate } from '../ui/relativeDate'
 
 type T = ReturnType<typeof useTranslation>['t']
 
@@ -517,12 +517,10 @@ export const presentNotification = (
           ? {
               label: t(($) => $.notifications.contest),
               contact: {
-                subject: t(($) => $.removal.contestSubject, {
-                  decision: t(($) => $.removal.contestDecision.part, {
-                    part: partText({ ...part, mediaId: null }, t, targetKind),
-                    title: project.title,
-                  }),
-                  date: shortDate(notification.at, language),
+                subject: partContestSubject(t, language, {
+                  part: partText({ ...part, mediaId: null }, t, targetKind),
+                  title: project.title,
+                  at: notification.at,
                 }),
               },
             }
@@ -578,12 +576,14 @@ export const presentNotification = (
             : {
                 label: t(($) => $.notifications.contest),
                 contact: {
-                  subject: t(($) => $.removal.contestSubject, {
-                    decision: t(($) => $.removal.contestDecision.profilePart, {
+                  subject: contestSubjectOf(
+                    t,
+                    language,
+                    t(($) => $.removal.contestDecision.profilePart, {
                       part: partText({ field, mediaId: null, position: null }, t),
                     }),
-                    date: shortDate(notification.at, language),
-                  }),
+                    notification.at,
+                  ),
                 },
               }
       return {

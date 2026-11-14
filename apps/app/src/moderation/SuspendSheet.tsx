@@ -35,10 +35,12 @@ import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useMember } from '../members/api'
 import { useSignInAgain } from '../navigation/signInAgain'
+import { type HeldAction, useLeaveGuard } from '../navigation/useLeaveGuard'
 import { isRecentAccount } from '../ui/AuthorRecord'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
+import { DiscardDialog } from '../ui/DiscardDialog'
 import { Hint } from '../ui/Hint'
 import { parisDateTime } from '../ui/parisTime'
 import { Sheet, type SheetNotice } from '../ui/Sheet'
@@ -171,57 +173,60 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
     ) : null
 
   return (
-    <Sheet
-      open={open}
-      title={title}
-      onClose={onClose}
-      // La fenêtre s'ouvre sous le doigt de « Suspendre » : ses boutons ignorent une double tape.
-      guardTaps
-      {...(form ? form.sheet : null)}
-    >
-      {form ? (
-        <Stack gap="lg">
-          {identity}
-          {form.content}
-        </Stack>
-      ) : null}
-      {body === 'sessionError' ? (
-        <StateMessage
-          kind="error"
-          level={2}
-          title={t(($) => $.states.errorTitle)}
-          message={t(($) => $.account.loadError)}
-          actions={[{ label: t(($) => $.common.retry), onPress: retry }]}
-        />
-      ) : null}
-      {body === 'signedOut' || body === 'expired' ? (
-        <StateMessage
-          kind="signedOut"
-          level={2}
-          title={t(($) => $.states.signedOutTitle)}
-          message={body === 'expired' ? t(($) => $.states.expired) : t(($) => $.home.membersOnly)}
-          // « Me connecter » ramène ici après la connexion (?next=) ; la feuille, posée sur sa
-          // propre adresse, se ferme d'elle-même quand la page de connexion s'ouvre.
-          actions={[signInAgain()]}
-        />
-      ) : null}
-      {body === 'loading' ? <StateMessage kind="loading" level={2} /> : null}
-      {body === 'none' ? (
-        <StateMessage kind="notFound" level={2} title={t(($) => $.states.notFoundTitle)} />
-      ) : null}
-      {body === 'blocked' || body === 'self' || body === 'admin' ? (
-        <Text>{reasons[body]}</Text>
-      ) : null}
-      {body === 'error' && failureKey ? (
-        <StateMessage
-          kind="error"
-          level={2}
-          title={t(($) => $.moderation.suspend.errorTitle)}
-          message={t(($) => $.errors[failureKey])}
-          actions={[{ label: t(($) => $.common.retry), onPress: () => void member.refetch() }]}
-        />
-      ) : null}
-    </Sheet>
+    <>
+      <Sheet
+        open={open}
+        title={title}
+        onClose={onClose}
+        // La fenêtre s'ouvre sous le doigt de « Suspendre » : ses boutons ignorent une double tape.
+        guardTaps
+        {...(form ? form.sheet : null)}
+      >
+        {form ? (
+          <Stack gap="lg">
+            {identity}
+            {form.content}
+          </Stack>
+        ) : null}
+        {body === 'sessionError' ? (
+          <StateMessage
+            kind="error"
+            level={2}
+            title={t(($) => $.states.errorTitle)}
+            message={t(($) => $.account.loadError)}
+            actions={[{ label: t(($) => $.common.retry), onPress: retry }]}
+          />
+        ) : null}
+        {body === 'signedOut' || body === 'expired' ? (
+          <StateMessage
+            kind="signedOut"
+            level={2}
+            title={t(($) => $.states.signedOutTitle)}
+            message={body === 'expired' ? t(($) => $.states.expired) : t(($) => $.home.membersOnly)}
+            // « Me connecter » ramène ici après la connexion (?next=) ; la feuille, posée sur sa
+            // propre adresse, se ferme d'elle-même quand la page de connexion s'ouvre.
+            actions={[signInAgain()]}
+          />
+        ) : null}
+        {body === 'loading' ? <StateMessage kind="loading" level={2} /> : null}
+        {body === 'none' ? (
+          <StateMessage kind="notFound" level={2} title={t(($) => $.states.notFoundTitle)} />
+        ) : null}
+        {body === 'blocked' || body === 'self' || body === 'admin' ? (
+          <Text>{reasons[body]}</Text>
+        ) : null}
+        {body === 'error' && failureKey ? (
+          <StateMessage
+            kind="error"
+            level={2}
+            title={t(($) => $.moderation.suspend.errorTitle)}
+            message={t(($) => $.errors[failureKey])}
+            actions={[{ label: t(($) => $.common.retry), onPress: () => void member.refetch() }]}
+          />
+        ) : null}
+      </Sheet>
+      {form?.layers}
+    </>
   )
 }
 
@@ -277,8 +282,16 @@ function useDecisionForm({
   member: Member | null
   fromReport?: ReportTarget
 }): {
-  sheet: { busy: boolean; notice: SheetNotice | null; footer: ReactNode }
+  sheet: {
+    busy: boolean
+    notice: SheetNotice | null
+    footer: ReactNode
+    closeGuard: () => void
+    onClose: () => void
+  }
   content: ReactNode
+  /** La fenêtre « Abandonner ? », posée par-dessus la feuille. */
+  layers: ReactNode
 } | null {
   const { t, i18n } = useTranslation()
   const signInAgain = useSignInAgain()
@@ -319,6 +332,35 @@ function useDecisionForm({
   const suspending = mode === 'suspend'
   const suspension = member?.moderation?.suspension ?? null
   const text = explanation.trim()
+
+  // Une explication écrite ou une durée choisie se perdent en fermant : la feuille le demande
+  // d'abord (copié de ReportSheet). Seulement avec un formulaire (`member`) et tant que la
+  // fenêtre est ouverte ; pendant l'envoi, rien ne la ferme (la réponse dira si c'est parti).
+  const [discarding, setDiscarding] = useState(false)
+  const dirty = member !== null && open && (text !== '' || duration !== null || cause !== null)
+  const held = useRef<HeldAction | null>(null)
+  const guard = useLeaveGuard(dirty || sending, (action) => {
+    // Pendant l'envoi : le retour est arrêté, sans question (ça part).
+    if (busy.current) return
+    held.current = action
+    setDiscarding(true)
+  })
+  // Sur le web, la fermeture attend que l'étape de plus de l'historique soit retirée.
+  const leave = () => void guard.release().then(onClose)
+  const requestClose = () => {
+    if (busy.current) return
+    if (dirty) {
+      held.current = null
+      setDiscarding(true)
+    } else leave()
+  }
+  const abandon = () => {
+    setDiscarding(false)
+    const action = held.current
+    held.current = null
+    if (action) guard.proceed(action)
+    else leave()
+  }
   const ready =
     text !== '' &&
     (suspending ? duration !== null && ground !== null : cause !== null) &&
@@ -354,10 +396,14 @@ function useDecisionForm({
     setSending(false)
     if (result.ok) {
       // La fenêtre se ferme d'abord : un message bref sous une fenêtre ouverte resterait caché.
-      onClose()
-      toast.show(
-        suspending ? t(($) => $.moderation.suspend.done) : t(($) => $.moderation.lift.done),
-      )
+      // Les changements sont partis : plus rien à garder (`leave` rend l'historique du web).
+      const said = suspending
+        ? t(($) => $.moderation.suspend.done)
+        : t(($) => $.moderation.lift.done)
+      void guard.release().then(() => {
+        onClose()
+        toast.show(said)
+      })
       return
     }
     if (result.error === 'passwordRequired' && !passwordAsked) {
@@ -391,12 +437,14 @@ function useDecisionForm({
     sheet: {
       busy: sending,
       notice,
+      closeGuard: requestClose,
+      onClose: requestClose,
       footer: (
         <Row gap="sm" justify="end" wrap>
           <Button
             label={t(($) => $.moderation.cancel)}
             variant="secondary"
-            onPress={onClose}
+            onPress={requestClose}
             disabled={sending}
           />
           <Button
@@ -417,6 +465,17 @@ function useDecisionForm({
         </Row>
       ),
     },
+    layers: (
+      <DiscardDialog
+        visible={discarding}
+        title={t(($) => $.moderation.discard.title)}
+        message={t(($) => $.moderation.discard.body)}
+        keepLabel={t(($) => $.moderation.discard.keep)}
+        discardLabel={t(($) => $.moderation.discard.confirm)}
+        onKeep={() => setDiscarding(false)}
+        onDiscard={abandon}
+      />
+    ),
     content: (
       <Stack gap="xl">
         <Stack gap="sm">

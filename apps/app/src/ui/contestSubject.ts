@@ -26,7 +26,23 @@ export const partContestSubject = (
   language: string,
   { part, title, at }: PartSubject,
 ): string =>
-  t(($) => $.removal.contestSubject, {
-    decision: t(($) => $.removal.contestDecision.part, { part, title }),
-    date: parisDateTime(at, language).date,
-  })
+  contestSubjectOf(
+    t,
+    language,
+    t(($) => $.removal.contestDecision.part, { part, title }),
+    at,
+  )
+
+/**
+ * L'objet de « Contester », partout le même (décision du 14/11/2026) : « Contestation : <décision>
+ * du 12 novembre ». La date est toujours la longue, à l'heure de Paris, jamais « 12 nov. » : une
+ * seule fonction l'écrit, pour que la boîte de contact lise le même format quelle que soit la page.
+ * `decision` est la phrase déjà traduite (`removal.contestDecision.*`).
+ */
+export const contestSubjectOf = (
+  t: Translate,
+  language: string,
+  decision: string,
+  at: string,
+): string =>
+  t(($) => $.removal.contestSubject, { decision, date: parisDateTime(at, language).date })
