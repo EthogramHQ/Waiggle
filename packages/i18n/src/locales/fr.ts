@@ -1931,6 +1931,8 @@ export const fr = {
     makePrivateBody:
       'Il ne sera plus visible que de toi. Pendant la suspension, tu ne pourras pas le rendre de nouveau public.',
     madePrivate: 'Projet passé en privé.',
+    // R9 : l'échec de « Rendre privé », lu dans sa fenêtre, qui reste ouverte.
+    makePrivateError: 'Le projet n’a pas pu passer en privé. Réessaie.',
   },
   removal: {
     // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de
@@ -1987,6 +1989,9 @@ export const fr = {
         'En attendant, il est provisoirement « {{name}} », partout. Choisis-en un autre : la raison est dans Activité.',
       chooseHandle: 'Choisir mon pseudo',
       chooseName: 'Choisir mon nom',
+      // R9 : « Supprimer » d'une photo retirée, réussi (bulle) ou refusé (sous la partie).
+      photoDeleted: 'Photo supprimée.',
+      deleteError: 'La photo n’a pas pu être supprimée. Réessaie.',
     },
     // L'objet de l'e-mail de « Contester » nomme la décision (J12) : « Contestation : retrait de la
     // photo 2 de « Météo » du 12 nov. ».
@@ -2309,6 +2314,9 @@ export const fr = {
     // R7b : une image d'un membre (la capture d'un retour, la photo d'un appel) s'ouvre en entier
     // au toucher ; le nom du bouton dit ce qu'il fait, puis l'image qu'il ouvre.
     enlarge: 'Voir en grand : {{description}}',
+    // R9 : une photo marquée (« Retiré par la modération », vue de son auteur seul) : sa place, puis
+    // la marque, dans ce que le lecteur d'écran entend.
+    marked: '{{photo}}. {{mark}}',
   },
   // Partager un projet ou une page de membre (R5a, F-Pr1, F-Mb1). Le lien ne contient que l'adresse.
   share: {
