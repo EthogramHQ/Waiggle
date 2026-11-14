@@ -263,10 +263,12 @@ const noHives: MyHives = { hives: [], invitations: [], createdCount: 0 }
 // --- Le sélecteur ---
 
 describe('the hive pills of the feed (R10)', () => {
+  // La liste des pastilles n'est pas « accessible » au sens de React Native (ses onglets le sont,
+  // pour VoiceOver) : on la trouve par son nom ; son rôle « tablist » est vérifié par HivePills.test.
   it('shows « Tout », then one pill per hive, under the header, « Tout » chosen', async () => {
     await openFeed()
 
-    const list = await screen.findByRole('tablist', { name: TEXT.pills })
+    const list = await screen.findByLabelText(TEXT.pills)
     const names = within(list)
       .getAllByRole('tab')
       .map((one) => one.props.accessibilityLabel ?? one.props['aria-label'])
@@ -354,9 +356,7 @@ describe('the hive pills of the feed (R10)', () => {
   it('links each hive tab to the feed panel it controls', async () => {
     await openFeed()
 
-    const tabs = within(await screen.findByRole('tablist', { name: TEXT.pills })).getAllByRole(
-      'tab',
-    )
+    const tabs = within(await screen.findByLabelText(TEXT.pills)).getAllByRole('tab')
     const panelIds = new Set(tabs.map((one) => one.props['aria-controls']))
     expect(panelIds.size).toBe(1)
     const [panelId] = [...panelIds]
@@ -444,7 +444,7 @@ describe('« Tes ruches » in the right column on a computer (R10, F-Fil11)', ()
     await openFeed()
 
     // Témoin : les pastilles sont là ; la colonne, non.
-    expect(await screen.findByRole('tablist', { name: TEXT.pills })).toBeTruthy()
+    expect(await screen.findByLabelText(TEXT.pills)).toBeTruthy()
     expect(screen.queryByRole('header', { name: TEXT.side })).toBeNull()
   })
 })
