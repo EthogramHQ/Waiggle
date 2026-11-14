@@ -170,7 +170,7 @@ describe('the catalogue and a hive-reserved project', () => {
         (c) => c.code === 'family',
       )?.projectCount
     const toolPage = async (cookie: string) =>
-      ToolPage.parse(await read('/v1/tags/le-chat', cookie)).tool.projectCount
+      ToolPage.parse(await read('/v1/tags/mistral', cookie)).tool.projectCount
 
     expect(await mistral(max)).toBe(1)
     expect(await others(max)).toContain('Outil Secret')

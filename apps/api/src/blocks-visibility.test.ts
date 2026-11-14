@@ -122,7 +122,7 @@ describe.each(DIRECTIONS)('the contents, when %s', (_, blockNow) => {
     ] as const) {
       const discover = await (await get('/v1/feed/discover', cookie)).text()
       expect(discover).not.toContain(hidden)
-      const tag = await (await get('/v1/tags/le-chat', cookie)).text()
+      const tag = await (await get('/v1/tags/mistral', cookie)).text()
       expect(tag).not.toContain(hidden)
     }
     // Zoé voit les deux projets. (Découvrir ne montre jamais de note : la note d'Inès se lit sur la

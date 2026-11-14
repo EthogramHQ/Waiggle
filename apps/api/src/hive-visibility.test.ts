@@ -360,7 +360,7 @@ describe('the lists', () => {
       '/v1/feed/discover',
       '/v1/feed/discover?testers=true',
       '/v1/feed/discover?category=family',
-      '/v1/tags/le-chat',
+      '/v1/tags/mistral',
     ]
     for (const path of lists) {
       expect(await readText(path, max), `member ${path}`).toContain(album.id)
@@ -368,7 +368,7 @@ describe('the lists', () => {
         expect(await readText(path, cookie), `${name} ${path}`).not.toContain(album.id)
       }
     }
-    const tool = ToolPage.parse(JSON.parse(await readText('/v1/tags/le-chat', max)))
+    const tool = ToolPage.parse(JSON.parse(await readText('/v1/tags/mistral', max)))
     expect(tool.projects.find((p) => p.id === album.id)?.hive).toEqual({
       id: famille,
       name: 'Famille',
@@ -391,7 +391,7 @@ describe('the lists', () => {
 
   it('drops it from every list of a member who left the hive', async () => {
     const album = await reservedProject()
-    const lists = ['/v1/feed/discover', '/v1/tags/le-chat', `/v1/members/${inesId}`]
+    const lists = ['/v1/feed/discover', '/v1/tags/mistral', `/v1/members/${inesId}`]
     for (const path of lists) {
       expect(await readText(path, max), path).toContain(album.id)
     }
