@@ -2457,6 +2457,11 @@ export const fr = {
       handOver: 'Confier l’animation',
       handOverHint: 'Choisis le membre qui animera la ruche. Tu en resteras membre.',
       delete: 'Supprimer la ruche',
+      // La précision de la ligne « Confier l'animation » (planche R10-Reglages-Ruche).
+      handOverDetail: 'Tu redeviens membre.',
+      // La feuille « Confier l'animation » quand l'animateur est seul dans la ruche.
+      handOverNone: 'Personne d’autre n’est membre de la ruche pour l’instant.',
+      iconError: 'L’icône n’a pas pu s’enregistrer. Réessaie.',
     },
     dialogs: {
       cancel: 'Annuler',
