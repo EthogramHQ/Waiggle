@@ -68,10 +68,16 @@ import { leaMe, suspendedMe } from '../src/testing/fixtures.ts'
 import {
   decisionHistory,
   decisionHistoryPageOf,
+  meteoPreview,
+  meteoProjectId,
+  meteoSecondPhotoId,
   moderationQueuePageOf,
+  moderationQueueR9,
+  photoRemoval,
   removalAfterReport,
   removalByLaw,
   removedPageOf,
+  removedPhotoPart,
   samMember,
   scamCommentItem,
   sevenDaySuspension,
@@ -228,6 +234,8 @@ const update = (
   createdAt: new Date(Date.UTC(2026, 9, day, 9)).toISOString(),
   // Le retrait par la modération (tranche 7a) : aucun par défaut.
   removal: null,
+  // R9 (7d) : les parties retirées seules, pour l'auteur ; aucune par défaut.
+  removedParts: [],
 })
 const line = (family, text) => ({ family, text })
 /** Le champ de la n-ième ligne (depuis 1) de la feuille « Nouvelle mise à jour » : « Changement 2 sur 3, … ». */
@@ -406,6 +414,24 @@ const sampleImage = (id) => {
 // Les projets des personnes que Léa suit (Max, Inès) : on ne se suit pas soi-même.
 const max = { id: 'max-id', name: 'Max Durand', avatarUrl: null }
 const ines = { id: 'ines-id', name: 'Inès Haddad', avatarUrl: null }
+// R9 : « Météo », le projet d'Inès que Léa signale (pages signaler-*) : deux photos, dont les
+// identifiants sont ceux de l'aperçu de la feuille (`meteoPreview`, testing/moderation.ts).
+const meteoProject = {
+  ...projectWithPhotos,
+  id: meteoProjectId,
+  author: ines,
+  title: 'Météo',
+  pitch: 'La météo de mon balcon, chaque matin.',
+  prompts: [],
+  isMine: false,
+  visuals: projectWithPhotos.visuals.slice(0, 2).map((visual, index) => ({
+    ...visual,
+    id:
+      index === 0
+        ? (meteoPreview.parts.find((p) => p.position === 1)?.mediaId ?? visual.id)
+        : meteoSecondPhotoId,
+  })),
+}
 const fromOthers = [
   {
     ...photosProject,
@@ -1392,6 +1418,57 @@ const goneCommentId = '5e6f7081-92a3-4b4c-8d5e-0000000000ff'
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
+  if (choice === 'moderation') {
+    return [
+      [
+        {
+          kind: 'removed',
+          id: `removed:project:${photosProject.id}:photo`,
+          at: hoursAgo(2),
+          isNew: true,
+          targetKind: 'project',
+          project: notified(photosProject),
+          excerpt: null,
+          part: { field: 'photo', position: 2 },
+          ground: photoRemoval.ground,
+          explanation: photoRemoval.explanation,
+          afterReport: photoRemoval.afterReport,
+          projectHidden: false,
+        },
+        {
+          kind: 'restored',
+          id: `restored:project:${photosProject.id}:description`,
+          at: hoursAgo(5),
+          isNew: true,
+          targetKind: 'project',
+          project: notified(photosProject),
+          part: { field: 'description', position: null },
+          valueBack: true,
+          handle: null,
+        },
+        {
+          kind: 'suspension_ended',
+          id: 'suspension_ended:9a3b4c5d-6e7f-4a81-9b2c-3d4e5f6a7b8c',
+          at: hoursAgo(26),
+          isNew: false,
+          lifted: true,
+          cause: 'error',
+          explanation: null,
+        },
+        {
+          kind: 'profile_removed',
+          id: 'profile_removed:handle:u1',
+          at: hoursAgo(30),
+          isNew: false,
+          part: { field: 'handle' },
+          replacedBy: 'membre_4f2a',
+          ground: 'rules',
+          explanation: 'Ce pseudo imitait celui d’un autre membre.',
+          afterReport: true,
+        },
+      ],
+    ]
+  }
   if (choice === 'updates') {
     return [
       [
@@ -1821,6 +1898,8 @@ const cornerCall = (n, text, days, photoOf = null) => ({
   photo: photoOf,
   createdAt: cornerAgo(days),
   removal: null,
+  // R9 (7d) : les parties retirées seules (la photo), pour l'auteur ; aucune par défaut.
+  removedParts: [],
 })
 const cornerMessage = (n, fields) => ({
   id: cornerId('c', n),
@@ -1833,6 +1912,8 @@ const cornerMessage = (n, fields) => ({
   createdAt: cornerAgo(0, 1),
   settled: null,
   removal: null,
+  // R9 (7d) : les parties retirées seules (la capture), pour son auteur ; aucune par défaut.
+  removedParts: [],
   mine: false,
   ...fields,
 })
@@ -2002,6 +2083,10 @@ const newestFirst = (messages) => [...messages].reverse()
 // `blocks` (tranche 7b) : 'some', Léa a bloqué Sam et Théo ; 'none', personne.
 // `email` (tranche « adresse ») : 'current', l'adresse de toujours ; 'changed', la nouvelle.
 // `suspended` (tranche 7c) : le compte de Léa est suspendu 7 jours (GET /v1/me le dit).
+// `moderation` (R9) : 'limit', les 20 signalements du jour sont faits (la feuille le dit dès
+// l'ouverture) ; 'part-removed', la 2e photo du projet aux photos de Léa est retirée seule (elle la
+// voit encore, avec « Retiré par la modération ») ; 'provisional', son pseudo a été retiré et
+// remplacé par un pseudo provisoire (la feuille « Choisir un pseudo », le bandeau de « Moi »).
 // `emailChoices` (R8) : les réglages d'e-mail de départ, 'default' (tout « Dans le récap »),
 // 'replies-now' (les réponses et mentions « Tout de suite ») ou 'recap-off' (récap coupé, les
 // commentaires « Tout de suite », les abonnés « Jamais »).
@@ -2014,6 +2099,7 @@ const fakeApi = (
   email = 'current',
   suspended = false,
   emailChoices = 'default',
+  moderation = null,
 ) => {
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
@@ -2036,6 +2122,10 @@ const fakeApi = (
     isAdmin: admin,
     email: accountEmail,
     suspension: suspended ? suspendedMe.suspension : null,
+    // R9 : un pseudo retiré par la modération, remplacé partout par un pseudo provisoire.
+    ...(moderation === 'provisional'
+      ? { handle: 'membre_4f2a', provisional: { name: false, handle: true } }
+      : null),
   })
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
@@ -2162,6 +2252,7 @@ const fakeApi = (
         beforeAfter: false,
         createdAt: new Date(SHOT_NOW).toISOString(),
         removal: null,
+        removedParts: [],
       })
     }
     if (/^\/v1\/projects\/[^/]+\/updates\/[^/]+$/.test(pathname) && method === 'DELETE') {
@@ -2362,7 +2453,19 @@ const fakeApi = (
       return route.fulfill({ status: 204, body: '' })
     }
     if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, withExtras(recipesShown))
-    if (pathname === `/v1/projects/${photosProject.id}`) return json(200, withExtras(photosProject))
+    if (pathname === `/v1/projects/${photosProject.id}`) {
+      // R9 : 'part-removed', sa 2e photo est retirée seule ; Léa la voit encore, avec la notice.
+      const second = photosProject.visuals[1]
+      return json(
+        200,
+        withExtras(
+          moderation === 'part-removed' && second
+            ? { ...photosProject, removedParts: [removedPhotoPart(second.id)] }
+            : photosProject,
+        ),
+      )
+    }
+    if (pathname === `/v1/projects/${meteoProjectId}`) return json(200, withExtras(meteoProject))
     if (pathname === `/v1/projects/${notMineProject.id}`) {
       return json(200, withExtras(notMineProject))
     }
@@ -2533,22 +2636,65 @@ const fakeApi = (
     // La cible que montre la page « Signaler » (GET /v1/reports/target) : le commentaire des
     // captures, avec son texte et son projet.
     if (pathname === '/v1/reports/target') {
+      const kind = url.searchParams.get('kind')
       const id = url.searchParams.get('id')
+      // R9 : ce qu'il peut encore envoyer aujourd'hui ; à 0, la feuille le dit dès l'ouverture.
+      const remainingToday = moderation === 'limit' ? 0 : 20
+      // « Météo » d'Inès : ses parties, ses deux photos (pages signaler-partie, signaler…).
+      if (kind === 'project' && id === meteoProjectId) {
+        return json(200, {
+          ...meteoPreview,
+          author: { ...meteoPreview.author, isBlocked: blocked.has(ines.id) },
+          remainingToday,
+        })
+      }
+      // Son propre projet, par un ancien lien : la feuille dit « C'est ton projet » (signaler-sien).
+      if (kind === 'project' && id === recipesProject.id) {
+        return json(200, {
+          target: { kind: 'project', id: recipesProject.id },
+          text: `${recipesProject.title} — ${recipesProject.pitch}`,
+          projectId: recipesProject.id,
+          author: {
+            id: leaMe.id,
+            name: leaMe.name,
+            handle: leaMe.handle,
+            isBlocked: false,
+            isAdmin: false,
+          },
+          head: { title: recipesProject.title, authorName: leaMe.name, image: null },
+          parts: ['description', 'tools', 'demoUrl', 'prompt'].map((field) => ({
+            field,
+            mediaId: null,
+            position: null,
+            thumb: null,
+            reportedByMe: false,
+          })),
+          reportedByMe: false,
+          remainingToday,
+        })
+      }
       const comment = notMineComments.find((c) => c.id === id)
-      if (url.searchParams.get('kind') !== 'comment' || !comment) {
+      if (kind !== 'comment' || !comment) {
         return json(404, { error: { code: 'not_found', message: '' } })
       }
       return json(200, {
         target: { kind: 'comment', id: comment.id },
         text: comment.body,
         projectId: commentedProject.id,
-        // Tranche 7b : l'auteur, pour « Bloquer aussi @x » après l'envoi (absent s'il est bloqué).
+        // Tranche 7b : l'auteur, pour « Bloquer aussi » (absent s'il est bloqué) ; R9 : jamais un
+        // administrateur.
         author: {
           id: comment.author.id,
           name: comment.author.name,
           handle: comment.author.id === ines.id ? 'ines_haddad' : 'max_durand',
           isBlocked: blocked.has(comment.author.id),
+          isAdmin: false,
         },
+        // R9 : le rappel en tête de la feuille ; un commentaire n'a ni titre, ni partie.
+        head: { title: null, authorName: comment.author.name, image: null },
+        parts: [],
+        reportedByMe: false,
+        remainingToday,
       })
     }
     // La modération (tranche 7a) : pour un membre qui n'est pas administrateur, ces routes
@@ -2572,7 +2718,8 @@ const fakeApi = (
       return onePage([admitChange, mergeChange, recategorizeChange])
     }
     if (pathname === '/v1/moderation/reports') {
-      const page = moderationQueuePageOf()
+      // R9 : la 2e photo de « Météo » en tête (une partie), puis la file d'avant.
+      const page = moderationQueuePageOf(moderationQueueR9)
       return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
     }
     if (pathname === '/v1/moderation/removed') {
@@ -3512,7 +3659,7 @@ const pages = [
   // Tranche 7b : bloquer. Le menu « … » de la page de Max, ouvert ; puis « Bloquer » choisi, la
   // fenêtre qui dit ce qui change ; la page de Sam vue par Léa qui l'a bloqué (l'en-tête seul,
   // « Tu as bloqué @sam ») ; la liste « Membres bloqués », pleine puis vide ; la confirmation d'un
-  // signalement qui propose « Bloquer aussi @ines_haddad » ; un fil où deux commentaires sont
+  // signalement (R9 : « Bloquer aussi » est une case avant l'envoi) ; un fil où deux commentaires sont
   // remplacés par leur emplacement ; le menu « … » d'un projet.
   {
     name: 'membre-menu',
@@ -3531,7 +3678,8 @@ const pages = [
       await page.getByRole('button', { name: /^Plus d.actions$/ }).click()
       await page.getByRole('menuitem', { name: 'Bloquer' }).click()
       // Le titre finit par « ? » derrière une espace insécable (typo:fix) : une expression suffit.
-      await page.getByRole('heading', { name: /^Bloquer @max_durand/ }).waitFor()
+      // R9 : « Bloquer Max Durand (@max_durand) ? » (planche R9-Bloquer).
+      await page.getByRole('heading', { name: /^Bloquer Max Durand \(@max_durand\)/ }).waitFor()
     },
   },
   { name: 'membre-bloque', path: `/members/${blockedSam.member.id}`, signedIn: true },
@@ -3545,7 +3693,8 @@ const pages = [
     prepare: async (page) => {
       await page.getByRole('radio', { name: /^Arnaque ou spam/ }).click()
       await page.getByRole('button', { name: 'Envoyer' }).click()
-      await page.getByRole('button', { name: 'Bloquer aussi @ines_haddad' }).waitFor()
+      // R9 : la feuille remercie ; « Bloquer aussi » était une case avant l'envoi.
+      await page.getByText(/^Merci, ton signalement a été envoyé/).waitFor()
     },
   },
   {
@@ -4038,7 +4187,17 @@ if (script) {
   const browser = await chromium.launch()
   const open = async (
     signedIn,
-    { feed, notifications, admin, blocks, email, suspended, emailChoices, ...options } = {},
+    {
+      feed,
+      notifications,
+      admin,
+      blocks,
+      email,
+      suspended,
+      emailChoices,
+      moderation,
+      ...options
+    } = {},
   ) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
@@ -4050,7 +4209,17 @@ if (script) {
     await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended, emailChoices),
+      fakeApi(
+        signedIn,
+        feed,
+        notifications,
+        admin,
+        blocks,
+        email,
+        suspended,
+        emailChoices,
+        moderation,
+      ),
     )
     return context
   }
@@ -4165,6 +4334,7 @@ async function layoutReport() {
             shot.email,
             shot.suspended,
             shot.emailChoices,
+            shot.moderation,
           ),
         )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
@@ -4343,6 +4513,7 @@ const capture = async ({ shot, device, scheme }) => {
         shot.email,
         shot.suspended,
         shot.emailChoices,
+        shot.moderation,
       ),
     )
     const page = await context.newPage()

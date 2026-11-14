@@ -10,6 +10,8 @@ import type {
   Removal,
   RemovedItem,
   RemovedPage,
+  RemovedPart,
+  ReportTargetPreview,
   Suspension,
 } from '@ruche/contracts'
 
@@ -417,3 +419,128 @@ export const decisionHistoryPageOf = (
   items: DecisionHistoryItem[] = decisionHistory,
   nextCursor: string | null = null,
 ): DecisionHistoryPage => ({ items, nextCursor })
+
+// --- R9 (7d) : une partie retirée seule (docs/scenarios/refonte.md, « Retirer une partie ») ---
+//
+// La modération retire une partie d'un contenu (la 2e photo de « Météo ») ; le reste reste affiché.
+// L'auteur seul la lit encore, dans `removedParts` (contrat `RemovedPart`) : le champ, la photo
+// visée, la valeur retirée (un texte, une liste, ou null pour une photo, qui reste dans sa galerie),
+// et le retrait (fondement, explication, date, après un signalement ou non). Tout autre membre
+// reçoit une liste vide, et la partie n'est plus là pour lui, comme si elle n'avait jamais existé.
+
+/**
+ * La 2e photo retirée au nom de la loi, après un signalement, le 12 novembre à midi, heure de Paris
+ * (11 h UTC : le même jour quel que soit le fuseau des tests).
+ */
+export const photoRemoval: Removal = {
+  ground: 'illegal',
+  explanation: 'Cette photo montre une personne reconnaissable sur son balcon, sans son accord.',
+  at: '2026-11-12T11:00:00.000Z',
+  afterReport: true,
+}
+
+/** Une description retirée au nom des règles, sans signalement, le 12 novembre à 16 h (Paris). */
+export const descriptionRemoval: Removal = {
+  ground: 'rules',
+  explanation: 'La description renvoie vers un faux site de paiement.',
+  at: '2026-11-12T15:00:00.000Z',
+  afterReport: false,
+}
+
+/** Une photo retirée seule, désignée par son identifiant : elle reste dans la galerie de l'auteur. */
+export const removedPhotoPart = (
+  mediaId: string,
+  removal: Removal = photoRemoval,
+): RemovedPart => ({
+  field: 'photo',
+  mediaId,
+  value: null,
+  imageUrl: null,
+  removal,
+})
+
+/**
+ * Un texte retiré seul (description, lien de la démo, outils, prompts) : la valeur est sortie de sa
+ * colonne, l'auteur la relit ici pour savoir quoi remplacer.
+ */
+export const removedTextPart = (
+  field: 'description' | 'demoUrl' | 'tools' | 'prompt',
+  value: string | string[],
+  removal: Removal = descriptionRemoval,
+): RemovedPart => ({ field, mediaId: null, value, imageUrl: null, removal })
+
+/** L'identifiant de la 2e photo de « Météo », signalée puis retirée. */
+export const meteoSecondPhotoId = '7a8b9cad-becf-4d0e-8f1a-2b3c4d5e6f70'
+
+/**
+ * La 2e photo de « Météo » d'Inès, signalée par deux membres comme « Une photo ou une information
+ * sur moi sans mon accord » : un élément de la file qui vise une partie, avec son projet porteur
+ * (`context`) et la fiche d'Inès, inscrite il y a moins de 14 jours (« Compte récent »).
+ */
+export const meteoPhotoItem: ModerationQueueItem = {
+  target: { kind: 'project', id: meteoProjectId },
+  part: { field: 'photo', mediaId: meteoSecondPhotoId, position: 2 },
+  context: { projectId: meteoProjectId, title: 'Météo', image: null },
+  contentCreatedAt: '2026-11-08T18:00:00.000Z',
+  projectId: meteoProjectId,
+  snapshot: [{ field: 'title', value: 'Météo' }],
+  images: [{ field: 'photo', state: 'present' }],
+  snapshotsDiffer: false,
+  state: 'present',
+  concernsMe: false,
+  reasons: [{ reason: 'privacy', count: 2 }],
+  details: ['On me reconnaît sur mon balcon, je n’ai rien demandé.'],
+  count: 2,
+  firstReportedAt: '2026-11-12T07:30:00.000Z',
+  lastReportedAt: '2026-11-12T09:10:00.000Z',
+  authorRecord: {
+    memberId: 'ines-id',
+    name: 'Inès Haddad',
+    handle: 'ines_haddad',
+    joinedAt: '2026-11-03T10:00:00.000Z',
+    projectCount: 2,
+    commentCount: 5,
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
+}
+
+/** La file de R9 : la photo de « Météo » en tête, puis la file d'avant. */
+export const moderationQueueR9: ModerationQueueItem[] = [meteoPhotoItem, ...moderationQueue]
+
+/**
+ * Ce que la feuille « Signaler » lit de « Météo » (GET /v1/reports/target) : le rappel en tête, les
+ * parties présentes dans l'ordre du registre (trois photos, la description, les outils, le lien de
+ * la démo ; pas de prompt), 20 signalements encore possibles aujourd'hui. Inès n'est ni bloquée ni
+ * administratrice : « Bloquer aussi » est proposé.
+ */
+export const meteoPreview: ReportTargetPreview = {
+  target: { kind: 'project', id: meteoProjectId },
+  text: 'Météo — La météo de mon balcon, chaque matin.',
+  projectId: meteoProjectId,
+  author: {
+    id: 'ines-id',
+    name: 'Inès Haddad',
+    handle: 'ines_haddad',
+    isBlocked: false,
+    isAdmin: false,
+  },
+  head: { title: 'Météo', authorName: 'Inès Haddad', image: null },
+  parts: [
+    { field: 'description', mediaId: null, position: null, thumb: null, reportedByMe: false },
+    { field: 'tools', mediaId: null, position: null, thumb: null, reportedByMe: false },
+    { field: 'demoUrl', mediaId: null, position: null, thumb: null, reportedByMe: false },
+    {
+      field: 'photo',
+      mediaId: '6f708192-a3b4-4c5d-8e6f-708192a3b4c5',
+      position: 1,
+      thumb: null,
+      reportedByMe: false,
+    },
+    { field: 'photo', mediaId: meteoSecondPhotoId, position: 2, thumb: null, reportedByMe: false },
+  ],
+  reportedByMe: false,
+  remainingToday: 20,
+}
