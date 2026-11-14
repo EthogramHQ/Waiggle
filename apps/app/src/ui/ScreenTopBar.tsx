@@ -76,8 +76,11 @@ type Props = {
   belowRef?: Ref<View>
 }
 
-/** La longueur du dégradé du voile, sous la barre (ou sous `belowBar`). */
-const VEIL_FADE = space.xxl
+/**
+ * La longueur du dégradé du voile, sous la barre (ou sous `belowBar`). Reprise par la place collée
+ * de Screen (ui/ScreenSticky.tsx, R10), qui pose le même voile.
+ */
+export const VEIL_FADE = space.xxl
 
 /** La part de la hauteur de la fenêtre au-delà de laquelle la barre ne reste plus fixe. */
 const MAX_PINNED_SHARE = 0.25
@@ -289,7 +292,7 @@ const withAlpha = (hex: string, alpha: number) =>
  * (react-native-web le transmet au navigateur) ; sur téléphone, `experimental_backgroundImage` de
  * React Native. `barShare` : la part de la hauteur du voile prise par la barre.
  */
-const veilGradient = (background: string, barShare: number): ViewStyle => {
+export const veilGradient = (background: string, barShare: number): ViewStyle => {
   const at = Math.round(Math.min(Math.max(barShare, 0), 1) * 100)
   const gradient = `linear-gradient(to bottom, ${withAlpha(background, VEIL_TOP)} 0%, ${withAlpha(
     background,
