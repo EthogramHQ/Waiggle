@@ -67,6 +67,16 @@ describe('Tabs scroll', () => {
     expect((x ?? 0) + BAND).toBeGreaterThanOrEqual(1600)
   })
 
+  it('shows a tab as wide as the strip from its start', async () => {
+    await renderWithProviders(
+      <Tabs label="Ruches" tabs={tabs} selected="h" onSelect={() => {}} panelId="panel" scroll />,
+    )
+    // Chaque onglet fait toute la bande : « h » va de 2 240 à 2 560, montré calé sur son début.
+    await layOut(BAND)
+
+    expect(lastX()).toBe(7 * BAND)
+  })
+
   it('never makes a tab wider than the strip', async () => {
     await renderWithProviders(
       <Tabs label="Ruches" tabs={tabs} selected="a" onSelect={() => {}} panelId="panel" scroll />,

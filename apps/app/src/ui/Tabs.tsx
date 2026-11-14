@@ -156,11 +156,18 @@ export function Tabs<K extends string>({
     pending.current = false
     // De l'air de chaque côté (l'onglet élargi de `space.lg`) : l'onglet voisin dépasse un peu,
     // signe que la bande continue.
-    const target = scrollToShow(
-      { x: Math.max(0, rowX.current + place.x - space.lg), width: place.width + 2 * space.lg },
-      viewport.current,
-      offset.current,
-    )
+    // Un onglet aussi large que la bande (un nom long, à 200 %) : sans air, calé sur son début.
+    const start = rowX.current + place.x
+    const roomy = place.width + 2 * space.lg <= viewport.current
+    const target = roomy
+      ? scrollToShow(
+          { x: Math.max(0, start - space.lg), width: place.width + 2 * space.lg },
+          viewport.current,
+          offset.current,
+        )
+      : Math.abs(offset.current - start) < 1
+        ? null
+        : start
     if (target === null) return
     scroller.current?.scrollTo({ x: target, animated: animated && !calm })
     // La position demandée devient la position connue : sur téléphone, `onScroll` la confirmera.
