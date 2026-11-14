@@ -1,35 +1,370 @@
-// L'onglet Ruches, avant les ruches (refonte, tranche R3 ; les ruches viennent en R10, choix de
-// Louis du 30/10/2026) : l'abeille qui fait coucou, « Les ruches arrivent bientôt » et deux phrases
-// sur ce qu'elles seront (des groupes de proches, comme « Ma ruche Famille »).
+// L'onglet Ruches (R10, docs/scenarios/refonte.md, « L'onglet Ruches » ; planches R10-Ruches et
+// R10-Etats). « Mes ruches » remplace « Les ruches arrivent bientôt » :
+// - en haut, le titre « Ruches », « Créer une ruche » à côté (blanc : l'action miel de la page est
+//   « Rejoindre la ruche » d'une invitation), et la phrase qui explique les ruches ;
+// - les invitations reçues, avec leur nombre en pastille : chaque carte dit qui invite et où, ses
+//   trois promesses, « Rejoindre la ruche » et « Refuser » ; « … » pour signaler la ruche ;
+// - mes ruches, une ligne chacune (`HiveRow`), dans l'ordre de l'API (la plus récemment active
+//   d'abord) ; toute la ligne mène à la page de la ruche ;
+// - sans ruche ni invitation : la mascotte qui dort, « Pas encore de ruche », la phrase et « Créer
+//   une ruche » (en miel : c'est la seule action de la page).
 //
-// La page ne demande rien et n'envoie rien : ni date, ni promesse, ni « Préviens-moi » (relecture
-// juridique, jur-J9). Elle ne lit que la session, comme toute page réservée aux membres.
+// Les limites (10 ruches créées, 20 ruches en tout) : « Créer une ruche » reste à sa place, grisé,
+// atteignable au clavier, et une phrase dit pourquoi. Un membre suspendu ne crée rien : le bouton
+// n'est pas là (l'API refuserait de toute façon).
+//
+// Après « Rejoindre la ruche », la page de la ruche s'ouvre. Après « Refuser », la carte reste à sa
+// place avec « Invitation refusée. » jusqu'au prochain passage sur l'onglet (relecture du plan,
+// interface 14) : la liste relue ne l'a plus, l'écran la garde lui-même. Une invitation qui n'est
+// plus valable (expirée : 410 ; ruche supprimée : 404) le dit dans une fenêtre, « Fermer » ; la
+// carte reste dessous tant que la fenêtre est ouverte (une liste ne perd pas d'élément sous une
+// fenêtre), puis part, et le focus va au titre de la section.
+import { HIVE_LIMITS, type HiveInvitation as Invitation, type MyHives } from '@ruche/contracts'
+import { useRouter } from 'expo-router'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Platform } from 'react-native'
 import { useMemberSession } from '../accounts/session'
+import { type ApiErrorKey, errorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
+import { useAcceptInvitation, useMyHives, useRefuseInvitation } from '../hives/api'
+import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
+import { Button } from '../ui/Button'
+import { CountBadge } from '../ui/CountBadge'
+import { Dialog } from '../ui/Dialog'
+import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from '../ui/focus'
+import { HiveInvitation } from '../ui/HiveInvitation'
+import { HiveRow } from '../ui/HiveRow'
+import { ListGroup } from '../ui/ListGroup'
+import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
+import { SkeletonList } from '../ui/Skeleton'
+import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { useScreenShownCount } from '../ui/screenFocus'
+import { Text } from '../ui/Text'
+import { useTapGuard } from '../ui/tapGuard'
+import { SessionErrorScreen, SignedOutScreen } from './states'
 
 export function HivesScreen() {
-  const { t } = useTranslation()
   const { state, session, retry } = useMemberSession()
-
-  if (state === 'pending') return <LoadingScreen />
+  // Pendant la lecture de la session : le titre et le squelette, comme pendant celle des ruches.
+  if (state === 'pending') return <HivesLoading />
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
   if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   if (!session) return <SignedOutScreen />
+  // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
+  return <Hives />
+}
 
+/** L'attente : le titre de l'onglet reste, deux cartes grises à la place du contenu. */
+function HivesLoading() {
+  const { t } = useTranslation()
   return (
     <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
-      {/* L'état « bientôt » de StateMessage : l'abeille qui fait coucou (décorative, le titre dit
-          déjà tout), le titre et les deux phrases, rangés à gauche comme tous les états de l'appli
-          (choix de Louis du 30/10/2026 ; relecture R3 : la page était centrée, à la main). */}
-      <StateMessage
-        kind="soon"
-        title={t(($) => $.hives.emptyTitle)}
-        message={[t(($) => $.hives.intro)]}
+      <SkeletonList count={2} />
+    </Screen>
+  )
+}
+
+function Hives() {
+  const { t } = useTranslation()
+  const mine = useMyHives()
+  // Les ruches d'abord : une relecture qui échoue (après un geste) garde ce qui est affiché.
+  if (mine.data) return <HivesView mine={mine.data} />
+  // Une erreur pendant une nouvelle tentative (« Réessayer ») : on montre l'attente.
+  if (mine.error && !mine.isFetching) {
+    const key = errorKey(mine.error)
+    // La session a expiré pendant la visite : se reconnecter, pas réessayer.
+    if (key === 'unauthorized') return <SignedOutScreen expired />
+    return (
+      <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
+        <StateMessage
+          kind="error"
+          title={t(($) => $.hives.loadError)}
+          message={t(($) => $.errors[key])}
+          actions={[{ label: t(($) => $.common.retry), onPress: () => void mine.refetch() }]}
+        />
+      </Screen>
+    )
+  }
+  return <HivesLoading />
+}
+
+/** Une invitation gardée à l'écran après que la liste l'a perdue, à la place qu'elle avait. */
+type Kept = { invitation: Invitation; index: number }
+
+/**
+ * Les invitations à montrer : celles de l'API, et celles que l'écran garde (refusées, ou qui ne
+ * valent plus pendant que la fenêtre le dit), chacune à la place qu'elle avait quand on l'a touchée.
+ */
+const withKept = (fromApi: readonly Invitation[], kept: readonly Kept[]): Invitation[] => {
+  const keptIds = new Set(kept.map((one) => one.invitation.id))
+  const list = fromApi.filter((one) => !keptIds.has(one.id))
+  for (const one of [...kept].sort((a, b) => a.index - b.index))
+    list.splice(Math.min(one.index, list.length), 0, one.invitation)
+  return list
+}
+
+/** Le message d'un échec de « Rejoindre » ou de « Refuser », sous sa carte. */
+type Failure = { id: string; text: string }
+
+/** Les refus que l'API explique elle-même ; les autres prennent la phrase de la carte. */
+const explained: ReadonlySet<ApiErrorKey> = new Set([
+  'hivesJoinedLimit',
+  'hiveFull',
+  'alreadyHiveMember',
+  'suspended',
+  'rateLimited',
+  'network',
+])
+
+function HivesView({ mine }: { mine: MyHives }) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const toSource = useMediaSources()
+  const { suspended } = useSuspension()
+  const guard = useTapGuard()
+  const accept = useAcceptInvitation()
+  const refuse = useRefuseInvitation()
+  const reasonId = useId()
+
+  // Les invitations refusées, gardées à leur place jusqu'au prochain passage sur l'onglet : quand
+  // la page redevient affichée (`useScreenShownCount` avance), on les oublie. Le nombre se compare
+  // pendant le rendu (et non dans un effet) : la carte part dans le même dessin que l'arrivée.
+  const [refused, setRefused] = useState<Record<string, Kept>>({})
+  const shownCount = useScreenShownCount()
+  const [seenCount, setSeenCount] = useState(shownCount)
+  if (shownCount !== seenCount) {
+    setSeenCount(shownCount)
+    setRefused({})
+  }
+
+  // L'invitation qui ne vaut plus (410 : expirée ; 404 : la ruche a été supprimée), et la fenêtre
+  // qui le dit. La carte reste dessous jusqu'à la fin du fondu de fermeture (`onClosed`).
+  const [gone, setGone] = useState<(Kept & { expired: boolean }) | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const closeRef = useRef<Focusable>(null)
+  const [failure, setFailure] = useState<Failure | null>(null)
+
+  // Le titre « Invitations » et celui de « Mes ruches » : où va le focus quand la carte de la
+  // fenêtre part (sinon il tomberait sur toute la page).
+  const section = useRef<Focusable>(null)
+  const invitationsTitle = useRef<Focusable>(null)
+  const hivesTitle = useRef<Focusable>(null)
+  const refocus = useRef(false)
+
+  const kept = [...Object.values(refused), ...(gone ? [gone] : [])]
+  const invitations = withKept(mine.invitations, kept)
+  // Le nombre de la pastille : les invitations qui attendent encore une réponse.
+  const waiting = invitations.filter((one) => !refused[one.id]).length
+
+  useEffect(() => {
+    if (gone || !refocus.current) return
+    refocus.current = false
+    // La carte est partie : le focus, s'il était chez elle, va au titre de la section.
+    if (holdsFocus(section.current)) return
+    const target = invitations.length > 0 ? invitationsTitle.current : hivesTitle.current
+    focusWithoutScroll(target)
+    moveReaderTo(target)
+  })
+
+  const createdFull = mine.createdCount >= HIVE_LIMITS.created
+  const joinedFull = mine.hives.length >= HIVE_LIMITS.joined
+  const limit = createdFull
+    ? t(($) => $.hives.createdLimit)
+    : joinedFull
+      ? t(($) => $.hives.joinedLimit)
+      : null
+  const openCreate = guard(() => router.push('/hives/new'))
+  // Une garde commune : la seconde tape d'une double tape n'ouvre ni une deuxième page, ni la
+  // feuille de création par-dessus la ruche.
+  const openHive = (id: string) =>
+    guard(() => router.push({ pathname: '/hives/[id]', params: { id } }))
+
+  const onAccept = async (invitation: Invitation, index: number) => {
+    setFailure(null)
+    try {
+      const hive = await accept.mutateAsync(invitation.id)
+      // Membre : la ruche ouverte (le Retour ramène à l'onglet, où elle a pris sa place).
+      router.push({ pathname: '/hives/[id]', params: { id: hive.id } })
+    } catch (error) {
+      onFailure(
+        invitation,
+        index,
+        error,
+        t(($) => $.hives.invitations.acceptError),
+      )
+    }
+  }
+
+  const onRefuse = async (invitation: Invitation, index: number) => {
+    setFailure(null)
+    try {
+      await refuse.mutateAsync(invitation.id)
+      setRefused((before) => ({ ...before, [invitation.id]: { invitation, index } }))
+    } catch (error) {
+      onFailure(
+        invitation,
+        index,
+        error,
+        t(($) => $.hives.invitations.refuseError),
+      )
+    }
+  }
+
+  const onFailure = (invitation: Invitation, index: number, error: unknown, fallback: string) => {
+    const key = errorKey(error)
+    if (key === 'invitationExpired' || key === 'notFound') {
+      setGone({ invitation, index, expired: key === 'invitationExpired' })
+      setDialogOpen(true)
+      return
+    }
+    setFailure({ id: invitation.id, text: explained.has(key) ? t(($) => $.errors[key]) : fallback })
+  }
+
+  // La fenêtre fermée : la carte part après le fondu (Android n'appelle pas `onClosed` : tout de
+  // suite).
+  const closeDialog = () => {
+    setDialogOpen(false)
+    if (Platform.OS === 'android') dropGone()
+  }
+  const dropGone = () => {
+    refocus.current = true
+    setGone(null)
+  }
+
+  const createButton = suspended ? null : (
+    <Button
+      label={t(($) => $.hives.create)}
+      icon="plus"
+      variant="secondary"
+      size="compact"
+      onPress={openCreate}
+      disabled={limit !== null}
+      focusableWhenDisabled
+      describedById={limit === null ? undefined : reasonId}
+      hint={limit ?? undefined}
+    />
+  )
+  const limitText =
+    limit === null || suspended ? null : (
+      <Text variant="caption" tone="secondary" nativeID={reasonId}>
+        {limit}
+      </Text>
+    )
+
+  const expiredDialog = (
+    <Dialog
+      visible={dialogOpen}
+      title={t(($) => $.hives.invitations.expiredTitle)}
+      // 410 : « Elle a expiré après 30 jours. » ; 404 (ruche supprimée) : le titre seul.
+      {...(gone?.expired ? { message: t(($) => $.hives.invitations.expired) } : null)}
+      onDismiss={closeDialog}
+      onClosed={dropGone}
+      initialFocusRef={closeRef}
+    >
+      <Button
+        ref={closeRef}
+        label={t(($) => $.hives.invitations.close)}
+        variant="secondary"
+        onPress={closeDialog}
       />
+    </Dialog>
+  )
+
+  // Ni ruche ni invitation : l'état vide, avec la mascotte.
+  if (mine.hives.length === 0 && invitations.length === 0) {
+    return (
+      <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
+        <StateMessage
+          kind="empty"
+          title={t(($) => $.hives.emptyTitle)}
+          message={t(($) => $.hives.intro)}
+          actions={
+            suspended || limit !== null
+              ? []
+              : [{ label: t(($) => $.hives.create), onPress: openCreate }]
+          }
+        >
+          {limitText}
+        </StateMessage>
+        {expiredDialog}
+      </Screen>
+    )
+  }
+
+  return (
+    <Screen
+      title={t(($) => $.hives.title)}
+      subtitle={t(($) => $.hives.intro)}
+      titleAside={createButton}
+      header={<TopNav />}
+    >
+      <Stack gap="xl" align="stretch">
+        {limitText}
+
+        {invitations.length > 0 ? (
+          <Stack ref={section} gap="md" align="stretch">
+            <Row gap="sm" align="center">
+              <Text
+                variant="heading"
+                heading={2}
+                focusRef={invitationsTitle}
+                // Le nombre de la pastille (cachée aux lecteurs d'écran) se dit avec le titre.
+                {...(waiting > 0
+                  ? {
+                      accessibilityLabel: `${t(($) => $.hives.invitations.title)}, ${t(
+                        ($) => $.hives.invitations.count,
+                        { count: waiting },
+                      )}`,
+                    }
+                  : null)}
+              >
+                {t(($) => $.hives.invitations.title)}
+              </Text>
+              <CountBadge count={waiting} />
+            </Row>
+            {invitations.map((invitation, index) => (
+              <Stack key={invitation.id} gap="sm" align="stretch">
+                <HiveInvitation
+                  invitation={invitation}
+                  onAccept={() => onAccept(invitation, index)}
+                  onRefuse={() => onRefuse(invitation, index)}
+                  onReport={() =>
+                    router.push({
+                      pathname: '/report',
+                      params: { kind: 'hive', id: invitation.hive.id },
+                    })
+                  }
+                  refused={Boolean(refused[invitation.id])}
+                />
+                {failure?.id === invitation.id ? <Notice message={failure.text} /> : null}
+              </Stack>
+            ))}
+          </Stack>
+        ) : null}
+
+        {mine.hives.length > 0 ? (
+          <Stack gap="md" align="stretch">
+            <Text variant="heading" heading={2} focusRef={hivesTitle}>
+              {t(($) => $.hives.mine)}
+            </Text>
+            <ListGroup list>
+              {mine.hives.map((hive) => (
+                <HiveRow
+                  key={hive.id}
+                  hive={hive}
+                  onPress={openHive(hive.id)}
+                  toSource={toSource}
+                />
+              ))}
+            </ListGroup>
+          </Stack>
+        ) : null}
+      </Stack>
+      {expiredDialog}
     </Screen>
   )
 }
