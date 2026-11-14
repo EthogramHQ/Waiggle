@@ -14,7 +14,7 @@ import {
   ReportTargetPreview,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
@@ -109,6 +109,41 @@ export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     await next()
   })
 
+  // Une décision « restore » de cette cible, après `since`, qui vise la même partie, ou le contenu
+  // entier (qui rend toutes ses parties). Photo et couverture se défont ensemble (une même image
+  // retirée comme l'une ou l'autre, comme dans reports/queue.ts). L'index
+  // moderation_decision_target_idx (target_kind, target_id, created_at) donne les décisions de la
+  // cible ; `limit 1` suffit à savoir s'il y en a une. La date est liée en paramètre.
+  const restoredSince = async (
+    since: Date,
+    target: ReportTarget,
+    part: { field: string; mediaId?: string | undefined } | undefined,
+  ) => {
+    const d = schema.moderationDecision
+    const sameImage =
+      part?.mediaId === undefined
+        ? undefined
+        : and(inArray(d.partField, ['cover', 'photo']), eq(d.partMediaId, part.mediaId))
+    const [row] = await db
+      .select({ id: d.id })
+      .from(d)
+      .where(
+        and(
+          eq(d.targetKind, target.kind),
+          eq(d.targetId, target.id),
+          eq(d.action, 'restore'),
+          gt(d.createdAt, since),
+          or(
+            isNull(d.partField),
+            part === undefined ? undefined : eq(d.partField, part.field),
+            sameImage,
+          ),
+        ),
+      )
+      .limit(1)
+    return row !== undefined
+  }
+
   app.openapi(postReportRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
@@ -141,7 +176,7 @@ export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // (le contenu entier n'a ni champ ni photo).
     const r = schema.contentReport
     const [previous] = await db
-      .select({ status: r.status, snapshot: r.snapshot })
+      .select({ status: r.status, snapshot: r.snapshot, decidedAt: r.decidedAt })
       .from(r)
       .where(
         and(
@@ -160,7 +195,14 @@ export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       // comme différente, et le signalement est accepté.
       const before = ReportSnapshot.safeParse(previous.snapshot)
       if (before.success && sameSnapshot(before.data, snapshot)) {
-        return c.json(errorBody(languageOf(c), 'already_examined'), 409)
+        // Relecture de sécurité R9 (sec-A1) : un retrait que personne n'a rétabli, et la partie
+        // est pourtant de nouveau visible : son auteur l'a remise lui-même (le même lien de démo
+        // renvoyé). La modération n'a pas examiné cette version : le signalement est accepté.
+        const writtenBack =
+          previous.status === 'removed' &&
+          previous.decidedAt !== null &&
+          !(await restoredSince(previous.decidedAt, target, part))
+        if (!writtenBack) return c.json(errorBody(languageOf(c), 'already_examined'), 409)
       }
     }
 

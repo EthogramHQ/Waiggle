@@ -61,7 +61,8 @@ const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 /**
  * Les signalements ouverts dont la cible n'existe plus (projet, mise à jour ou commentaire supprimé
  * par son auteur, appel ou message du coin des testeurs effacé, compte supprimé, ancienne note du
- * Journal) passent à « void », datés de `now` : la purge les efface 30 jours
+ * Journal, ou photo supprimée quand le signalement ne visait qu'elle) passent à « void », datés de
+ * `now` : la purge les efface 30 jours
  * plus tard. La personne qui a signalé n'est pas prévenue (règle 29).
  *
  * « not exists (select 1 …) » est vrai quand la sous-requête ne trouve rien. Chaque sous-requête
@@ -83,16 +84,29 @@ export const voidReportsOfGoneTargets = async (db: Database, now: Date) => {
     .where(
       and(
         eq(r.status, 'open'),
-        sql`case content_report.target_kind
-          when 'project' then not exists (select 1 from project p where p.id = ${id})
-          when 'update' then not exists (select 1 from project_update u where u.id = ${id})
-          when 'note' then true
-          when 'comment' then not exists (
-            select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
-          when 'call' then not exists (select 1 from tester_call tc where tc.id = ${id})
-          when 'message' then not exists (select 1 from tester_message tm where tm.id = ${id})
-          else not exists (select 1 from "user" u where u.id = content_report.target_id)
-        end`,
+        or(
+          sql`case content_report.target_kind
+            when 'project' then not exists (select 1 from project p where p.id = ${id})
+            when 'update' then not exists (select 1 from project_update u where u.id = ${id})
+            when 'note' then true
+            when 'comment' then not exists (
+              select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
+            when 'call' then not exists (select 1 from tester_call tc where tc.id = ${id})
+            when 'message' then not exists (select 1 from tester_message tm where tm.id = ${id})
+            else not exists (select 1 from "user" u where u.id = content_report.target_id)
+          end`,
+          // R9 (relecture juridique, jur-B1) : une photo supprimée par son auteur (sa photo, sa
+          // couverture ou sa description) ne laisse aucune ligne dans project_media ni dans
+          // tester_media ; sans cette condition, le signalement de cette seule partie resterait
+          // ouvert pour toujours (retirer et classer répondent 404), avec le motif, la précision et
+          // la copie. Les deux tables se cherchent par leur clé primaire. Un retrait de la
+          // modération, lui, garde la ligne (elle est seulement marquée) : il n'entre pas ici.
+          sql`(content_report.part_media_id is not null
+            and not exists (
+              select 1 from project_media pm where pm.id = content_report.part_media_id)
+            and not exists (
+              select 1 from tester_media tmd where tmd.id = content_report.part_media_id))`,
+        ),
       ),
     )
     .returning({ id: r.id })

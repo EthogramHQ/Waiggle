@@ -18,6 +18,7 @@
 // décide. La purge s'appelle comme la tâche de nuit, avec une heure `now` d'un an et plus après la
 // décision ; l'horloge de l'API, elle, ne bouge pas (les sessions resteraient sinon expirées).
 import {
+  ModerationQueuePage,
   Project,
   ProjectUpdate,
   type ReportPart,
@@ -436,5 +437,43 @@ describe('a deleted account and the decisions about it', () => {
     later()
     await act.deleteAccount(lea, LEA_PASSWORD)
     expect(files()).toEqual([])
+  })
+})
+
+// ─── Une photo supprimée par son auteur (relecture juridique R9, jur-B1) ────────────────────────
+
+describe('a report of a photo its author deleted', () => {
+  it('voids the open report of a photo its author deleted, and the queue no longer lists it', async () => {
+    const photo = await uploadVisual(meteo.id)
+    await expectOk('PATCH', `/v1/projects/${meteo.id}/visuals/${photo}`, lea, {
+      description: 'Le radar de pluie.',
+    })
+    // Deux signalements ouverts de cette photo : la photo, et sa description.
+    await report(max, projectTarget(), { field: 'photo', mediaId: photo })
+    await report(max, projectTarget(), { field: 'photoDescription', mediaId: photo })
+    // Témoin : la file les montre tant que la photo est là.
+    const listed = async () => {
+      const res = await act.send('GET', '/v1/moderation/reports', louis)
+      expect(res.status).toBe(200)
+      return ModerationQueuePage.parse(await res.json()).items
+    }
+    expect(await listed()).toHaveLength(2)
+
+    await expectOk('DELETE', `/v1/projects/${meteo.id}/visuals/${photo}`, lea)
+
+    // La file classe d'abord « sans objet » ce dont la photo a disparu : plus rien à décider.
+    expect(await listed()).toEqual([])
+    expect((await reportsInBase()).map((row) => row.status)).toEqual(['void', 'void'])
+    // Et la purge de nuit les efface (30 jours après), avec le motif, la précision et la copie.
+    await purgeAfter(31)
+    expect(await reportsInBase()).toEqual([])
+  })
+
+  // Témoin : une photo encore là garde son signalement ouvert.
+  it('keeps open the report of a photo that is still there', async () => {
+    const photo = await uploadVisual(meteo.id)
+    await report(max, projectTarget(), { field: 'photo', mediaId: photo })
+    await purgeAfter(0)
+    expect((await reportsInBase()).map((row) => row.status)).toEqual(['open'])
   })
 })
