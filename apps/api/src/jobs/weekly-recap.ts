@@ -435,12 +435,12 @@ const take = async (db: Database, userId: string, now: Date) => {
         and (email_preference.recap_unvisited < ${RECAP_UNVISITED_MAX}
           or ${visitedSince('email_preference')})
       returning user_id, recap_unvisited, instant_sent_at, email_reactions, email_comments,
-        email_replies, email_follows, email_updates, email_testers
+        email_replies, email_follows, email_updates, email_testers, email_hives
     )
     select u.email, u.name, u.language, taken.recap_unvisited,
       to_char(taken.instant_sent_at, ${ISO}) as instant_sent_at,
       taken.email_reactions, taken.email_comments, taken.email_replies, taken.email_follows,
-      taken.email_updates, taken.email_testers
+      taken.email_updates, taken.email_testers, taken.email_hives
     from taken join "user" u on u.id = taken.user_id
   `
   const [row] = z.object({ rows: z.array(Taken) }).parse(await db.execute(query)).rows

@@ -23,7 +23,7 @@ import { eq } from 'drizzle-orm'
 
 const t = schema.emailPreference
 
-/** Les sept réglages, chacun avec sa colonne : le nom du contrat → la colonne de la table. */
+/** Les huit réglages (R10 : « Ruches »), chacun avec sa colonne : le nom du contrat → la colonne de la table. */
 const columns = {
   weeklyRecap: t.weeklyRecap,
   reactions: t.emailReactions,
@@ -32,6 +32,8 @@ const columns = {
   follows: t.emailFollows,
   updates: t.emailUpdates,
   testers: t.emailTesters,
+  // R10 : les ruches.
+  hives: t.emailHives,
 }
 
 /**
@@ -56,6 +58,7 @@ const columnValues = (values: Partial<EmailPreferences>) => ({
   ...(values.follows !== undefined && { emailFollows: values.follows }),
   ...(values.updates !== undefined && { emailUpdates: values.updates }),
   ...(values.testers !== undefined && { emailTesters: values.testers }),
+  ...(values.hives !== undefined && { emailHives: values.hives }),
 })
 
 /**
