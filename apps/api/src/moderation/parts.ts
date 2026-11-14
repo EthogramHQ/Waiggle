@@ -329,6 +329,8 @@ const lastIdentityRemoval = async (
         eq(d.targetKind, 'member'),
         eq(d.targetId, memberId),
         eq(d.partField, field),
+        // Un classement (dismiss) ne compte pas : seuls un retrait ou un rétablissement changent la partie.
+        inArray(d.action, ['remove', 'restore']),
         ne(d.id, restoreId),
       ),
     )
