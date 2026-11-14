@@ -32,8 +32,10 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, errorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
 import { useMember } from '../members/api'
 import { useSignInAgain } from '../navigation/signInAgain'
+import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { Hint } from '../ui/Hint'
@@ -41,6 +43,7 @@ import { parisDateTime } from '../ui/parisTime'
 import { Sheet, type SheetNotice } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
+import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
@@ -77,7 +80,11 @@ type Mode = 'suspend' | 'lift'
 export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Props) {
   const { t } = useTranslation()
   const nameOf = useNameOf()
-  const { session } = useMemberSession()
+  const signInAgain = useSignInAgain()
+  const toSource = useMediaSources()
+  // La session d'abord (comme l'ancienne page `/suspend`) : une lecture en échec propose de
+  // réessayer, jamais de se connecter ; sans session, rien n'est demandé à l'API.
+  const { state, session, retry } = useMemberSession()
   // Le membre ne se lit que dans le navigateur, fenêtre ouverte : rien au pré-rendu.
   const hydrated = useHydrated()
   const member = useMember(memberId, open && hydrated && Boolean(session) && memberId !== '')
@@ -91,12 +98,27 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
       : t(($) => $.moderation.suspend.title, { nameOf: nameOf(data.name) })
     : t(($) => $.moderation.suspendAction)
 
-  // Le sous-titre de la planche : le pseudo, l'inscription, ce qui a déjà été décidé.
-  const subtitle = useAuthorLine(author)
+  // Le sous-titre de la planche : le pseudo, l'inscription, ce qui a déjà été décidé ; sans la
+  // fiche de la file (ouverte depuis la page du membre), le pseudo seul.
+  const authorLine = useAuthorLine(author)
+  const recent = useRecentAccount(author?.joinedAt)
 
   // Ce que la fenêtre peut offrir : un formulaire, ou la raison pour laquelle il n'y en a pas.
-  let body: 'form' | 'loading' | 'error' | 'none' | 'blocked' | 'self' | 'admin' = 'loading'
-  if (data) {
+  const failureKey = member.error ? errorKey(member.error) : null
+  let body:
+    | 'form'
+    | 'loading'
+    | 'error'
+    | 'none'
+    | 'blocked'
+    | 'self'
+    | 'admin'
+    | 'sessionError'
+    | 'signedOut'
+    | 'expired' = 'loading'
+  if (state === 'error') body = 'sessionError'
+  else if (state === 'signedOut') body = 'signedOut'
+  else if (data) {
     if (!moderation) body = 'none'
     else if (moderation.suspension) body = data.isBlocked ? 'blocked' : 'form'
     else if (!moderation.canSuspend) {
@@ -106,7 +128,8 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
       else if (moderation.isAdmin) body = 'admin'
       else body = data.isBlocked ? 'blocked' : 'admin'
     } else body = 'form'
-  } else if (member.error) body = 'error'
+  } else if (failureKey === 'unauthorized') body = 'expired'
+  else if (member.error) body = 'error'
 
   // Le formulaire, quand il y en a un. Une seule feuille pour tous les états : celle du chargement
   // devient celle du formulaire sans se refermer ni se rouvrir (une feuille montée déjà ouverte
@@ -124,19 +147,63 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
     self: t(($) => $.moderation.suspend.notAllowedSelf),
     admin: t(($) => $.moderation.suspend.notAllowedAdmin),
   }
-  const failureKey = member.error ? errorKey(member.error) : null
+
+  // Sous le titre (planche R9-Suspendre) : la photo, « Compte récent » sous 14 jours, puis le
+  // pseudo, l'inscription et ce qui a déjà été décidé. Seulement quand il y a un formulaire : un
+  // refus ou une erreur se lisent sans elle.
+  const identity =
+    data && body === 'form' ? (
+      <Row gap="md">
+        <Avatar
+          name={data.name}
+          source={toSource(data.avatarUrl)}
+          label={data.name}
+          size={AVATAR_SIZE}
+        />
+        <Stack gap="xs" grow>
+          {recent ? <StatusPill label={t(($) => $.moderation.authorCard.recent)} /> : null}
+          <Text tone="secondary">
+            {authorLine ?? t(($) => $.member.handle, { handle: data.handle })}
+          </Text>
+        </Stack>
+      </Row>
+    ) : null
 
   return (
     <Sheet
       open={open}
       title={title}
-      {...(subtitle ? { subtitle } : null)}
       onClose={onClose}
       // La fenêtre s'ouvre sous le doigt de « Suspendre » : ses boutons ignorent une double tape.
       guardTaps
       {...(form ? form.sheet : null)}
     >
-      {form ? form.content : null}
+      {form ? (
+        <Stack gap="lg">
+          {identity}
+          {form.content}
+        </Stack>
+      ) : null}
+      {body === 'sessionError' ? (
+        <StateMessage
+          kind="error"
+          level={2}
+          title={t(($) => $.states.errorTitle)}
+          message={t(($) => $.account.loadError)}
+          actions={[{ label: t(($) => $.common.retry), onPress: retry }]}
+        />
+      ) : null}
+      {body === 'signedOut' || body === 'expired' ? (
+        <StateMessage
+          kind="signedOut"
+          level={2}
+          title={t(($) => $.states.signedOutTitle)}
+          message={body === 'expired' ? t(($) => $.states.expired) : t(($) => $.home.membersOnly)}
+          // « Me connecter » ramène ici après la connexion (?next=) ; la feuille, posée sur sa
+          // propre adresse, se ferme d'elle-même quand la page de connexion s'ouvre.
+          actions={[signInAgain()]}
+        />
+      ) : null}
       {body === 'loading' ? <StateMessage kind="loading" level={2} /> : null}
       {body === 'none' ? (
         <StateMessage kind="notFound" level={2} title={t(($) => $.states.notFoundTitle)} />
@@ -155,6 +222,22 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
       ) : null}
     </Sheet>
   )
+}
+
+/** La photo du membre sous le titre : la taille d'une ligne de liste (SearchScreen), 48 points. */
+const AVATAR_SIZE = 48
+/** « Compte récent » : inscrit depuis moins de 14 jours (la fiche de l'auteur, contrat de la file). */
+const RECENT_ACCOUNT_DAYS = 14
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Hook : vrai si le compte a moins de 14 jours. La date du jour ne se lit qu'une fois la page
+ * hydratée (web) : `Date.now()` au pré-rendu différerait du navigateur (#418).
+ */
+const useRecentAccount = (joinedAt: string | undefined): boolean => {
+  const hydrated = useHydrated()
+  if (!joinedAt || !hydrated) return false
+  return Date.now() - Date.parse(joinedAt) < RECENT_ACCOUNT_DAYS * DAY_MS
 }
 
 /** Le sous-titre de la planche, ou rien sans la fiche de l'auteur. */

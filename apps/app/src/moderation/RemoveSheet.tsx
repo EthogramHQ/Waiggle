@@ -35,8 +35,10 @@ import { Button } from '../ui/Button'
 import { Hint } from '../ui/Hint'
 import { MenuField } from '../ui/MenuField'
 import { RadioGroup } from '../ui/Radio'
-import { Sheet, type SheetNotice } from '../ui/Sheet'
+import { RemovalNotice } from '../ui/RemovalNotice'
+import { Sheet, type SheetNotice, useSheetAside } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
+import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { useDecide } from './api'
 import { decisionFailure } from './failure'
@@ -74,6 +76,8 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
   const { t } = useTranslation()
   const signInAgain = useSignInAgain()
   const { decide } = useDecide()
+  // La feuille posera-t-elle sa colonne `aside` à côté du formulaire ? (Sinon l'aperçu va dessous.)
+  const besideRoom = useSheetAside()
   const kind = item.target.kind
   const part = item.part
   // La partie peut-elle se retirer seule ? Et le contenu entier (jamais un profil) ?
@@ -168,12 +172,41 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
       ? t(($) => $.moderation.removeSheet.confirmPart, { part: partLabel })
       : t(($) => $.moderation.confirmRemove)
 
+  // « Ce que lira Inès Haddad » (planche R9-Retirer) : le bandeau que l'auteur lira, phrase par
+  // phrase, tel que le formulaire le remplit (le fondement et l'explication paraissent quand ils
+  // sont choisis et écrits), puis pourquoi le lui dire (DSA, article 17). Le retrait part toujours
+  // d'un signalement ouvert (l'API l'exige) : « Après un signalement ». Sans la fiche de l'auteur
+  // (un contenu déjà retiré), pas de nom à écrire, pas d'aperçu.
+  const preview = record ? (
+    <Stack gap="md">
+      <Text variant="callout" weight={600} heading={3}>
+        {t(($) => $.moderation.removeSheet.preview, { name: record.name })}
+      </Text>
+      <RemovalNotice
+        title={t(($) => $.removal.banner)}
+        lines={[
+          t(($) => $.removal.onlyYou),
+          t(($) => $.removal.afterReport),
+          ...(ground ? [t(($) => $.removal.grounds[ground])] : []),
+          ...(text ? [t(($) => $.removal.explanation, { explanation: text })] : []),
+          t(($) => $.removal.contest),
+        ]}
+      />
+      <Text variant="caption" tone="secondary">
+        {t(($) => $.moderation.removeSheet.dsa)}
+      </Text>
+    </Stack>
+  ) : null
+
   return (
     <Sheet
       open={open}
       title={title}
       subtitle={t(($) => $.moderation.removeSheet.message)}
       onClose={onClose}
+      // Sur ordinateur, l'aperçu dans la colonne à droite du formulaire ; quand la fenêtre n'a pas
+      // la place de la poser (téléphone, fenêtre étroite), il vient sous le formulaire.
+      {...(preview && besideRoom ? { aside: preview } : null)}
       busy={sending}
       guardTaps
       notice={notice}
@@ -273,6 +306,8 @@ export function RemoveSheet({ item, open, onClose, onDone }: Props) {
         {!ready && !passwordAsked ? (
           <Hint icon="info" text={t(($) => $.moderation.removeSheet.missing)} />
         ) : null}
+
+        {besideRoom ? null : preview}
       </Stack>
     </Sheet>
   )
