@@ -408,6 +408,8 @@ describe('the page of a blocked member', () => {
       isFollowed: false,
       followerCount: 0,
       projects: [],
+      // R9 : ses parties retirées ne se lisent que par elle-même.
+      removedParts: [],
       // Tranche 7c : réservé aux administrateurs.
       moderation: null,
     })
