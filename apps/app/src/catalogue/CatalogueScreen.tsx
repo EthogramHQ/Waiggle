@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { AmbientLight } from '../ui/AmbientLight'
 import { Button } from '../ui/Button'
+import { Checkbox } from '../ui/Checkbox'
 import { Choices } from '../ui/Choices'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
@@ -33,9 +34,11 @@ import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { type IconName, iconPaths } from '../ui/icons.generated'
+import { KeyPoints } from '../ui/KeyPoints'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
+import { MarkedAvatar } from '../ui/MarkedAvatar'
 import { MemberHeader } from '../ui/MemberHeader'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { NoteComposer } from '../ui/NoteComposer'
@@ -102,6 +105,8 @@ import { UpdateFamiliesCatalogue } from './mises-a-jour'
 import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
 import { ModerationCatalogue } from './moderation'
+import { ModerationSheetsCatalogue } from './moderation-fenetres'
+import { ModerationR9Catalogue } from './moderation-r9'
 import { NavigationCatalogue } from './navigation'
 import { NotificationsCatalogue } from './notifications'
 import { ToolsCatalogue } from './outils'
@@ -136,6 +141,7 @@ import { PublishDeleteCatalogue } from './publier-supprimer'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { NotificationSettingsCatalogue } from './reglages-notifications'
+import { RemovalR9Catalogue } from './removal-r9'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
@@ -153,6 +159,7 @@ export function CatalogueScreen() {
   const { t, i18n } = useTranslation()
   const [dialog, setDialog] = useState(false)
   const [longDialog, setLongDialog] = useState(false)
+  const [alsoReportExample, setAlsoReportExample] = useState(false)
   const { appearance, setAppearance } = useTheme()
   const l = labels[i18n.language === 'en' ? 'en' : 'fr']
 
@@ -447,26 +454,79 @@ export function CatalogueScreen() {
           <Button label={l.confirmDelete} variant="confirm" onPress={() => setDialog(false)} />
           <Button label={l.cancel} variant="secondary" onPress={() => setDialog(false)} />
         </Dialog>
-        {/* Un message en plusieurs paragraphes, alignés à gauche, et la garde des tapes (600 ms
-            après l'ouverture) : la fenêtre « Bloquer @x ? » (tranche 7b), avec ses textes. */}
+        {/* R9 (planche R9-Bloquer) : la fenêtre « Bloquer Max Durand (@max_durand) ? », avec ses
+            textes. Un avatar marqué (`MarkedAvatar`) en illustration, un texte riche (`body` :
+            `KeyPoints`, résumé, puces, texte complet), la case « Signaler aussi son profil » et la
+            garde des tapes (600 ms après l'ouverture). */}
         <Button
-          label={t(($) => $.block.title, { handle: 'max_durand' })}
+          label={t(($) => $.block.titleNamed, { name: 'Max Durand', handle: 'max_durand' })}
           variant="secondary"
           onPress={() => setLongDialog(true)}
         />
+        {/* Les deux états de l'avatar marqué (initiales, ici ; la photo, dans la fenêtre d'un
+            membre qui en a une) et la liste sans texte complet. */}
+        <Row gap="lg" align="center">
+          <MarkedAvatar
+            name="Max Durand"
+            source={null}
+            label="Max Durand"
+            mark={{ icon: 'prohibit', label: t(($) => $.block.badge) }}
+          />
+          <MarkedAvatar
+            name="Papi"
+            source={null}
+            label="Papi"
+            size={44}
+            mark={{ icon: 'prohibit', label: t(($) => $.block.badge) }}
+          />
+        </Row>
+        <KeyPoints
+          summary={t(($) => $.block.summary, { name: 'Max Durand' })}
+          points={[
+            { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
+            { icon: 'users', text: t(($) => $.block.bullets.follows) },
+          ]}
+        />
         <Dialog
           visible={longDialog}
-          title={t(($) => $.block.title, { handle: 'max_durand' })}
-          message={[
-            t(($) => $.block.hidden),
-            t(($) => $.block.remains, { handle: 'max_durand' }),
-            t(($) => $.block.follows),
-            t(($) => $.block.notTold, { handle: 'max_durand' }),
-            t(($) => $.block.notModeration),
-          ]}
+          illustration={
+            <MarkedAvatar
+              name="Max Durand"
+              source={null}
+              label="Max Durand"
+              mark={{ icon: 'prohibit', label: t(($) => $.block.badge) }}
+            />
+          }
+          title={t(($) => $.block.titleNamed, { name: 'Max Durand', handle: 'max_durand' })}
+          body={
+            <KeyPoints
+              summary={t(($) => $.block.summary, { name: 'Max Durand' })}
+              points={[
+                { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
+                { icon: 'users', text: t(($) => $.block.bullets.follows) },
+                { icon: 'bell-slash', text: t(($) => $.block.bullets.notTold) },
+                { icon: 'flag', text: t(($) => $.block.bullets.moderation) },
+              ]}
+              details={{
+                title: t(($) => $.block.fullText),
+                paragraphs: [
+                  t(($) => $.block.hidden),
+                  t(($) => $.block.remains, { handle: 'max_durand' }),
+                  t(($) => $.block.follows),
+                  t(($) => $.block.notTold, { handle: 'max_durand' }),
+                  t(($) => $.block.notModeration),
+                ],
+              }}
+            />
+          }
           guardTaps
           onDismiss={() => setLongDialog(false)}
         >
+          <Checkbox
+            label={t(($) => $.block.alsoReport)}
+            value={alsoReportExample}
+            onValueChange={setAlsoReportExample}
+          />
           <Button
             label={t(($) => $.block.confirm)}
             variant="confirm"
@@ -755,8 +815,12 @@ export function CatalogueScreen() {
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
       <ModerationCatalogue />
+      <ModerationR9Catalogue />
+      {/* R9 : les briques de la fenêtre « Retirer » (moderation-fenetres.tsx). */}
+      <ModerationSheetsCatalogue />
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
+      <RemovalR9Catalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}

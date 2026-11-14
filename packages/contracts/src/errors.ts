@@ -67,6 +67,11 @@ export const ErrorCode = z.enum([
   // Tranche R7b : le 6e appel d'un projet dans la journée (429). Le quota du membre (20 appels en
   // 24 h) garde `rate_limited` : l'appli distingue les deux pour dire lequel est atteint.
   'project_calls_limited',
+  // Tranche R9 : retirer seule une partie qui ne se retire qu'avec tout le contenu (titre, pitch,
+  // texte d'une mise à jour) ou qui se range (catégorie) ; retirer une partie qu'aucun signalement
+  // ouvert ne vise.
+  'part_whole_only',
+  'part_not_reported',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

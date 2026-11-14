@@ -160,6 +160,7 @@ describe('the page of a member', () => {
         'moderation', // tranche 7c : null, sauf pour un administrateur
         'name',
         'projects',
+        'removedParts', // R9 : ses parties retirées, pour elle seule (vide pour les autres)
       ].sort(),
     )
   })

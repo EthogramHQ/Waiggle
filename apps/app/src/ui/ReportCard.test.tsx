@@ -17,7 +17,10 @@ describe('ReportCard', () => {
     snapshot: 'Envoie-moi le code de ta carte, je te débloque la version pro.',
     // Le libellé de la citation a changé avec la tranche 7b (moderation.snapshot, commit du contrat).
     snapshotLabel: 'Copie au moment du signalement',
-    count: '3 signalements',
+    // R9 : le nombre de signalements devient un nombre ; la carte écrit « Signalé 3 fois ».
+    count: 3,
+    // R9 : l'heure du signalement, relative sur la carte, exacte au survol et dans le détail.
+    reportedAt: { relative: 'il y a 12 min', exact: 'aujourd’hui à 17:48' },
     reasons: ['Arnaque ou spam ×2', 'Harcèlement ou haine ×1'],
     details: ['Il a écrit la même chose sous trois projets.'],
     when: 'Premier signalement le 20 oct.',
@@ -29,7 +32,9 @@ describe('ReportCard', () => {
 
     expect(screen.getByText('Commentaire')).toBeTruthy()
     expect(screen.getByText(card.snapshot)).toBeTruthy()
-    expect(screen.getByText('3 signalements')).toBeTruthy()
+    expect(
+      screen.getByText(containing(fr.t(($) => $.moderation.reportedTimes, { count: 3 }))),
+    ).toBeTruthy()
     expect(screen.getByText('Arnaque ou spam ×2')).toBeTruthy()
     expect(screen.getByText('Harcèlement ou haine ×1')).toBeTruthy()
     expect(screen.getByText('Il a écrit la même chose sous trois projets.')).toBeTruthy()
@@ -537,5 +542,124 @@ describe('ReportCard', () => {
     for (const { value } of update) expect(screen.getByText(value)).toBeTruthy()
     expect(screen.getByText('Version')).toBeTruthy()
     expect(screen.getAllByText('Changement')).toHaveLength(2)
+  })
+
+  // --- R9 : un élément de la file (planches `R9-Moderation-Desktop` et `-Telephone`) ---
+  //
+  // Interface attendue (le `## Découpage` du plan de R9, revu à la relecture, ui-P7) : les props
+  // d'avant, plus `part?: string | null` (le libellé de la partie, « la photo 2 » ; null ou absent :
+  // le contenu entier), `count: number` (« Signalé 2 fois » en rouge à partir de 2),
+  // `reportedAt: { relative; exact }`, `href` (l'adresse `?item=` de cet élément : la carte devient
+  // un lien, un vrai `<a>` sur le web), `current` (l'élément montré dans le détail), `onSelect` (le
+  // geste, que l'écran branche sur son routeur, comme `ListRow`), et des actions hors de la zone
+  // qu'on touche.
+  describe('R9, an item of the queue', () => {
+    const item = {
+      ...card,
+      reasons: ['Une photo ou une information sur moi sans mon accord'],
+      count: 1,
+      reportedAt: { relative: 'il y a 1 h', exact: 'aujourd’hui à 17:00' },
+      viewLabel: undefined,
+      href: '/moderation?item=meteo-photo-2',
+    }
+    /** Le lien de l'élément : son nom porte le motif, son titre. */
+    const itemLink = () => screen.getByRole('link', { name: containing(item.reasons[0] ?? '') })
+    const propsOf = (element: { props: unknown }) => element.props as Record<string, unknown>
+    /** Vrai si l'élément est marqué « actuel » (web) ou « sélectionné » (téléphone). */
+    const isCurrent = (element: { props: unknown }) => {
+      const props = propsOf(element)
+      const state = props.accessibilityState as { selected?: boolean } | undefined
+      return Boolean(props['aria-current'] ?? state?.selected)
+    }
+
+    it('names the part reported next to the kind of content', async () => {
+      await renderWithProviders(<ReportCard {...item} part="la photo 2" onSelect={jest.fn()} />)
+
+      expect(screen.getByText(containing('Commentaire'))).toBeTruthy()
+      expect(screen.getByText(containing('la photo 2'))).toBeTruthy()
+    })
+
+    it('names no part for a whole content', async () => {
+      await renderWithProviders(<ReportCard {...item} part={null} onSelect={jest.fn()} />)
+
+      expect(screen.getByText(containing('Commentaire'))).toBeTruthy() // témoin
+      expect(screen.queryByText(/la photo/)).toBeNull()
+    })
+
+    it('says « Signalé 2 fois » when several members reported it', async () => {
+      await renderWithProviders(<ReportCard {...item} count={2} onSelect={jest.fn()} />)
+
+      expect(
+        screen.getByText(containing(fr.t(($) => $.moderation.reportedTimes, { count: 2 }))),
+      ).toBeTruthy()
+    })
+
+    it('says no count for a single report', async () => {
+      await renderWithProviders(<ReportCard {...item} count={1} onSelect={jest.fn()} />)
+
+      expect(itemLink()).toBeTruthy() // témoin
+      expect(screen.queryByText(/Signalé \d+ fois/)).toBeNull()
+    })
+
+    it('shows when it was reported, as a relative time', async () => {
+      await renderWithProviders(<ReportCard {...item} onSelect={jest.fn()} />)
+
+      expect(screen.getByText(containing('il y a 1 h'))).toBeTruthy()
+    })
+
+    it('is a link carrying the address of its item, and the gesture goes to the screen', async () => {
+      const onSelect = jest.fn()
+      await renderWithProviders(<ReportCard {...item} onSelect={onSelect} />)
+
+      const link = itemLink()
+      expect(propsOf(link).href).toBe(item.href)
+      await fireEvent.press(link)
+      expect(onSelect).toHaveBeenCalledTimes(1)
+    })
+
+    it('opens a queue item with Enter as a link marked current', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        const onSelect = jest.fn()
+        await renderWithProviders(<ReportCard {...item} current onSelect={onSelect} />)
+
+        const link = itemLink()
+        expect(propsOf(link).href).toBe(item.href)
+        expect(isCurrent(link)).toBe(true)
+        await fireEvent(link, 'keyDown', { key: 'Enter', preventDefault: () => {} })
+        expect(onSelect).toHaveBeenCalledTimes(1)
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('is not marked current when another item is shown', async () => {
+      await renderWithProviders(<ReportCard {...item} current={false} onSelect={jest.fn()} />)
+
+      expect(isCurrent(itemLink())).toBe(false)
+    })
+
+    it('keeps its actions outside the link, each a button of its own', async () => {
+      const remove = jest.fn()
+      const onSelect = jest.fn()
+      await renderWithProviders(
+        <ReportCard
+          {...item}
+          onSelect={onSelect}
+          actions={[{ label: 'Retirer', onPress: remove, tone: 'danger' }]}
+        />,
+      )
+
+      const link = itemLink()
+      const button = screen.getByRole('button', { name: 'Retirer' })
+      // Un bouton dans un lien : deux contrôles l'un dans l'autre, interdit en HTML (et le toucher
+      // ouvrirait aussi l'élément). On remonte du bouton : le lien n'est pas sur son chemin.
+      let node = button.parent
+      while (node && node !== link) node = node.parent
+      expect(node).toBeNull()
+      await fireEvent.press(button)
+      expect(remove).toHaveBeenCalledTimes(1)
+      expect(onSelect).not.toHaveBeenCalled()
+    })
   })
 })

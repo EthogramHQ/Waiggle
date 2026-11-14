@@ -46,7 +46,7 @@ import {
 } from '../testing/moderation'
 import { pathOf } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
-import { containing, fr } from '../testing/text'
+import { choiceRole, containing, fr } from '../testing/text'
 import { ModerationScreen } from './ModerationScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -172,8 +172,48 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
-/** La carte d'un signalement : on remonte depuis son texte jusqu'à l'ensemble qui porte « Voir ». */
-const cardOf = (text: string) => {
+/** R9 : le seul lien du détail, « Voir en contexte » (avant : « Voir », « Voir le projet »). */
+const SEE = fr.t(($) => $.moderation.detail.seeInContext)
+
+/**
+ * Les pages ouvertes hors de la modération. R9 : sur téléphone, toucher un élément de la file ouvre
+ * son détail en page (`/moderation?item=…`) ; ces visites-là ne comptent pas ici.
+ */
+const pushedAway = () =>
+  mockPush.mock.calls
+    .map(([href]) => pathOf(href))
+    .filter((path) => path !== '/moderation' && !path.startsWith('/moderation?'))
+
+/** Redessine la page ouverte (Expo Router le fait quand l'adresse change). */
+let rerenderScreen: () => Promise<void> = async () => {}
+
+/** Revient à la file (sur téléphone, le détail est une page : l'adresse perd `item`). */
+const backToQueue = async () => {
+  const { item: _item, ...rest } = mockParams
+  mockParams = rest
+  await rerenderScreen()
+}
+
+/**
+ * La carte d'un signalement. R9 (tests adaptés à l'écran refait) : sur téléphone, la file ne montre
+ * qu'une ligne par élément, un lien vers son détail (`?item=`) ; la carte complète (la copie, les
+ * motifs, les précisions, « Voir en contexte », les décisions) est dans ce détail, ouvert en page.
+ * On revient donc à la file, on touche l'élément dont la ligne commence par ce texte, puis, dans le
+ * détail, on remonte depuis le texte jusqu'à l'ensemble qui porte un lien, comme avant.
+ */
+const cardOf = async (text: string) => {
+  await backToQueue()
+  const start = text.slice(0, 20)
+  const link = screen
+    .getAllByRole('link')
+    .find(
+      (candidate) =>
+        String(candidate.props.href ?? '').includes('item=') &&
+        within(candidate).queryAllByText(containing(start)).length > 0,
+    )
+  if (!link) throw new Error(`no queue item for ${text}`)
+  await fireEvent.press(link)
+  await rerenderScreen()
   let node = screen.getByText(text).parent
   while (node && within(node).queryAllByRole('link').length === 0) node = node.parent
   if (!node) throw new Error(`no card around ${text}`)
@@ -183,15 +223,33 @@ const cardOf = (text: string) => {
 /** Le contenu de la fenêtre qui porte ce titre (comme dans ProjectScreen.testkit.tsx). */
 const dialogTitled = (title: string) => {
   let node = screen.getByRole('header', { name: title }).parent
-  while (node && within(node).queryAllByRole('button').length === 0) node = node.parent
+  while (node && within(node).queryAllByRole('button', { name: 'Annuler' }).length === 0) {
+    node = node.parent
+  }
   if (!node) throw new Error(`no dialog titled ${title}`)
   return within(node)
 }
 
+/** R9 : choisit le fondement dans le menu de la feuille « Retirer » (comme RemoveSheet.test). */
+const chooseGround = async (ground: 'illegal' | 'rules') => {
+  await fireEvent.press(
+    screen.getByRole('button', { name: new RegExp(`^${fr.t(($) => $.moderation.groundLabel)}`) }),
+  )
+  await fireEvent.press(
+    await screen.findByRole(choiceRole(), {
+      name: containing(fr.t(($) => $.moderation.grounds[ground])),
+    }),
+  )
+}
+
 /** Ouvre la page, en attendant le profil (qui dit si le membre est administrateur). */
 const openModeration = async () => {
-  await renderWithProviders(<ModerationScreen />)
-  await screen.findByText(firstTextOf(scamCommentItem))
+  const { rerender } = await renderWithProviders(<ModerationScreen />)
+  // Un nouvel élément à chaque fois : le même objet ne redessine pas (charte, RNTL 14).
+  rerenderScreen = async () => {
+    await rerender(<ModerationScreen />)
+  }
+  await screen.findByText(containing(firstTextOf(scamCommentItem).slice(0, 20)))
 }
 
 describe('who sees the moderation', () => {
@@ -199,7 +257,8 @@ describe('who sees the moderation', () => {
     await renderWithProviders(<ModerationScreen />)
 
     expect(await screen.findByRole('header', { name: 'Modération' })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'En attente', checked: true })).toBeTruthy()
+    // R9 : « En attente » devient « À traiter », suivi du nombre d'éléments (« À traiter (4) »).
+    expect(screen.getByRole('radio', { name: /^À traiter/, checked: true })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Retirés', checked: false })).toBeTruthy()
     expect(screen.getByText(firstTextOf(scamCommentItem))).toBeTruthy()
     // Le groupe d'onglets porte un nom à lui, pas celui de la page (relecture de 7a).
@@ -213,10 +272,11 @@ describe('who sees the moderation', () => {
     await openModeration()
 
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', { name: 'Retirer' }),
     )
 
-    // Le texte paraît deux fois : sur la carte, et rappelé dans la fenêtre.
+    // Le texte paraît deux fois : sur la carte (le détail), et rappelé dans la feuille.
+    expect(screen.getByRole('header', { name: 'Retirer ce contenu ?' })).toBeTruthy()
     expect(screen.getAllByText(firstTextOf(scamCommentItem))).toHaveLength(2)
   })
 
@@ -226,7 +286,7 @@ describe('who sees the moderation', () => {
 
     expect(await screen.findByRole('button', { name: 'Retour à l’accueil' })).toBeTruthy()
     expect(screen.queryByText(firstTextOf(scamCommentItem))).toBeNull()
-    expect(screen.queryByRole('radio', { name: 'En attente' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: /^À traiter/ })).toBeNull()
   })
 
   it('says « not found » when the API does not know the page (a revoked administrator)', async () => {
@@ -268,9 +328,11 @@ describe('the pending reports', () => {
   it('shows the kind, the text reported, the reasons with their count, the details and the date', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(scamCommentItem))
+    const card = await cardOf(firstTextOf(scamCommentItem))
     expect(card.getByText('Commentaire')).toBeTruthy()
-    expect(card.getByText(containing(fr.t(($) => $.moderation.count, { count: 3 })))).toBeTruthy()
+    expect(
+      card.getByText(containing(fr.t(($) => $.moderation.reportedTimes, { count: 3 }))),
+    ).toBeTruthy()
     // Le format du motif et de son nombre vient des textes (« Arnaque ou spam : 2 » depuis 8e26421).
     const reasonCount = (reason: string, count: number) =>
       containing(fr.t(($) => $.moderation.reasonCount, { reason, count }))
@@ -291,33 +353,33 @@ describe('the pending reports', () => {
   it('leads to the project of a reported comment through « Voir »', async () => {
     await openModeration()
 
-    await fireEvent.press(cardOf(firstTextOf(scamCommentItem)).getByRole('link', { name: 'Voir' }))
+    await fireEvent.press(
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('link', { name: SEE }),
+    )
 
-    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual([
-      `/projects/${meteoProjectId}`,
-    ])
+    expect(pushedAway()).toEqual([`/projects/${meteoProjectId}`])
   })
 
   it('leads to the page of a reported member through « Voir »', async () => {
     await openModeration()
 
     await fireEvent.press(
-      cardOf(firstTextOf(impersonationItem)).getByRole('link', { name: 'Voir' }),
+      (await cardOf(firstTextOf(impersonationItem))).getByRole('link', { name: SEE }),
     )
 
-    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual(['/members/u7'])
+    expect(pushedAway()).toEqual(['/members/u7'])
   })
 
   it('offers no decision on what concerns the administrator, and says why', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(ownNoteItem))
+    const card = await cardOf(firstTextOf(ownNoteItem))
     expect(card.getByText(containing(fr.t(($) => $.moderation.concernsMe)))).toBeTruthy()
     expect(card.queryByRole('button', { name: 'Retirer' })).toBeNull()
     expect(card.queryByRole('button', { name: 'Classer sans suite' })).toBeNull()
     // Témoin : un autre signalement, lui, se décide.
     expect(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', { name: 'Retirer' }),
     ).toBeTruthy()
   })
 
@@ -325,7 +387,7 @@ describe('the pending reports', () => {
     // L'API refuse de « retirer » un profil (422) : les actions sur un compte viennent plus tard.
     await openModeration()
 
-    const card = cardOf(firstTextOf(impersonationItem))
+    const card = await cardOf(firstTextOf(impersonationItem))
     expect(card.getByRole('button', { name: 'Classer sans suite' })).toBeTruthy()
     expect(card.queryByRole('button', { name: 'Retirer' })).toBeNull()
   })
@@ -361,7 +423,7 @@ describe('removing a content', () => {
   const openRemove = async () => {
     await openModeration()
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', { name: 'Retirer' }),
     )
     // Tranche 7c : la fenêtre garde ses boutons des tapes juste après l'ouverture (`guardTaps`) ;
     // on attend la fin de cette garde avant de la toucher (test adapté à la décision du plan 7c).
@@ -373,10 +435,12 @@ describe('removing a content', () => {
     // Règle 21 de la relecture du plan.
     const dialog = await openRemove()
 
+    // R9 : la feuille « Retirer » (RemoveSheet) ; le fondement, la loi ou les règles, dans un menu.
+    // Un commentaire entier : « Les autres membres ne le verront plus… », non « cette partie ».
     expect(dialog.getByText(containing(fr.t(($) => $.moderation.removeMessage)))).toBeTruthy()
-    expect(dialog.getByRole('radio', { name: 'La loi' })).toBeTruthy()
+    await chooseGround('illegal')
     expect(
-      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
+      screen.getByRole('button', { name: containing(fr.t(($) => $.moderation.grounds.illegal)) }),
     ).toBeTruthy()
     expect(dialog.getByLabelText('Explication')).toBeTruthy()
     expect(dialog.getByText(containing(fr.t(($) => $.moderation.explanationHint)))).toBeTruthy()
@@ -385,9 +449,7 @@ describe('removing a content', () => {
   it('removes nothing without an explanation', async () => {
     const dialog = await openRemove()
 
-    await fireEvent.press(
-      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
-    )
+    await chooseGround('rules')
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
 
     expect(mockDecide).not.toHaveBeenCalled()
@@ -405,9 +467,7 @@ describe('removing a content', () => {
   it('removes the content with its ground and explanation, and says so', async () => {
     const dialog = await openRemove()
 
-    await fireEvent.press(
-      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
-    )
+    await chooseGround('rules')
     await fireEvent.changeText(dialog.getByLabelText('Explication'), 'Arnaque à la carte bancaire.')
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
 
@@ -434,7 +494,7 @@ describe('removing a content', () => {
     mockDecide.mockResolvedValue({ ok: false, error: 'alreadyDecided' })
     const dialog = await openRemove()
 
-    await fireEvent.press(dialog.getByRole('radio', { name: 'La loi' }))
+    await chooseGround('illegal')
     await fireEvent.changeText(dialog.getByLabelText('Explication'), 'Photos sans accord.')
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
 
@@ -448,7 +508,9 @@ describe('dismissing a report', () => {
     await openModeration()
 
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Classer sans suite' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', {
+        name: 'Classer sans suite',
+      }),
     )
 
     expect(mockDecide).toHaveBeenCalledWith({ action: 'dismiss', target: scamCommentItem.target })
@@ -460,23 +522,29 @@ describe('dismissing a report', () => {
    * le doigt. Rend le bouton « Classer sans suite » de ce projet.
    */
   const dismissFirst = async () => {
-    const { rerender } = await renderWithProviders(<ModerationScreen />)
-    await screen.findByText(firstTextOf(scamCommentItem))
+    await openModeration()
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Classer sans suite' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', {
+        name: 'Classer sans suite',
+      }),
     )
     mockQueue([moderationQueuePageOf([fakeReviewsItem])])
-    await rerender(<ModerationScreen />)
-    return cardOf(firstTextOf(fakeReviewsItem)).getByRole('button', { name: 'Classer sans suite' })
+    await rerenderScreen()
   }
+
+  /** R9 : le « Classer sans suite » suivant, dans le détail de l'élément suivant de la file. */
+  const nextDismiss = async () =>
+    (await cardOf(firstTextOf(fakeReviewsItem))).getByRole('button', {
+      name: 'Classer sans suite',
+    })
 
   it('ignores the next « Classer sans suite » touched right after, as the second tap of a double tap', async () => {
     // La garde de 600 ms de la charte du design : la carte suivante remonte sous le doigt.
     jest.useFakeTimers()
-    const next = await dismissFirst()
+    await dismissFirst()
 
     await act(() => jest.advanceTimersByTime(200))
-    await fireEvent.press(next)
+    await fireEvent.press(await nextDismiss())
 
     expect(mockDecide).toHaveBeenCalledTimes(1)
   })
@@ -484,8 +552,14 @@ describe('dismissing a report', () => {
   it('keeps the decided card in its place, the outcome instead of its buttons', async () => {
     // Relecture de 7a : la carte retirée de la liste faisait remonter le « Classer » suivant sous
     // le doigt. La file mise à jour n'a plus le commentaire de Sam ; l'écran le garde, premier.
+    // R9 : le détail garde l'élément classé, son résultat à la place des boutons ; dans la file,
+    // il garde sa place, avant le suivant, jusqu'au choix suivant.
     await dismissFirst()
 
+    expect(screen.getByText(firstTextOf(scamCommentItem))).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Signalement classé sans suite.' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Classer sans suite' })).toBeNull()
+    await backToQueue()
     const shown = screen
       .getAllByText(
         new RegExp(
@@ -494,18 +568,15 @@ describe('dismissing a report', () => {
       )
       .map((node) => [node.props.children].flat().join(''))
     expect(shown).toEqual([firstTextOf(scamCommentItem), firstTextOf(fakeReviewsItem)])
-    const decidedCard = cardOf(firstTextOf(scamCommentItem))
-    expect(decidedCard.getByRole('status', { name: 'Signalement classé sans suite.' })).toBeTruthy()
-    expect(decidedCard.queryByRole('button')).toBeNull()
   })
 
   it('dismisses the next one touched once the first has had time to be read', async () => {
     jest.useFakeTimers()
-    const next = await dismissFirst()
+    await dismissFirst()
 
     // Témoin : le même appui, 700 ms plus tard, part bien.
     await act(() => jest.advanceTimersByTime(700))
-    await fireEvent.press(next)
+    await fireEvent.press(await nextDismiss())
 
     expect(mockDecide).toHaveBeenCalledTimes(2)
     expect(mockDecide).toHaveBeenLastCalledWith({
@@ -526,16 +597,16 @@ describe('the removed contents', () => {
     await openRemoved()
 
     expect(await screen.findByText(containing(removedCommentItem.text))).toBeTruthy()
-    expect(screen.getAllByText(containing(removedCommentItem.explanation)).length).toBeGreaterThan(
-      0,
-    )
     expect(screen.getAllByText(/Retiré le /).length).toBeGreaterThan(0)
+    // R9 : l'explication se lit dans le détail de l'élément.
+    const card = await cardOf(removedCommentItem.text)
+    expect(card.getAllByText(containing(removedCommentItem.explanation)).length).toBeGreaterThan(0)
   })
 
   it('restores a removed content, and says so', async () => {
     await openRemoved()
 
-    const card = cardOf(removedCommentItem.text)
+    const card = await cardOf(removedCommentItem.text)
     await fireEvent.press(card.getByRole('button', { name: 'Rétablir' }))
 
     expect(mockDecide).toHaveBeenCalledWith({
@@ -549,13 +620,9 @@ describe('the removed contents', () => {
     // Relecture de 7a : un projet retiré n'a plus de page, même pour l'administrateur.
     await openRemoved()
 
-    await fireEvent.press(
-      cardOf(removedCommentItem.text).getByRole('link', { name: 'Voir le projet' }),
-    )
+    await fireEvent.press((await cardOf(removedCommentItem.text)).getByRole('link', { name: SEE }))
 
-    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual([
-      `/projects/${meteoProjectId}`,
-    ])
+    expect(pushedAway()).toEqual([`/projects/${meteoProjectId}`])
     expect(screen.getAllByRole('link', { name: /^Voir/ })).toHaveLength(1)
   })
 
@@ -579,7 +646,7 @@ describe('the copy of a report', () => {
   it('shows every text field of a reported project, each with its label', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const card = await cardOf(firstTextOf(fakeReviewsItem))
     // Test changé aux corrections de 7b (relecture de design, point 14) : la copie d'un projet se
     // replie après trois champs ; « Afficher tout » montre les autres.
     await fireEvent.press(card.getByRole('button', { name: fr.t(($) => $.moderation.showAll) }))
@@ -592,7 +659,7 @@ describe('the copy of a report', () => {
   it('shows the name, the handle, the bio and the tools of a reported profile', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(impersonationItem))
+    const card = await cardOf(firstTextOf(impersonationItem))
     for (const label of ['Nom', 'Pseudo', 'Bio', 'Outils favoris']) {
       expect(card.getByText(label)).toBeTruthy()
     }
@@ -602,7 +669,7 @@ describe('the copy of a report', () => {
   it('reads a copy made before slice 7b as a single « Texte »', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(ownNoteItem))
+    const card = await cardOf(firstTextOf(ownNoteItem))
     expect(card.getByText('Texte')).toBeTruthy()
     expect(card.getByText('v3 : export en PDF')).toBeTruthy()
   })
@@ -611,18 +678,18 @@ describe('the copy of a report', () => {
     // Règle 22 de 7a : ce qu'un membre a écrit ne devient jamais un lien dans la file.
     await openModeration()
 
-    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const card = await cardOf(firstTextOf(fakeReviewsItem))
     // Test changé aux corrections de 7b : le lien de démo, sixième champ, est replié au départ.
     await fireEvent.press(card.getByRole('button', { name: fr.t(($) => $.moderation.showAll) }))
     expect(card.getByText('https://faux-avis.example/essai')).toBeTruthy() // témoin
     expect(card.queryByRole('link', { name: /faux-avis/ })).toBeNull()
-    expect(card.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual(['Voir'])
+    expect(card.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual([SEE])
   })
 
   it('says, for each image, whether it is still shown or gone since, never the image itself', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const card = await cardOf(firstTextOf(fakeReviewsItem))
     const imageState = (image: 'cover' | 'photo' | 'avatar', state: 'present' | 'gone') =>
       containing(
         fr.t(($) => $.moderation.images[state], { image: fr.t(($) => $.moderation.images[image]) }),
@@ -631,14 +698,14 @@ describe('the copy of a report', () => {
     expect(card.getByText(imageState('photo', 'gone'))).toBeTruthy()
     // Le profil de Lucas : sa photo de profil est toujours là.
     expect(
-      cardOf(firstTextOf(impersonationItem)).getByText(imageState('avatar', 'present')),
+      (await cardOf(firstTextOf(impersonationItem))).getByText(imageState('avatar', 'present')),
     ).toBeTruthy()
   })
 
   it('says nothing of images when the copy has none', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(scamCommentItem))
+    const card = await cardOf(firstTextOf(scamCommentItem))
     expect(card.getByText(firstTextOf(scamCommentItem))).toBeTruthy() // témoin
     expect(card.queryByText(/toujours affichée|supprimée ou remplacée/)).toBeNull()
   })
@@ -656,7 +723,7 @@ describe('the copy of a report', () => {
     mockQueue([moderationQueuePageOf([scamCommentItem, photos])])
     await openModeration()
 
-    const card = cardOf(firstTextOf(photos))
+    const card = await cardOf(firstTextOf(photos))
     const line = (image: string, state: 'present' | 'gone') =>
       containing(fr.t(($) => $.moderation.images[state], { image }))
     expect(
@@ -697,7 +764,7 @@ describe('the copy of a report', () => {
   it('keeps « Photo » without a number when the copy has a single photo', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const card = await cardOf(firstTextOf(fakeReviewsItem))
     expect(
       card.getByText(
         containing(
@@ -712,7 +779,7 @@ describe('the copy of a report', () => {
     // Relecture de design 7b (point 14) : la copie entière d'un projet dépassait un écran.
     await openModeration()
 
-    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const card = await cardOf(firstTextOf(fakeReviewsItem))
     const [title, pitch, description, prompt] = fakeReviewsItem.snapshot
     expect(card.getByText(title?.value ?? '')).toBeTruthy()
     expect(card.getByText(pitch?.value ?? '')).toBeTruthy()
@@ -733,7 +800,7 @@ describe('the copy of a report', () => {
     await openModeration()
 
     const changed = containing(fr.t(($) => $.moderation.snapshotsDiffer))
-    expect(cardOf(firstTextOf(fakeReviewsItem)).getByText(changed)).toBeTruthy()
+    expect((await cardOf(firstTextOf(fakeReviewsItem))).getByText(changed)).toBeTruthy()
     expect(screen.getAllByText(changed)).toHaveLength(1)
   })
 })
@@ -752,29 +819,31 @@ const suspendsOpened = (): Record<string, string>[] =>
     .filter((path) => path === '/suspend' || path.startsWith('/suspend?'))
     .map((path) => Object.fromEntries(new URLSearchParams(path.slice('/suspend'.length))))
 
+/** R9 : « Déjà décidé : » de la fiche de l'auteur (AuthorRecord), sans la liste qui suit. */
+const DECIDED = fr.t(($) => $.moderation.authorCard.decided, { record: '' }).trim()
+/** R9 : « Suspendre », sur la fiche de l'auteur. */
+const SUSPEND = fr.t(($) => $.moderation.detail.suspend)
+
 describe('the card of a report, slice 7c', () => {
   it('recalls what the moderation already decided for the author', async () => {
     // Sam : 2 retraits et 1 suspension sur l'année gardée (authorRecord).
     await openModeration()
 
-    const card = cardOf(firstTextOf(scamCommentItem))
-    expect(card.getByText(containing(fr.t(($) => $.moderation.record.title)))).toBeTruthy()
+    await cardOf(firstTextOf(scamCommentItem))
+    expect(screen.getByText(containing(DECIDED))).toBeTruthy()
     expect(
-      card.getByText(containing(fr.t(($) => $.moderation.record.removals, { count: 2 }))),
+      screen.getByText(containing(fr.t(($) => $.moderation.record.removals, { count: 2 }))),
     ).toBeTruthy()
     expect(
-      card.getByText(containing(fr.t(($) => $.moderation.record.suspensions, { count: 1 }))),
+      screen.getByText(containing(fr.t(($) => $.moderation.record.suspensions, { count: 1 }))),
     ).toBeTruthy()
   })
 
   it('says when nothing was decided yet for the author', async () => {
     await openModeration()
 
-    expect(
-      cardOf(firstTextOf(fakeReviewsItem)).getByText(
-        containing(fr.t(($) => $.moderation.record.none)),
-      ),
-    ).toBeTruthy()
+    await cardOf(firstTextOf(fakeReviewsItem))
+    expect(screen.getByText(containing(fr.t(($) => $.moderation.record.none)))).toBeTruthy()
   })
 
   it('says when the author is suspended right now, and offers no second suspension', async () => {
@@ -782,6 +851,12 @@ describe('the card of a report, slice 7c', () => {
       ...fakeReviewsItem,
       authorRecord: {
         memberId: 'u4',
+        // R9 : la fiche de l'auteur, son nom, son pseudo, son inscription et ses nombres.
+        name: 'Nora',
+        handle: 'nora',
+        joinedAt: '2026-09-14T09:00:00.000Z',
+        projectCount: 2,
+        commentCount: 7,
         removals: 1,
         suspensions: 1,
         suspendedNow: true,
@@ -791,10 +866,10 @@ describe('the card of a report, slice 7c', () => {
     mockQueue([moderationQueuePageOf([scamCommentItem, suspended])])
     await openModeration()
 
-    const card = cardOf(firstTextOf(suspended))
-    expect(card.getByText(containing(fr.t(($) => $.moderation.record.suspendedNow)))).toBeTruthy()
+    const card = await cardOf(firstTextOf(suspended))
+    expect(screen.getByText(containing(fr.t(($) => $.moderation.record.suspendedNow)))).toBeTruthy()
     expect(card.getByRole('button', { name: 'Classer sans suite' })).toBeTruthy() // témoin
-    expect(card.queryByRole('button', { name: fr.t(($) => $.moderation.suspendAction) })).toBeNull()
+    expect(screen.queryByRole('button', { name: SUSPEND })).toBeNull()
   })
 
   it('recalls nothing when the account of the author is gone', async () => {
@@ -802,21 +877,18 @@ describe('the card of a report, slice 7c', () => {
     mockQueue([moderationQueuePageOf([scamCommentItem, gone])])
     await openModeration()
 
-    const card = cardOf(firstTextOf(gone))
+    const card = await cardOf(firstTextOf(gone))
     expect(card.getByRole('button', { name: 'Classer sans suite' })).toBeTruthy() // témoin
-    expect(card.queryByText(containing(fr.t(($) => $.moderation.record.title)))).toBeNull()
-    expect(card.queryByRole('button', { name: fr.t(($) => $.moderation.suspendAction) })).toBeNull()
+    expect(screen.queryByText(containing(DECIDED))).toBeNull()
+    expect(screen.queryByRole('button', { name: SUSPEND })).toBeNull()
   })
 
   it('opens « Suspendre » for the author of a reported content, saying which report it comes from', async () => {
     // Relecture juridique J2 : la suspension partie d'une carte dit « après un signalement ».
     await openModeration()
 
-    await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', {
-        name: fr.t(($) => $.moderation.suspendAction),
-      }),
-    )
+    await cardOf(firstTextOf(scamCommentItem))
+    await fireEvent.press(screen.getByRole('button', { name: SUSPEND }))
 
     expect(suspendsOpened()).toEqual([
       { member: 'u5', fromKind: 'comment', fromId: scamCommentItem.target.id },
@@ -826,11 +898,8 @@ describe('the card of a report, slice 7c', () => {
   it('opens « Suspendre » for a reported profile, the member being the target', async () => {
     await openModeration()
 
-    await fireEvent.press(
-      cardOf(firstTextOf(impersonationItem)).getByRole('button', {
-        name: fr.t(($) => $.moderation.suspendAction),
-      }),
-    )
+    await cardOf(firstTextOf(impersonationItem))
+    await fireEvent.press(screen.getByRole('button', { name: SUSPEND }))
 
     expect(suspendsOpened()).toEqual([{ member: 'u7', fromKind: 'member', fromId: 'u7' }])
   })
@@ -838,16 +907,16 @@ describe('the card of a report, slice 7c', () => {
   it('offers no suspension on what concerns the administrator', async () => {
     await openModeration()
 
-    const card = cardOf(firstTextOf(ownNoteItem))
+    const card = await cardOf(firstTextOf(ownNoteItem))
     expect(card.getByText(containing(fr.t(($) => $.moderation.concernsMe)))).toBeTruthy() // témoin
-    expect(card.queryByRole('button', { name: fr.t(($) => $.moderation.suspendAction) })).toBeNull()
+    expect(screen.queryByRole('button', { name: SUSPEND })).toBeNull()
   })
 
   it('says why a profile has no « Retirer »', async () => {
     // Relecture de design 7a : un profil n'avait que « Classer », sans dire pourquoi.
     await openModeration()
 
-    const card = cardOf(firstTextOf(impersonationItem))
+    const card = await cardOf(firstTextOf(impersonationItem))
     expect(card.getByText(containing(fr.t(($) => $.moderation.profileNoRemove)))).toBeTruthy()
     // Une seule carte le dit : les contenus, eux, se retirent.
     expect(screen.getAllByText(containing(fr.t(($) => $.moderation.profileNoRemove)))).toHaveLength(
@@ -859,11 +928,11 @@ describe('the card of a report, slice 7c', () => {
     // Relecture de design 7a : les précisions ressemblaient à la citation.
     await openModeration()
 
-    const card = cardOf(firstTextOf(scamCommentItem))
+    const card = await cardOf(firstTextOf(scamCommentItem))
     expect(card.getByText(containing(fr.t(($) => $.moderation.detailsLabel)))).toBeTruthy()
     // Le projet de Nora n'a aucune précision : pas de libellé non plus.
     expect(
-      cardOf(firstTextOf(fakeReviewsItem)).queryByText(
+      (await cardOf(firstTextOf(fakeReviewsItem))).queryByText(
         containing(fr.t(($) => $.moderation.detailsLabel)),
       ),
     ).toBeNull()
@@ -875,7 +944,9 @@ describe('the card of a report, slice 7c', () => {
     await openModeration()
 
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Classer sans suite' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', {
+        name: 'Classer sans suite',
+      }),
     )
 
     expect(
@@ -889,10 +960,13 @@ describe('the card of a report, slice 7c', () => {
     // Relecture de design 7a : le message restait affiché dans l'autre onglet.
     await openModeration()
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Classer sans suite' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', {
+        name: 'Classer sans suite',
+      }),
     )
     expect(await screen.findByText('Signalement classé sans suite.')).toBeTruthy() // témoin
 
+    await backToQueue()
     await fireEvent.press(screen.getByRole('radio', { name: 'Retirés' }))
 
     expect(await screen.findByText(containing(removedCommentItem.text))).toBeTruthy()
@@ -907,13 +981,11 @@ describe('removing a content, slice 7c', () => {
   const fillRemove = async () => {
     await openModeration()
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', { name: 'Retirer' }),
     )
     await passTapGuard()
     const dialog = dialogTitled('Retirer ce contenu ?')
-    await fireEvent.press(
-      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
-    )
+    await chooseGround('rules')
     await fireEvent.changeText(dialog.getByLabelText('Explication'), 'Arnaque à la carte bancaire.')
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
     return dialog
@@ -984,7 +1056,7 @@ describe('removing a content, slice 7c', () => {
     // Design 7b (`guardTaps`) : la fenêtre s'ouvre sous le doigt qui vient de toucher « Retirer ».
     await openModeration()
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+      (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', { name: 'Retirer' }),
     )
 
     await fireEvent.press(
@@ -995,6 +1067,9 @@ describe('removing a content, slice 7c', () => {
     expect(screen.getByRole('header', { name: 'Retirer ce contenu ?' })).toBeTruthy()
   })
 })
+
+/** R9 : « Historique », le bouton de la file sur téléphone et le titre de la vue. */
+const HISTORY = fr.t(($) => $.moderation.recent.title)
 
 describe('the history of decisions', () => {
   /** La dernière façon dont l'écran a demandé l'historique : le membre filtré, et s'il est lu. */
@@ -1014,7 +1089,7 @@ describe('the history of decisions', () => {
   /** Passe à l'onglet « Historique ». */
   const openHistory = async () => {
     await openModeration()
-    await fireEvent.press(screen.getByRole('radio', { name: fr.t(($) => $.moderation.history) }))
+    await fireEvent.press(screen.getByRole('button', { name: HISTORY }))
   }
 
   /** « Tout voir » : un lien ou un bouton, au choix de l'interface. */
@@ -1026,14 +1101,12 @@ describe('the history of decisions', () => {
   it('is a third tab, loaded only once open', async () => {
     await openModeration()
 
-    expect(
-      screen.getByRole('radio', { name: fr.t(($) => $.moderation.history), checked: false }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: HISTORY })).toBeTruthy()
     // Tant que l'onglet est fermé, l'historique n'est pas demandé (comme les retirés).
     const calls = jest.mocked(useDecisionHistory).mock.calls
     expect(calls.every(([, enabled]) => enabled === false)).toBe(true)
 
-    await fireEvent.press(screen.getByRole('radio', { name: fr.t(($) => $.moderation.history) }))
+    await fireEvent.press(screen.getByRole('button', { name: HISTORY }))
 
     expect(lastHistoryCall()).toEqual([undefined, true])
   })
@@ -1109,9 +1182,7 @@ describe('the history of decisions', () => {
     expect(
       await screen.findByText(containing(fr.t(($) => $.moderation.historyFor, { handle: 'sam' }))),
     ).toBeTruthy()
-    expect(
-      screen.getByRole('radio', { name: fr.t(($) => $.moderation.history), checked: true }),
-    ).toBeTruthy()
+    expect(screen.getByRole('header', { name: HISTORY })).toBeTruthy()
     expect(lastHistoryCall()).toEqual(['u5', true])
   })
 
@@ -1153,10 +1224,9 @@ describe('the record of a card, after the design review of slice 7c', () => {
 
     // Un bouton qui agit sur place (l'onglet et son filtre), comme « Tout voir » : le seul lien
     // d'une carte reste « Voir » (règle 22).
+    await cardOf(firstTextOf(scamCommentItem))
     await fireEvent.press(
-      cardOf(firstTextOf(scamCommentItem)).getByRole('button', {
-        name: fr.t(($) => $.moderation.record.title),
-      }),
+      screen.getByRole('button', { name: fr.t(($) => $.moderation.authorCard.seeDecisions) }),
     )
 
     expect(mockParams).toEqual({ tab: 'history', member: 'u5' })

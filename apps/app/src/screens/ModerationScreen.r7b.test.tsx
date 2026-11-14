@@ -14,6 +14,7 @@ import { getMe } from '../profile/api'
 import { adminMe } from '../testing/fixtures'
 import {
   decisionHistoryPageOf,
+  firstTextOf,
   goneTargetDecision,
   meteoProjectId,
   moderationQueuePageOf,
@@ -34,6 +35,8 @@ jest.mock('../moderation/api', () => ({
   useDecide: jest.fn(),
   useDecisionHistory: jest.fn(),
 }))
+/** Les paramètres de l'adresse : `cardOf` y pose l'élément ouvert, comme Expo Router. */
+let mockParams: Record<string, string> = {}
 jest.mock('expo-router', () => ({
   usePathname: () => '/moderation',
   useRouter: () => ({
@@ -44,7 +47,8 @@ jest.mock('expo-router', () => ({
     back: jest.fn(),
     canGoBack: () => true,
   }),
-  useLocalSearchParams: () => ({}),
+  // R9 : l'élément de la file montré dans le détail vit dans l'adresse (`?item=`).
+  useLocalSearchParams: () => mockParams,
 }))
 
 const infinite = <Page,>(pages: Page[]) => ({
@@ -68,6 +72,10 @@ const PHOTO_URI = 'https://api.waiggle.test/v1/testers/call-photos/p4'
 
 const messageItem: ModerationQueueItem = {
   target: { kind: 'message', id: 'a1b2c3d4-0000-4a26-8b37-48596a7b8c01' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: meteoProjectId,
   snapshot: [{ field: 'body', value: 'Mon retour : le bouton ne répond pas.' }],
   images: [{ field: 'photo', state: 'present', url: CAPTURE_URI }],
@@ -104,6 +112,8 @@ const publicPhotoItem: ModerationQueueItem = {
 
 const removedMessage: RemovedItem = {
   target: { kind: 'message', id: 'a1b2c3d4-0000-4a26-8b37-48596a7b8c05' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: meteoProjectId,
   text: 'Un message retiré du fil.',
   ground: 'rules',
@@ -128,8 +138,29 @@ const imagesOf = (uri: string) =>
     JSON.stringify(node.props.source ?? null).includes(uri),
   )
 
-/** La carte d'un signalement : on remonte depuis son texte jusqu'à l'ensemble qui porte « Voir ». */
-const cardOf = (text: string) => {
+/** Redessine la page ouverte (Expo Router le fait quand l'adresse change). */
+let rerenderScreen: () => Promise<void> = async () => {}
+
+/**
+ * La carte d'un signalement. R9 (test adapté à l'écran refait) : la file ne montre qu'une ligne par
+ * élément, un lien vers son détail ; la carte complète (la copie, ses images) est dans ce détail. On
+ * revient à la file, on suit l'adresse du lien dont la ligne commence par ce texte, puis, dans le
+ * détail, on remonte depuis le texte jusqu'à l'ensemble qui porte un lien, comme avant.
+ */
+const cardOf = async (text: string) => {
+  mockParams = {}
+  await rerenderScreen()
+  const link = screen
+    .getAllByRole('link')
+    .find(
+      (candidate) =>
+        String(candidate.props.href ?? '').includes('item=') &&
+        within(candidate).queryAllByText(text.slice(0, 20), { exact: false }).length > 0,
+    )
+  if (!link) throw new Error(`no queue item for ${text}`)
+  const href = String(link.props.href)
+  mockParams = Object.fromEntries(new URLSearchParams(href.slice(href.indexOf('?'))))
+  await rerenderScreen()
   let node = screen.getByText(text).parent
   while (node && within(node).queryAllByRole('link').length === 0) node = node.parent
   if (!node) throw new Error(`no card around ${text}`)
@@ -147,7 +178,11 @@ const open = async (queue: ModerationQueueItem[], removed: RemovedItem[] = []) =
     .mockReturnValue(
       infinite([removedPageOf(removed)]) as unknown as ReturnType<typeof useRemovedItems>,
     )
-  await renderWithProviders(<ModerationScreen />)
+  mockParams = {}
+  const { rerender } = await renderWithProviders(<ModerationScreen />)
+  rerenderScreen = async () => {
+    await rerender(<ModerationScreen />)
+  }
   await screen.findByText(queue[0]?.snapshot[0]?.value ?? '')
 }
 
@@ -168,14 +203,20 @@ describe('the picture of a tester call or message', () => {
   it('draws the capture or the photo when the queue gives its address', async () => {
     await open([messageItem, callItem])
 
+    await cardOf(firstTextOf(messageItem))
     expect(imagesOf(CAPTURE_URI).length).toBeGreaterThan(0)
+    await cardOf(firstTextOf(callItem))
     expect(imagesOf(PHOTO_URI).length).toBeGreaterThan(0)
   })
 
   it('loads it in memory only, never in the disk cache', async () => {
     await open([messageItem, callItem])
 
-    for (const uri of [CAPTURE_URI, PHOTO_URI]) {
+    for (const [item, uri] of [
+      [messageItem, CAPTURE_URI],
+      [callItem, PHOTO_URI],
+    ] as const) {
+      await cardOf(firstTextOf(item))
       const images = imagesOf(uri)
       // Témoin : l'image est dessinée.
       expect({ uri, drawn: images.length > 0 }).toEqual({ uri, drawn: true })
@@ -189,14 +230,14 @@ describe('the picture of a tester call or message', () => {
   it('names the picture by its field, inside the card of its target', async () => {
     await open([messageItem])
 
-    const card = cardOf('Mon retour : le bouton ne répond pas.')
+    const card = await cardOf('Mon retour : le bouton ne répond pas.')
     expect(card.getByRole('image', { name: fr.t(($) => $.moderation.images.photo) })).toBeTruthy()
   })
 
   it('keeps the state line next to the picture', async () => {
     await open([messageItem])
 
-    const card = cardOf('Mon retour : le bouton ne répond pas.')
+    const card = await cardOf('Mon retour : le bouton ne répond pas.')
     expect(
       card.getByText(
         fr.t(($) => $.moderation.images.present, {
@@ -209,14 +250,14 @@ describe('the picture of a tester call or message', () => {
   it('draws nothing for an image without address, and keeps its state', async () => {
     await open([goneItem, publicPhotoItem])
 
-    const gone = cardOf('Un message dont la capture a disparu.')
+    const gone = await cardOf('Un message dont la capture a disparu.')
     expect(
       gone.getByText(
         fr.t(($) => $.moderation.images.gone, { image: fr.t(($) => $.moderation.images.photo) }),
       ),
     ).toBeTruthy()
     expect(gone.queryByRole('image')).toBeNull()
-    const publicPhoto = cardOf('Un projet à photo publique.')
+    const publicPhoto = await cardOf('Un projet à photo publique.')
     expect(
       publicPhoto.getByText(
         fr.t(($) => $.moderation.images.present, { image: fr.t(($) => $.moderation.images.photo) }),
@@ -231,12 +272,14 @@ describe('the kinds « call » and « message »', () => {
     await open([messageItem, callItem])
 
     expect(
-      cardOf('Mon retour : le bouton ne répond pas.').getByText(
+      (await cardOf('Mon retour : le bouton ne répond pas.')).getByText(
         fr.t(($) => $.moderation.kinds.message),
       ),
     ).toBeTruthy()
     expect(
-      cardOf('Venez tester la nouvelle carte.').getByText(fr.t(($) => $.moderation.kinds.call)),
+      (await cardOf('Venez tester la nouvelle carte.')).getByText(
+        fr.t(($) => $.moderation.kinds.call),
+      ),
     ).toBeTruthy()
   })
 
@@ -245,9 +288,11 @@ describe('the kinds « call » and « message »', () => {
     await fireEvent.press(screen.getByRole('radio', { name: 'Retirés' }))
 
     expect(
-      cardOf(removedMessage.text).getByText(fr.t(($) => $.moderation.kinds.message)),
+      (await cardOf(removedMessage.text)).getByText(fr.t(($) => $.moderation.kinds.message)),
     ).toBeTruthy()
-    expect(cardOf(removedCall.text).getByText(fr.t(($) => $.moderation.kinds.call))).toBeTruthy()
+    expect(
+      (await cardOf(removedCall.text)).getByText(fr.t(($) => $.moderation.kinds.call)),
+    ).toBeTruthy()
   })
 
   it('reads them in the history', async () => {
@@ -268,7 +313,8 @@ describe('the kinds « call » and « message »', () => {
         ]) as unknown as ReturnType<typeof useDecisionHistory>,
       )
     await open([messageItem])
-    await fireEvent.press(screen.getByRole('radio', { name: 'Historique' }))
+    // R9 : sur téléphone, l'historique complet s'ouvre par le bouton « Historique » de la file.
+    await fireEvent.press(screen.getByRole('button', { name: 'Historique' }))
 
     expect(screen.getAllByText(fr.t(($) => $.moderation.kinds.call)).length).toBeGreaterThan(0)
     expect(screen.getAllByText(fr.t(($) => $.moderation.kinds.message)).length).toBeGreaterThan(0)

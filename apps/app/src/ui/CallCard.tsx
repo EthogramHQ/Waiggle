@@ -7,7 +7,11 @@
 // - l'avis de la modération, quand l'écran en donne un (`removal`, un `RemovalNotice`) ;
 // - le texte entier, jamais replié : un appel est court (500 caractères) et se lit d'un bout à
 //   l'autre ;
-// - une photo facultative, sur toute la largeur de la carte.
+// - une photo facultative, sur toute la largeur de la carte ;
+// - pour l'auteur seul, quand la modération a retiré cette photo seule (R9, décision L2) : la photo
+//   reste sous ses yeux, dans une `RemovedPart` (fondement, explication, date, « Contester ») ; le
+//   texte de l'appel reste affiché au-dessus. Ni « Remplacer » ni « Supprimer » : aucune route ne
+//   supprime la photo seule d'un appel.
 //
 // La photo est privée au coin (relecture de sécurité du plan, sec-A4) : elle se charge sans cache
 // disque (`cachePolicy="memory"`), pour que l'appareil ne garde pas une image que le membre ne
@@ -17,6 +21,7 @@
 // La carte n'a pas de rôle à elle : l'écran la pose dans sa liste. Elle ne parle pas à l'API : les
 // actions du menu et l'adresse de la photo arrivent toutes prêtes.
 import { space } from '@ruche/brand'
+import type { Removal } from '@ruche/contracts'
 import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -27,6 +32,7 @@ import { Icon, SMALL_ICON } from './Icon'
 import type { ImageSource } from './image'
 import { OpenableImage } from './OpenableImage'
 import { RelativeTime } from './RelativeTime'
+import { RemovedPart } from './RemovedPart'
 import { Surface } from './Surface'
 import { Text } from './Text'
 
@@ -43,6 +49,12 @@ type Props = {
   photo?: { source: ImageSource; description: string; width?: number; height?: number } | null
   /** L'avis de la modération (un `RemovalNotice`), posé au-dessus du texte. */
   removal?: ReactNode
+  /**
+   * La photo retirée seule par la modération, pour l'auteur de l'appel (R9) : la décision du contrat
+   * (`removedParts`) et l'objet de « Contester », écrit par l'écran qui connaît le projet. Null ou
+   * absent : la photo n'est pas retirée.
+   */
+  photoRemoval?: { removal: Removal; contestSubject: string } | null
   /** Les actions du menu « … » ; vide ou absent : pas de bouton du tout. */
   menu?: ActionMenuItem[]
   /**
@@ -65,7 +77,15 @@ const MENU_EXCERPT = 80
  */
 const MENU_HANG = space.sm
 
-export function CallCard({ text, at, photo = null, removal, menu = [], focusRef }: Props) {
+export function CallCard({
+  text,
+  at,
+  photo = null,
+  removal,
+  photoRemoval = null,
+  menu = [],
+  focusRef,
+}: Props) {
   const { t } = useTranslation()
   // Le nom du menu reprend le début de l'appel, sur une ligne : les sauts de ligne et les blancs
   // répétés deviennent une espace (un nom lu ne passe pas à la ligne).
@@ -76,6 +96,12 @@ export function CallCard({ text, at, photo = null, removal, menu = [], focusRef 
   const photoName = photo?.description.trim()
     ? photo.description
     : t(($) => $.project.testers.calls.photoName)
+  // Une image nommée : sa description, ou « Photo jointe à l'appel ». Entière, à ses proportions,
+  // sur la largeur de la carte et 240 points de haut au plus ; un appui l'ouvre en grand (relecture
+  // de design B2). En mémoire seulement (sécurité A4).
+  const picture = photo ? (
+    <OpenableImage source={photo.source} label={photoName} size={photo} radius="small" />
+  ) : null
 
   return (
     <Surface variant="grouped" padding="lg" gap="sm">
@@ -116,12 +142,21 @@ export function CallCard({ text, at, photo = null, removal, menu = [], focusRef 
       <Text selectable breakAnywhere {...(focusRef ? { focusRef } : null)}>
         {text}
       </Text>
-      {photo ? (
-        // Une image nommée : sa description, ou « Photo jointe à l'appel ». Entière, à ses
-        // proportions, sur la largeur de la carte et 240 points de haut au plus ; un appui
-        // l'ouvre en grand (relecture de design B2). En mémoire seulement (sécurité A4).
-        <OpenableImage source={photo.source} label={photoName} size={photo} radius="small" />
-      ) : null}
+      {photoRemoval ? (
+        // La photo retirée, que l'auteur voit encore, suivie de la notice : un groupe nommé « La
+        // photo a été retirée par la modération ».
+        <RemovedPart
+          title={t(($) => $.removal.part.titles.callPhoto)}
+          removal={photoRemoval.removal}
+          contestSubject={photoRemoval.contestSubject}
+          onReplace={null}
+          onDelete={null}
+        >
+          {picture}
+        </RemovedPart>
+      ) : (
+        picture
+      )}
     </Surface>
   )
 }

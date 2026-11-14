@@ -394,20 +394,6 @@ export const fr = {
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
-    // Les réglages d'e-mail (tranche 6c) : chacun s'enregistre dès qu'on le touche.
-    emails: {
-      title: 'E‑mails',
-      weeklyRecap: 'Le récap de la semaine',
-      weeklyRecapHint: 'Le dimanche à 10 h, seulement s’il y a du nouveau.',
-      mentionEmails: 'Un e‑mail quand on me mentionne ou me répond',
-      mentionEmailsHint: 'Un quart d’heure après, si tu ne l’as pas déjà vu. Un par heure au plus.',
-      saved: 'Réglage enregistré.',
-      accountEmails:
-        'Les e‑mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
-      // Ces réglages ne passent pas par « Enregistrer » : la phrase le dit (relecture de design, 6c).
-      instant: 'Chaque réglage s’enregistre dès que tu le touches.',
-      loadError: 'Tes réglages d’e‑mail n’ont pas pu se charger.',
-    },
     savedHandle: 'Profil enregistré. @{{former}} te reste réservé {{days}} jours.',
     errors: {
       nameTooLong: 'Le nom doit faire au plus {{max}} caractères.',
@@ -429,6 +415,22 @@ export const fr = {
     /** R3 : sous le nom, la rubrique dit que la recherche trouve le membre (relecture juridique, jur-J3). */
     searchable:
       'Les membres connectés peuvent te trouver par ton nom ou ton pseudo, dans la recherche et après « @ » dans un commentaire.',
+    // R9 (7d) : le nom ou le pseudo remplacés d'office ; la feuille paraît une fois par visite, un
+    // bandeau reste sur « Moi » jusqu'au choix (décision L3 de Louis pour la dernière phrase).
+    provisional: {
+      handleTitle: 'Choisis un nouveau pseudo',
+      handleLead: 'En attendant, tu es @{{handle}} partout.',
+      nameTitle: 'Choisis un nouveau nom',
+      nameLead: 'En attendant, tu t’appelles « {{name}} » partout.',
+      handleRule: '{{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
+      restoreNote:
+        'Si tu contestes et que la modération annule sa décision, ton ancien pseudo te sera rendu, à condition que tu n’en aies pas choisi d’autre.',
+      later: 'Plus tard',
+      chooseHandle: 'Choisir ce pseudo',
+      chooseName: 'Choisir ce nom',
+      bannerHandle: 'Ton pseudo provisoire est @{{handle}}. Choisis-en un autre.',
+      bannerName: 'Ton nom provisoire est « {{name}} ». Choisis-en un autre.',
+    },
   },
   project: {
     // R6a : la feuille de publication et de modification (planches R6-*). Les textes marqués
@@ -1218,7 +1220,7 @@ export const fr = {
       call: 'L’appel signalé',
       message: 'Le message signalé',
     },
-    reasonLabel: 'Pourquoi le signales-tu ?',
+    reasonLabel: 'Qu’est-ce qui ne va pas ?',
     reasons: {
       illegal: 'Contenu illégal',
       harassment: 'Harcèlement ou haine',
@@ -1226,11 +1228,13 @@ export const fr = {
       scamSpam: 'Arnaque ou spam',
       impersonation: 'Usurpation d’identité',
       privacy: 'Une photo ou une information sur moi sans mon accord',
+      // R9 : le 8e motif (A6, choix 2 du scénario).
+      dangerousLink: 'Lien, démo ou prompt dangereux',
       other: 'Autre chose',
     },
-    details: 'Précision (facultatif)',
+    details: 'Ajoute un détail, facultatif',
     detailsHint: 'N’ajoute pas d’informations personnelles inutiles.',
-    illegalDetails: 'Dis-nous pourquoi',
+    illegalDetails: 'Dis-nous pourquoi, obligatoire',
     illegalHint:
       'Dis-nous pourquoi ce contenu te semble illégal. En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
     anonymity:
@@ -1238,8 +1242,9 @@ export const fr = {
     // R7b (juridique J3) : dans un fil à deux, l'autre peut deviner.
     anonymityThread:
       'Ton nom n’est pas transmis. Mais vous êtes les deux seules personnes à lire ce fil : {{name}} pourra deviner que le signalement vient de toi. La modération voit qui signale, pour éviter les abus.',
-    danger: 'Quelqu’un est en danger ? Appelle le 112.',
-    submit: 'Envoyer',
+    danger:
+      'Si quelqu’un est en danger maintenant, appelle le 112 : nous lisons les signalements, mais pas en temps réel.',
+    submit: 'Envoyer le signalement',
     sent: 'Merci, ton signalement a été envoyé. La modération va le regarder.',
     back: 'Revenir',
     // Tranche 7a, décisions du 23/10 : la précision obligatoire pour un contenu dit illégal, le
@@ -1247,7 +1252,7 @@ export const fr = {
     illegalRequired: 'Dis-nous pourquoi ce contenu te semble illégal.',
     limited:
       'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous : {{contactEmail}}',
-    gone: 'Ce contenu n’existe plus, ou tu ne peux plus le voir.',
+    gone: 'Ce contenu n’est plus là.',
     // Tranche 7b : « Envoyer » dit pourquoi il ne part pas (design.md, À reprendre) ; après l'envoi,
     // bloquer l'auteur est proposé, jamais présélectionné (J14).
     reasonRequired: 'Choisis un motif pour envoyer ton signalement.',
@@ -1257,6 +1262,91 @@ export const fr = {
     // pourquoi… » (l'aide entière répéterait l'erreur, qui en est la première phrase).
     goodFaith:
       'En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
+    // R9 : la feuille en deux étapes (la partie, puis le motif), ses états et ses sorties.
+    comment: 'Signaler ce commentaire',
+    partQuestion: 'Quelle partie ?',
+    continue: 'Continuer',
+    stepBack: 'Retour',
+    cancel: 'Annuler',
+    close: 'Fermer',
+    // Le rappel en tête de la feuille : « Un projet d’Inès Haddad ».
+    head: {
+      project: 'Un projet {{nameOf}}',
+      update: 'Une mise à jour {{nameOf}}',
+      comment: 'Un commentaire {{nameOf}}',
+      member: 'Le profil {{nameOf}}',
+      call: 'Un appel à tester {{nameOf}}',
+      message: 'Un message {{nameOf}}',
+    },
+    // Le premier choix, « tout le contenu », choisi d'avance.
+    whole: {
+      project: 'Tout le projet',
+      update: 'Toute la mise à jour',
+      member: 'Tout le profil',
+      call: 'Tout l’appel',
+      message: 'Tout le message',
+    },
+    // Les parties, dans l'ordre de la feuille ; une photo se nomme par son rang (« La 2e photo »).
+    parts: {
+      title: 'Le titre',
+      pitch: 'Le pitch',
+      description: 'La description',
+      category: 'La catégorie',
+      tools: 'Les outils',
+      demoUrl: 'Le lien de la démo',
+      cover: 'La couverture',
+      photo: 'La {{rank}} photo',
+      photoDescription: 'La description de la {{rank}} photo',
+      prompt: 'Le prompt de départ',
+      text: 'Ce qui a changé',
+      name: 'Le nom',
+      handle: 'Le pseudo',
+      bio: 'La bio',
+      favoriteTools: 'Les outils favoris',
+      avatar: 'La photo de profil',
+      capture: 'La capture',
+      callPhoto: 'La photo',
+    },
+    // Le rang d'une photo : « 1re », puis « 2e », « 3e »…
+    rank: { first: '1re', other: '{{n}}e' },
+    // « La 2e photo de Météo » (l'écran Envoyé, la modération).
+    partOf: '{{part}} de {{title}}',
+    reasonHints: { dangerousLink: 'Arnaque, virus, hameçonnage, prompt piégé' },
+    detailsExample: {
+      photo: 'Par exemple : ce que montre la photo',
+      other: 'Par exemple : ce qui pose problème',
+    },
+    // La case avant l'envoi (décision des planches, 28/10), jamais cochée d'avance.
+    alsoBlockNamed: 'Bloquer aussi {{name}} (@{{handle}})',
+    sentTitle: 'Merci, ton signalement a été envoyé.',
+    sentBody:
+      'La modération va le regarder. Si le contenu est encore là, une notification te dira ce qu’elle a décidé.',
+    sentRecap: '{{what}}, {{nameOf}} · {{reason}}',
+    alsoBlocked: 'Tu as aussi bloqué {{name}}.',
+    // Décision L4 de Louis (13/11/2026) : le blocage refusé après l'envoi.
+    blockFailed:
+      'Ton signalement a été envoyé, mais le blocage n’a pas pu être enregistré. Tu peux bloquer {{name}} depuis sa page.',
+    discard: {
+      title: 'Abandonner le signalement ?',
+      body: 'Ce que tu as écrit dans cette feuille sera perdu.',
+      keep: 'Continuer',
+      confirm: 'Abandonner',
+    },
+    // Son propre contenu : la feuille le dit, sans rien attendre.
+    own: {
+      project: 'C’est ton projet : tu peux le modifier ou le supprimer.',
+      update: 'C’est ta mise à jour : tu peux la modifier ou la supprimer.',
+      comment: 'C’est ton commentaire : tu peux le modifier ou le supprimer.',
+      member: 'C’est ton profil : tu peux le modifier dans Mon profil.',
+      call: 'C’est ton appel à tester : tu peux le supprimer.',
+      message: 'C’est ton message : tu peux le supprimer.',
+      edit: 'Modifier',
+    },
+    alreadyReportedWhole: 'Tu as déjà signalé ce contenu. La modération va le regarder.',
+    alreadyReportedPart: 'Tu as déjà signalé cette partie. La modération va la regarder.',
+    // Le quota, dès l'ouverture : la phrase, puis l'adresse en lien (ContactLink).
+    limitedLead:
+      'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous :',
   },
   // Le menu « … » (tranche 7b) : les actions secondaires d'une page, au lieu d'un bouton chacune.
   actionMenu: {
@@ -1311,10 +1401,23 @@ export const fr = {
     },
     // Le quota des déblocages a son propre nombre (UNBLOCKS_PER_DAY) : « blocages » serait faux.
     unblockLimited: 'Tu as atteint la limite de {{max}} déblocages en 24 heures. Réessaie demain.',
+    // R9 (planche R9-Bloquer) : le nom et le pseudo, un résumé en gras, quatre puces, puis le texte
+    // complet d'aujourd'hui (rien du texte juridique ne disparaît).
+    titleNamed: 'Bloquer {{name}} (@{{handle}}) ?',
+    badge: 'bloqué',
+    summary: '{{name}} et toi ne vous verrez plus.',
+    bullets: {
+      content: 'Vous ne verrez plus les contenus l’un de l’autre.',
+      follows: 'Vos abonnements de l’un à l’autre sont retirés.',
+      notTold: 'Aucun message ne lui est envoyé.',
+      moderation: 'La modération n’est pas prévenue.',
+    },
+    fullText: 'Ce que change le blocage',
+    alsoReport: 'Signaler aussi son profil',
   },
   moderation: {
     title: 'Modération',
-    pending: 'En attente',
+    pending: 'À traiter',
     removed: 'Retirés',
     empty: 'Aucun signalement en attente.',
     emptyRemoved: 'Aucun contenu retiré.',
@@ -1648,6 +1751,150 @@ export const fr = {
        */
       otherDetail: 'Toujours en dernier · {{projects}}',
     },
+    // R9 : l'écran en trois colonnes (ordinateur), ou la file puis le détail (téléphone).
+    subtitle: 'Les signalements des membres arrivent ici. Chaque décision entre dans l’historique.',
+    adminOnly: 'Réservé aux administrateurs',
+    pendingCount: 'À traiter ({{count}})',
+    reportedTimes_one: 'Signalé {{count}} fois',
+    reportedTimes_other: 'Signalé {{count}} fois',
+    // Les parties en minuscules, après le genre du contenu : « Projet · la photo 2 ».
+    parts: {
+      title: 'le titre',
+      pitch: 'le pitch',
+      description: 'la description',
+      category: 'la catégorie',
+      tools: 'les outils',
+      demoUrl: 'le lien de démo',
+      cover: 'la couverture',
+      photo: 'la photo {{n}}',
+      photoDescription: 'la description de la photo {{n}}',
+      prompt: 'le prompt de départ',
+      text: 'ce qui a changé',
+      name: 'le nom',
+      handle: 'le pseudo',
+      bio: 'la bio',
+      favoriteTools: 'les outils favoris',
+      avatar: 'la photo de profil',
+      capture: 'la capture',
+      callPhoto: 'la photo',
+    },
+    kindPart: '{{kind}} · {{part}}',
+    contextLine: '{{title}}, {{nameOf}}',
+    authorOn: '{{name}}, sur {{title}}',
+    // Le détail d'un signalement (la colonne du milieu, ou sa page sur téléphone).
+    detail: {
+      commentOn: 'Un commentaire sur {{title}}',
+      partOf: '{{part}} de {{title}}',
+      seeInContext: 'Voir en contexte',
+      firstReport: 'Premier signalement',
+      at: '{{relative}}, {{exact}}',
+      written: {
+        project: 'Projet publié',
+        update: 'Mise à jour publiée',
+        comment: 'Commentaire écrit',
+        member: 'Profil créé',
+        call: 'Appel lancé',
+        message: 'Message écrit',
+      },
+      snapshotAt: 'Copie gardée à {{time}}',
+      reasons: 'Motifs',
+      removeHint: 'Retirer demande un fondement et une explication, montrés à l’auteur.',
+      accountOf: 'Le compte {{nameOf}}',
+      suspendHint: 'La suspension s’ouvre dans une fenêtre : durée, fondement, explication.',
+      suspend: 'Suspendre',
+      unknown: 'Ce signalement n’est plus dans la file.',
+      backToQueue: 'Retour à la file',
+    },
+    // La fiche de l'auteur, que les administrateurs seuls voient.
+    authorCard: {
+      recent: 'Compte récent',
+      joined: 'Inscription le {{date}}',
+      projects_one: '{{count}} projet',
+      projects_other: '{{count}} projets',
+      noProject: 'aucun projet',
+      comments_one: '{{count}} commentaire',
+      comments_other: '{{count}} commentaires',
+      noComment: 'aucun commentaire',
+      decided: 'Déjà décidé : {{record}}',
+      seeDecisions: 'Voir ses décisions',
+      liftedSuspensions_one: '{{count}} suspension levée',
+      liftedSuspensions_other: '{{count}} suspensions levées',
+    },
+    // L'historique récent, une ligne courte par décision, avec sa couleur.
+    recent: {
+      title: 'Historique',
+      phoneTitle: 'Décisions récentes',
+      order: 'Du plus récent au plus ancien',
+      all: 'Voir tout l’historique',
+      what: {
+        project: 'un projet',
+        update: 'une mise à jour',
+        note: 'une note',
+        comment: 'un commentaire',
+        member: 'un profil',
+        call: 'un appel à tester',
+        message: 'un message',
+      },
+      remove: 'a retiré {{what}}',
+      removePart: 'a retiré {{part}} d’{{what}}',
+      restore: 'a rétabli {{what}}',
+      restorePart: 'a rétabli {{part}} d’{{what}}',
+      dismiss: 'a classé un signalement sans suite',
+      suspend: 'a suspendu un compte pour {{duration}}',
+      suspendIndefinite: 'a suspendu un compte sans fin',
+      lift: 'a levé une suspension',
+      liftError: 'a levé une suspension : c’était une erreur',
+    },
+    // La fenêtre « Retirer » d'une partie (planche R9-Retirer).
+    removeSheet: {
+      title: 'Retirer {{part}} de « {{title}} » ?',
+      message:
+        'Les autres membres ne verront plus cette partie. Son auteur sera prévenu, avec ton explication, et pourra la remplacer ou la supprimer. Tu pourras la rétablir.',
+      what: 'Que retirer ?',
+      onlyPart: 'Seulement cette partie : {{part}}',
+      rest: {
+        project: 'Le reste du projet reste affiché.',
+        update: 'Le reste de la mise à jour reste affiché.',
+        member: 'Le reste du profil reste affiché.',
+        call: 'Le reste de l’appel reste affiché.',
+        message: 'Le reste du message reste affiché.',
+      },
+      whole: {
+        project: 'Tout le projet',
+        update: 'Toute la mise à jour',
+        call: 'Tout l’appel',
+        message: 'Tout le message',
+      },
+      wholeHint: {
+        project: 'Il n’apparaît plus nulle part pour les autres membres.',
+        update: 'Elle n’apparaît plus nulle part pour les autres membres.',
+        call: 'Il n’apparaît plus nulle part pour les autres membres.',
+        message: 'Il n’apparaît plus nulle part pour les autres membres.',
+      },
+      shownTo: 'Montrée à {{name}}',
+      preview: 'Ce que lira {{name}}',
+      dsa: 'Le règlement européen sur les services numériques (DSA, article 17) demande de dire à l’auteur ce qui est retiré, pourquoi, et comment contester.',
+      confirmPart: 'Retirer {{part}}',
+      // Le menu du fondement, avant un choix ; et ce qui manque encore, sous le bouton inactif.
+      groundNone: 'À choisir',
+      missing: 'Pour retirer, choisis un fondement et écris une explication.',
+    },
+    // La fenêtre « Suspendre » (planche R9-Suspendre).
+    suspendSheet: {
+      subtitle: '@{{handle}} · inscription le {{date}} · déjà décidé : {{record}}',
+      afterReport:
+        'La suspension suit ce signalement : l’historique et la notification le disent. Les signalements ouverts restent dans la file.',
+      // Rien encore de décidé pour ce membre : le sous-titre sans son rappel.
+      subtitleNew: '@{{handle}} · inscription le {{date}}',
+    },
+    // Quitter la feuille « Suspendre » avec une explication écrite ou une durée choisie : la
+    // fenêtre demande d'abord (même forme que `report.discard`).
+    discard: {
+      title: 'Abandonner la décision ?',
+      body: 'Ce que tu as écrit ou choisi dans cette feuille sera perdu.',
+      keep: 'Continuer',
+      confirm: 'Abandonner',
+    },
   },
   // Le compte suspendu, tel que son membre le lit (tranche 7c, article 17 du DSA) : la mesure, sa
   // durée, le fondement, l'explication, ce qui reste possible, et comment contester.
@@ -1667,18 +1914,37 @@ export const fr = {
     direct: 'Une personne de la modération a décidé de suspendre ton compte.',
     explanation: 'Explication : {{explanation}}',
     canStill:
-      'Tu peux toujours tout lire, supprimer tes projets, tes mises à jour, tes commentaires, tes appels et tes retours, quitter les testeurs d’un projet, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
+      'Tu peux toujours tout lire, supprimer tes projets, tes mises à jour, tes commentaires, tes appels et tes retours, passer un projet en privé, retirer ta bio, tes outils favoris et ta photo, quitter les testeurs d’un projet, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
     // Les recours (J3, formulation à faire valider par un professionnel).
     // Suivi de l’adresse, en lien qui ouvre la messagerie (Louis, 27/10/2026).
     contest: 'Pour contester : écris à {{contactEmail}}. Tu peux aussi saisir la justice.',
     contestLead: 'Pour contester, écris à la modération :',
     contestCourt: 'Tu peux aussi saisir la justice.',
     // À la place d'un formulaire de projet, et sur « Mon profil ».
-    formBody: 'Tu ne peux pas publier ni modifier de projet pendant la suspension.',
-    profileLocked: 'Ton profil ne peut pas être modifié pendant la suspension.',
+    formBody:
+      'Pendant la suspension, tu ne peux ni publier ni modifier un projet. Tu peux le passer en privé ou le supprimer.',
+    profileLocked:
+      'Pendant la suspension, tu peux seulement retirer ta bio, tes outils favoris et ta photo.',
+    // R9 (relecture juridique jur-B4) : un nom ou un pseudo provisoire se remplace même suspendu.
+    profileLockedProvisional:
+      'Pendant la suspension, tu peux seulement retirer ta bio, tes outils favoris et ta photo, et remplacer ton nom ou ton pseudo provisoire.',
     // Le titre de la page qui remplace le formulaire de projet (C, 7c) : le bandeau dit
     // déjà « Ton compte est suspendu », le titre ne le répète pas.
     formTitle: 'Publication impossible pour l’instant',
+    // R9 (jur-R5, J14, L6) : ce qu'un compte suspendu peut retirer, et le passage en privé.
+    removeBio: 'Retirer ma bio',
+    removeTools: 'Retirer mes outils',
+    removeAvatar: 'Retirer ma photo',
+    bioRemoved: 'Bio retirée.',
+    toolsRemoved: 'Outils retirés.',
+    avatarRemoved: 'Photo retirée.',
+    makePrivate: 'Rendre privé',
+    makePrivateTitle: 'Rendre « {{title}} » privé ?',
+    makePrivateBody:
+      'Il ne sera plus visible que de toi. Pendant la suspension, tu ne pourras pas le rendre de nouveau public.',
+    madePrivate: 'Projet passé en privé.',
+    // R9 : l'échec de « Rendre privé », lu dans sa fenêtre, qui reste ouverte.
+    makePrivateError: 'Le projet n’a pas pu passer en privé. Réessaie.',
   },
   removal: {
     // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de
@@ -1695,6 +1961,70 @@ export const fr = {
     },
     explanation: 'Explication : {{explanation}}',
     contest: 'Pour contester : {{contactEmail}}',
+    // R9 (7d, décision L2 de Louis) : une partie retirée, vue par son auteur seul : le fondement,
+    // l'explication, la date, « Contester » avec l'adresse écrite, et la justice.
+    part: {
+      titles: {
+        description: 'La description a été retirée par la modération',
+        tools: 'Les outils ont été retirés par la modération',
+        demoUrl: 'Le lien de la démo a été retiré par la modération',
+        cover: 'La couverture a été retirée par la modération',
+        photo: 'La photo {{n}} a été retirée par la modération',
+        photoDescription: 'La description de la photo {{n}} a été retirée par la modération',
+        prompt: 'Le prompt de départ a été retiré par la modération',
+        name: 'Ton nom a été retiré par la modération',
+        handle: 'Ton pseudo a été retiré par la modération',
+        bio: 'Ta bio a été retirée par la modération',
+        favoriteTools: 'Tes outils favoris ont été retirés par la modération',
+        avatar: 'Ta photo de profil a été retirée par la modération',
+        capture: 'La capture a été retirée par la modération',
+        callPhoto: 'La photo a été retirée par la modération',
+      },
+      onlyYou:
+        'Les autres membres ne voient plus cette partie, jusqu’à un éventuel rétablissement.',
+      rest: {
+        project: 'Le reste du projet reste affiché.',
+        update: 'Le reste de la mise à jour reste affiché.',
+        member: 'Le reste de ton profil reste affiché.',
+        call: 'Le reste de l’appel reste affiché.',
+        message: 'Le reste du message reste affiché.',
+      },
+      date: 'Retiré le {{date}}',
+      contestLead: 'Pour contester :',
+      court: 'Tu peux aussi saisir la justice.',
+      replace: 'Remplacer',
+      delete: 'Supprimer',
+      // Le nom ou le pseudo remplacés d'office (planche R9-Partie-Retiree).
+      provisionalHandle:
+        'En attendant, il est provisoirement @{{handle}}, partout. Choisis-en un autre : la raison est dans Activité.',
+      provisionalName:
+        'En attendant, il est provisoirement « {{name}} », partout. Choisis-en un autre : la raison est dans Activité.',
+      chooseHandle: 'Choisir mon pseudo',
+      chooseName: 'Choisir mon nom',
+      // R9 : « Supprimer » d'une photo retirée, réussi (bulle) ou refusé (sous la partie).
+      // R9 (relectures) : la confirmation avant de supprimer une photo retirée, pour de bon.
+      deleteConfirmTitle: 'Supprimer cette photo ?',
+      deleteConfirmBody:
+        'Elle disparaîtra de ton projet pour de bon : tu ne pourras pas la récupérer.',
+      photoDeleted: 'Photo supprimée.',
+      deleteError: 'La photo n’a pas pu être supprimée. Réessaie.',
+    },
+    // L'objet de l'e-mail de « Contester » nomme la décision (J12) : « Contestation : retrait de la
+    // photo 2 de « Météo » du 12 nov. ».
+    contestSubject: 'Contestation : {{decision}} du {{date}}',
+    contestDecision: {
+      project: 'retrait de mon projet « {{title}} »',
+      update: 'retrait de ma mise à jour de « {{title}} »',
+      comment: 'retrait de mon commentaire sur « {{title}} »',
+      call: 'retrait de mon appel à tester « {{title}} »',
+      message: 'retrait de mon message sur « {{title}} »',
+      part: 'retrait de {{part}} de « {{title}} »',
+      profilePart: 'retrait de {{part}} de mon profil',
+      suspension: 'suspension de mon compte',
+    },
+    // Le nom donné d'office quand la modération retire celui d'un membre (R9), dans la langue de
+    // son compte ; il le garde jusqu'à ce qu'il en choisisse un autre.
+    provisionalNameValue: 'Membre',
   },
   member: {
     // {{nameOf}} : « d’Inès », « de Léa » (nameOf de @ruche/i18n, tranche 6c).
@@ -2000,6 +2330,9 @@ export const fr = {
     // R7b : une image d'un membre (la capture d'un retour, la photo d'un appel) s'ouvre en entier
     // au toucher ; le nom du bouton dit ce qu'il fait, puis l'image qu'il ouvre.
     enlarge: 'Voir en grand : {{description}}',
+    // R9 : une photo marquée (« Retiré par la modération », vue de son auteur seul) : sa place, puis
+    // la marque, dans ce que le lecteur d'écran entend.
+    marked: '{{photo}}. {{mark}}',
   },
   // Partager un projet ou une page de membre (R5a, F-Pr1, F-Mb1). Le lien ne contient que l'adresse.
   share: {
@@ -2292,7 +2625,7 @@ export const fr = {
       },
       explanation: 'Explication : {{explanation}}',
       meanwhile:
-        'Pendant la suspension, tu peux tout lire, supprimer tes projets, tes mises à jour, tes commentaires, tes appels et tes retours, quitter les testeurs d’un projet, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
+        'Pendant la suspension, tu peux tout lire, supprimer tes projets, tes mises à jour, tes commentaires, tes appels et tes retours, passer un projet en privé, retirer ta bio, tes outils favoris et ta photo, quitter les testeurs d’un projet, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
       contest:
         'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
       // La salutation, sans le nom : l'e-mail ne cite que la décision (7c).
@@ -2466,8 +2799,6 @@ export const fr = {
     allMarkedRead: 'Tout est marqué comme lu.',
     // La roue de la barre du haut (bouton à icône seule : ce texte est son nom).
     settings: 'Régler les notifications',
-    // Sous une ligne de retrait par la modération.
-    removedDetail: 'Voir la raison et comment contester',
     // R8 : chaque phrase est une seule clé ; <b>…</b> marque ce qui s'écrit en gras (noms, titres),
     // <v>…</v> une version. L'appli découpe ces marques (notifications/marks.ts), qu'aucun texte de
     // membre ne peut contenir : les noms et titres remplissent {{…}} après le découpage.
@@ -2584,6 +2915,12 @@ export const fr = {
         removed: 'Ton signalement d’un message a été traité : le message a été retiré.',
         dismissed: 'Ton signalement d’un message a été traité : nous ne l’avons pas retiré.',
       },
+      // R9 (relectures, 14/11/2026) : le signalement ne visait qu'une partie du contenu.
+      part: {
+        removed: 'Ton signalement a été traité : la partie que tu as signalée a été retirée.',
+        dismissed:
+          'Ton signalement a été traité : nous n’avons pas retiré la partie que tu as signalée.',
+      },
       contest: 'Pas d’accord ? Écris-nous : {{contactEmail}}',
     },
     // Tranche 7c : la suspension de son compte, et sa fin.
@@ -2592,7 +2929,56 @@ export const fr = {
     suspensionEnded: {
       ended: 'Ta suspension a pris fin : tu peux de nouveau publier et interagir.',
       lifted: 'Ta suspension a été levée : tu peux de nouveau publier et interagir.',
+      // R9 (jur-R6, décision L1 de Louis, 13/11/2026).
+      liftedError:
+        'Ta suspension a été levée : c’était une erreur de la modération. Tu peux de nouveau publier et interagir.',
     },
+    // R9 : une partie retirée, une partie du profil retirée, un rétablissement (signé l'équipe).
+    removedPart: {
+      description: 'La description de <b>{{title}}</b> a été retirée par la modération',
+      tools: 'Les outils de <b>{{title}}</b> ont été retirés par la modération',
+      demoUrl: 'Le lien de la démo de <b>{{title}}</b> a été retiré par la modération',
+      cover: 'La couverture de <b>{{title}}</b> a été retirée par la modération',
+      photo: 'La {{rank}} photo de <b>{{title}}</b> a été retirée par la modération',
+      photoDescription:
+        'La description de la {{rank}} photo de <b>{{title}}</b> a été retirée par la modération',
+      prompt: 'Le prompt de départ de <b>{{title}}</b> a été retiré par la modération',
+      updatePhoto:
+        'Une photo de ta mise à jour de <b>{{title}}</b> a été retirée par la modération',
+      capture: 'La capture de ton message sur <b>{{title}}</b> a été retirée par la modération',
+      callPhoto: 'La photo de ton appel à tester <b>{{title}}</b> a été retirée par la modération',
+    },
+    profileRemoved: {
+      name: 'Ton nom a été retiré : tu t’appelles <b>{{replacedBy}}</b> jusqu’à ce que tu en choisisses un autre',
+      handle:
+        'Ton pseudo a été retiré : tu es <b>@{{replacedBy}}</b> jusqu’à ce que tu en choisisses un autre',
+      bio: 'Ta bio a été retirée par la modération',
+      favoriteTools: 'Tes outils favoris ont été retirés par la modération',
+      avatar: 'Ta photo de profil a été retirée par la modération',
+    },
+    chooseHandle: 'Choisir un pseudo',
+    chooseName: 'Choisir un nom',
+    contest: 'Contester',
+    restored: {
+      project: 'Ton projet <b>{{title}}</b> est de nouveau visible',
+      update: 'Ta mise à jour de <b>{{title}}</b> est de nouveau visible',
+      comment: 'Ton commentaire sur <b>{{title}}</b> est de nouveau visible',
+      commentElsewhere: 'Ton commentaire est de nouveau visible',
+      call: 'Ton appel à tester <b>{{title}}</b> est de nouveau visible',
+      message: 'Ton message sur <b>{{title}}</b> est de nouveau visible',
+      part: '{{part}} de <b>{{title}}</b> est de nouveau visible',
+      bio: 'Ta bio est de nouveau visible',
+      favoriteTools: 'Tes outils favoris sont de nouveau visibles',
+      avatar: 'Ta photo de profil est de nouveau visible',
+      // Décision L3 de Louis (13/11/2026).
+      handleBack: 'La modération a annulé le retrait de ton pseudo : @{{handle}} t’est rendu.',
+      handleNotBack:
+        'La modération a annulé le retrait de ton pseudo. L’ancien ne peut pas revenir : tu gardes @{{handle}}, que tu peux changer dans ton profil.',
+      nameBack: 'La modération a annulé le retrait de ton nom : il t’est rendu.',
+      nameNotBack:
+        'La modération a annulé le retrait de ton nom. L’ancien ne peut pas revenir : tu gardes celui que tu as choisi, que tu peux changer dans ton profil.',
+    },
+    team: 'L’équipe de {{appName}}',
   },
   errors: {
     notFound: 'Cette page n’existe pas.',
@@ -2649,5 +3035,8 @@ export const fr = {
     invalidFeedback:
       'Un des retours cochés n’est plus à traiter : la liste est à jour, vérifie-la puis publie.',
     testerMediaFull: 'Ce fil ou ce coin a atteint 100 images. Supprimes-en une pour en ajouter.',
+    // Tranche R9.
+    partWholeOnly: 'Cette partie ne se retire pas seule : retire tout le contenu.',
+    partNotReported: 'Aucun signalement ouvert ne vise cette partie.',
   },
 } as const

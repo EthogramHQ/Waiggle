@@ -14,6 +14,7 @@
 import { borders, layout, type Space, space } from '@ruche/brand'
 import { Fragment, type ReactNode } from 'react'
 import { View } from 'react-native'
+import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
@@ -41,6 +42,12 @@ type Props = { gap?: Space; sideWidth?: SideWidth } & (
        * au-dessus.
        */
       sideFirst?: boolean
+      /**
+       * Une troisième colonne (R9, la modération : l'historique récent), à droite du détail. Trois
+       * colonnes seulement sur un grand écran (`wide`) ; en dessous, elle est lue juste après la
+       * colonne principale, dans la même colonne : rien n'est perdu, rien ne se met à la ligne seul.
+       */
+      aside?: ReactNode
       rows?: never
       divided?: never
     }
@@ -52,6 +59,7 @@ type Props = { gap?: Space; sideWidth?: SideWidth } & (
       main?: never
       side?: never
       sideFirst?: never
+      aside?: never
     }
 )
 
@@ -63,6 +71,7 @@ export function Columns(props: Props) {
       <ColumnPair
         main={props.main}
         side={props.side}
+        aside={props.aside}
         gap={gap}
         sideWidth={sideWidth}
         sideFirst={props.sideFirst ?? false}
@@ -88,17 +97,33 @@ export function Columns(props: Props) {
 function ColumnPair({
   main,
   side,
+  aside,
   gap,
   sideWidth,
   sideFirst = false,
 }: {
   main: ReactNode
   side: ReactNode
+  aside?: ReactNode
   gap: Space
   sideWidth: SideWidth
   sideFirst?: boolean
 }) {
   const wide = sideWidth === 'wide'
+  // Trois colonnes : seulement avec un `aside` et sur un grand écran. Sinon `aside` suit le détail
+  // dans la colonne principale (lu après lui) ; sans `aside`, rien ne change.
+  const { sizeClass } = useLayout()
+  const hasAside = aside !== undefined && aside !== null
+  const three = hasAside && sizeClass === 'wide'
+  const mainContent =
+    hasAside && !three ? (
+      <>
+        {main}
+        {aside}
+      </>
+    ) : (
+      main
+    )
   const sideColumn = (
     <View
       style={{
@@ -115,7 +140,13 @@ function ColumnPair({
   )
   return (
     <View
-      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[gap], alignItems: 'flex-start' }}
+      style={{
+        flexDirection: 'row',
+        // Trois colonnes : jamais à la ligne (la pile est déjà décidée par `wide`).
+        flexWrap: three ? 'nowrap' : 'wrap',
+        gap: space[gap],
+        alignItems: 'flex-start',
+      }}
     >
       {sideFirst ? sideColumn : null}
       {/* flexGrow 999 : la colonne principale prend presque toute la place gagnée. En `wide`, les
@@ -130,9 +161,22 @@ function ColumnPair({
           gap: space[gap],
         }}
       >
-        {main}
+        {mainContent}
       </View>
       {sideFirst ? null : sideColumn}
+      {three ? (
+        <View
+          style={{
+            flexGrow: 1,
+            flexShrink: 1,
+            flexBasis: layout.sideColumn,
+            minWidth: 0,
+            gap: space[gap],
+          }}
+        >
+          {aside}
+        </View>
+      ) : null}
     </View>
   )
 }

@@ -7,18 +7,23 @@
 // (`DecisionHistoryItem`) : l'écran n'a qu'à la poser et à dire où mène « Voir ». Jamais qui a
 // signalé : le contrat n'a aucun champ pour cela, et la carte aucune place.
 //
+// R9 : avec `compact`, une seule ligne courte (« a retiré un commentaire ») et une icône de couleur
+// par sorte de décision, pour l'historique récent de la page « Modération ».
+//
 // Une trace ne s'efface pas : un administrateur parti, un membre parti, un contenu supprimé depuis
 // gardent leur ligne, dite en mots (« compte supprimé »), sans lien vers ce qui n'existe plus.
 // L'explication s'affiche en texte brut : ni Markdown, ni lien qu'on toucherait par mégarde (règle 22
 // de la relecture du plan 7a).
-import { borders, radii, space } from '@ruche/brand'
+import { borders, type ColorName, radii, space } from '@ruche/brand'
 import type { DecisionHistoryItem } from '@ruche/contracts'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ActionDescription, excerpt } from './CommentAction'
 import { Icon } from './Icon'
+import type { IconName } from './icons.generated'
 import { parisDateTime } from './parisTime'
+import { partText } from './partText'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -32,13 +37,97 @@ type Props = {
    * routes. Sans lui, pas de lien ; une cible supprimée depuis n'en a jamais.
    */
   onView?: (() => void) | undefined
+  /**
+   * R9 : la ligne courte de l'historique récent (icône de couleur, « a retiré un commentaire »),
+   * sans explication, fondement ni lien. Faux (défaut) : la carte entière de l'historique.
+   */
+  compact?: boolean
 }
 
 /** Vrai si la cible n'existe plus : un contenu sans projet, ou un membre dont le compte est parti. */
 export const targetIsGone = (decision: DecisionHistoryItem): boolean =>
   decision.target.kind === 'member' ? decision.member === null : decision.projectId === null
 
-export function DecisionCard({ decision, onView }: Props) {
+/** L'icône et la couleur de chaque sorte de décision, dans la version compacte (R9). */
+const compactLook = {
+  remove: { icon: 'trash', color: 'decisionRemove' },
+  removePart: { icon: 'eye-slash', color: 'decisionRemovePart' },
+  restore: { icon: 'arrows-clockwise', color: 'decisionRestore' },
+  dismiss: { icon: 'flag', color: 'decisionDismiss' },
+  suspend: { icon: 'prohibit', color: 'decisionSuspend' },
+  lift: { icon: 'lock-simple-open', color: 'decisionLift' },
+} as const satisfies Record<string, { icon: IconName; color: ColorName }>
+
+/**
+ * La version compacte (R9, l'historique récent à côté de la file, « Décisions récentes » sur
+ * téléphone) : une icône de couleur, une ligne courte qui dit la décision en mots (la couleur ne la
+ * porte jamais seule), et dessous qui et quand. Ni explication, ni fondement, ni lien « Voir » : la
+ * page « Historique » les montre.
+ */
+function CompactDecision({ decision }: { decision: DecisionHistoryItem }) {
+  const { t, i18n } = useTranslation()
+  const { action, admin, part, target, duration, liftCause } = decision
+  const what = t(($) => $.moderation.recent.what[target.kind])
+  // La sorte de décision pour l'icône, et sa phrase. Une partie : « la photo 2 d’un projet ».
+  const partName = part ? partText(part, t, target.kind) : null
+  const { sort, line } = ((): { sort: keyof typeof compactLook; line: string } => {
+    switch (action) {
+      case 'remove':
+        return partName
+          ? {
+              sort: 'removePart',
+              line: t(($) => $.moderation.recent.removePart, { part: partName, what }),
+            }
+          : { sort: 'remove', line: t(($) => $.moderation.recent.remove, { what }) }
+      case 'restore':
+        return {
+          sort: 'restore',
+          line: partName
+            ? t(($) => $.moderation.recent.restorePart, { part: partName, what })
+            : t(($) => $.moderation.recent.restore, { what }),
+        }
+      case 'dismiss':
+        return { sort: 'dismiss', line: t(($) => $.moderation.recent.dismiss) }
+      case 'suspend':
+        return {
+          sort: 'suspend',
+          line:
+            duration && duration !== 'indefinite'
+              ? t(($) => $.moderation.recent.suspend, {
+                  duration: t(($) => $.moderation.durations[duration]),
+                })
+              : t(($) => $.moderation.recent.suspendIndefinite),
+        }
+      case 'lift':
+        return {
+          sort: 'lift',
+          line:
+            liftCause === 'error'
+              ? t(($) => $.moderation.recent.liftError)
+              : t(($) => $.moderation.recent.lift),
+        }
+    }
+  })()
+  const look = compactLook[sort]
+  const who = admin
+    ? t(($) => $.moderation.decidedBy, { name: admin.name })
+    : t(($) => $.moderation.decidedByGone)
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+      <Icon name={look.icon} size={20} color={look.color} />
+      <View style={{ flex: 1, minWidth: 0, gap: space.xxs }}>
+        <Text variant="callout" weight={600}>
+          {line}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {`${parisDateTime(decision.at, i18n.language).date} · ${who}`}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+export function DecisionCard({ decision, onView, compact = false }: Props) {
   const { colors, shadows } = useTheme()
   const { t, i18n } = useTranslation()
   // Le texte caché qui dit de quelle carte il s'agit, lu après « Voir » (toutes les cartes ont le
@@ -51,6 +140,7 @@ export function DecisionCard({ decision, onView }: Props) {
     kind: actionLabel,
     excerpt: explanation ? excerpt(explanation) : (member?.name ?? ''),
   })
+  if (compact) return <CompactDecision decision={decision} />
   const gone = targetIsGone(decision)
   // Une décision sur un contenu dit lequel (« Commentaire ») ; une suspension, une levée, visent
   // le membre lui-même, déjà dit par « Membre visé ».

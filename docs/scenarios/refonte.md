@@ -2467,7 +2467,7 @@ icône rouge, et mènent à la raison et à la façon de contester, comme aujour
   la roue, règle « Commentaires sur tes projets » sur « Tout de suite », revient, et la page
   « Activité » n'a plus de miel
 
-### Les choix de la session (12/11/2026), à valider avec ce scénario
+### Les choix de la session (12/11/2026), validés avec ce scénario
 
 1. **« Retours par e-mail »** (renvoi de R7b) veut dire : être prévenu par e-mail d'un nouveau
    message du coin, sans son texte. Répondre depuis sa messagerie vient plus tard.
@@ -2494,3 +2494,277 @@ Dessinées et validées par Louis avant la relecture du plan :
   de testeur (sans texte), et sa page « Ne plus recevoir ces e-mails » ;
 - `R8-Reglages`, complétée : la ligne « Coin des testeurs », et un type « Dans le récap » quand le
   récap est coupé ; `R8-Recap`, corrigée : sans le domaine de la démo.
+
+## R9 — La modération, avec 7d
+
+Statut : **validé par Louis** le 12/11/2026 (conversation « plan » de R9), tel quel, avec les
+huit choix de la session et les trois planches à dessiner.
+
+R9 refait le geste de signaler et l'écran de la modération d'après les planches du 28/10
+(`R9-Signaler`, `R9-Signaler-Danger`, `R9-Signaler-Envoye`, `R9-Bloquer`,
+`R9-Moderation-Telephone`, `R9-Moderation-Desktop`, `R9-Retirer`, `R9-Suspendre`, `R9-Suspendu`,
+`R9-Partie-Retiree` ; décisions A4, A6, A7, A12, B8, F-S4, F-Ad3). Elle livre aussi 7d, jamais
+ouverte seule (scénario de 7c, `phase-1.md`, validé le 26/10) : signaler et retirer une seule
+partie d'un contenu, le nom et le pseudo provisoires, ce qu'un membre suspendu peut retirer
+(jur-R5), la levée « pour erreur » dite au membre (jur-R6), et les points « Signaler » de la liste
+« À reprendre ».
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : la modération ne
+montre jamais qui a signalé (A4) ; un administrateur ne décide pas de ce qui le concerne ; au plus
+50 décisions par administrateur et par jour ; le mot de passe retapé pour une suspension sans fin
+ou plus de 10 retraits en une heure ; une seule décision à la fois par cible (« Déjà traité ») ;
+20 signalements par membre et par jour ; une décision gardée un an après la fin de son effet ; la
+modération lit un message du coin des testeurs signalé et sa capture, jamais le reste du fil.
+
+Hors de R9, et où ça va :
+- le signalement par un visiteur sans compte (planche `R12-Visiteur-Signaler`) : R12 ;
+- l'échelle des sanctions et le réexamen des suspensions sans fin (J11), la base légale de
+  l'historique nominatif : R11, la conformité, avec un professionnel ;
+- un commentateur qui veut effacer son commentaire sur un projet retiré (« À surveiller ») : R11 ;
+- une modération assistée par l'IA, ou des modérateurs qui ne sont pas administrateurs : non.
+
+### Signaler, dans une feuille (planches `R9-Signaler`, `R9-Signaler-Danger`)
+
+- Étant donné Malik, connecté, sur le projet « Météo » d'Inès
+- Quand il choisit « Signaler ce projet » dans le menu « … » (ou le lien gris du bas de la page)
+- Alors une feuille s'ouvre par-dessus le projet, qui se floute, titrée « Signaler ce projet »
+- Et elle rappelle ce qui est signalé : la miniature, le titre et l'auteur
+- Et elle demande d'abord « Quelle partie ? » : « Tout le projet » (choisi d'avance), ou une partie
+  présente sur la page (voir « Les parties », plus bas)
+- Quand il choisit « La 2e photo » puis « Continuer »
+- Alors la feuille demande « Qu'est-ce qui ne va pas ? », avec les huit motifs (A6) :
+  « Contenu illégal », « Harcèlement ou haine », « Contenu sexuel ou violent », « Arnaque ou
+  spam », « Usurpation d'identité », « Une photo ou une information sur moi sans mon accord »,
+  « Lien, démo ou prompt dangereux » (arnaque, virus, hameçonnage, prompt piégé) et « Autre chose »
+  (les sept d'aujourd'hui gardent leur texte)
+- Et un champ de précision, facultatif, avec un texte d'exemple et « N'ajoute pas d'informations
+  personnelles inutiles »
+- Et « La modération voit qui signale, pour éviter les abus », la phrase de bonne foi, et le bouton
+  « Envoyer le signalement »
+- Quand il choisit « Harcèlement ou haine », « Contenu sexuel ou violent » ou « Contenu illégal »
+- Alors la phrase du 112 paraît, et seulement pour ces trois motifs : « Si quelqu'un est en danger
+  maintenant, appelle le 112 : nous lisons les signalements, mais pas en temps réel. » (B8)
+- Et pour « Contenu illégal », la précision devient obligatoire : « Dis-nous pourquoi »
+- Quand il envoie sans motif
+- Alors le bouton n'était pas grisé : « Choisis un motif » paraît sous la liste, et le focus y va
+  (« À reprendre », Signaler 7a)
+- Quand il envoie « Contenu illégal » sans précision
+- Alors l'erreur paraît sous le champ, et l'aide reste lisible (« À reprendre », `TextField`)
+- Une note de version, un commentaire, un message du coin ou un appel à tester sans partie à
+  choisir : la feuille commence au motif, titrée « Signaler ce commentaire » (ou « ce
+  message »…)
+
+**Les sorties de la feuille** (téléphone et web) :
+- « Retour », en tête de la deuxième étape, revient à « Quelle partie ? » en gardant le choix
+- Annuler, Échap, glisser vers le bas, toucher le voile ou le Retour du navigateur ferment la
+  feuille ; si une précision est écrite, la feuille demande d'abord « Abandonner le
+  signalement ? » (Abandonner / Continuer)
+- Pendant l'envoi, la feuille ne se ferme pas ; la double tape n'envoie qu'une fois
+- La page `/report` disparaît ; un ancien lien `/report?kind=…&id=…` ouvre le contenu avec sa
+  feuille
+
+**Bloquer aussi** (décision des planches, 28/10 : une case avant l'envoi)
+- Étant donné Malik qui signale un contenu d'Inès
+- Alors sous la précision, une case « Bloquer aussi Inès Haddad (@ines_haddad) », jamais cochée d'avance
+- Quand il la coche et envoie
+- Alors la fenêtre de blocage (A7, plus bas) s'ouvre avant l'envoi ; « Bloquer » envoie le
+  signalement puis bloque ; « Annuler » décoche la case et laisse la feuille ouverte
+- La case n'existe pas pour son propre contenu, ni pour un membre déjà bloqué ; un administrateur
+  se bloque comme tout membre : sa place ne se devine nulle part (relecture de sécurité, 14/11/2026)
+
+**Envoyé** (planche `R9-Signaler-Envoye`)
+- Alors la feuille dit « Merci, ton signalement a été envoyé. La modération va le regarder. Si le
+  contenu est encore là, une notification te dira ce qu’elle a décidé. » (14/11/2026), et
+  « Fermer » ; si Malik a bloqué Inès, elle le rappelle (« Tu as aussi bloqué Inès Haddad. »)
+
+**Les cas où l'on ne signale pas**
+- Son propre contenu : « Signaler » n'est dans aucun menu ; un ancien lien ouvre la feuille sur
+  « C'est ton projet : tu peux le modifier ou le supprimer », avec « Modifier » et « Fermer »,
+  sans aucune attente (« À reprendre », 7c : 3 lectures, « décider », « Retour à l'accueil »)
+- Déjà signalé à l'identique : « Tu as déjà signalé cette partie. La modération va la regarder. »
+- 20 signalements envoyés en 24 heures : la feuille le dit **dès son ouverture**, avant tout
+  choix, avec l'adresse de contact en lien et la phrase du 112
+- Le contenu a disparu entre-temps : « Ce contenu n'est plus là. », et « Fermer »
+
+### Les parties
+
+Ce qu'on peut viser, et ce que la modération peut retirer seul (le registre des entrées dit, pour
+chaque champ, s'il se retire seul ; un test échoue si un champ n'y est pas classé) :
+
+| Contenu | Parties qu'on signale | Retirée seule ? |
+| --- | --- | --- |
+| Projet | tout le projet ; le titre ; le pitch ; la description ; la catégorie ; les outils ; le lien de la démo ; la couverture ; chaque photo ; la description d'une photo ; le prompt de départ | la description, les outils, le lien de la démo, la couverture, une photo, la description d'une photo, le prompt de départ. Le titre et le pitch : on retire tout le projet. La catégorie : la modération la range (R6b), sans retrait |
+| Mise à jour | toute la mise à jour ; « Ce qui a changé » ; chaque photo (avant / après comprises) | une photo ; le texte : toute la mise à jour |
+| Profil | tout le profil ; le nom ; le pseudo ; la bio ; les outils ; la photo | chaque partie (un profil entier ne se retire pas : il se suspend) |
+| Message du coin, appel à tester | tout le message ; sa capture (ou sa photo) | la capture ou la photo |
+| Commentaire, note | en entier | en entier |
+
+La liste ne propose que les parties présentes (un projet sans prompt n'a pas « Le prompt de
+départ ») ; les photos se nomment par leur rang et montrent leur miniature (« La 2e photo »).
+
+### Retirer une partie (planches `R9-Retirer`, `R9-Partie-Retiree`)
+
+- Étant donné Louis, administrateur, devant le signalement de la 2e photo de « Météo »
+- Quand il choisit « Retirer »
+- Alors une fenêtre s'ouvre : « Seulement cette partie » (choisi d'avance) ou « Tout le projet »,
+  le fondement (les règles de {{appName}} ou la loi, et laquelle), et l'explication, avec « Montrée
+  à Inès »
+- Quand il confirme
+- Alors la photo disparaît pour tous, sauf Inès ; le reste du projet reste affiché ; ses
+  signalements sont traités, et ceux qui visaient tout le projet restent dans la file
+- Et Inès reçoit une notification qui nomme la partie (« La 2e photo de Météo a été retirée par la
+  modération »), l'explication, et « Contester »
+- Et dans « Météo », Inès voit la photo avec « Retiré par la modération », le fondement,
+  l'explication, la date, « Contester » avec l'adresse de contact écrite en clair (et son lien), la
+  possibilité de saisir la justice, « Remplacer » et « Supprimer » (décision L2 de Louis, 13/11/2026)
+- Et Malik est prévenu que son signalement a été traité, sans le détail de la décision : « la
+  partie que tu as signalée a été retirée », jamais « le projet a été retiré » (14/11/2026)
+
+Ce que voient les autres d'une partie retirée : rien, comme si elle n'avait jamais été là (une
+couverture retirée laisse la place à la photo suivante, ou au fond de la marque ; un lien de démo
+retiré enlève « Tester » ; des outils ou une bio retirés, leur ligne disparaît ; une photo de
+profil retirée laisse les initiales).
+
+- Quand Inès remplace la photo
+- Alors la nouvelle s'affiche pour tous, peut être signalée à son tour, et la décision reste dans
+  l'historique
+- Quand Inès touche « Supprimer », une fenêtre demande « Supprimer cette photo ? » (« Elle
+  disparaîtra de ton projet pour de bon : tu ne pourras pas la récupérer. »), « Annuler » et
+  « Supprimer » ; « Supprimer » n'existe que sous une photo ou la couverture, jamais sous la seule
+  description d'une photo (14/11/2026)
+- Quand Inès supprime la photo, la partie et sa mention « Retiré » disparaissent
+
+### Un nom ou un pseudo retiré (planche `R9-Partie-Retiree`)
+
+- Étant donné Louis qui retire le pseudo de Karim, « @karim_le_vrai »
+- Alors Karim s'appelle partout « @membre_4f2a » (quatre signes au hasard, sans tiret), et l'ancien
+  pseudo reste réservé 30 jours : personne ne peut le prendre, pas même Karim
+- Et Karim reçoit une notification ; à sa visite suivante, une feuille lui demande de choisir un
+  nouveau pseudo (« Plus tard » la ferme ; un bandeau sur « Moi » reste jusqu'au choix)
+- Même chose pour le nom, qui devient « Membre » jusqu'à ce que Karim en choisisse un autre
+- Un pseudo choisi après un retrait peut être signalé et retiré à son tour
+
+### Rétabli
+
+- Quand Louis rétablit un contenu ou une partie retirés (onglet « Retirés »)
+- Alors l'auteur reçoit une notification « Ton projet Météo est de nouveau visible » (ou « La 2e
+  photo de Météo… »), signée « L'équipe de {{appName}} », sans nom d'administrateur (renvoyé de R8)
+- Et un pseudo ou un nom rétabli ne revient pas tout seul s'il a été changé entre-temps : la
+  notification dit alors que l'ancien ne peut pas revenir (décision L3 de Louis, 13/11/2026)
+
+### Bloquer (planche `R9-Bloquer`, A7, F-S4)
+
+- Étant donné Malik sur le profil d'Hugo, qui choisit « Bloquer »
+- Alors la fenêtre est titrée « Bloquer Hugo Lefèvre (@hugo_l) ? », avec son avatar et la pastille
+  « bloqué »
+- Et le résumé en gras, quatre puces courtes toujours visibles, puis le texte complet d'aujourd'hui
+  (rien du texte juridique ne disparaît)
+- Et une case « Signaler aussi son profil », jamais cochée d'avance ; cochée, « Bloquer » bloque
+  puis ouvre la feuille « Signaler ce profil »
+- La case n'existe pas quand la fenêtre vient de « Bloquer aussi » (le signalement est déjà
+  parti)
+
+### La modération sur ordinateur (planche `R9-Moderation-Desktop`, B8, F-Ad3)
+
+- Étant donné Louis sur « Modération », sur un écran large
+- Alors la page porte un sous-titre et la pastille « Réservé aux administrateurs »
+- Et trois colonnes : la file (« À traiter (3) » et « Retirés »), le détail du signalement choisi,
+  l'historique récent ; « Outils » et « Catégories » restent en tête de la file
+- Et chaque signalement de la file montre son motif en titre, la partie visée, « Signalé 2 fois »
+  en rouge quand plusieurs membres l'ont signalé, et l'heure relative (l'heure exacte au survol et
+  dans le détail)
+- Et le détail montre « Un commentaire sur Décollage ! » (ou « La 2e photo de Météo »), avec la
+  miniature et « Voir en contexte », la copie gardée au moment du signalement, les précisions des
+  membres (jamais leurs noms), et les actions : Retirer, Classer sans suite, Suspendre le compte
+- Et la fiche de l'auteur : « Compte récent » s'il a moins de 14 jours, sa date d'inscription, ses
+  nombres de projets et de commentaires, et ce que la modération a déjà décidé pour lui (« 2
+  retraits, 1 suspension levée ») ; les administrateurs seuls la voient
+- Et l'historique montre une icône de couleur par action (retrait, retrait d'une partie,
+  rétablissement, classement, suspension, levée) ; « Tout l'historique » ouvre l'historique
+  complet, filtrable par membre comme aujourd'hui
+- Et « Suspendre le compte » ouvre une fenêtre (planche `R9-Suspendre`) : 7 jours, 30 jours ou sans
+  fin, le fondement, l'explication, le mot de passe pour « sans fin » ; la page `/suspend`
+  disparaît, la levée passe par la même fenêtre
+
+### La modération sur téléphone (planche `R9-Moderation-Telephone`)
+
+- Étant donné Louis sur « Modération », sur son téléphone
+- Alors il voit la file (« À traiter (3) », « Retirés ») et un bouton « Historique »
+- Quand il touche un signalement, son détail s'ouvre en page (même contenu que la colonne du
+  milieu) ; Retirer et Suspendre ouvrent des feuilles
+
+### Un compte suspendu (planche `R9-Suspendu`, jur-R5, jur-R6, J12, J14)
+
+- Étant donné Karim, suspendu, qui se connecte
+- Alors le bandeau donne la raison, la fin et « Contester », un lien vers l'adresse de contact dont
+  l'objet nomme la décision (J12) ; le « + » disparaît de la barre d'onglets
+- Et en plus de ce qu'il peut faire aujourd'hui (supprimer ses contenus, exporter, régler, bloquer,
+  signaler…), il peut **retirer** sa bio, ses outils et sa photo, sans en mettre d'autres (jur-R5)
+- Et il peut passer un projet public en privé, jamais l'inverse (J14), après une confirmation
+  (décision L6 de Louis, 13/11/2026)
+- Quand Louis lève la suspension « pour erreur »
+- Alors la notification le dit : « Ta suspension a été levée : c'était une erreur de la
+  modération. Tu peux de nouveau publier et interagir. » (jur-R6 ; texte relu, décision L1 de
+  Louis, 13/11/2026)
+- Et une levée simple dit seulement que la suspension est levée, comme aujourd'hui
+
+### L'adresse de contact, partout un lien
+
+- La connexion, les bandeaux, les notifications de modération et les feuilles de Signaler écrivent
+  l'adresse de contact comme un lien (`ContactLink`) (« À reprendre ») ; « Contester » en est un
+
+### Accessibilité (« À reprendre », points « Signaler » de 7a et 7b)
+
+- La notice d'un contenu retiré est un groupe nommé par son titre ; dans la notification de
+  retrait, la citation du contenu vient sous le titre, avant « Pour contester »
+- Sur téléphone, le focus du lecteur d'écran revient sur « … » quand le menu se ferme
+- Sur ordinateur, le premier Tab après l'ouverture de la feuille va dans la feuille (plus de
+  « BODY [FOCUS PERDU] » à 1440 px), et le focus revient sur « Signaler » à la fermeture
+- Chaque choix de la feuille se parcourt aux flèches, un seul arrêt de Tab par liste
+
+### Ménage (restes de R8)
+
+- Les clés orphelines `profile.emails.*` et `notifications.removedDetail` disparaissent ; la tâche
+  retirée `mention-emails` sort du planificateur
+
+### Mes données
+
+- L'export garde les décisions qui visent le membre, avec la partie retirée et le pseudo
+  provisoire ; jamais l'administrateur, jamais qui a signalé
+- Un signalement garde la partie visée ; la suppression du compte s'en charge comme aujourd'hui
+  (un an, sans le nom)
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) : Malik signale la 2e photo de « Le ciel de ce soir » (« Lien, démo ou
+  prompt dangereux ») depuis le menu « … » ; un administrateur la retire seule ; Léa, l'autrice,
+  voit la photo « Retiré par la modération » et la remplace ; Malik voit que son signalement a été
+  traité
+
+### Les choix de la session (12/11/2026), à valider avec ce scénario
+
+1. **« Bloquer aussi » est une case avant l'envoi**, comme le dit `decisions.md` (28/10), et non
+   un bouton sur l'écran « Envoyé » comme le dessine `R9-Signaler-Envoye`.
+2. **Le huitième motif** s'appelle « Lien, démo ou prompt dangereux » (les renvois de R5a et R6),
+   pas « Lien ou démo dangereux » (A6).
+3. **La catégorie se signale, mais ne se retire pas** : la modération la range (R6b).
+4. **Le quota se dit à l'ouverture de la feuille**, pas après qu'on a tout rempli.
+5. **La fenêtre « Retirer »** propose deux choix, comme la planche : retirer une autre partie que
+   celle signalée n'y est pas (7c le permettait) ; on rouvre alors le contenu.
+6. **Le pseudo provisoire se demande dans une feuille qu'on peut remettre à plus tard**, avec un
+   bandeau sur « Moi ».
+7. **Deux points des listes** : J12, « Contester » nomme la décision dans l'objet de l'e-mail ;
+   J14, un suspendu peut passer un projet en privé.
+8. **La copie gardée** au moment du signalement reste la preuve montrée à la modération, même si
+   l'auteur a changé la partie depuis.
+
+### Les planches qui manquent (les visuels d'abord)
+
+Les dix planches du 28/10 couvrent l'essentiel. À dessiner et faire valider avant la relecture du
+plan :
+- `R9-Signaler-Etats` : le quota atteint à l'ouverture, « C'est ton projet », « déjà signalé »,
+  « Abandonner le signalement ? » (téléphone, jour) ;
+- `R9-Moderation-Detail-Telephone` : le détail d'un signalement sur téléphone, la fiche de
+  l'auteur, la feuille « Retirer » ;
+- `R9-Activite-Moderation` : les lignes d'Activité d'une partie retirée, d'un rétablissement, d'une
+  levée pour erreur et du pseudo provisoire (téléphone, jour).

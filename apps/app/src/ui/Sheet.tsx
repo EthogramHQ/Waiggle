@@ -27,6 +27,9 @@
 // - on la ferme aussi en la glissant vers le bas par sa tête (décision D1 de Louis), sauf pendant
 //   une action en cours (`busy`).
 //
+// Tranche R9 (la feuille « Signaler », deux étapes) : `back`, un « Retour » en haut à gauche de la
+// tête, qui revient d'une étape sans fermer la feuille (voir la prop).
+//
 // Tranche R6a (la feuille de publication), pour toutes les feuilles, chaque prop facultative :
 // - `closeGuard` : la feuille a des changements à ne pas perdre. Toute demande de fermeture
 //   (« Annuler », « Fermer », Échap, voile, retour d'Android, glisser) l'appelle au lieu de
@@ -66,7 +69,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
-import { type Focusable, focusTarget, focusWithoutScroll } from './focus'
+import { type Focusable, focusTarget, focusWithoutScroll, moveReaderTo } from './focus'
 import { IconButton } from './IconButton'
 import { inLayerAbove, layerStillOpening, openModalLayer, sameLayer } from './modalLayers'
 import { Notice, type NoticeAction } from './Notice'
@@ -213,6 +216,22 @@ type PanelProps = {
    * projet… », R6a) ; sur téléphone, où l'action est dans la tête, à la fin du contenu.
    */
   footerNote?: ReactNode
+  /**
+   * « Retour » (R9, la feuille « Signaler » : de l'étape du motif, retour à « Quelle partie ? »), en
+   * haut à gauche de la tête, avant le titre. Revenir d'une étape ne ferme pas la feuille : il
+   * n'appelle ni `onClose` ni `closeGuard`. Pendant une action en cours (`busy`), il est inactif
+   * comme « Fermer ». « Annuler » passe alors à droite, à la place où se trouvait la croix.
+   */
+  back?: { label: string; onPress: () => void }
+  /**
+   * Le pied a déjà son propre « Fermer » (R9, la feuille « Signaler » : « Merci », la limite du
+   * jour, « déjà signalé ») : la tête ne dessine pas sa croix. Deux boutons du même nom « Fermer »
+   * se liraient pareil, sans dire lequel prendre (relecture de R9). Le focus qui allait à la croix
+   * (ouverture, Tab sans rien d'autre, tape sur le voile pendant la garde) va au premier bouton du
+   * pied ; si la croix avait le focus en disparaissant, il y passe aussi. Sans effet quand
+   * « Annuler » remplace la croix (`cancelLabel`).
+   */
+  closeInFooter?: boolean
 }
 
 /**
@@ -725,13 +744,21 @@ export function Sheet({
   // titre de la page qui reste (`giveFocusBack`).
   useEffect(() => {
     escapeHandled.current = false
-    if (Platform.OS !== 'web') return
+    if (Platform.OS !== 'web') {
+      // Sur téléphone, le lecteur d'écran va lui aussi à l'élément attendu, comme dans `Dialog` :
+      // le `focus()` de `onShow` (plus bas) n'ouvre que le clavier d'un champ, et ne déplace rien
+      // quand l'élément attendu est un bouton (« Fondement » du retrait, R9).
+      if (open) moveReaderTo(initialFocusRef?.current)
+      return
+    }
     if (open) {
       shown.current = true
       opener.current = activeElement()
       openerName.current = nameOf(opener.current)
       const wanted = initialFocusRef?.current
-      if (!wanted || !focusWithoutScroll(wanted)) focusWithoutScroll(closeRef.current)
+      // `focusTarget` : la croix elle-même, ou le premier bouton du pied quand il porte « Fermer »
+      // (`closeInFooter`, la `ref` est alors sur le pied).
+      if (!wanted || !focusWithoutScroll(wanted)) focusWithoutScroll(focusTarget(closeRef.current))
       return
     }
     // Une feuille jamais ouverte n'a rien à rendre (montée fermée, elle ne prend pas le focus).
@@ -840,7 +867,7 @@ export function Sheet({
         )
       : []
     if (nodes.length === 0) {
-      focusWithoutScroll(closeRef.current)
+      focusWithoutScroll(focusTarget(closeRef.current))
       return
     }
     const index = nodes.indexOf(activeElement() as WebElement)
@@ -911,7 +938,7 @@ export function Sheet({
     ? undefined
     : () => {
         if (!tapsAllowed) {
-          if (Platform.OS === 'web') focusWithoutScroll(closeRef.current)
+          if (Platform.OS === 'web') focusWithoutScroll(focusTarget(closeRef.current))
           return
         }
         requestClose()
@@ -1153,6 +1180,8 @@ export function SheetPanel({
   action,
   cancelLabel,
   footerNote,
+  back,
+  closeInFooter = false,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -1245,6 +1274,14 @@ export function SheetPanel({
     </Text>
   )
 
+  // « Retour », au bord gauche de la rangée du haut, dessiné avant tout le reste : le premier
+  // élément atteignable de la tête. Il ne ferme rien (`onPress` de l'écran) ; inactif pendant `busy`.
+  const backLink = back ? (
+    <View style={{ position: 'absolute', left: 0 }}>
+      <TextLink label={back.label} onPress={back.onPress} role="button" disabled={busy} />
+    </View>
+  ) : null
+
   // La poignée, au centre ; décorative (« Fermer » ou « Annuler » font le même geste).
   const handle = (
     <View
@@ -1267,8 +1304,13 @@ export function SheetPanel({
       <View style={{ gap: space.xs }}>
         <View
           {...dragHandlers}
-          style={{ alignItems: 'center', justifyContent: 'center', minHeight: space.xl }}
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: back ? layout.touchTarget : space.xl,
+          }}
         >
+          {backLink}
           {handle}
         </View>
         <SheetHeader
@@ -1299,59 +1341,95 @@ export function SheetPanel({
       </View>
     ) : null
 
+  // La croix n'est pas dessinée quand le pied porte déjà « Fermer » (`closeInFooter`), sauf si
+  // « Annuler » la remplace (il n'y a alors pas de croix de toute façon).
+  const crossless = closeInFooter && !(phone && cancelLabel !== undefined)
+  // Le pied libre de l'écran. Sans croix, il reçoit aussi la `ref` de « Fermer » (voir plus bas).
+  const footerBox = useRef<View | null>(null)
+  const footerRef = (node: View | null) => {
+    footerBox.current = node
+    if (!crossless || !closeRef) return
+    if (typeof closeRef === 'function') closeRef(node)
+    else closeRef.current = node
+  }
+  // La croix vient de partir (la feuille passe à « Merci », ou s'est ouverte sur la limite du jour)
+  // alors qu'elle avait le focus : le navigateur le laisse sur la page (`body`). Il va au premier
+  // bouton du pied, le « Fermer » qui la remplace. useLayoutEffect : avant que rien ne se dessine.
+  // Seulement au changement (à l'ouverture, Sheet pose lui-même le focus ; au catalogue, la page
+  // ne doit pas se le faire prendre).
+  const wasCrossless = useRef(crossless)
+  useLayoutEffect(() => {
+    const before = wasCrossless.current
+    wasCrossless.current = crossless
+    if (Platform.OS !== 'web' || before || !crossless || !focusLost()) return
+    focusWithoutScroll(focusTarget(footerBox.current))
+  }, [crossless])
+  // La rangée du haut : sur ordinateur, sans croix ni « Retour », elle serait vide (44 points d'air
+  // au-dessus du titre) ; elle n'est pas posée.
+  const topRow = phone || back !== undefined || !crossless
+
   const header = actionHeader ?? (
     // Sur téléphone, toute la tête de la feuille (poignée, « Fermer », titre) se saisit pour la
     // glisser vers le bas (`dragHandlers`, donnés par Sheet).
     <View style={{ gap: space.md }} {...dragHandlers}>
       {/* La rangée du haut a la hauteur du bouton « Fermer » (44) : il y tient entier, au lieu de
           déborder du coin arrondi de la feuille, et la poignée est centrée dans la même rangée. */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: layout.touchTarget,
-        }}
-      >
-        {phone ? handle : null}
-        {/* « Fermer », à côté de la poignée, au bord droit : le premier élément atteignable de la
+      {topRow ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: layout.touchTarget,
+          }}
+        >
+          {backLink}
+          {phone ? handle : null}
+          {/* « Fermer », à côté de la poignée, au bord droit : le premier élément atteignable de la
             feuille, où le focus arrive à l'ouverture. Sur téléphone, « Annuler » (R6a) le
             remplace, au bord gauche ; sur ordinateur, « Annuler » est au pied, et la croix reste. */}
-        {phone && cancelLabel !== undefined ? (
-          <View style={{ position: 'absolute', left: 0 }}>
-            <TextLink
-              label={cancelLabel}
-              onPress={guarded(onClose)}
-              role="button"
-              disabled={busy}
-              {...(closeRef ? { ref: closeRef } : null)}
-            />
-          </View>
-        ) : (
-          <View style={{ position: 'absolute', right: 0 }}>
-            <IconButton
-              icon="x"
-              label={close}
-              variant="plain"
-              onPress={onClose}
-              // Pendant une action qui ne s'arrête plus, « Fermer » est inactif : il ne mentirait pas.
-              disabled={busy}
-              {...(closeRef ? { ref: closeRef } : null)}
-            />
-          </View>
-        )}
-      </View>
+          {crossless ? null : phone && cancelLabel !== undefined ? (
+            // À gauche ; à droite quand « Retour » a pris la gauche.
+            <View
+              style={back ? { position: 'absolute', right: 0 } : { position: 'absolute', left: 0 }}
+            >
+              <TextLink
+                label={cancelLabel}
+                onPress={guarded(onClose)}
+                role="button"
+                disabled={busy}
+                {...(closeRef ? { ref: closeRef } : null)}
+              />
+            </View>
+          ) : (
+            <View style={{ position: 'absolute', right: 0 }}>
+              <IconButton
+                icon="x"
+                label={close}
+                variant="plain"
+                onPress={onClose}
+                // Pendant une action qui ne s'arrête plus, « Fermer » est inactif : il ne mentirait pas.
+                disabled={busy}
+                {...(closeRef ? { ref: closeRef } : null)}
+              />
+            </View>
+          )}
+        </View>
+      ) : null}
       {/* Le titre et, à sa droite, le décor (s'il y en a un). Sans décor, la rangée garde à droite
           la place du bouton « Fermer », pour que les deux bords du titre restent alignés. Sauf un
           titre avec son nombre : sa taille est calculée pour que son plus long mot tienne dans la
           largeur de la feuille (`wholeWords`), et « Commentaires » se coupait à 200 % de texte dans
-          cette place en moins (R5b, des-C2) ; « Fermer » est dans la rangée du dessus. */}
+          cette place en moins (R5b, des-C2) ; « Fermer » est dans la rangée du dessus. Sans croix
+          (`closeInFooter`), rien à équilibrer : le titre prend toute la largeur. */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: space.md,
-          ...(decoration || titleCount ? null : { paddingRight: layout.touchTarget + space.md }),
+          ...(decoration || titleCount || crossless
+            ? null
+            : { paddingRight: layout.touchTarget + space.md }),
         }}
       >
         <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
@@ -1522,7 +1600,10 @@ export function SheetPanel({
         <View
           style={{
             paddingHorizontal: actionOnTop ? space.md : space.xl,
-            paddingTop: actionOnTop ? space.xs : space.md,
+            // Sans la rangée du haut (ni croix ni « Retour » : feuille sans croix sur ordinateur),
+            // plus de 44 points d'air au-dessus du titre : il prendrait 12 points du coin arrondi,
+            // moins que les 20 du côté. La marge du haut vaut alors celle du côté.
+            paddingTop: actionOnTop ? space.xs : topRow ? space.md : space.xl,
             paddingBottom: space.sm,
             ...(actionOnTop
               ? { borderBottomWidth: borders.hairline, borderBottomColor: colors.line }
@@ -1576,7 +1657,13 @@ export function SheetPanel({
             {noticeBelow ? noticeNode : null}
             {/* Le pied libre d'un écran (« Quitter les testeurs ») : pendant la garde d'ouverture
                 il ne reçoit aucune tape. La même vue reste là ensuite (rien ne se remonte). */}
-            {footer ? <View pointerEvents={tapsAllowed ? 'auto' : 'none'}>{footer}</View> : null}
+            {/* Sans croix (`closeInFooter`), la `ref` de « Fermer » va au pied : Sheet y pose le
+                focus sur son premier bouton (`focusTarget`). */}
+            {footer ? (
+              <View pointerEvents={tapsAllowed ? 'auto' : 'none'} ref={footerRef}>
+                {footer}
+              </View>
+            ) : null}
             {actionRow}
           </View>
         ) : null}

@@ -2,16 +2,25 @@
 // (R7a ; une note avant), un commentaire (ou une réponse) ou un profil, avec un motif ; un administrateur voit la file, puis
 // retire le contenu ou classe le signalement. Chaque décision est gardée : qui, quand, quoi,
 // pourquoi. La personne qui signale n'apparaît dans aucune réponse destinée à l'auteur du contenu.
+// R9 (7d) : on signale aussi une partie d'un contenu (« La 2e photo »), que la modération peut
+// retirer seule ; les parties sont décrites dans removal.ts.
 import { z } from 'zod'
 import { PASSWORD_MAX_LENGTH } from './accounts'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
 import { MemberId } from './members'
 import { ProjectId } from './projects'
-import { REMOVAL_EXPLANATION_MAX, RemovalGround } from './removal'
+import {
+  PartOut,
+  REMOVAL_EXPLANATION_MAX,
+  RemovalGround,
+  ReportPart,
+  ReportPartField,
+} from './removal'
 import { LiftCause, SuspensionDuration } from './suspension'
 import { FreeText, isClean, VisibleFreeText } from './text'
 import { UpdateId } from './updates'
+import { ProjectVisual } from './visuals'
 
 /** La précision libre d'un signalement : 500 caractères au plus. */
 export const REPORT_DETAILS_MAX = 500
@@ -168,9 +177,66 @@ export const ReportReason = z.enum([
   'scam_spam',
   'impersonation',
   'privacy',
+  // R9 : « Lien, démo ou prompt dangereux » (arnaque, virus, hameçonnage, prompt piégé), avant
+  // « Autre chose ».
+  'dangerous_link',
   'other',
 ])
 export type ReportReason = z.infer<typeof ReportReason>
+
+/**
+ * R9 : les parties qu'on peut signaler, par sorte de cible, dans l'ordre où la feuille les propose
+ * (le tableau « Les parties » du scénario). Un commentaire se signale en entier : il n'en a pas.
+ */
+export const REPORTABLE_PARTS = {
+  project: [
+    'title',
+    'pitch',
+    'description',
+    'category',
+    'tools',
+    'demoUrl',
+    'cover',
+    'photo',
+    'photoDescription',
+    'prompt',
+  ],
+  update: ['text', 'photo'],
+  comment: [],
+  member: ['name', 'handle', 'bio', 'favoriteTools', 'avatar'],
+  call: ['photo'],
+  message: ['photo'],
+} as const satisfies Record<ReportTargetKind, readonly ReportPartField[]>
+
+/**
+ * R9 : les parties que la modération peut retirer seules. Le titre et le pitch d'un projet, le
+ * texte d'une mise à jour : on retire tout le contenu (l'API répond 422 `part_whole_only`). La
+ * catégorie : la modération la range depuis « Catégories » (R6b), sans retrait. Un profil ne se
+ * retire pas entier (il se suspend) : chacune de ses parties se retire seule.
+ */
+export const REMOVABLE_PARTS = {
+  project: ['description', 'tools', 'demoUrl', 'cover', 'photo', 'photoDescription', 'prompt'],
+  update: ['photo'],
+  comment: [],
+  member: ['name', 'handle', 'bio', 'favoriteTools', 'avatar'],
+  call: ['photo'],
+  message: ['photo'],
+} as const satisfies Record<ReportTargetKind, readonly ReportPartField[]>
+
+/** Vrai si `field` est une partie qu'on peut signaler sur une cible de cette sorte. */
+export const isReportablePart = (kind: StoredReportTargetKind, field: ReportPartField): boolean =>
+  kind !== 'note' && (REPORTABLE_PARTS[kind] as readonly ReportPartField[]).includes(field)
+
+/** Vrai si la modération peut retirer seule cette partie d'une cible de cette sorte. */
+export const isRemovablePart = (kind: StoredReportTargetKind, field: ReportPartField): boolean =>
+  kind !== 'note' && (REMOVABLE_PARTS[kind] as readonly ReportPartField[]).includes(field)
+
+/** La règle commune : une partie n'existe que pour une sorte de cible qui en a (400 sinon). */
+const partFitsTarget = (value: {
+  target: { kind: StoredReportTargetKind }
+  part?: ReportPart | undefined
+}) => value.part === undefined || isReportablePart(value.target.kind, value.part.field)
+const PART_DOES_NOT_FIT = { path: ['part'], message: 'this target has no such part' }
 
 /**
  * Ce que l'appli envoie pour signaler (POST /v1/reports). Le texte visé n'en fait pas partie :
@@ -184,9 +250,12 @@ export type ReportReason = z.infer<typeof ReportReason>
 export const CreateReport = z
   .object({
     target: ReportTarget,
+    /** R9 : la partie signalée ; absente, tout le contenu. */
+    part: ReportPart.optional(),
     reason: ReportReason,
     details: FreeText(REPORT_DETAILS_MAX).optional(),
   })
+  .refine(partFitsTarget, PART_DOES_NOT_FIT)
   .refine(
     (report) =>
       report.reason !== 'illegal' ||
@@ -221,6 +290,8 @@ export const ReportTargetPreview = z
      * après l'envoi (tranche 7b) ; `isBlocked` : le visiteur l'a déjà bloqué (rien à proposer).
      * `handle` vaut null quand un blocage les sépare, dans un sens ou dans l'autre (un commentaire
      * lu malgré le blocage, règles 1 et 2) : le nom reste, le pseudo et la photo non (24/10/2026).
+     * Jamais si l'auteur est administrateur : ce rôle n'est dit à aucun membre, et un
+     * administrateur se bloque comme tout membre (relecture de sécurité de R9, 14/11/2026).
      */
     author: z
       .object({
@@ -230,6 +301,43 @@ export const ReportTargetPreview = z
         isBlocked: z.boolean(),
       })
       .strict(),
+    /**
+     * R9 : le rappel en tête de la feuille (relecture du plan ui-P1) : le titre du contenu (titre
+     * d'un projet ou d'une mise à jour ; null pour ce qui n'en a pas, l'appli compose alors son
+     * libellé), le nom de son auteur, et la miniature (couverture visible du projet, photo de profil,
+     * ou null).
+     */
+    head: z
+      .object({
+        title: z.string().nullable(),
+        authorName: z.string(),
+        image: ProjectVisual.pick({ url: true, thumbhash: true }).nullable(),
+      })
+      .strict(),
+    /**
+     * R9 : les parties présentes sur la page, dans l'ordre de REPORTABLE_PARTS (un projet sans prompt
+     * n'a pas `prompt`) ; vide pour un commentaire. Une photo porte son identifiant, son rang à partir
+     * de 1 et sa miniature. `reportedByMe` : ce membre a déjà un signalement ouvert de cette partie
+     * (« Tu as déjà signalé cette partie », dit après « Continuer »).
+     */
+    parts: z.array(
+      z
+        .object({
+          field: ReportPartField,
+          mediaId: z.uuid().nullable(),
+          position: z.int().positive().nullable(),
+          thumb: ProjectVisual.pick({ url: true, thumbhash: true }).nullable(),
+          reportedByMe: z.boolean(),
+        })
+        .strict(),
+    ),
+    /** R9 : ce membre a déjà un signalement ouvert du contenu entier. */
+    reportedByMe: z.boolean(),
+    /**
+     * R9 : les signalements qu'il peut encore envoyer dans les 24 heures (REPORTS_PER_DAY au plus) ;
+     * à 0, la feuille le dit dès son ouverture. Lu sans compter ni ouvrir de fenêtre (`peek`).
+     */
+    remainingToday: z.int().min(0).max(REPORTS_PER_DAY),
   })
   .meta({ id: 'ReportTargetPreview' })
 export type ReportTargetPreview = z.infer<typeof ReportTargetPreview>
@@ -249,6 +357,25 @@ export type ReportTargetState = z.infer<typeof ReportTargetState>
 export const ModerationQueueItem = z
   .object({
     target: StoredReportTarget,
+    /**
+     * R9 : la partie signalée ; null : le contenu entier. Une même cible donne un élément par partie
+     * (le projet entier et sa 2e photo sont deux éléments de la file).
+     */
+    part: PartOut.nullable(),
+    /**
+     * R9 (ui-P1) : le projet qui porte la cible, pour « Un commentaire sur Décollage ! » et sa
+     * miniature ; null pour un profil, ou un projet supprimé depuis.
+     */
+    context: z
+      .object({
+        projectId: ProjectId,
+        title: z.string(),
+        image: ProjectVisual.pick({ url: true, thumbhash: true }).nullable(),
+      })
+      .strict()
+      .nullable(),
+    /** R9 : la date de publication de la cible ; null si elle a disparu. */
+    contentCreatedAt: z.iso.datetime().nullable(),
     /** Le projet de la cible, pour le lien « Voir » ; null pour un profil. */
     projectId: ProjectId.nullable(),
     /**
@@ -275,11 +402,19 @@ export const ModerationQueueItem = z
      * un profil), sur l'année gardée (tranche 7c) ; null si son compte a été supprimé. Ne comptent
      * ni les retraits rétablis depuis, ni les suspensions levées pour erreur (J10).
      * `canSuspend` : faux pour l'administrateur qui regarde, pour un administrateur en fonction, ou
-     * un membre déjà suspendu.
+     * un membre déjà suspendu. R9 (la fiche de l'auteur) : son nom et son pseudo actuels, sa date
+     * d'inscription (« Compte récent » sous 14 jours), ses nombres de projets et de commentaires non
+     * supprimés, privés et retirés compris. Jamais qui a signalé. `removals` compte aussi les
+     * retraits d'une partie.
      */
     authorRecord: z
       .object({
         memberId: z.string(),
+        name: z.string(),
+        handle: z.string(),
+        joinedAt: z.iso.datetime(),
+        projectCount: z.int().nonnegative(),
+        commentCount: z.int().nonnegative(),
         removals: z.int().nonnegative(),
         suspensions: z.int().nonnegative(),
         suspendedNow: z.boolean(),
@@ -309,6 +444,8 @@ export type ModerationQueuePage = z.infer<typeof ModerationQueuePage>
 export const RemovedItem = z
   .object({
     target: StoredReportTarget,
+    /** R9 : la partie retirée seule ; null : le contenu entier. */
+    part: PartOut.nullable(),
     projectId: ProjectId.nullable(),
     /** Son texte actuel (titre et pitch d'un projet, titre et lignes d'une mise à jour, texte d'un commentaire). */
     text: z.string(),
@@ -343,19 +480,31 @@ export const ModerationPassword = z.string().min(1).max(PASSWORD_MAX_LENGTH)
 /**
  * Une décision (POST /v1/moderation/decisions) : retirer (avec un fondement et une explication),
  * classer sans suite, ou rétablir un contenu retiré ; suspendre un compte ou lever sa suspension
- * (tranche 7c). Un profil n'accepte que « classer » (le retrait d'une partie vient en 7d).
+ * (tranche 7c). R9 (7d) : retirer, classer et rétablir visent aussi une partie (`part`) ; un profil
+ * n'accepte un retrait que d'une partie. L'API vérifie que la photo appartient à la cible (404),
+ * qu'un signalement ouvert vise cette partie pour un retrait (409 `part_not_reported`), et refuse
+ * une partie qui ne se retire pas seule (422 `part_whole_only`, REMOVABLE_PARTS).
  */
 export const ModerationDecisionInput = z
   .discriminatedUnion('action', [
     z.object({
       action: z.literal('remove'),
       target: StoredReportTarget,
+      part: ReportPart.optional(),
       ground: RemovalGround,
       explanation: RemovalExplanation,
       password: ModerationPassword.optional(),
     }),
-    z.object({ action: z.literal('dismiss'), target: StoredReportTarget }),
-    z.object({ action: z.literal('restore'), target: StoredReportTarget }),
+    z.object({
+      action: z.literal('dismiss'),
+      target: StoredReportTarget,
+      part: ReportPart.optional(),
+    }),
+    z.object({
+      action: z.literal('restore'),
+      target: StoredReportTarget,
+      part: ReportPart.optional(),
+    }),
     z.object({
       action: z.literal('suspend'),
       memberId: MemberId,
@@ -376,6 +525,7 @@ export const ModerationDecisionInput = z
       explanation: RemovalExplanation,
     }),
   ])
+  .refine((decision) => !('part' in decision) || partFitsTarget(decision), PART_DOES_NOT_FIT)
   .meta({ id: 'ModerationDecisionInput' })
 export type ModerationDecisionInput = z.infer<typeof ModerationDecisionInput>
 
@@ -413,6 +563,8 @@ export const DecisionHistoryItem = z
     admin: HistoryMember.nullable(),
     /** La cible : un contenu, ou le membre pour un profil, une suspension ou une levée. */
     target: StoredReportTarget,
+    /** R9 : la partie d'un retrait, d'un classement ou d'un rétablissement d'une partie ; null sinon. */
+    part: PartOut.nullable(),
     /** Le projet de la cible, pour le lien ; null pour un membre, ou un contenu supprimé depuis. */
     projectId: ProjectId.nullable(),
     /** Le membre visé (l'auteur du contenu, ou le membre lui-même) ; null si son compte est parti. */
@@ -452,6 +604,8 @@ export type ReportOutcome = z.infer<typeof ReportOutcome>
 export const ReportExport = z.object({
   targetKind: StoredReportTargetKind,
   targetId: z.string(),
+  /** R9 : la partie signalée (son champ, et sa photo) ; null : le contenu entier. */
+  part: z.object({ field: ReportPartField, mediaId: z.uuid().nullable() }).nullable(),
   reason: ReportReason,
   details: z.string().nullable(),
   createdAt: z.iso.datetime(),
@@ -459,3 +613,23 @@ export const ReportExport = z.object({
   decidedAt: z.iso.datetime().nullable(),
 })
 export type ReportExport = z.infer<typeof ReportExport>
+
+/**
+ * R9 (relecture juridique P3) : une décision qui vise le membre, dans l'export de ses données :
+ * retraits (entiers ou d'une partie) et rétablissements de ses contenus, suspensions et levées de
+ * son compte, des plus anciennes aux plus récentes. Jamais l'administrateur, jamais qui a signalé,
+ * jamais un classement sans suite (il ne le vise pas). `previousValue` : l'ancien nom ou pseudo
+ * remplacé d'office par « Membre » ou « membre_4f2a », gardé un an pour un rétablissement ; null
+ * sinon.
+ */
+export const ModerationDecisionExport = z.object({
+  action: z.enum(['remove', 'restore', 'suspend', 'lift']),
+  at: z.iso.datetime(),
+  targetKind: StoredReportTargetKind,
+  targetId: z.string(),
+  part: z.object({ field: ReportPartField, mediaId: z.uuid().nullable() }).nullable(),
+  ground: RemovalGround.nullable(),
+  explanation: z.string().nullable(),
+  previousValue: z.string().nullable(),
+})
+export type ModerationDecisionExport = z.infer<typeof ModerationDecisionExport>

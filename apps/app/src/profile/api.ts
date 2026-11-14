@@ -2,7 +2,7 @@
 // d'avatar. Comme pour accounts/api.ts, les écrans n'appellent que ces fonctions ; les tests les
 // remplacent par de faux appels.
 import { Me, type ProfileUpdate } from '@ruche/contracts'
-import { request } from '../api/client'
+import { request, requestWithoutBody } from '../api/client'
 import { ApiError, type ApiResult } from '../api/errors'
 import { appendImage, pickImage } from '../media/pick'
 
@@ -45,3 +45,11 @@ export const uploadAvatar = async (image: PickedImage): Promise<ApiResult<Me>> =
   // Pas d'en-tête Content-Type ici : fetch le calcule lui-même avec la « frontière » du multipart.
   return request('/v1/me/avatar', { method: 'POST', body: form }, Me)
 }
+
+/**
+ * Retire la photo de profil (DELETE /v1/me/avatar, R9) : le seul geste sur la photo qu'un compte
+ * suspendu garde (jur-R5). La réponse n'a pas de corps qu'on lise : l'écran met lui-même le profil
+ * gardé en cache à jour (`useRemoveProfilePart`).
+ */
+export const deleteAvatar = (): Promise<ApiResult<null>> =>
+  requestWithoutBody('/v1/me/avatar', { method: 'DELETE' })

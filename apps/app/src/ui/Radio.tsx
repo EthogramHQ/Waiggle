@@ -10,7 +10,7 @@
 //   Choices fait la même chose en pastilles, sur une rangée ; RadioGroup sert quand les libellés
 //   sont longs ou nombreux.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { spaceToggles } from './keyboard'
 import { Text } from './Text'
@@ -77,6 +77,12 @@ export type RadioOption<T extends string> = {
   label: string
   /** Un choix qu'on voit mais qu'on ne peut pas prendre (annoncé « désactivé »). */
   disabled?: boolean
+  /**
+   * R9 : une phrase sous le libellé, plus petite, qui dit ce que le choix fait (« Le reste du projet
+   * reste affiché. », la fenêtre « Retirer »). Le nom lu reste le libellé ; la phrase est lue après,
+   * comme une description (`aria-describedby` sur le web, indice sur téléphone).
+   */
+  detail?: string
 }
 
 // <T extends string> : un composant « générique ». T est le type des valeurs possibles
@@ -114,6 +120,8 @@ export function RadioGroup<T extends string>({
   labelHidden = false,
 }: GroupProps<T>) {
   const { colors } = useTheme()
+  // Le préfixe des identifiants des phrases `detail`, stable au pré-rendu comme dans le navigateur.
+  const detailId = useId()
   // Les choix, pour y poser le focus quand une flèche passe au voisin.
   const refs = useRef<(View | null)[]>([])
   // Le seul choix que Tab atteint : le choix coché, sinon le premier qu'on peut prendre. Jamais un
@@ -168,6 +176,13 @@ export function RadioGroup<T extends string>({
         {options.map((option, index) => {
           const checked = option.value === value
           const disabled = option.disabled ?? false
+          const describedId = `${detailId}-${index}`
+          // La phrase du choix, reliée à lui sans entrer dans son nom.
+          const described = option.detail
+            ? Platform.OS === 'web'
+              ? { 'aria-describedby': describedId }
+              : { accessibilityHint: option.detail }
+            : null
           return (
             <Pressable
               key={option.value}
@@ -181,6 +196,7 @@ export function RadioGroup<T extends string>({
               disabled={disabled}
               onPress={() => onChange(option.value)}
               {...keys(index, option)}
+              {...described}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -196,6 +212,11 @@ export function RadioGroup<T extends string>({
               {/* flexShrink : un libellé long passe à la ligne au lieu de sortir de l'écran. */}
               <View style={{ flexShrink: 1 }}>
                 <Text tone={disabled ? 'muted' : 'default'}>{option.label}</Text>
+                {option.detail ? (
+                  <Text variant="caption" tone="muted" nativeID={describedId}>
+                    {option.detail}
+                  </Text>
+                ) : null}
               </View>
             </Pressable>
           )

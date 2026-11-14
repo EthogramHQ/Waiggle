@@ -1,7 +1,8 @@
 // Page « Mon profil » : photo, nom, pseudo, bio et outils favoris du membre connecté.
 // Les réglages d'e-mail (tranche 6c), qui étaient au bas de cette page, vivent depuis R2 dans la
 // rubrique « Notifications » des réglages (screens/settings/EmailSettings.tsx).
-// Un compte suspendu (tranche 7c) lit son profil sans pouvoir le modifier.
+// Un compte suspendu (tranche 7c) lit son profil sans pouvoir le modifier ; depuis R9 (jur-R5), il
+// peut en retirer sa bio, ses outils favoris et sa photo.
 // Depuis la tranche R2, tout se passe dans une feuille posée sur la page (ui/Sheet.tsx) : la photo
 // floutée en tête, « Changer la photo » qui la chevauche, « Enregistrer » collé en bas ; sur
 // ordinateur, l'aperçu de sa page à droite, qui suit ce qu'on tape. « Fermer » revient aux
@@ -26,13 +27,20 @@ import { useMediaSources } from '../api/media'
 import { useRouteSheet } from '../navigation/useRouteSheet'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { type ProfileFormErrors, toProfileUpdate } from '../profile/form'
-import { useMe, useSetMe } from '../profile/hooks'
+import { type RemovablePart, useMe, useRemoveProfilePart, useSetMe } from '../profile/hooks'
+import { ProvisionalNameSheet } from '../profile/ProvisionalNameSheet'
 import { useTools } from '../tools/api'
 import { useToolLabels } from '../tools/labels'
 import { isCatalogueName, matchTools } from '../tools/match'
 import { AvatarCover } from '../ui/AvatarCover'
 import { Button } from '../ui/Button'
-import { focusAndReveal } from '../ui/focus'
+import {
+  type Focusable,
+  focusAndReveal,
+  focusWithoutScroll,
+  holdsFocus,
+  moveReaderTo,
+} from '../ui/focus'
 import { Icon } from '../ui/Icon'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
@@ -80,13 +88,93 @@ function LockedProfile({ me }: { me: Me }) {
   const tools = usePreviewTools(me.favoriteTools)
   const sheet = useRouteSheet('/settings')
   const title = t(($) => $.profile.title)
+  const removePart = useRemoveProfilePart()
+  // Le pseudo (d'abord) ou le nom provisoire, que la modération a remplacé : `null` s'il n'y en a pas.
+  const provisionalKind = me.provisional.handle ? 'handle' : me.provisional.name ? 'name' : null
+  const [choosing, setChoosing] = useState(false)
+
+  // R9 (jur-R5, décision L5) : retirer sa bio, ses outils, sa photo, sans rien mettre à la place.
+  // Un retrait à la fois : `sending` le sait tout de suite (une double tape n'envoie qu'une fois),
+  // `busy` dessine le chargement du bouton touché au dessin suivant.
+  const sending = useRef(false)
+  const [busy, setBusy] = useState<RemovablePart | null>(null)
+  const [message, setMessage] = useState<Message>(null)
+  // Le titre de la feuille, où va le focus quand le bouton touché disparaît (relecture de
+  // l'interface, P8) : sans lui, le focus retomberait sur toute la page.
+  const titleRef = useRef<Focusable>(null)
+  const buttons = {
+    bio: useRef<Focusable>(null),
+    tools: useRef<Focusable>(null),
+    avatar: useRef<Focusable>(null),
+  }
+
+  const remove = async (part: RemovablePart) => {
+    if (sending.current) return
+    sending.current = true
+    setBusy(part)
+    const result = await removePart(part, me.id).finally(() => {
+      sending.current = false
+      setBusy(null)
+    })
+    if (!result.ok) {
+      // Le bouton reste, et le message dit pourquoi rien n'a changé.
+      setMessage({ text: t(($) => $.errors[result.error]), ok: false })
+      return
+    }
+    setMessage({
+      text:
+        part === 'bio'
+          ? t(($) => $.suspension.bioRemoved)
+          : part === 'tools'
+            ? t(($) => $.suspension.toolsRemoved)
+            : t(($) => $.suspension.avatarRemoved),
+      ok: true,
+    })
+    // Le bouton va disparaître (plus rien à retirer). Le clavier qui était dessus passe au titre,
+    // sans faire défiler ; le lecteur d'écran du téléphone aussi. Un focus parti ailleurs pendant
+    // l'attente reste où le membre l'a mis.
+    if (holdsFocus(buttons[part].current)) focusWithoutScroll(titleRef.current)
+    moveReaderTo(titleRef.current)
+  }
+
+  // Le message du dernier retrait, en tête du pied, comme « Profil enregistré. » du formulaire.
+  const notice = message
+    ? message.ok
+      ? { message: message.text, tone: 'success' as const, polite: true }
+      : { message: message.text }
+    : null
+  // Un bouton par chose à retirer, seulement s'il y a quelque chose.
+  const removals = [
+    me.bio ? { part: 'bio' as const, label: t(($) => $.suspension.removeBio) } : null,
+    me.favoriteTools.length > 0
+      ? { part: 'tools' as const, label: t(($) => $.suspension.removeTools) }
+      : null,
+    me.avatarUrl ? { part: 'avatar' as const, label: t(($) => $.suspension.removeAvatar) } : null,
+  ].filter((removal) => removal !== null)
+
   return (
     // La même feuille, sans champ : le titre « Mon profil » (niveau 1, la feuille est toute la
-    // page), puis le profil tel que les autres le lisent (son nom en niveau 2).
+    // page), puis le profil tel que les autres le lisent (son nom en niveau 2), puis ce qu'on peut
+    // en retirer (planche R9-Suspendu).
     <Screen pageTitle={title}>
-      <Sheet open={sheet.open} onClose={sheet.close} title={title} heading={1}>
+      <Sheet
+        open={sheet.open}
+        onClose={sheet.close}
+        title={title}
+        heading={1}
+        titleRef={titleRef}
+        notice={notice}
+      >
         {/* Lue à son tour (role « status ») : elle est là dès l'ouverture, ce n'est pas une alerte. */}
-        <Notice tone="info" message={t(($) => $.suspension.profileLocked)} polite />
+        <Notice
+          tone="info"
+          message={
+            provisionalKind
+              ? t(($) => $.suspension.profileLockedProvisional)
+              : t(($) => $.suspension.profileLocked)
+          }
+          polite
+        />
         <MemberHeader
           name={me.name}
           handle={t(($) => $.member.handle, { handle: me.handle })}
@@ -96,7 +184,47 @@ function LockedProfile({ me }: { me: Me }) {
           tools={tools}
           heading={2}
         />
+        {removals.length > 0 || provisionalKind ? (
+          <Stack gap="sm">
+            {/* Un nom ou un pseudo provisoire (retiré par la modération) se remplace même suspendu
+                (jur-B4) : ce bouton ouvre la feuille du nom provisoire, comme celle de « Moi ». */}
+            {provisionalKind ? (
+              <Button
+                label={
+                  provisionalKind === 'handle'
+                    ? t(($) => $.removal.part.chooseHandle)
+                    : t(($) => $.removal.part.chooseName)
+                }
+                variant="secondary"
+                icon="pencil-simple"
+                onPress={() => setChoosing(true)}
+              />
+            ) : null}
+            {removals.map(({ part, label }) => (
+              <Button
+                // La clé suit la partie, pas la place : quand un voisin disparaît, le bouton qui a
+                // le focus le garde.
+                key={part}
+                ref={buttons[part]}
+                label={label}
+                variant="secondary"
+                icon="trash"
+                onPress={() => void remove(part)}
+                loading={busy === part}
+              />
+            ))}
+          </Stack>
+        ) : null}
       </Sheet>
+      {/* La feuille du nom provisoire, ouverte par le bouton ci-dessus et par lui seul. */}
+      {provisionalKind ? (
+        <ProvisionalNameSheet
+          me={me}
+          otherSheetOpen={false}
+          open={choosing}
+          onClose={() => setChoosing(false)}
+        />
+      ) : null}
     </Screen>
   )
 }

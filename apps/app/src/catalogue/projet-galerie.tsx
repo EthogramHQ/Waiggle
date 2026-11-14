@@ -45,6 +45,9 @@ const fr = {
   more: 'Plus d’actions',
   day: 'jour',
   night: 'nuit',
+  marked:
+    'Une photo marquée (R9, mark) : retirée par la modération, que son auteur voit encore ; la marque suit la place dans le nom lu',
+  mark: 'Retiré par la modération',
 }
 
 const en: typeof fr = {
@@ -69,6 +72,9 @@ const en: typeof fr = {
   more: 'More actions',
   day: 'day',
   night: 'night',
+  marked:
+    'A marked photo (R9, mark): removed by moderation, still seen by its author; the mark follows the place in the spoken name',
+  mark: 'Removed by moderation',
 }
 
 /**
@@ -158,6 +164,20 @@ export function GalleryCatalogue() {
           {l.heard.replace('{{spoken}}', l.description)}
         </Text>
       </Example>
+
+      {/* R9 : la première photo marquée, de jour et de nuit (le verre de la pastille change). */}
+      {schemes.map((scheme) => (
+        <ThemeProvider key={`marked-${scheme}`} appearance={scheme}>
+          <Example caption={`${l.marked} — ${l[scheme]}`}>
+            <PhotoGallery
+              photos={PHOTOS.slice(0, 2).map((photo, rank) => ({
+                ...photo,
+                mark: rank === 0 ? l.mark : null,
+              }))}
+            />
+          </Example>
+        </ThemeProvider>
+      ))}
 
       <Text variant="caption" tone="muted">
         {l.bleed}

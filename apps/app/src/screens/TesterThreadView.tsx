@@ -53,7 +53,9 @@ import {
 } from '../testers/corner-api'
 import { draftKey, useDraft } from '../testers/drafts'
 import { Button } from '../ui/Button'
+import { excerpt } from '../ui/CommentAction'
 import { CommentComposer } from '../ui/CommentComposer'
+import { partContestSubject } from '../ui/contestSubject'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import { type Focusable, focusTarget, moveReaderTo } from '../ui/focus'
@@ -90,6 +92,11 @@ type Props = {
   authorName: string
   testerName: string
   /**
+   * Le titre du projet, pour l'objet de « Contester » d'une capture retirée (R9, J12). Absent : le
+   * début du retour nomme le message à sa place.
+   */
+  projectTitle?: string
+  /**
    * Pourquoi on ne peut plus répondre (« … ne fait plus partie des testeurs », « Le coin est
    * fermé… ») ; null : on peut répondre. On relit le fil, on supprime ses messages, on signale ceux
    * de l'autre.
@@ -123,6 +130,7 @@ export function TesterThreadView({
   reader,
   authorName,
   testerName,
+  projectTitle,
   readOnly,
   closed,
   layout = ({ messages, footer }) => (
@@ -291,6 +299,22 @@ export function TesterThreadView({
     return t(($) => $.project.testers.thread.settled)
   }
 
+  // La capture d'un retour retirée seule (R9, décision L2) : l'API ne la dit qu'à qui l'a envoyée
+  // (`removedParts` vide pour l'autre, qui ne reçoit plus la capture). L'objet de « Contester »
+  // nomme la capture, le projet (ou, sans lui, le début du retour) et la date de la décision (J12).
+  const captureRemovalOf = (message: TesterMessage) => {
+    const part = message.removedParts.find((one) => one.field === 'photo')
+    if (!part) return null
+    return {
+      removal: part.removal,
+      contestSubject: partContestSubject(t, i18n.language, {
+        part: t(($) => $.moderation.parts.capture),
+        title: projectTitle ?? excerpt(message.text ?? ''),
+        at: part.removal.at,
+      }),
+    }
+  }
+
   const bubble = (message: TesterMessage, index: number) => {
     const outcome = message.outcome
     const device = message.device
@@ -329,6 +353,7 @@ export function TesterThreadView({
               }
             : null
         }
+        captureRemoval={captureRemovalOf(message)}
         settled={settledText(message)}
         removal={
           message.removal ? (

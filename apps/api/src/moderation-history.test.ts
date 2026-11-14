@@ -185,7 +185,8 @@ describe('the history of decisions', () => {
 
     const admin = { id: louisId, name: 'Louis', handle: louisHandle }
     const member = { id: leaId, name: 'Léa', handle: leaHandle }
-    const none = { ground: null, explanation: null, duration: null, liftCause: null }
+    // R9 : part vaut null pour une décision sur le contenu entier.
+    const none = { ground: null, explanation: null, duration: null, liftCause: null, part: null }
     expect(page.items).toEqual([
       {
         id: expect.any(String),
@@ -401,6 +402,7 @@ describe('the history of decisions', () => {
         explanation: 'Une note publicitaire.',
         duration: null,
         liftCause: null,
+        part: null,
         afterReport: false,
       },
     ])

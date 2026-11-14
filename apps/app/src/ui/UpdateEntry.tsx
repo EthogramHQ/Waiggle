@@ -10,7 +10,11 @@
 // - ses lignes, chacune avec la pastille de sa famille, et lue « Nouveau : … » (la pastille seule ne
 //   dirait sa famille que par sa couleur et son icône) ;
 // - ses photos : l'avant / après des deux premières (puis les photos 3 et 4 en petites tuiles), ou
-//   la galerie « Photos de la mise à jour ».
+//   la galerie « Photos de la mise à jour » ;
+// - pour l'auteur seul, chaque photo retirée seule par la modération (R9, décision L2) : une
+//   `RemovedPart` sous les photos, avec la petite tuile de la photo, le fondement, l'explication, la
+//   date et « Contester ». Le reste de la mise à jour reste affiché au-dessus, tel quel. Ni
+//   « Remplacer » ni « Supprimer » : aucune route ne supprime une photo seule d'une mise à jour.
 //
 // Le composant ne parle jamais à l'API (règle des étages) : l'écran lui donne `toSource`, la fonction
 // de `useMediaSources()` qui fait une adresse de photo une source d'image (avec le cookie de session
@@ -22,6 +26,7 @@ import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
 import { BeforeAfter } from './BeforeAfter'
+import { partContestSubject } from './contestSubject'
 import type { Focusable } from './focus'
 import { hiddenFrame } from './HiddenHeading'
 import { IconButton } from './IconButton'
@@ -31,6 +36,7 @@ import { type GalleryPhoto, PhotoGallery } from './PhotoGallery'
 import { type CoverShape, ProjectCover } from './ProjectCover'
 import { RelativeTime } from './RelativeTime'
 import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
+import { RemovedPart } from './RemovedPart'
 import { Stack } from './Stack'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
@@ -98,7 +104,7 @@ export function UpdateEntry({
   now,
   photoHeight: photoShape,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { sizeClass } = useLayout()
   const compact = sizeClass === 'compact'
   const titleId = `update-title-${useId().replace(/[^\w-]/g, '')}`
@@ -124,6 +130,34 @@ export function UpdateEntry({
   // est plus grande ; ici, la mise à jour se lit dans une page qui a déjà sa couverture), sauf si
   // l'écran en demande une (la section de la page projet : une bande, même sur ordinateur).
   const photoHeight = photoShape ?? (compact ? 'band' : 'medium')
+
+  // Les photos retirées seules, que l'API ne donne qu'à l'auteur (`removedParts` vide pour les
+  // autres). Leur rang (« La photo 2 ») est leur place dans la mise à jour ; une photo que la liste
+  // n'a plus se dit sans numéro (« La photo a été retirée »).
+  const removedPhotos = update.removedParts
+    .filter((part) => part.field === 'photo')
+    .map((part) => {
+      const index = update.photos.findIndex((visual) => visual.id === part.mediaId)
+      const n = index + 1
+      return {
+        key: part.mediaId ?? `photo-${part.removal.at}`,
+        removal: part.removal,
+        photo: index >= 0 ? photos[index] : undefined,
+        title:
+          index >= 0
+            ? t(($) => $.removal.part.titles.photo, { n })
+            : t(($) => $.removal.part.titles.callPhoto),
+        subject: partContestSubject(t, i18n.language, {
+          part:
+            index >= 0
+              ? t(($) => $.moderation.parts.photo, { n })
+              : t(($) => $.moderation.parts.callPhoto),
+          title,
+          at: part.removal.at,
+        }),
+        tileLabel: t(($) => $.gallery.photoOf, { index: n, count: photos.length }),
+      }
+    })
 
   return (
     <View style={{ alignSelf: 'stretch', gap: space.md }}>
@@ -246,6 +280,21 @@ export function UpdateEntry({
           ))}
         </View>
       ) : null}
+
+      {/* Sous les photos, la notice de chaque photo retirée, avec sa tuile : l'auteur voit laquelle
+          (et la garde sous les yeux), le reste de la mise à jour reste lisible au-dessus. */}
+      {removedPhotos.map((removed) => (
+        <RemovedPart
+          key={removed.key}
+          title={removed.title}
+          removal={removed.removal}
+          contestSubject={removed.subject}
+          onReplace={null}
+          onDelete={null}
+        >
+          {removed.photo ? <PhotoTile photo={removed.photo} label={removed.tileLabel} /> : null}
+        </RemovedPart>
+      ))}
     </View>
   )
 }

@@ -3,7 +3,7 @@
 // apps/api/src/member-inputs.test.ts lit le schéma de la base et échoue si une colonne n'est
 // classée ni ici (une saisie), ni dans NOT_MEMBER_INPUTS (avec sa raison) : un champ ajouté un jour
 // ne peut donc pas échapper au signalement, au blocage et à l'export sans que quelqu'un le décide.
-import type { MemberInputField } from '@ruche/contracts'
+import { isRemovablePart, type MemberInputField, ReportPartField } from '@ruche/contracts'
 
 /** L'objet qui porte le champ : ce qu'on signale et ce qu'un blocage cache. */
 export type InputObject =
@@ -31,10 +31,31 @@ export type MemberInput = {
   snapshot: boolean
   /** Présent dans l'export de son auteur (jamais dans celui de qui signale). */
   export: boolean
-  // Tranche 7c : `removable`, le retrait de ce seul champ par la modération.
+  /**
+   * R9 (7d) : la modération peut retirer ce seul champ, le reste de son objet restant affiché
+   * (REMOVABLE_PARTS du contrat). Faux pour un champ qui n'est pas une partie (la version, une
+   * ligne d'une mise à jour, un commentaire, la précision d'un signalement), ou qui se retire avec
+   * tout son objet (le titre, le pitch, le texte d'une mise à jour).
+   */
+  removable: boolean
 }
 
-export const MEMBER_INPUTS: readonly MemberInput[] = [
+/** Une entrée telle qu'écrite plus bas ; `removable` est calculé ensuite, depuis le contrat. */
+type WrittenInput = Omit<MemberInput, 'removable'>
+
+/**
+ * Vrai si le champ est une partie que la modération retire seule sur cet objet. La règle n'est
+ * écrite qu'une fois, dans le contrat (isRemovablePart) : le registre la lit, il ne la recopie pas.
+ * `safeParse` dit si le nom du champ est bien une partie (ReportPartField) ; la précision d'un
+ * signalement (objet `report`) n'en est jamais une.
+ */
+const removableOf = (input: WrittenInput): boolean => {
+  if (input.object === 'report' || input.field === null) return false
+  const field = ReportPartField.safeParse(input.field)
+  return field.success && isRemovablePart(input.object, field.data)
+}
+
+const WRITTEN_INPUTS: readonly WrittenInput[] = [
   // Le profil.
   {
     field: 'name',
@@ -310,6 +331,12 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
   },
 ]
 
+/** Le registre : chaque entrée, avec son classement « se retire seule » (R9). */
+export const MEMBER_INPUTS: readonly MemberInput[] = WRITTEN_INPUTS.map((input) => ({
+  ...input,
+  removable: removableOf(input),
+}))
+
 /**
  * Les colonnes qui ne sont pas une saisie libre d'un membre, table par table, chacune avec sa
  * raison. Une colonne `text`, `jsonb` ou tableau n'y entre qu'avec une raison écrite (relecture de
@@ -345,6 +372,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     user_id: 'identifiant',
     claimed_at: 'date',
     released_at: 'date',
+    // R9 : le retrait qui a ôté ce pseudo à son propriétaire (réservé 30 jours).
+    held_by_removal: 'identifiant',
   },
   project: {
     id: 'identifiant',
@@ -376,6 +405,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     created_at: 'date',
     update_id:
       "la mise à jour qui porte la photo (null : photo du projet ou en attente), écrite par l'API",
+    // R9 : la décision qui a retiré cette seule photo (null : visible).
+    removal_id: 'identifiant',
   },
   // R7a : le titre, la version et les lignes sont au registre (MEMBER_INPUTS) ; le reste est écrit
   // par l'API.
@@ -427,6 +458,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     thumbhash:
       "l'aperçu flou calculé par l'API à partir de l'image, déjà au registre par sa clé (storage_key)",
     created_at: 'date',
+    // R9 : la décision qui a retiré cette seule photo (null : visible).
+    removal_id: 'identifiant',
   },
   project_comment: {
     id: 'identifiant',
@@ -570,6 +603,28 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     created_at: 'date',
     decided_at: 'date',
     decision_id: 'identifiant',
+    // R9 : la partie signalée seule.
+    part_field:
+      'la partie signalée (la 2e photo, la bio…), une liste fermée par Zod (ReportPartField)',
+    part_media_id: 'identifiant',
+  },
+  // R9 (7d) : les parties retirées en cours, écrites par l'API sur la décision d'un administrateur.
+  // Pas « * » : `hidden_value` est du JSON, qui demande sa raison écrite (B7).
+  content_part_removal: {
+    id: 'identifiant',
+    removal_id: 'identifiant',
+    author_id: 'identifiant',
+    object_kind: "la sorte de contenu, une liste fermée vérifiée par la base, écrite par l'API",
+    project_id: 'identifiant',
+    update_id: 'identifiant',
+    call_id: 'identifiant',
+    message_id: 'identifiant',
+    field: 'la partie retirée, une liste fermée par Zod (ReportPartField) et par la base',
+    project_media_id: 'identifiant',
+    tester_media_id: 'identifiant',
+    hidden_value:
+      "la valeur sortie de sa colonne au retrait, copie par l'API d'une saisie déjà au registre, lue par son seul auteur",
+    created_at: 'date',
   },
   moderation_decision: {
     id: 'identifiant',
@@ -586,6 +641,14 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     duration: "la durée d'une suspension, une liste fermée par Zod (SuspensionDuration)",
     after_report: 'booléen',
     lift_cause: "la raison d'une levée, une liste fermée par Zod (LiftCause)",
+    // R9 (7d) : la partie d'une décision, et le nom ou pseudo remplacé d'office.
+    part_field:
+      'la partie visée (la 2e photo, la bio…), une liste fermée par Zod (ReportPartField)',
+    part_media_id: 'identifiant',
+    previous_value:
+      "l'ancien nom ou pseudo remplacé d'office, copie par l'API d'une saisie déjà au registre, gardée un an pour un rétablissement",
+    provisional_value:
+      "le nom « Membre » ou le pseudo provisoire « membre_xxxx », fabriqué par l'API, jamais tapé par un membre",
   },
   // La suspension d'un compte (tranche 7c) : écrite par l'API sur la décision d'un administrateur ;
   // son explication est sur la décision (moderation_decision.explanation), pas ici.

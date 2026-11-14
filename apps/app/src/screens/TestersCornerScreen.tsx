@@ -65,6 +65,7 @@ import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Button } from '../ui/Button'
 import { CallCard } from '../ui/CallCard'
 import { Columns } from '../ui/Columns'
+import { partContestSubject } from '../ui/contestSubject'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
@@ -375,6 +376,7 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
       reader="tester"
       authorName={project.author.name}
       testerName={memberName}
+      projectTitle={project.title}
       readOnly={
         former ? t(($) => $.project.testers.formerTester, { name: project.author.name }) : null
       }
@@ -636,7 +638,7 @@ function ThreadPlaceholder({ projectId }: { projectId: string }) {
 // --- L'onglet « Appels » ---------------------------------------------------------------------------
 
 function CallsTab({ project, corner }: { project: Project; corner: TesterCorner }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
   const isAuthor = corner.role === 'author'
@@ -727,6 +729,23 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
           },
         ]
 
+  // La photo d'un appel retirée seule (R9) : l'API ne la dit qu'à l'auteur de l'appel
+  // (`removedParts` vide pour les testeurs, qui ne reçoivent plus la photo). L'objet de
+  // « Contester » nomme la photo, le projet et la date de la décision (J12).
+  const photoRemovalOf = (call: TesterCall) => {
+    const part = call.removedParts.find((one) => one.field === 'photo')
+    return part
+      ? {
+          removal: part.removal,
+          contestSubject: partContestSubject(t, i18n.language, {
+            part: t(($) => $.moderation.parts.callPhoto),
+            title: project.title,
+            at: part.removal.at,
+          }),
+        }
+      : null
+  }
+
   const more = calls.isFetchingNextPage
     ? 'loading'
     : calls.isFetchNextPageError
@@ -787,6 +806,7 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
                   <RemovalNotice {...removalBanner(call.removal, t)} compact />
                 ) : undefined
               }
+              photoRemoval={photoRemovalOf(call)}
               menu={menuOf(call)}
               focusRef={refOf(call.id, index)}
             />

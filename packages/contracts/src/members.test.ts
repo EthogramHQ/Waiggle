@@ -35,6 +35,8 @@ const lea = {
   isFollowed: false,
   followerCount: 3,
   projects: [summary],
+  // R9 : les parties retirées de son profil, vides pour tout autre visiteur.
+  removedParts: [],
   moderation: null,
 }
 

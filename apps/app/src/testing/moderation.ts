@@ -10,6 +10,8 @@ import type {
   Removal,
   RemovedItem,
   RemovedPage,
+  RemovedPart,
+  ReportTargetPreview,
   Suspension,
 } from '@ruche/contracts'
 
@@ -35,6 +37,10 @@ export const removalByLaw: Removal = {
 /** Le commentaire de Sam sur « Météo » : trois signalements, deux motifs, une précision. */
 export const scamCommentItem: ModerationQueueItem = {
   target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: meteoProjectId,
   // Tranche 7b : la copie est un tableau de champs, nommés comme au registre des entrées.
   snapshot: [
@@ -56,6 +62,12 @@ export const scamCommentItem: ModerationQueueItem = {
   // suspension, finie depuis. Il peut être suspendu de nouveau.
   authorRecord: {
     memberId: 'u5',
+    name: 'Sam',
+    handle: 'sam',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 2,
     suspensions: 1,
     suspendedNow: false,
@@ -71,6 +83,10 @@ export const scamCommentItem: ModerationQueueItem = {
  */
 export const fakeReviewsItem: ModerationQueueItem = {
   target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
   snapshot: [
     { field: 'title', value: 'Faux avis en masse' },
@@ -98,6 +114,12 @@ export const fakeReviewsItem: ModerationQueueItem = {
   // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
   authorRecord: {
     memberId: 'u4',
+    name: 'Nora',
+    handle: 'nora',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 0,
     suspensions: 0,
     suspendedNow: false,
@@ -108,6 +130,10 @@ export const fakeReviewsItem: ModerationQueueItem = {
 /** Le profil de « Lucas Martin », signalé pour usurpation : pas de projet, donc pas de lien vers un projet. */
 export const impersonationItem: ModerationQueueItem = {
   target: { kind: 'member', id: 'u7' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: null,
   snapshot: [
     { field: 'name', value: 'Lucas Martin' },
@@ -127,6 +153,12 @@ export const impersonationItem: ModerationQueueItem = {
   // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
   authorRecord: {
     memberId: 'u7',
+    name: 'Jules',
+    handle: 'jules',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 0,
     suspensions: 0,
     suspendedNow: false,
@@ -137,6 +169,10 @@ export const impersonationItem: ModerationQueueItem = {
 /** Une note de Louis lui-même : il ne peut pas en décider (« Te concerne »). */
 export const ownNoteItem: ModerationQueueItem = {
   target: { kind: 'note', id: 'e2f30415-2637-4c48-8d59-6a7b8c9daebf' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
+  context: null,
+  contentCreatedAt: '2026-10-20T07:00:00.000Z',
   projectId: 'f3041526-3748-4d59-9e6a-7b8c9daebfc0',
   // Une copie d'avant la tranche 7b : un seul champ `text`, le texte tel qu'on le gardait alors.
   snapshot: [{ field: 'text', value: 'v3 : export en PDF' }],
@@ -152,6 +188,12 @@ export const ownNoteItem: ModerationQueueItem = {
   // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
   authorRecord: {
     memberId: 'u9',
+    name: 'Maya',
+    handle: 'maya',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests (les comptes).
+    projectCount: 3,
+    commentCount: 7,
     removals: 0,
     suspensions: 0,
     suspendedNow: false,
@@ -181,6 +223,8 @@ export const moderationQueuePageOf = (
 /** Le commentaire d'Alex sur « Météo », retiré hier : on peut le rétablir. */
 export const removedCommentItem: RemovedItem = {
   target: { kind: 'comment', id: 'a7b8c9da-ebfc-4d0e-9f10-213243546576' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: meteoProjectId,
   text: 'Clique ici pour gagner un téléphone.',
   ground: 'rules',
@@ -192,6 +236,8 @@ export const removedCommentItem: RemovedItem = {
 /** Un projet retiré au nom de la loi. */
 export const removedProjectItem: RemovedItem = {
   target: { kind: 'project', id: 'b8c9daeb-fc0d-4e1f-8021-324354657687' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: 'b8c9daeb-fc0d-4e1f-8021-324354657687',
   text: 'Photos de la soirée — Toutes les photos de samedi, avec les noms.',
   ground: 'illegal',
@@ -274,6 +320,8 @@ export const suspendDecision: DecisionHistoryItem = {
   at: '2026-10-22T10:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'member', id: samMember.id },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   member: samMember,
   ground: 'rules',
@@ -290,6 +338,8 @@ export const liftDecision: DecisionHistoryItem = {
   at: '2026-10-24T09:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'member', id: samMember.id },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   member: samMember,
   ground: null,
@@ -306,6 +356,8 @@ export const removeDecision: DecisionHistoryItem = {
   at: '2026-10-21T09:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: meteoProjectId,
   member: samMember,
   ground: 'rules',
@@ -322,6 +374,8 @@ export const dismissByGoneAdminDecision: DecisionHistoryItem = {
   at: '2026-10-20T16:00:00.000Z',
   admin: null,
   target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
   member: noraMember,
   ground: null,
@@ -338,6 +392,8 @@ export const goneTargetDecision: DecisionHistoryItem = {
   at: '2026-10-19T08:00:00.000Z',
   admin: louisAdmin,
   target: { kind: 'note', id: 'e2f30415-2637-4c48-8d59-6a7b8c9daebf' },
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   member: null,
   ground: 'illegal',
@@ -363,3 +419,127 @@ export const decisionHistoryPageOf = (
   items: DecisionHistoryItem[] = decisionHistory,
   nextCursor: string | null = null,
 ): DecisionHistoryPage => ({ items, nextCursor })
+
+// --- R9 (7d) : une partie retirée seule (docs/scenarios/refonte.md, « Retirer une partie ») ---
+//
+// La modération retire une partie d'un contenu (la 2e photo de « Météo ») ; le reste reste affiché.
+// L'auteur seul la lit encore, dans `removedParts` (contrat `RemovedPart`) : le champ, la photo
+// visée, la valeur retirée (un texte, une liste, ou null pour une photo, qui reste dans sa galerie),
+// et le retrait (fondement, explication, date, après un signalement ou non). Tout autre membre
+// reçoit une liste vide, et la partie n'est plus là pour lui, comme si elle n'avait jamais existé.
+
+/**
+ * La 2e photo retirée au nom de la loi, après un signalement, le 12 novembre à midi, heure de Paris
+ * (11 h UTC : le même jour quel que soit le fuseau des tests).
+ */
+export const photoRemoval: Removal = {
+  ground: 'illegal',
+  explanation: 'Cette photo montre une personne reconnaissable sur son balcon, sans son accord.',
+  at: '2026-11-12T11:00:00.000Z',
+  afterReport: true,
+}
+
+/** Une description retirée au nom des règles, sans signalement, le 12 novembre à 16 h (Paris). */
+export const descriptionRemoval: Removal = {
+  ground: 'rules',
+  explanation: 'La description renvoie vers un faux site de paiement.',
+  at: '2026-11-12T15:00:00.000Z',
+  afterReport: false,
+}
+
+/** Une photo retirée seule, désignée par son identifiant : elle reste dans la galerie de l'auteur. */
+export const removedPhotoPart = (
+  mediaId: string,
+  removal: Removal = photoRemoval,
+): RemovedPart => ({
+  field: 'photo',
+  mediaId,
+  value: null,
+  imageUrl: null,
+  removal,
+})
+
+/**
+ * Un texte retiré seul (description, lien de la démo, outils, prompts) : la valeur est sortie de sa
+ * colonne, l'auteur la relit ici pour savoir quoi remplacer.
+ */
+export const removedTextPart = (
+  field: 'description' | 'demoUrl' | 'tools' | 'prompt',
+  value: string | string[],
+  removal: Removal = descriptionRemoval,
+): RemovedPart => ({ field, mediaId: null, value, imageUrl: null, removal })
+
+/** L'identifiant de la 2e photo de « Météo », signalée puis retirée. */
+export const meteoSecondPhotoId = '7a8b9cad-becf-4d0e-8f1a-2b3c4d5e6f70'
+
+/**
+ * La 2e photo de « Météo » d'Inès, signalée par deux membres comme « Une photo ou une information
+ * sur moi sans mon accord » : un élément de la file qui vise une partie, avec son projet porteur
+ * (`context`) et la fiche d'Inès, inscrite il y a moins de 14 jours (« Compte récent »).
+ */
+export const meteoPhotoItem: ModerationQueueItem = {
+  target: { kind: 'project', id: meteoProjectId },
+  part: { field: 'photo', mediaId: meteoSecondPhotoId, position: 2 },
+  context: { projectId: meteoProjectId, title: 'Météo', image: null },
+  contentCreatedAt: '2026-11-08T18:00:00.000Z',
+  projectId: meteoProjectId,
+  snapshot: [{ field: 'title', value: 'Météo' }],
+  images: [{ field: 'photo', state: 'present' }],
+  snapshotsDiffer: false,
+  state: 'present',
+  concernsMe: false,
+  reasons: [{ reason: 'privacy', count: 2 }],
+  details: ['On me reconnaît sur mon balcon, je n’ai rien demandé.'],
+  count: 2,
+  firstReportedAt: '2026-11-12T07:30:00.000Z',
+  lastReportedAt: '2026-11-12T09:10:00.000Z',
+  authorRecord: {
+    memberId: 'ines-id',
+    name: 'Inès Haddad',
+    handle: 'ines_haddad',
+    joinedAt: '2026-11-03T10:00:00.000Z',
+    projectCount: 2,
+    commentCount: 5,
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
+}
+
+/** La file de R9 : la photo de « Météo » en tête, puis la file d'avant. */
+export const moderationQueueR9: ModerationQueueItem[] = [meteoPhotoItem, ...moderationQueue]
+
+/**
+ * Ce que la feuille « Signaler » lit de « Météo » (GET /v1/reports/target) : le rappel en tête, les
+ * parties présentes dans l'ordre du registre (trois photos, la description, les outils, le lien de
+ * la démo ; pas de prompt), 20 signalements encore possibles aujourd'hui. Inès n'est ni bloquée ni
+ * administratrice : « Bloquer aussi » est proposé.
+ */
+export const meteoPreview: ReportTargetPreview = {
+  target: { kind: 'project', id: meteoProjectId },
+  text: 'Météo — La météo de mon balcon, chaque matin.',
+  projectId: meteoProjectId,
+  author: {
+    id: 'ines-id',
+    name: 'Inès Haddad',
+    handle: 'ines_haddad',
+    isBlocked: false,
+  },
+  head: { title: 'Météo', authorName: 'Inès Haddad', image: null },
+  parts: [
+    { field: 'description', mediaId: null, position: null, thumb: null, reportedByMe: false },
+    { field: 'tools', mediaId: null, position: null, thumb: null, reportedByMe: false },
+    { field: 'demoUrl', mediaId: null, position: null, thumb: null, reportedByMe: false },
+    {
+      field: 'photo',
+      mediaId: '6f708192-a3b4-4c5d-8e6f-708192a3b4c5',
+      position: 1,
+      thumb: null,
+      reportedByMe: false,
+    },
+    { field: 'photo', mediaId: meteoSecondPhotoId, position: 2, thumb: null, reportedByMe: false },
+  ],
+  reportedByMe: false,
+  remainingToday: 20,
+}

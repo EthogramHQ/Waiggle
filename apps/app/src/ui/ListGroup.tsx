@@ -309,8 +309,9 @@ type RowBase = {
   hint?: string
   /**
    * La vue de la ligne (la ligne touchable, sinon son cadre), pour qu'une liste par pages y pose le
-   * focus quand la dernière page arrive (`useFirstArrived`, jur-RF2). Ignoré sur un choix : le
-   * groupe radio garde déjà sa vue pour les flèches.
+   * focus quand la dernière page arrive (`useFirstArrived`, jur-RF2). Sur un choix, la vue est
+   * donnée à la fois au groupe radio (les flèches) et à l'écran : la feuille « Signaler » (R9) rend
+   * le focus au choix coché quand on revient à « Quelle partie ? ».
    */
   ref?: Ref<View> | undefined
   /**
@@ -490,6 +491,14 @@ export function ListRow({
 
   if (!onPress) return content
 
+  // La vue d'un choix va au groupe (les flèches) et à l'écran qui la demande. Une `ref` peut être
+  // une fonction ou un objet `{ current }` : les deux formes sont servies.
+  const choiceRef = (node: View | null) => {
+    slot?.setNode(node)
+    if (typeof ref === 'function') ref(node)
+    else if (ref) (ref as { current: View | null }).current = node
+  }
+
   // Un choix (bouton radio) au clavier, sur le web : react-native-web ne fait réagir aux touches
   // que les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a) ne pouvait pas
   // s'envoyer au clavier : aucun motif ne se cochait. Espace et Entrée cochent ; dans un groupe
@@ -532,7 +541,7 @@ export function ListRow({
       {...(href ? { href, ...(current ? { 'aria-current': 'page' } : null) } : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
-      ref={isChoice ? slot?.setNode : ref}
+      ref={isChoice ? choiceRef : ref}
       {...(isChoice ? choiceKeys(onPress) : null)}
       disabled={disabled}
       onPress={onPress}

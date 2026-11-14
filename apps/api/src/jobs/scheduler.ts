@@ -159,14 +159,6 @@ export const startScheduler = async ({
   }
 }
 
-/**
- * Les tâches retirées, dont la planification peut encore être en base (R8 : « mention-emails »,
- * remplacée par « instant-emails »). Les planifications de pg-boss sont gardées dans PostgreSQL :
- * sans `unschedule`, pg-boss continuerait de créer leurs exécutions, que personne ne prendrait. La
- * version d'avant R8, si l'on y revenait, la replanifie d'elle-même. À effacer en R9.
- */
-const RETIRED_TASKS = ['mention-emails'] as const
-
 const queueOptions = (expireInSeconds: number) => ({
   policy: 'exclusive' as const,
   retryLimit: 0,
@@ -176,13 +168,6 @@ const queueOptions = (expireInSeconds: number) => ({
 
 /** Crée les files, puis planifie chaque tâche (ou la retire, si EMAIL_JOBS=off). */
 const planTasks = async (boss: PgBoss, deps: JobDeps, emailJobs: boolean) => {
-  for (const name of RETIRED_TASKS) {
-    // La file est créée si elle manque (une installation neuve) : deleteQueuedJobs refuse une file
-    // inconnue. Puis plus de planification, plus rien en attente.
-    await boss.createQueue(name, queueOptions(15 * 60))
-    await boss.unschedule(name)
-    await boss.deleteQueuedJobs(name)
-  }
   for (const task of tasks) {
     // createQueue ne change rien à une file qui existe déjà (« on conflict do nothing »).
     await boss.createQueue(task.name, queueOptions(task.expireInSeconds))

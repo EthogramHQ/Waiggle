@@ -4,8 +4,8 @@
 // le lecteur d'écran et la touche Tab. Les places à l'écran se regardent dans les captures.
 import { layout } from '@ruche/brand'
 import { screen } from '@testing-library/react-native'
-import { type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
-import { renderWithProviders } from '../testing/render'
+import { Dimensions, type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
+import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { Button } from './Button'
 import { Columns } from './Columns'
 import { Text } from './Text'
@@ -144,6 +144,128 @@ describe('Columns', () => {
 
       expect(columnOf('En-tête').maxWidth).toBeUndefined()
       expect(columnOf('Galerie').flexGrow).toBeGreaterThan(columnOf('En-tête').flexGrow ?? 0)
+    })
+  })
+
+  // R9 (la modération sur ordinateur, planche R9-Moderation-Desktop) : une troisième colonne,
+  // `aside` (l'historique récent), à droite de la principale. API fixée au plan :
+  // `{ side, main, aside, sideFirst }` ; trois colonnes seulement quand `useLayout().sizeClass`
+  // vaut `wide` (1 100 points et plus), sinon comme aujourd'hui (deux colonnes, ou la pile).
+  // L'écran choisit seul sa mise en page : sur téléphone, il ne passe pas `aside`.
+  describe('with a third column, aside (R9)', () => {
+    type Host = { type: unknown; props: Record<string, unknown>; parent: Host | null }
+    type Tree = { props: Record<string, unknown>; children: (Tree | string)[] }
+    const hasBasis = (node: Host | Tree) =>
+      StyleSheet.flatten(node.props.style as StyleProp<ViewStyle>)?.flexBasis !== undefined
+    /** La colonne qui contient ce texte : le premier ancêtre qui a une base. */
+    const columnNode = (text: string): Host => {
+      let node: Host | null = screen.getByText(text) as unknown as Host
+      while (node) {
+        if (hasBasis(node)) return node
+        node = node.parent
+      }
+      throw new Error(`no column around ${text}`)
+    }
+    /** Les colonnes posées côte à côte dans la rangée de ce texte : les enfants qui ont une base. */
+    const columnsBeside = (text: string) => {
+      const row = columnNode(text).parent as unknown as Tree | null
+      if (!row) throw new Error(`no row around ${text}`)
+      return row.children.filter(
+        (child): child is Tree => typeof child !== 'string' && hasBasis(child),
+      )
+    }
+    /** Les textes dans l'ordre de l'arbre, celui du lecteur d'écran et de la touche Tab. */
+    const readingOrder = () => {
+      const order: string[] = []
+      const walk = (node: Tree | string) => {
+        if (typeof node === 'string') order.push(node)
+        else for (const child of node.children) walk(child)
+      }
+      walk(screen.root as unknown as Tree)
+      return order
+    }
+
+    let restoreWindow: (() => void) | null = null
+    afterEach(() => {
+      restoreWindow?.()
+      restoreWindow = null
+    })
+    /** Une fenêtre de 900 points : une tablette, ou une petite fenêtre d'ordinateur (`medium`). */
+    const setMediumWindow = () => {
+      const medium = { width: 900, height: 900, scale: 2, fontScale: 1 }
+      const phoneWindow = { width: 390, height: 844, scale: 3, fontScale: 1 }
+      Dimensions.set({ window: medium, screen: medium })
+      restoreWindow = () => Dimensions.set({ window: phoneWindow, screen: phoneWindow })
+    }
+
+    const threeColumns = (
+      <Columns
+        sideFirst
+        side={<Text>La file</Text>}
+        main={<Text>Le détail</Text>}
+        aside={<Text>L’historique</Text>}
+      />
+    )
+
+    it('sets three columns side by side on a wide screen: the queue, the detail, the history', async () => {
+      restoreWindow = setDesktopWindow()
+      await renderWithProviders(threeColumns)
+
+      // Trois colonnes distinctes, dans la même rangée.
+      expect(columnsBeside('Le détail')).toHaveLength(3)
+      const columns = new Set(['La file', 'Le détail', 'L’historique'].map(columnNode))
+      expect(columns.size).toBe(3)
+      expect(columnNode('L’historique').parent).toBe(columnNode('Le détail').parent)
+    })
+
+    it('reads the queue, then the detail, then the history', async () => {
+      restoreWindow = setDesktopWindow()
+      await renderWithProviders(threeColumns)
+
+      expect(readingOrder()).toEqual(['La file', 'Le détail', 'L’historique'])
+    })
+
+    it('keeps two columns below a wide screen, without losing the aside', async () => {
+      setMediumWindow()
+      await renderWithProviders(threeColumns)
+
+      expect(columnsBeside('Le détail')).toHaveLength(2)
+      // Rien n'est perdu : ce que l'écran a donné reste lu, après le détail.
+      const order = readingOrder()
+      expect(order).toContain('L’historique')
+      expect(order.indexOf('L’historique')).toBeGreaterThan(order.indexOf('Le détail'))
+    })
+
+    it('keeps two columns on a phone too', async () => {
+      await renderWithProviders(threeColumns)
+
+      expect(screen.getByText('Le détail')).toBeTruthy() // témoin
+      expect(columnsBeside('Le détail').length).toBeLessThanOrEqual(2)
+    })
+
+    it('adds no empty third column without an aside, even on a wide screen', async () => {
+      restoreWindow = setDesktopWindow()
+      await renderWithProviders(
+        <Columns sideFirst side={<Text>La file</Text>} main={<Text>Le détail</Text>} />,
+      )
+
+      expect(columnsBeside('Le détail')).toHaveLength(2)
+      expect(readingOrder()).toEqual(['La file', 'Le détail'])
+    })
+
+    it('still puts the side column first only with sideFirst', async () => {
+      restoreWindow = setDesktopWindow()
+      await renderWithProviders(
+        <Columns
+          side={<Text>La file</Text>}
+          main={<Text>Le détail</Text>}
+          aside={<Text>L’historique</Text>}
+        />,
+      )
+
+      const order = readingOrder()
+      expect(order.indexOf('Le détail')).toBeLessThan(order.indexOf('La file'))
+      expect(order).toContain('L’historique')
     })
   })
 

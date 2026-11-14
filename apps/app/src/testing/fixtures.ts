@@ -16,6 +16,8 @@ export const leaMe: Me = {
   isAdmin: false,
   // Tranche 7c : pas suspendue.
   suspension: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  provisional: { name: false, handle: false },
 }
 
 /** Louis, administrateur (tranche 7a) : il voit « Modération » dans Mon compte. */

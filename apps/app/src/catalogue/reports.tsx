@@ -26,6 +26,8 @@ const fr = {
   explanationLong:
     'Explication : Demander un code de carte bancaire n’est pas permis ici, même pour rire : https://exemple.fr/une-adresse-tres-longue-qui-doit-se-couper',
   contest: 'Pour contester : contact@waiggle.com',
+  // R9 : l'objet de l'e-mail du bandeau qui écrit lui-même « Pour contester » (`contest`).
+  contestSubject: 'Contestation : retrait de mon projet « Faux avis » du 18 oct.',
   removedPlaceholder: 'Contenu retiré par la modération',
   when: '18 oct.',
   maxPage: 'Voir la page de Max',
@@ -41,8 +43,6 @@ const fr = {
   projectKind: 'Projet',
   profileKind: 'Profil',
   copyLabel: 'Copie au moment du signalement',
-  count2: '2 signalements',
-  count1: '1 signalement',
   scamReason: 'Arnaque ou spam : 2',
   impersonationReason: 'Usurpation d’identité : 1',
   since: 'Premier signalement le 22 oct.',
@@ -106,6 +106,7 @@ const en: typeof fr = {
   explanationLong:
     'Explanation: Asking for a bank card code is not allowed here, even as a joke: https://example.com/a-very-long-address-that-has-to-wrap',
   contest: 'To contest: contact@waiggle.com',
+  contestSubject: 'Contest: removal of my project “Fake reviews” on Oct 18',
   removedPlaceholder: 'Content removed by the moderation',
   when: 'Oct 18',
   maxPage: 'See Max’s page',
@@ -120,8 +121,6 @@ const en: typeof fr = {
   projectKind: 'Project',
   profileKind: 'Profile',
   copyLabel: 'Copy made when reported',
-  count2: '2 reports',
-  count1: '1 report',
   scamReason: 'Scam or spam: 2',
   impersonationReason: 'Impersonation: 1',
   since: 'First reported on Oct 22',
@@ -215,6 +214,19 @@ export function ReportSamples() {
       {/* En tête d'un projet retiré, pour son auteur : les deux sortes de retrait. */}
       <RemovalNotice {...afterReport} />
       <RemovalNotice {...byLaw} />
+      {/* R9 : « Pour contester », écrit par le bandeau lui-même, avec l'adresse en lien qui ouvre
+          la messagerie sur un objet prêt ; puis le même, serré, au-dessus d'un commentaire. */}
+      <RemovalNotice
+        title={l.removedTitle}
+        lines={afterReport.lines.slice(0, -1)}
+        contest={{ subject: l.contestSubject }}
+      />
+      <RemovalNotice
+        title={l.removedTitle}
+        lines={byLaw.lines.slice(0, -1)}
+        contest={{ subject: l.contestSubject }}
+        compact
+      />
       {/* Les commentaires : celui d'un autre membre, avec « Signaler » ; le sien, retiré (le
           bandeau, et « Supprimer » seul : il ne se modifie plus) ; l'emplacement que lisent les
           autres, l'auteur du projet compris. */}
@@ -268,7 +280,7 @@ export function ReportSamples() {
       </Text>
       <ReportCard
         kind={l.projectKind}
-        count={l.count2}
+        count={2}
         snapshot={l.fields}
         snapshotLabel={l.copyLabel}
         snapshotNote={l.changed}
@@ -284,7 +296,7 @@ export function ReportSamples() {
       />
       <ReportCard
         kind={l.profileKind}
-        count={l.count1}
+        count={1}
         snapshot={l.profileFields}
         snapshotLabel={l.copyLabel}
         images={l.avatarImage}
@@ -301,7 +313,7 @@ export function ReportSamples() {
       </Text>
       <ReportCard
         kind={l.projectKind}
-        count={l.count1}
+        count={1}
         snapshot={l.fullFields}
         snapshotLabel={l.copyLabel}
         images={l.numberedImages}
@@ -320,7 +332,7 @@ export function ReportSamples() {
       </Text>
       <ReportCard
         kind={l.messageKind}
-        count={l.count1}
+        count={1}
         snapshot={l.messageFields}
         snapshotLabel={l.copyLabel}
         images={[l.pictureState]}

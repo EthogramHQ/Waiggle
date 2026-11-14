@@ -8,13 +8,15 @@ import {
   AVATAR_MAX_BYTES,
   HANDLE_CHANGES_PER_DAY,
   Me,
+  ModerationDecisionExport,
   ProfileUpdate,
   ReportOutcome,
+  ReportPartField,
   ReportReason,
   StoredReportTargetKind,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
@@ -29,13 +31,21 @@ import { currentHandle, formerHandleOf } from '../handles/load'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
 import { mentionsOfComments } from '../mentions/load'
+import {
+  dropProfilePartRemovals,
+  releaseAvatarKey,
+  replacedProfileParts,
+} from '../moderation/replaced'
 import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
+import { provisionalOf } from '../profile/provisional'
 import { loadProjectsOf } from '../projects/load'
 import { listedProject, listedProjectFor } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
+import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { dismissedSuggestionsOf } from '../suggestions/load'
+import { isJsonObject, suspendedProfileChange } from '../suspension/guard'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import { testerCornerExport } from '../testers/export'
 import { chargeOtherTools } from '../tools/quota'
@@ -79,7 +89,10 @@ const updateMeRoute = createRoute({
     200: meResponse,
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
-    403: errorResponse('A suspended account may only change its language.'),
+    403: errorResponse(
+      'A suspended account may only change its language, empty its bio or its tools, ' +
+        'and choose a name or handle while it is provisional.',
+    ),
     409: errorResponse('Handle already taken, or still reserved for its former owner.'),
     429: errorResponse('Too many changes.'),
   },
@@ -103,6 +116,18 @@ const avatarRoute = createRoute({
   },
 })
 
+const deleteAvatarRoute = createRoute({
+  method: 'delete',
+  path: '/v1/me/avatar',
+  summary: 'Delete my avatar',
+  description: 'Allowed during a suspension. Without an avatar, there is nothing to do: 204 too.',
+  responses: {
+    204: { description: 'Deleted.' },
+    401: errorResponse('Not signed in.'),
+    429: errorResponse('Too many changes.'),
+  },
+})
+
 const exportRoute = createRoute({
   method: 'get',
   path: '/v1/me/export',
@@ -116,6 +141,15 @@ const exportRoute = createRoute({
     429: errorResponse('Too many exports.'),
   },
 })
+
+/**
+ * La partie d'un signalement ou d'une décision, telle que l'export la donne : son champ (vérifié
+ * par le contrat) et sa photo ; null pour un contenu entier.
+ */
+const partOf = (row: { partField: string | null; partMediaId: string | null }) =>
+  row.partField === null
+    ? null
+    : { field: ReportPartField.parse(row.partField), mediaId: row.partMediaId }
 
 type Deps = {
   db: Database
@@ -154,6 +188,19 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     return c.json(me, 200)
   })
 
+  // R9 : son nom et son pseudo sont-ils provisoires (mis d'office par la modération) ? Le nom par la
+  // clé primaire de `user`, le pseudo par l'index member_handle_current_idx, puis les décisions.
+  const provisionalIdentityOf = async (userId: string) => {
+    const [row] = await db
+      .select({ name: schema.user.name })
+      .from(schema.user)
+      .where(eq(schema.user.id, userId))
+    return provisionalOf(db, userId, {
+      name: row?.name ?? '',
+      handle: await currentHandle(db, userId),
+    })
+  }
+
   // Le quota du profil compte AVANT de lire le corps de la demande (audit de sécurité du
   // 25/10/2026, C7, comme routes/notes.ts) : le schéma ProfileUpdate est vérifié par un middleware
   // que Hono place juste avant la route ; ce garde, enregistré plus tôt pour la même adresse et la
@@ -163,16 +210,24 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!user) return unauthorized(c)
     const decision = await limiter.hit(memberCounterKeys(user.id).profile, profileRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
-    // Un compte suspendu (tranche 7c, S9) : la garde (suspension/guard.ts) le laisse entrer ici
-    // pour changer de langue, et rien d'autre. Toute autre clé du corps, même avec sa valeur
-    // actuelle ou null, reçoit 403 `suspended`, avant le validateur et avant toute lecture du
-    // pseudo. `c.req.json()` garde le corps lu : le validateur le relit sans le redemander. Un corps
-    // qui n'est pas un objet JSON passe : le validateur répond 400, comme à tout membre.
+    // Un compte suspendu (tranche 7c, S9 ; R9, P7) : la garde (suspension/guard.ts) le laisse
+    // entrer ici pour changer de langue, vider sa bio ou ses outils, et choisir un nom ou un pseudo
+    // provisoire ; `suspendedProfileChange` juge chaque clé, et tout le reste reçoit 403
+    // `suspended`, avant le validateur. Le corps n'est lu qu'une fois : `c.req.json()` le garde, et
+    // le validateur relit cette même lecture sans le redemander (sinon un corps lu deux fois pourrait
+    // être jugé sur une valeur et écrit avec une autre). Un corps qui n'est pas un objet JSON passe :
+    // le validateur répond 400, comme à tout membre.
     if (await isSuspended(db, user.id, new Date())) {
       const body: unknown = await c.req.json().catch(() => null)
-      const keys = typeof body === 'object' && body !== null ? Object.keys(body) : []
-      if (keys.some((key) => key !== 'language')) {
-        return c.json(errorBody(languageOf(c), 'suspended'), 403)
+      if (isJsonObject(body)) {
+        // Le nom et le pseudo actuels ne se lisent que si la demande veut les changer.
+        const provisional =
+          'name' in body || 'handle' in body
+            ? await provisionalIdentityOf(user.id)
+            : { name: false, handle: false }
+        if (!suspendedProfileChange(body, provisional)) {
+          return c.json(errorBody(languageOf(c), 'suspended'), 403)
+        }
       }
     }
     await next()
@@ -241,6 +296,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             createdHere = resolved.created
             await replaceProfileTools(tx, user.id, resolved.tools)
           }
+          // R9 (P5) : une nouvelle bio ou de nouveaux outils, non vides, remplacent ceux que la
+          // modération avait retirés ; leur marque s'efface (moderation/replaced.ts).
+          await dropProfilePartRemovals(tx, user.id, replacedProfileParts({ bio, favoriteTools }))
         }
       })
     } catch (error) {
@@ -317,7 +375,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           .update(schema.profile)
           .set({ avatarKey: key })
           .where(eq(schema.profile.userId, user.id))
-        return row?.avatarKey ?? null
+        // R9 (P5) : une photo retirée par la modération est remplacée : sa marque s'efface, et le
+        // fichier à effacer est celui qu'elle gardait (moderation/replaced.ts).
+        return row?.avatarKey ? releaseAvatarKey(tx, user.id, row.avatarKey) : null
       })
     } catch (error) {
       await storage.delete(key) // la base n'a rien enregistré : le nouveau fichier ne sert à rien
@@ -328,6 +388,36 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
     return c.json(me, 200)
+  })
+
+  // R9 : supprimer sa photo de profil. Permis à un compte suspendu, comme tout DELETE (retirer
+  // n'ajoute rien, jur-R5). Le même quota que l'envoi, compté avant tout. Le verrou (FOR UPDATE)
+  // fait attendre un envoi simultané : on efface bien le fichier de la photo lue, jamais celui de la
+  // nouvelle. Sans photo, il n'y a rien à faire : 204 aussi (la demande a le résultat voulu).
+  app.openapi(deleteAvatarRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    const decision = await limiter.hit(memberCounterKeys(user.id).avatar, avatarRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+
+    const fileKey = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ avatarKey: schema.profile.avatarKey })
+        .from(schema.profile)
+        .where(eq(schema.profile.userId, user.id))
+        .for('update')
+      if (!row?.avatarKey) return null
+      await tx
+        .update(schema.profile)
+        .set({ avatarKey: null })
+        .where(eq(schema.profile.userId, user.id))
+      // Une photo retirée par la modération : sa marque s'efface avec elle, et son vrai fichier est
+      // celui que la ligne du retrait gardait.
+      return releaseAvatarKey(tx, user.id, row.avatarKey)
+    })
+    // Le fichier s'efface après la transaction : la base ne le cite plus.
+    if (fileKey) await storage.delete(fileKey)
+    return c.body(null, 204)
   })
 
   app.openapi(exportRoute, async (c) => {
@@ -455,6 +545,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         createdAt: schema.contentReport.createdAt,
         status: schema.contentReport.status,
         decidedAt: schema.contentReport.decidedAt,
+        partField: schema.contentReport.partField,
+        partMediaId: schema.contentReport.partMediaId,
       })
       .from(schema.contentReport)
       .where(eq(schema.contentReport.reporterId, user.id))
@@ -465,6 +557,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // « stocké », qui l'admet encore.
       targetKind: StoredReportTargetKind.parse(row.targetKind),
       targetId: row.targetId,
+      // R9 : la partie signalée seule (son champ, et sa photo) ; null pour le contenu entier.
+      part: partOf(row),
       reason: ReportReason.parse(row.reason),
       details: row.details,
       createdAt: row.createdAt.toISOString(),
@@ -482,6 +576,67 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Les suspensions de son compte (tranche 7c, J8), avec leur fin réelle et la raison d'une
     // levée ; jamais l'administrateur qui a décidé, jamais qui a signalé (suspension/load.ts).
     const moderation = await suspensionsOfMember(db, user.id, new Date())
+    // R9 (relecture juridique P3) : les décisions qui le visent, lues par target_member_id (le
+    // membre visé : l'auteur du contenu, ou lui-même pour son profil, une suspension, une levée),
+    // des plus anciennes aux plus récentes. Retraits, rétablissements, suspensions et levées ;
+    // jamais un classement sans suite (il ne le vise pas). Les colonnes sont choisies une à une :
+    // jamais l'administrateur (admin_id), jamais qui a signalé (une autre table, jamais lue ici),
+    // jamais le nom ou pseudo provisoire (provisional_value, déjà dans `user`). L'index
+    // moderation_decision_member_idx (target_member_id, created_at desc, id desc) trouve ses
+    // décisions et les rend déjà triées, lu à l'envers.
+    const decisionRows = await db
+      .select({
+        action: schema.moderationDecision.action,
+        createdAt: schema.moderationDecision.createdAt,
+        targetKind: schema.moderationDecision.targetKind,
+        targetId: schema.moderationDecision.targetId,
+        partField: schema.moderationDecision.partField,
+        partMediaId: schema.moderationDecision.partMediaId,
+        ground: schema.moderationDecision.ground,
+        explanation: schema.moderationDecision.explanation,
+        previousValue: schema.moderationDecision.previousValue,
+      })
+      .from(schema.moderationDecision)
+      .where(
+        and(
+          eq(schema.moderationDecision.targetMemberId, user.id),
+          inArray(schema.moderationDecision.action, ['remove', 'restore', 'suspend', 'lift']),
+        ),
+      )
+      .orderBy(asc(schema.moderationDecision.createdAt), asc(schema.moderationDecision.id))
+    // .parse : chaque valeur lue doit être l'une de celles du contrat (action, sorte, fondement).
+    const moderationDecisions = decisionRows.map((row) =>
+      ModerationDecisionExport.parse({
+        action: row.action,
+        at: row.createdAt.toISOString(),
+        targetKind: row.targetKind,
+        targetId: row.targetId,
+        part: partOf(row),
+        ground: row.ground,
+        explanation: row.explanation,
+        previousValue: row.previousValue,
+      }),
+    )
+
+    // R9 (RGPD art. 15 et 20) : les parties de son profil retirées (bio, outils favoris, photo, et nom
+    // ou pseudo encore provisoires), avec leur valeur et leur décision, lues comme sur sa page :
+    // leur texte n'est plus que dans la ligne de retrait. Une requête, plus celle du nom et du pseudo.
+    const profileRemovedParts =
+      (
+        await removedPartsOf(
+          db,
+          [
+            {
+              kind: 'member',
+              id: user.id,
+              authorId: user.id,
+              current: { name: me.name, handle: me.handle },
+            },
+          ],
+          user.id,
+          publicApiUrl,
+        )
+      ).get(partOwnerKey('member', user.id)) ?? []
 
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
@@ -505,6 +660,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         reports,
         blocks,
         moderation,
+        moderationDecisions,
+        profileRemovedParts,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         feed: { readAt: feedReadAt?.toISOString() ?? null },
         dismissedSuggestions,

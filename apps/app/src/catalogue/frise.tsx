@@ -150,6 +150,8 @@ const updatesOf = (l: Labels): ProjectUpdate[] =>
     beforeAfter: false,
     createdAt: hoursAgo(3 + rank * 170),
     removal: null,
+    // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+    removedParts: [],
   }))
 
 export function UpdateTimelineCatalogue() {

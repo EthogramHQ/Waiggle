@@ -43,6 +43,11 @@
         "apps/app/src/comments/**",
         "apps/app/src/updates/**",
         "apps/app/src/testers/**",
+        "apps/app/src/moderation/**",
+        "apps/app/src/blocks/**",
+        "apps/app/src/reports/**",
+        "apps/app/src/profile/**",
+        "apps/app/src/notifications/**",
         "apps/app/app/**",
         "!**/*.test.tsx"
       ],

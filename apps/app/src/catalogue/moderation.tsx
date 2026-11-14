@@ -3,13 +3,14 @@
 // qui l'importe en une ligne : deux personnes y travaillaient en même temps. Ses exemples (un outil
 // de développement, absent de l'appli publiée) sont écrits ici, en français et en anglais.
 import { appName, contactEmail } from '@ruche/brand'
-import type { DecisionHistoryItem } from '@ruche/contracts'
+import type { DecisionHistoryItem, PartOut } from '@ruche/contracts'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/Button'
 import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
 import { NotificationCard } from '../ui/NotificationCard'
+import { QuotedContent } from '../ui/QuotedContent'
 import { ReportCard } from '../ui/ReportCard'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -20,8 +21,6 @@ const fr = {
   profile: 'Profil',
   note: 'Note',
   project: 'Projet',
-  three: '3 signalements',
-  one: '1 signalement',
   snapshotLabel: 'Copie au moment du signalement',
   scam: 'Envoie-moi le code de ta carte, je te débloque la version pro.',
   scamReasons: ['Arnaque ou spam : 2', 'Harcèlement ou haine : 1'],
@@ -91,6 +90,20 @@ const fr = {
   profileNoRemove:
     'Un profil ne se retire pas en entier : classe le signalement, ou suspends le compte.',
   history: 'Historique des décisions',
+  historyCompact: 'Historique récent, version compacte (R9)',
+  // R9 : le geste d'une notification (« Contester », « Choisir un pseudo »). Le détail ne dit plus
+  // « Pour contester » : le lien le fait.
+  actions: 'Notifications avec un geste (R9)',
+  notifRemovedNoContest: [
+    'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
+    'Après un signalement, une personne de la modération a décidé de le retirer.',
+    `Fondement : les règles de ${appName}.`,
+  ].join('\n'),
+  notifPhotoRemoved: 'La photo 2 de « Le ciel de ce soir » a été retirée par la modération',
+  notifRenamed:
+    'Ton pseudo a été remplacé par la modération. En attendant, tu es provisoirement @membre-4821.',
+  subjectDate: '12 nov.',
+  subjectTitle: 'Le ciel de ce soir',
 }
 
 const en: typeof fr = {
@@ -99,8 +112,6 @@ const en: typeof fr = {
   profile: 'Profile',
   note: 'Note',
   project: 'Project',
-  three: '3 reports',
-  one: '1 report',
   snapshotLabel: 'Copy at the time of the report',
   scam: 'Send me your card code and I’ll unlock the pro version.',
   scamReasons: ['Scam or spam: 2', 'Harassment or hate: 1'],
@@ -168,6 +179,18 @@ const en: typeof fr = {
   profileNoRemove:
     'A profile is not removed as a whole: dismiss the report, or suspend the account.',
   history: 'History of decisions',
+  historyCompact: 'Recent history, compact version (R9)',
+  actions: 'Notifications with a gesture (R9)',
+  notifRemovedNoContest: [
+    'Only you can see it now, until it is restored, if it ever is.',
+    'After a report, a person from the moderation decided to remove it.',
+    `Ground: the rules of ${appName}.`,
+  ].join('\n'),
+  notifPhotoRemoved: 'Photo 2 of “Tonight’s sky” was removed by the moderation',
+  notifRenamed:
+    'Your username was replaced by the moderation. Until then, you are temporarily @member-4821.',
+  subjectDate: 'Nov 12',
+  subjectTitle: 'Tonight’s sky',
 }
 
 // Les décisions d'exemple de l'historique (DecisionCard écrit lui-même ses textes, dans la langue
@@ -177,6 +200,8 @@ const en: typeof fr = {
 const louis = { id: 'u0', name: 'Louis', handle: 'louis' }
 const sam = { id: 'u5', name: 'Sam', handle: 'sam' }
 const blank = {
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  part: null,
   projectId: null,
   ground: null,
   explanation: null,
@@ -293,11 +318,50 @@ const decisions: DecisionHistoryItem[] = [
   },
 ]
 
+// La version compacte (R9) : les six sortes de décision, dont le retrait et le rétablissement d'une
+// partie (la 2e photo d'un projet), en plus des décisions ci-dessus (suspension sans fin, levée pour
+// erreur).
+const photoPart: PartOut = {
+  field: 'photo',
+  mediaId: '2b3c4d5e-6f70-4a81-9b2c-3d4e5f607182',
+  position: 2,
+}
+const partDecision: DecisionHistoryItem = {
+  ...blank,
+  id: '93a4b5c6-d7e8-4df4-9fa6-8192a3b4c5d6',
+  action: 'remove',
+  at: '2026-10-23T08:00:00.000Z',
+  admin: louis,
+  target: { kind: 'project', id: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d' },
+  projectId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  member: sam,
+  part: photoPart,
+}
+const compactDecisions: DecisionHistoryItem[] = [
+  partDecision,
+  { ...partDecision, id: 'a4b5c6d7-e8f9-4e05-8ab7-92a3b4c5d6e7', action: 'restore' },
+  ...decisions.slice(0, 8),
+]
+
 const noop = () => {}
 
+/** Une image grise d'un point (exemple du catalogue : aucune photo réelle à montrer). */
+const pixel =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO8f/36fwAJGAOvOmFqmQAAAABJRU5ErkJggg=='
+
 export function ModerationCatalogue() {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
+  // Les vrais textes de l'appli pour les gestes et l'objet de l'e-mail (« Contestation : retrait de
+  // la photo 2 de « Le ciel de ce soir » du 12 nov. ») : le catalogue montre ce que lira le membre.
+  const contest = t(($) => $.notifications.contest)
+  const subject = t(($) => $.removal.contestSubject, {
+    decision: t(($) => $.removal.contestDecision.part, {
+      part: t(($) => $.moderation.parts.photo, { n: 2 }),
+      title: l.subjectTitle,
+    }),
+    date: l.subjectDate,
+  })
   // La fenêtre « Retirer » d'exemple, ouverte par un bouton.
   const [dialog, setDialog] = useState(false)
   return (
@@ -313,7 +377,7 @@ export function ModerationCatalogue() {
       <Stack gap="md" accessibilityRole="list">
         <ReportCard
           kind={l.comment}
-          count={l.three}
+          count={3}
           snapshot={l.scam}
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
@@ -332,7 +396,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.profile}
-          count={l.one}
+          count={1}
           snapshot={l.impersonation}
           snapshotLabel={l.snapshotLabel}
           reasons={l.impersonationReasons}
@@ -350,7 +414,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.note}
-          count={l.one}
+          count={1}
           snapshot={l.ownNote}
           snapshotLabel={l.snapshotLabel}
           reasons={l.otherReasons}
@@ -361,7 +425,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.project}
-          count={l.three}
+          count={3}
           snapshot={l.longText}
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
@@ -399,7 +463,7 @@ export function ModerationCatalogue() {
       <Stack gap="md" accessibilityRole="list">
         <ReportCard
           kind={l.comment}
-          count={l.three}
+          count={3}
           snapshot={l.scam}
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
@@ -415,7 +479,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.comment}
-          count={l.one}
+          count={1}
           snapshot={l.removedText}
           snapshotLabel={l.snapshotLabel}
           reasons={l.otherReasons}
@@ -426,7 +490,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.project}
-          count={l.one}
+          count={1}
           snapshot={l.longText}
           snapshotLabel={l.snapshotLabel}
           reasons={l.otherReasons}
@@ -437,7 +501,7 @@ export function ModerationCatalogue() {
         />
         <ReportCard
           kind={l.profile}
-          count={l.one}
+          count={1}
           snapshot={l.impersonation}
           snapshotLabel={l.snapshotLabel}
           reasons={l.impersonationReasons}
@@ -460,6 +524,13 @@ export function ModerationCatalogue() {
         <Button label={l.confirmRemove} variant="confirm" onPress={() => setDialog(false)} />
         <Button label={l.cancel} variant="secondary" onPress={() => setDialog(false)} />
       </Dialog>
+      {/* Le contenu rappelé en citation (fenêtre et feuille « Retirer ») : un texte court, un texte
+          coupé à trois lignes, et une vignette (la capture d'un message de testeur). */}
+      <Stack gap="md">
+        <QuotedContent label={l.project} text={l.snapshotLabel} />
+        <QuotedContent label={l.project} text={l.removeMessage.repeat(3)} />
+        <QuotedContent label={l.project} picture={{ name: l.project, source: { uri: pixel } }} />
+      </Stack>
       {/* Les deux notifications de la modération : un commentaire retiré (le détail, une phrase
           par ligne, puis l'extrait), un signalement traité sans lien (la cible n'est plus
           visible), et un autre qui mène encore au projet. */}
@@ -492,6 +563,41 @@ export function ModerationCatalogue() {
           onPress={noop}
         />
       </Stack>
+      {/* R9 : le geste d'une notification, sous la phrase et la citation, hors du lien de la
+          ligne : « Contester » sur une ligne nouvelle qui mène au contenu ; sur une ligne qui ne
+          mène nulle part (une photo retirée) ; « Choisir un pseudo », un geste de l'écran. */}
+      <Text variant="headline" heading={3}>
+        {l.actions}
+      </Text>
+      <Stack gap="sm" accessibilityRole="list">
+        <NotificationCard
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifRemoved }]}
+          detail={l.notifRemovedNoContest}
+          quote={l.notifRemovedQuote}
+          when={l.today}
+          isNew
+          onPress={noop}
+          action={{ label: contest, contact: { subject } }}
+        />
+        <NotificationCard
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifPhotoRemoved }]}
+          detail={l.notifRemovedNoContest}
+          when={l.yesterday}
+          isNew={false}
+          onPress={null}
+          action={{ label: contest, contact: { subject } }}
+        />
+        <NotificationCard
+          leading={{ kind: 'icon', icon: 'shield-warning', tone: 'danger' }}
+          parts={[{ text: l.notifRenamed }]}
+          when={l.today}
+          isNew
+          onPress={noop}
+          action={{ label: t(($) => $.notifications.chooseHandle), onPress: noop }}
+        />
+      </Stack>
       {/* L'historique (tranche 7c) : chaque sorte de décision ; « Voir » vers le membre ou le
           contenu, jamais vers ce qui a disparu (la dernière carte, sans lien). */}
       <Text variant="headline" heading={3}>
@@ -500,6 +606,15 @@ export function ModerationCatalogue() {
       <Stack gap="md" accessibilityRole="list">
         {decisions.map((decision) => (
           <DecisionCard key={decision.id} decision={decision} onView={noop} />
+        ))}
+      </Stack>
+      {/* La version compacte : une ligne par décision, une icône de couleur par sorte. */}
+      <Text variant="headline" heading={3}>
+        {l.historyCompact}
+      </Text>
+      <Stack gap="md" accessibilityRole="list">
+        {compactDecisions.map((decision) => (
+          <DecisionCard key={decision.id} decision={decision} compact />
         ))}
       </Stack>
     </Stack>

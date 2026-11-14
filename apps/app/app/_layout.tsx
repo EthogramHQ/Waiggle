@@ -14,6 +14,7 @@ import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
+import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { AmbientHost, hostedNavigationTheme, hostedStackStyle } from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
@@ -76,7 +77,15 @@ export default function RootLayout() {
               {/* R4 : la carte qui devient la page. Le fournisseur garde le cadre de la photo
                   touchée, que la page du projet lit pour la faire grandir depuis la carte. */}
               <CoverTransitionProvider>
-                {launching ? <LaunchScreen /> : <ThemedChrome />}
+                {/* R9 : la feuille du nom ou du pseudo provisoire, au-dessus de l'appli, après le lancement. */}
+                {launching ? (
+                  <LaunchScreen />
+                ) : (
+                  <>
+                    <ThemedChrome />
+                    <ProvisionalNameGate />
+                  </>
+                )}
               </CoverTransitionProvider>
             </ToastProvider>
           </TabBarHost>
@@ -112,6 +121,11 @@ function ThemedChrome() {
           testeurs : leur adresse à elles, et donc le Retour du navigateur pour les fermer. */}
       <Stack.Screen name="projects/[id]/testers/new-call" options={sheetRoute} />
       <Stack.Screen name="projects/[id]/testers/new-feedback" options={sheetRoute} />
+      {/* R9 : « Signaler » est une feuille posée sur la page du contenu signalé (le Retour du
+          navigateur la ferme, la page d'où l'on vient reste dessinée dessous). */}
+      <Stack.Screen name="report" options={sheetRoute} />
+      {/* R9 : « Suspendre » aussi, posée sur la page du membre ou sur la file de la modération. */}
+      <Stack.Screen name="suspend" options={sheetRoute} />
     </Stack>
   )
   return (

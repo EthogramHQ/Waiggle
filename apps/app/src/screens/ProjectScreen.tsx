@@ -25,6 +25,9 @@
 // « ?announce=<statut> », et la feuille s'ouvre, toute prête.
 // Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre et
 // retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
+// R9 (7d) : l'auteur suspendu peut aussi « Rendre privé » un projet public (menu « … »,
+// projects/MakePrivateDialog.tsx) ; et l'auteur voit, à leur place, les parties retirées seules par
+// la modération (projects/ProjectRemovedPart.tsx), la photo retirée restant marquée dans sa galerie.
 import { type Project, REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
@@ -40,9 +43,18 @@ import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { DeleteProjectDialog } from '../projects/DeleteProjectDialog'
 import { useProject } from '../projects/hooks'
+import { MakePrivateDialog } from '../projects/MakePrivateDialog'
 import { startedMonth } from '../projects/month'
 import { ProjectActions } from '../projects/ProjectActions'
 import { ProjectHeader } from '../projects/ProjectHeader'
+import {
+  isDeletablePhoto,
+  isProjectPart,
+  type ProjectPartField,
+  ProjectRemovedPart,
+  type ProjectRemovedPartData,
+  useDeleteRemovedPhoto,
+} from '../projects/ProjectRemovedPart'
 import { ProjectUpdatesSection, useUpdateSheet } from '../projects/ProjectUpdatesSection'
 import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
@@ -52,7 +64,7 @@ import { Columns } from '../ui/Columns'
 import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
 import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
-import type { Focusable } from '../ui/focus'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
 import { OwnReactions } from '../ui/OwnReactions'
@@ -276,6 +288,19 @@ function ProjectView({ project }: { project: Project }) {
   // conditions que « Modifier » : l'API refuserait un projet retiré ou un compte suspendu.
   const canPublish = project.isMine && !project.removal && !suspended
   const updateSheet = useUpdateSheet(project.id, canPublish)
+  // R9 (J14, décision L6 de Louis) : « Rendre privé », le seul changement permis à un auteur
+  // suspendu, sur un projet public qui n'a pas été retiré (un projet retiré ne se modifie plus).
+  // Une fenêtre le confirme d'abord : pendant la suspension, il ne pourra pas revenir en arrière.
+  const canMakePrivate =
+    project.isMine && suspended && !project.removal && project.visibility === 'public'
+  const [makingPrivate, setMakingPrivate] = useState(false)
+  const onMadePrivate = () => {
+    setMakingPrivate(false)
+    toast.show(
+      t(($) => $.suspension.madePrivate),
+      { icon: 'check-circle' },
+    )
+  }
   // Le menu « … » : copier le lien, puis signaler (un autre membre) ou, pour l'auteur, modifier et
   // publier une mise à jour (sauf projet retiré par la modération ou compte suspendu : l'API
   // refuserait) et supprimer.
@@ -303,6 +328,15 @@ function ProjectView({ project }: { project: Project }) {
                   onPress: () => updateSheet.open(menuRef),
                 },
               ]),
+          ...(canMakePrivate
+            ? [
+                {
+                  label: t(($) => $.suspension.makePrivate),
+                  icon: 'lock-simple' as const,
+                  onPress: () => setMakingPrivate(true),
+                },
+              ]
+            : []),
           // R7b : « Le coin des testeurs », sous la même condition que son bouton sur la page
           // (le projet cherche des testeurs, ou en a). Même retiré ou suspendu : le coin se lit.
           ...(project.status === 'testable' || (project.testerCount ?? 0) > 0
@@ -383,6 +417,15 @@ function ProjectView({ project }: { project: Project }) {
   // suspendu (la photo le couvrirait) ; Retour, Partager et « … » posés dessus. Ailleurs, coins
   // arrondis et la capsule à cheval sur son bas.
   const bleed = !large && !suspended
+  // R9 : les photos retirées par la modération restent dans la galerie de leur auteur, marquées
+  // (pas celles dont seule la description a été retirée). L'API ne les donne qu'à lui.
+  const markedPhotos = new Set(
+    project.isMine
+      ? project.removedParts
+          .filter((part) => part.field === 'photo' || part.field === 'cover')
+          .map((part) => part.mediaId)
+      : [],
+  )
   const gallery = (
     // La photo qui grandit depuis la carte touchée : cachée au lecteur d'écran pendant son vol,
     // puis le focus va au titre.
@@ -398,6 +441,8 @@ function ProjectView({ project }: { project: Project }) {
           thumbhash: visual.thumbhash,
           // R6a : une photo décrite est lue par sa description (texte brut, jamais du Markdown).
           description: visual.description,
+          // R9 : une photo retirée par la modération, que son auteur voit encore.
+          mark: markedPhotos.has(visual.id) ? t(($) => $.removal.banner) : null,
         }))}
         // Sans photo, la lumière miel seule (sans `title`) : le titre est déjà juste à côté ou
         // dessous, dans l'en-tête ; écrit aussi sur la lumière, il se lisait deux fois à l'œil.
@@ -439,6 +484,64 @@ function ProjectView({ project }: { project: Project }) {
   // Retiré par la modération (tranche 7a) : l'auteur, seul à le voir encore, lit en tête pourquoi,
   // et comment contester.
   const removal = project.removal ? <RemovalNotice {...removalBanner(project.removal, t)} /> : null
+
+  // R9 (décision L2 de Louis) : les parties retirées seules par la modération. L'API ne les donne
+  // qu'à l'auteur ; la page vérifie quand même `isMine`, pour ne jamais les montrer à un autre.
+  // Chacune s'affiche à la place de ce qu'elle était : les photos sous la galerie (où la photo reste,
+  // marquée), le lien de démo sous les actions, les outils sous la recette, la description dans sa
+  // section, le prompt à sa place. « Remplacer » ouvre le formulaire (l'auteur y écrit la partie à
+  // nouveau, ce qui efface la marque), sauf pendant une suspension ou sur un projet retiré, où
+  // l'API refuserait. « Supprimer » : seulement une photo, qui part pour de bon.
+  const removedParts: ProjectRemovedPartData[] = project.isMine
+    ? project.removedParts.filter(isProjectPart)
+    : []
+  const canReplace = !suspended && !project.removal
+  // Supprimée, la photo part avec son encadré : le focus, posé sur le titre de l'encadré par
+  // « Supprimer », passe au titre de la page plutôt que de se perdre ; la bulle le dit.
+  const photoDeletion = useDeleteRemovedPhoto(project.id, () => {
+    toast.show(
+      t(($) => $.removal.part.photoDeleted),
+      { icon: 'check-circle' },
+    )
+    if (!focusWithoutScroll(titleRef.current)) moveReaderTo(titleRef.current)
+  })
+  const deletionError = (mediaId: string | null) => {
+    const failed = photoDeletion.failed
+    if (!failed || failed.mediaId !== mediaId) return null
+    if (failed.error === 'unauthorized') return t(($) => $.states.expired)
+    if (failed.error === 'rateLimited') return t(($) => $.errors.rateLimited)
+    return t(($) => $.removal.part.deleteError)
+  }
+  /** Les encadrés des parties retirées de ces champs, empilés ; null s'il n'y en a aucune. */
+  const partsOf = (fields: readonly ProjectPartField[]) => {
+    const parts = removedParts.filter((part) => fields.includes(part.field))
+    if (parts.length === 0) return null
+    return (
+      <Stack gap="lg">
+        {parts.map((part) => {
+          // L'identifiant de la photo que « Supprimer » ferait partir : la photo ou la couverture
+          // seulement. La description d'une photo retirée n'a que « Remplacer ».
+          const mediaId = isDeletablePhoto(part) ? part.mediaId : null
+          return (
+            <ProjectRemovedPart
+              key={`${part.field}-${part.mediaId ?? ''}`}
+              project={project}
+              part={part}
+              onReplace={canReplace ? edit : null}
+              onDelete={mediaId ? () => void photoDeletion.remove(mediaId) : null}
+              error={deletionError(mediaId)}
+              deleting={mediaId !== null && photoDeletion.deleting === mediaId}
+            />
+          )
+        })}
+      </Stack>
+    )
+  }
+  const removedPhotos = partsOf(['cover', 'photo', 'photoDescription'])
+  const removedDemo = partsOf(['demoUrl'])
+  const removedTools = partsOf(['tools'])
+  const removedDescription = partsOf(['description'])
+  const removedPrompt = partsOf(['prompt'])
 
   // La recette (R6a) : quand l'auteur les a donnés, le mois où il a commencé (« Commencé en
   // septembre 2026 », écrit par Intl dans la langue de l'appli) et la difficulté (« Facile à
@@ -494,17 +597,24 @@ function ProjectView({ project }: { project: Project }) {
       </Surface>
     ) : null
 
-  const description = project.description ? (
-    <Stack gap="md">
-      <Text variant="heading" heading={2}>
-        {t(($) => $.project.page.description)}
-      </Text>
-      <Markdown text={project.description} onLinkPress={openOutside} />
-    </Stack>
-  ) : null
+  // R9 : une description retirée garde sa section, avec son encadré (l'auteur seul).
+  const description =
+    project.description || removedDescription ? (
+      <Stack gap="md">
+        <Text variant="heading" heading={2}>
+          {t(($) => $.project.page.description)}
+        </Text>
+        {project.description ? (
+          <Markdown text={project.description} onLinkPress={openOutside} />
+        ) : null}
+        {removedDescription}
+      </Stack>
+    ) : null
 
-  // Le prompt de départ et les autres (repliés). Sans prompt, rien : pas même une place vide.
-  const prompt = project.prompts.length > 0 ? <PromptBlock prompts={project.prompts} /> : null
+  // Le prompt de départ et les autres (repliés). Sans prompt, rien : pas même une place vide. R9 :
+  // un prompt retiré, son encadré à la place (l'auteur seul).
+  const prompt =
+    project.prompts.length > 0 ? <PromptBlock prompts={project.prompts} /> : removedPrompt
 
   // R7a : « Les mises à jour », à la place du journal des notes. Pour un autre membre, seulement
   // s'il y a une mise à jour à lire (décidé ici : `faded` envelopperait sinon une place vide, qui
@@ -577,6 +687,17 @@ function ProjectView({ project }: { project: Project }) {
   const layers = (
     <>
       {deletion}
+      {project.isMine && suspended && !project.removal ? (
+        // Montée pour tout projet d'un auteur suspendu, public ou non : passé en privé, le projet
+        // ne la propose plus, mais la fenêtre finit son fondu de sortie et rend le focus au « … ».
+        <MakePrivateDialog
+          project={{ id: project.id, title: project.title }}
+          visible={makingPrivate}
+          onCancel={() => setMakingPrivate(false)}
+          onDone={onMadePrivate}
+          opener={menuRef}
+        />
+      ) : null}
       {quitDialog}
       {capsule && !suspended ? (
         <ReactionFan
@@ -635,6 +756,7 @@ function ProjectView({ project }: { project: Project }) {
                 main: (
                   <>
                     {gallery}
+                    {faded(removedPhotos)}
                     {faded(ownReactions)}
                   </>
                 ),
@@ -642,7 +764,9 @@ function ProjectView({ project }: { project: Project }) {
                   <>
                     {faded(header)}
                     {faded(actions)}
+                    {faded(removedDemo)}
                     {faded(recipe)}
+                    {faded(removedTools)}
                   </>
                 ),
               },
@@ -663,10 +787,13 @@ function ProjectView({ project }: { project: Project }) {
           // Tablette : une seule colonne, dans l'ordre du téléphone.
           <>
             {gallery}
+            {faded(removedPhotos)}
             {faded(header)}
             {faded(actions)}
+            {faded(removedDemo)}
             {faded(ownReactions)}
             {faded(recipe)}
+            {faded(removedTools)}
             {faded(description)}
             {faded(prompt)}
             {faded(journal)}
@@ -682,10 +809,14 @@ function ProjectView({ project }: { project: Project }) {
   const page = (
     <>
       {faded(removal)}
+      {/* R9 : la photo retirée est juste au-dessus, dans la galerie : son encadré ouvre la page. */}
+      {faded(removedPhotos)}
       {faded(header)}
       {faded(actions)}
+      {faded(removedDemo)}
       {faded(ownReactions)}
       {faded(recipe)}
+      {faded(removedTools)}
       {faded(description)}
       {faded(prompt)}
       {faded(journal)}

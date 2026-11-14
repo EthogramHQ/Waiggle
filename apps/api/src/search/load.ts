@@ -14,7 +14,7 @@ import { and, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { notBlockedWith } from '../blocks/visibility'
 import { memberFollowerCounts } from '../follows/load'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { loadSummaries } from '../projects/load'
 import { listedVerifiedProjectFor, projectVisibleTo, verifiedAuthor } from '../projects/visibility'
 import { excerptOf } from './excerpt'
@@ -232,7 +232,7 @@ const searchMembers = async (
       id: row.id,
       name: row.name,
       handle: row.handle,
-      avatarUrl: row.avatar_key ? mediaUrl(publicApiUrl, row.avatar_key) : null,
+      avatarUrl: avatarUrlOf(publicApiUrl, row.avatar_key),
       followerCount: counts.get(row.id) ?? 0,
     })),
     more: rows.length > SEARCH_GROUP_MAX,
