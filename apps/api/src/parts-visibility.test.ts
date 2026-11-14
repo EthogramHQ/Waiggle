@@ -433,6 +433,28 @@ describe('a removed part, for the other members', () => {
     ])
   })
 
+  it('shows the next photo as the thumbnail of the context of a reported comment, in the moderation queue', async () => {
+    later()
+    const meteo = await act.publish(ines, 'Météo')
+    const first = await uploadVisual(ines, meteo.id)
+    const second = await uploadVisual(ines, meteo.id)
+    const comment = await act.comment(meteo.id, max, 'Un commentaire signalé')
+    later()
+    const reported = await act.send('POST', '/v1/reports', lea, {
+      target: { kind: 'comment', id: comment.id },
+      reason: 'other',
+    })
+    expect(reported.status).toBe(201)
+    // Témoin : la 1re photo est la miniature du contexte.
+    expect(await rawText('/v1/moderation/reports', louis)).toContain(first.key)
+
+    await removePart({ kind: 'project', id: meteo.id }, { field: 'cover', mediaId: first.id })
+
+    const queue = await rawText('/v1/moderation/reports', louis)
+    expect(queue).not.toContain(first.key)
+    expect(queue).toContain(second.key)
+  })
+
   it('serves a removed avatar, photo, portrait cover, update photo or capture to its author only, with the 404 of an unknown file', async () => {
     const avatar = await uploadAvatar(ines)
     const meteo = await testableProjectWithMax()

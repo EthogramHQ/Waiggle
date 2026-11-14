@@ -73,9 +73,9 @@ afterEach(async () => {
 // ─── Les gestes ──────────────────────────────────────────────────────────────────────────────────
 
 /** Max signale (une partie ou tout le contenu), puis Louis retire. */
-const remove = async (target: ReportTarget, part?: ReportPart) => {
+const remove = async (target: ReportTarget, part?: ReportPart, reporter = max) => {
   later()
-  const reported = await act.send('POST', '/v1/reports', max, {
+  const reported = await act.send('POST', '/v1/reports', reporter, {
     target,
     ...(part && { part }),
     reason: 'other',
@@ -245,7 +245,8 @@ describe('the notification « restored »', () => {
     expect(ofKind((await notificationsOf(karim)).items, 'profile_removed')).toEqual([])
 
     // Retiré encore ; Karim en choisit un autre avant le rétablissement : l'ancien ne revient pas.
-    await remove({ kind: 'member', id: karimId }, { field: 'handle' })
+    // Signalé par un autre membre que Max : la même copie déjà décidée serait refusée (409 already_examined).
+    await remove({ kind: 'member', id: karimId }, { field: 'handle' }, ines)
     later()
     await act.updateProfile(karim, { handle: 'karim_2' })
     await restore({ kind: 'member', id: karimId }, { field: 'handle' })

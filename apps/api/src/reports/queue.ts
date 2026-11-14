@@ -42,6 +42,7 @@ import { after, type CursorContent, encodeCursor } from '../cursor'
 import { isoDate } from '../jobs/shared'
 import { utc } from '../notifications/load'
 import { mediaUrl } from '../profile/me'
+import { mediaOnCoversSql } from '../projects/media-visibility'
 import { activeSuspensionSql } from '../suspension/load'
 import { readLines } from '../updates/load'
 import { blockedByAdmin } from './decide'
@@ -400,6 +401,9 @@ const projectContexts = async (db: Database, projectIds: string[], publicApiUrl:
     left join lateral (
       select m.storage_key, m.thumbhash from project_media m
       where m.project_id = p.id and m.slot in ('gallery', 'portrait')
+        -- R9 : jamais une photo retirée seule par la modération (projects/media-visibility.ts) :
+        -- la miniature est la 1re photo visible.
+        and ${mediaOnCoversSql('m')}
       order by m.slot = 'portrait', m.position, m.created_at
       limit 1
     ) cover on true
