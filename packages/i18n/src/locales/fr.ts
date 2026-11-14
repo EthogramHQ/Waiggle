@@ -2417,6 +2417,8 @@ export const fr = {
       desktopNote:
         'Une partie de la ruche arrive dans ton récap du dimanche. Les défis viendront plus tard.',
       loadError: 'Cette ruche n’a pas pu se charger.',
+      // Sous le nom de soi, dans la liste des membres : « @ines_h · toi » ({{handle}} : member.handle).
+      handleYou: '{{handle}} · {{you}}',
     },
     // « Ne pas me proposer aux autres » : dans l'onglet Membres et dans Mes données.
     hideFromSuggestions: 'Ne pas me proposer aux autres',
