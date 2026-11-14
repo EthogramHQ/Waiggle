@@ -136,6 +136,7 @@ import { PublishDeleteCatalogue } from './publier-supprimer'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { NotificationSettingsCatalogue } from './reglages-notifications'
+import { RemovalR9Catalogue } from './removal-r9'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
@@ -757,6 +758,7 @@ export function CatalogueScreen() {
       <ModerationCatalogue />
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
+      <RemovalR9Catalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}

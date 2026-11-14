@@ -83,8 +83,16 @@ const show = (
     </RemovedPart>,
   )
 
-/** La notice entière : le groupe nommé par son titre. */
-const group = () => screen.getByRole('group', { name: TITLE })
+/**
+ * La notice entière : le groupe nommé par son titre. Cherché par son nom, puis son rôle vérifié
+ * (comme CategoryPicker) : `getByRole` exigerait une vue `accessible`, qui sur iOS cacherait à
+ * VoiceOver les boutons et le lien qu'elle contient (R9, piège de design.md).
+ */
+const group = () => {
+  const found = screen.getByLabelText(TITLE)
+  expect(found.props.role ?? found.props.accessibilityRole).toBe('group')
+  return found
+}
 /** Vrai si ce texte est écrit dans la notice, blancs de la typographie française compris. */
 const inGroup = (text: string) => within(group()).queryAllByText(containing(text)).length > 0
 
