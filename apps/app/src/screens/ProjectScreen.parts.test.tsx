@@ -173,6 +173,8 @@ const T = {
   banner: fr.t(($) => $.removal.banner),
   replace: fr.t(($) => $.removal.part.replace),
   remove: fr.t(($) => $.removal.part.delete),
+  confirmTitle: fr.t(($) => $.removal.part.deleteConfirmTitle),
+  confirmBody: fr.t(($) => $.removal.part.deleteConfirmBody),
   contestLead: fr.t(($) => $.removal.part.contestLead),
   court: fr.t(($) => $.removal.part.court),
   onlyYou: fr.t(($) => $.removal.part.onlyYou),
@@ -301,17 +303,41 @@ describe('a photo removed by the moderation, seen by its author', () => {
     expect(pushed()).toContain(`/projects/${id}/edit`)
   })
 
-  it('deletes the removed photo, and only it, from « Supprimer »', async () => {
+  // R9 (relectures, design-2) : « Supprimer » ouvre d'abord une fenêtre, la photo part pour de bon.
+  /** La fenêtre de confirmation, ouverte depuis « Supprimer » sous la photo retirée. */
+  const confirmDeletion = async () => {
     await openProject(withRemovedPhoto)
-
     await fireEvent.press(part(T.photoTitle).getByRole('button', { name: T.remove }))
-    // Une confirmation, si l'écran en pose une : son bouton est le dernier « Supprimer » venu.
-    if (jest.mocked(deleteVisual).mock.calls.length === 0) {
-      await passTapGuard()
-      const buttons = screen.queryAllByRole('button', { name: T.remove })
-      const confirm = buttons.at(-1)
-      if (confirm) await fireEvent.press(confirm)
-    }
+    await passTapGuard()
+    return dialogTitled(T.confirmTitle)
+  }
+
+  it('asks before deleting the removed photo, and sends nothing yet', async () => {
+    const dialog = await confirmDeletion()
+
+    expect(screen.getByText(T.confirmBody)).toBeTruthy()
+    expect(dialog.getByRole('button', { name: T.cancel })).toBeTruthy()
+    expect(dialog.getByRole('button', { name: T.remove })).toBeTruthy()
+    expect(deleteVisual).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing when « Annuler » closes the confirmation', async () => {
+    const dialog = await confirmDeletion()
+
+    await fireEvent.press(dialog.getByRole('button', { name: T.cancel }))
+
+    await waitFor(() => expect(screen.queryByText(T.confirmBody)).toBeNull())
+    expect(deleteVisual).not.toHaveBeenCalled()
+    // Témoin : la photo retirée et son « Supprimer » sont toujours là.
+    expect(part(T.photoTitle).getByRole('button', { name: T.remove })).toBeTruthy()
+  })
+
+  it('deletes the removed photo, and only it, once, from the confirmation', async () => {
+    const dialog = await confirmDeletion()
+
+    const confirm = dialog.getByRole('button', { name: T.remove })
+    await fireEvent.press(confirm)
+    await fireEvent.press(confirm)
 
     await waitFor(() => expect(deleteVisual).toHaveBeenCalledTimes(1))
     expect(deleteVisual).toHaveBeenCalledWith(id, secondPhoto.id)
@@ -348,6 +374,8 @@ describe('a photo removed by the moderation, seen by its author', () => {
       (button.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
 
     await fireEvent.press(part(T.photoTitle).getByRole('button', { name: T.remove }))
+    await passTapGuard()
+    await fireEvent.press(dialogTitled(T.confirmTitle).getByRole('button', { name: T.remove }))
 
     await waitFor(() =>
       expect(busy(part(T.photoTitle).getByRole('button', { name: T.remove }))).toBe(true),

@@ -55,7 +55,6 @@ const ines = {
   name: 'Inès Haddad',
   handle: 'ines_haddad',
   isBlocked: false,
-  isAdmin: false,
 }
 
 const meteo: ReportTargetPreview = {
