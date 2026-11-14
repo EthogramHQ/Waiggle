@@ -88,9 +88,21 @@ type Props = {
    * l'élément du fil, posée par feed/FeedList.tsx) ; absente ailleurs.
    */
   update?: UpdateSummary
+  /**
+   * R10 : la pastille de la carte, à la place de « Privé » : « Épinglé par Papi Jean » sur le projet
+   * épinglé d'une ruche (relecture du plan, interface 13 : l'épingle par `ProjectCard badge`).
+   */
+  badge?: string
 }
 
-export function SummaryCard({ project, at = project.createdAt, overlay, coverRef, update }: Props) {
+export function SummaryCard({
+  project,
+  at = project.createdAt,
+  overlay,
+  coverRef,
+  update,
+  badge,
+}: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const openDemo = useOpenDemo()
@@ -140,7 +152,7 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
         label: t(($) => $.project.status[project.status]),
         strong: project.status === 'testable',
       }}
-      badge={project.visibility === 'private' ? t(($) => $.member.private) : undefined}
+      badge={badge ?? (project.visibility === 'private' ? t(($) => $.member.private) : undefined)}
       tryIt={
         demoUrl
           ? {

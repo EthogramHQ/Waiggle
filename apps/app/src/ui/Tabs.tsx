@@ -51,6 +51,13 @@ export type Tab<K extends string> = {
    * Décorative : cachée des lecteurs d'écran, l'onglet reste nommé par son seul libellé.
    */
   icon?: IconName
+  /**
+   * R10 : le nom lu, quand il diffère du libellé affiché. « Projets · 5 » se voit, « Projets, 5
+   * projets » s'entend : le point médian et le nombre seul ne se lisent pas bien. Il garde les mots
+   * affichés, dans le même ordre (WCAG 2.5.3 : on peut dire « Projets » pour le toucher). Sans lui,
+   * le libellé.
+   */
+  spokenLabel?: string
 }
 
 /** La taille de l'icône d'un onglet, à l'échelle du texte « callout » qu'elle précède. */
@@ -285,7 +292,7 @@ export function Tabs<K extends string>({
             }}
             nativeID={tabId(tab.key)}
             role="tab"
-            accessibilityLabel={tab.label}
+            accessibilityLabel={tab.spokenLabel ?? tab.label}
             aria-selected={chosen}
             // Le panneau que l'onglet commande (`aria-controls` manque aux types de React
             // Native ; sur téléphone, la propriété est ignorée).
