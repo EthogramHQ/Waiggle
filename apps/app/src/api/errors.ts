@@ -53,6 +53,15 @@ export type ApiErrorKey =
   | 'invalidPhoto'
   | 'invalidFeedback'
   | 'testerMediaFull'
+  // Tranche R10 : les ruches (pleine, limites de 10 créées et 20 rejointes, déjà membre, déjà
+  // invité, invitation qui ne vaut plus, projet qu'on ne peut pas épingler).
+  | 'hiveFull'
+  | 'hivesCreatedLimit'
+  | 'hivesJoinedLimit'
+  | 'alreadyHiveMember'
+  | 'alreadyInvited'
+  | 'invitationExpired'
+  | 'pinNotVisible'
   | 'internal'
   | 'network'
 
@@ -87,6 +96,9 @@ const byStatus: Record<number, ApiErrorKey> = {
   // 429 : « trop de demandes ». Aussi le 6e changement de pseudo du jour (handle_change_limit),
   // qui a son propre message (réessayer demain, pas dans quelques minutes) : voir byCode.
   429: 'rateLimited',
+  // 410 : « disparu ». R10 : une invitation expirée, ou dont la ruche a été supprimée
+  // (`invitation_expired`) ; son seul usage, donc le statut suffit.
+  410: 'invitationExpired',
   503: 'unavailable',
 }
 
@@ -143,6 +155,14 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   invalid_photo: 'invalidPhoto',
   invalid_feedback: 'invalidFeedback',
   tester_media_full: 'testerMediaFull',
+  // Tranche R10 : six 409 et un 422 (le 410 d'une invitation se lit par son statut).
+  hive_full: 'hiveFull',
+  hives_created_limit: 'hivesCreatedLimit',
+  hives_joined_limit: 'hivesJoinedLimit',
+  already_hive_member: 'alreadyHiveMember',
+  already_invited: 'alreadyInvited',
+  invitation_expired: 'invitationExpired',
+  pin_not_visible: 'pinNotVisible',
   // Tranche R7b : le quota des appels d'un projet (429) a le message de « trop de demandes » ; son
   // code est lu à part (`projectLimit`).
   project_calls_limited: 'rateLimited',
