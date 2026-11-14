@@ -92,7 +92,13 @@ const T = {
 }
 
 /** La notice d'une partie retirée : le groupe nommé par son titre. */
-const part = (title: string) => within(screen.getByRole('group', { name: title }))
+// Cherché par son nom, puis son rôle vérifié : getByRole exigerait une vue accessible, qui sur iOS
+// cacherait à VoiceOver le lien de la notice (comme RemovedPart.test.tsx).
+const part = (title: string) => {
+  const found = screen.getByLabelText(title)
+  expect(found.props.role ?? found.props.accessibilityRole).toBe('group')
+  return within(found)
+}
 
 /** Vrai si ce texte est écrit dans la notice, blancs de la typographie française compris. */
 const inPart = (title: string, text: string) =>
@@ -176,7 +182,7 @@ describe('a photo of an update removed by the moderation', () => {
 
     // Témoin : la mise à jour est là, avec « Signaler cette mise à jour ».
     expect(screen.getByText(rocketUpdate.title ?? '')).toBeTruthy()
-    expect(screen.queryByRole('group', { name: T.updatePhoto })).toBeNull()
+    expect(screen.queryByLabelText(T.updatePhoto)).toBeNull()
     expect(screen.queryAllByText(containing(T.banner))).toHaveLength(0)
     expect(screen.queryAllByText(containing(contactEmail))).toHaveLength(0)
   })
@@ -242,7 +248,7 @@ describe('the capture of a feedback removed by the moderation', () => {
     await openThread('author')
 
     // Témoin : le retour est là, sans capture ni notice.
-    expect(screen.queryByRole('group', { name: T.capture })).toBeNull()
+    expect(screen.queryByLabelText(T.capture)).toBeNull()
     expect(screen.queryAllByText(containing(T.banner))).toHaveLength(0)
     expect(screen.queryAllByText(containing(contactEmail))).toHaveLength(0)
   })
@@ -307,7 +313,7 @@ describe('the photo of a call removed by the moderation', () => {
 
     // Témoin : l'appel est là, sans photo ni notice.
     expect(await screen.findByText(containing(call.text))).toBeTruthy()
-    expect(screen.queryByRole('group', { name: T.callPhoto })).toBeNull()
+    expect(screen.queryByLabelText(T.callPhoto)).toBeNull()
     expect(screen.queryAllByText(containing(contactEmail))).toHaveLength(0)
   })
 })
