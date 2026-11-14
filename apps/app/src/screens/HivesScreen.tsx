@@ -33,7 +33,13 @@ import { TopNav } from '../navigation/TopNav'
 import { Button } from '../ui/Button'
 import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
-import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from '../ui/focus'
+import {
+  type Focusable,
+  focusWithoutScroll,
+  holdsFocus,
+  moveReaderTo,
+  revealWithoutJump,
+} from '../ui/focus'
 import { HiveInvitation } from '../ui/HiveInvitation'
 import { HiveRow } from '../ui/HiveRow'
 import { ListGroup } from '../ui/ListGroup'
@@ -45,6 +51,7 @@ import { StateMessage } from '../ui/StateMessage'
 import { useScreenShownCount } from '../ui/screenFocus'
 import { Text } from '../ui/Text'
 import { useTapGuard } from '../ui/tapGuard'
+import { useCalmMotion } from '../ui/theme/motion'
 import { SessionErrorScreen, SignedOutScreen } from './states'
 
 export function HivesScreen() {
@@ -118,6 +125,8 @@ const explained: ReadonlySet<ApiErrorKey> = new Set([
   'suspended',
   'rateLimited',
   'network',
+  // La session a expiré pendant la visite : « Connecte-toi pour continuer. »
+  'unauthorized',
 ])
 
 function HivesView({ mine }: { mine: MyHives }) {
@@ -147,6 +156,13 @@ function HivesView({ mine }: { mine: MyHives }) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const closeRef = useRef<Focusable>(null)
   const [failure, setFailure] = useState<Failure | null>(null)
+  // L'échec s'écrit sous la carte touchée, qui peut être au bas de l'écran (sous la barre d'onglets
+  // du téléphone) : il vient dans l'écran à son apparition, sans saut (`revealWithoutJump`).
+  const failureNotice = useRef<Focusable>(null)
+  const calm = useCalmMotion()
+  useEffect(() => {
+    if (failure) revealWithoutJump(failureNotice.current, calm)
+  }, [failure, calm])
 
   // Le titre « Invitations » et celui de « Mes ruches » : où va le focus quand la carte de la
   // fenêtre part (sinon il tomberait sur toute la page).
@@ -340,7 +356,9 @@ function HivesView({ mine }: { mine: MyHives }) {
                   }
                   refused={Boolean(refused[invitation.id])}
                 />
-                {failure?.id === invitation.id ? <Notice message={failure.text} /> : null}
+                {failure?.id === invitation.id ? (
+                  <Notice ref={failureNotice} message={failure.text} />
+                ) : null}
               </Stack>
             ))}
           </Stack>
