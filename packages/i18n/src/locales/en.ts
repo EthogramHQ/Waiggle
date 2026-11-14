@@ -2109,7 +2109,11 @@ export const en: Translation = {
       handOver: 'Hand over',
       handOverError: 'Hosting could not be handed over. Try again.',
     },
-    pills: { label: 'Feed hives', all: 'All' },
+    pills: {
+      label: 'Feed hives',
+      all: 'All',
+      caption: 'New projects and updates from the members of the {{hive}} hive.',
+    },
     side: 'Your hives',
   },
   me: {

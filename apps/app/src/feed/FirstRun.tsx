@@ -6,6 +6,7 @@
 // HomeScreen le pose quand la première page du fil dit `followsAnyone: false`. Comme tout ce qui
 // est dans feed/, ce fichier assemble des composants de ui/ sans écrire de style.
 import { useRouter } from 'expo-router'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSuspension } from '../moderation/suspension'
 import { PeopleToFollow } from '../suggestions/PeopleToFollow'
@@ -19,9 +20,14 @@ const FIRST_RUN_SUGGESTIONS = 5
 type Props = {
   /** Le nom du membre, pour le salut. */
   name: string
+  /**
+   * R10 (F-Fil9, planche R4-Fil-Premier) : ses invitations dans une ruche, posées par l'écran sous
+   * le salut et au-dessus de « Proches à suivre » ; absentes, rien ne change.
+   */
+  invitations?: ReactNode
 }
 
-export function FirstRun({ name }: Props) {
+export function FirstRun({ name, invitations }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const { suspended } = useSuspension()
@@ -32,6 +38,7 @@ export function FirstRun({ name }: Props) {
         title={t(($) => $.feed.firstRun.title)}
         body={t(($) => $.feed.firstRun.body)}
       />
+      {invitations}
       <PeopleToFollow max={FIRST_RUN_SUGGESTIONS} />
       {suspended ? null : <PublishPrompt onPublish={() => router.push('/projects/new')} />}
     </Stack>

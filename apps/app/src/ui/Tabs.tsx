@@ -405,3 +405,32 @@ export function Tabs<K extends string>({
     </View>
   )
 }
+
+type PanelProps = {
+  /**
+   * L'identifiant que les onglets citent (`panelId`) ; absent quand il n'y a pas d'onglets (un
+   * membre sans ruche) : une simple vue, sans rôle ni nom.
+   */
+  id?: string | undefined
+  /** Le nom du panneau : celui de l'onglet choisi (« Famille »). */
+  label?: string | undefined
+  children: ReactNode
+}
+
+/**
+ * R10 : le panneau d'onglets porté par l'écran (`panelId`), le Fil sous les pastilles des ruches.
+ * Le rôle `tabpanel` et le nom de l'onglet choisi (`aria-label` : l'identifiant de l'onglet est
+ * interne à la rangée, `aria-labelledby` ne peut pas le citer). Sans `id`, la même vue sans rôle :
+ * l'arbre ne change pas quand les onglets arrivent (les ruches lues après le Fil), et la liste
+ * dessous garde sa mémoire des cartes déjà vues.
+ */
+export function TabPanel({ id, label, children }: PanelProps) {
+  return (
+    <View
+      {...(id ? { nativeID: id, role: 'tabpanel' as const } : null)}
+      {...(id && label ? { 'aria-label': label } : null)}
+    >
+      {children}
+    </View>
+  )
+}
