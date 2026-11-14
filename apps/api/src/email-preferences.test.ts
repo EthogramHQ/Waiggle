@@ -60,6 +60,9 @@ const DEFAULTS = {
   follows: 'digest',
   updates: 'digest',
   testers: 'digest',
+  // R10 : « Ruches » vaut « Tout de suite » par défaut (DEFAULT_EMAIL_PREFERENCES) : une invitation
+  // attend une réponse.
+  hives: 'now',
 } as const
 
 beforeEach(async () => {
@@ -120,12 +123,12 @@ describe('reading my e-mail settings', () => {
     expect((await act.send('GET', PATH, ines)).status).toBe(200)
   })
 
-  it('gives the defaults to a member who never changed anything: the recap on, every type in the recap', async () => {
+  it('gives the defaults to a member who never changed anything: the recap on, every type in the recap, hives at once', async () => {
     const res = await act.send('GET', PATH, ines)
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    // Rien de plus que les sept réglages (ni date d'envoi, ni jeton, ni l'ancien interrupteur).
+    // Rien de plus que les huit réglages (ni date d'envoi, ni jeton, ni l'ancien interrupteur).
     expect(body).toEqual(DEFAULTS)
     expect(EmailPreferences.parse(body)).toEqual(DEFAULT_EMAIL_PREFERENCES)
   })
@@ -157,8 +160,8 @@ describe('changing my e-mail settings', () => {
     })
   })
 
-  it('accepts every choice on comments, replies and the testers corner', async () => {
-    for (const type of ['comments', 'replies', 'testers'] as const) {
+  it('accepts every choice on comments, replies, the testers corner and hives', async () => {
+    for (const type of ['comments', 'replies', 'testers', 'hives'] as const) {
       for (const choice of ['now', 'never', 'digest'] as const) {
         const res = await patch(ines, { [type]: choice })
         expect(res.status, `${type} ${choice}`).toBe(200)
@@ -434,6 +437,8 @@ describe('the trace of a setting lowered, for a restored backup', () => {
       await act.setPreferences(ines, { reactions: 'never' })
       await act.setPreferences(ines, { follows: 'never' })
       await act.setPreferences(ines, { updates: 'never' })
+      // R10 : « Ruches » part de « Tout de suite » (son défaut) : le passer au récap le baisse.
+      await act.setPreferences(ines, { hives: 'digest' })
       await act.setPreferences(ines, { weeklyRecap: false })
     })
 
@@ -444,6 +449,7 @@ describe('the trace of a setting lowered, for a restored backup', () => {
       `Unsubscribe ${inesId} reactions never`,
       `Unsubscribe ${inesId} follows never`,
       `Unsubscribe ${inesId} updates never`,
+      `Unsubscribe ${inesId} hives digest`,
       `Unsubscribe ${inesId} recap`,
     ])
   })
