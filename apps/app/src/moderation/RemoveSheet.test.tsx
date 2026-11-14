@@ -444,3 +444,55 @@ describe('the password asked again', () => {
     expect(onDone).not.toHaveBeenCalled()
   })
 })
+
+// R9, relecture : la feuille rappelle le contenu visé (comme la fenêtre de 7a), et dit du contenu
+// entier qu'« on ne le verra plus », non « cette partie ».
+describe('recalling the content to remove', () => {
+  const commentKind = fr.t(($) => $.moderation.kinds.comment)
+  const commentText = scamCommentItem.snapshot[0]?.value ?? ''
+
+  it('recalls the kind and the text of a comment, in three lines at most', async () => {
+    await openSheet(scamCommentItem)
+
+    expect(screen.getByText(commentKind)).toBeTruthy()
+    expect(screen.getByText(commentText).props.numberOfLines).toBe(3)
+  })
+
+  it('recalls the text of the part, not the title of the project', async () => {
+    await openSheet(descriptionItem)
+
+    expect(screen.getByText('Gagne 500 € par jour sans rien faire.')).toBeTruthy()
+  })
+
+  it('shows the picture of a tester’s message instead of a text', async () => {
+    const url = 'https://api.example.test/media/capture.webp'
+    await openSheet(
+      itemOf({
+        target: { kind: 'message', id: 'a1b2c3d4-0000-4000-8000-000000000001' },
+        part: null,
+        snapshot: [],
+        images: [{ field: 'photo', state: 'present', url }],
+      }),
+    )
+
+    expect(screen.getByRole('image', { name: fr.t(($) => $.moderation.images.photo) })).toBeTruthy()
+  })
+
+  it('says the whole content will not be seen anymore, without « cette partie »', async () => {
+    await openSheet(scamCommentItem)
+
+    expect(screen.getByText(containing(fr.t(($) => $.moderation.removeMessage)))).toBeTruthy()
+    expect(screen.queryByText(containing('cette partie'))).toBeNull()
+  })
+
+  it('says « cette partie » while only a part is removed, and the whole content once chosen', async () => {
+    await openSheet()
+
+    const partMessage = fr.t(($) => $.moderation.removeSheet.message)
+    expect(screen.getByText(containing(partMessage))).toBeTruthy()
+    await fireEvent.press(screen.getByRole('radio', { name: containing(T.wholeProject) }))
+
+    expect(screen.getByText(containing(fr.t(($) => $.moderation.removeMessage)))).toBeTruthy()
+    expect(screen.queryByText(containing(partMessage))).toBeNull()
+  })
+})

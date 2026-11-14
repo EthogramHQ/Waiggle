@@ -275,10 +275,9 @@ describe('who sees the moderation', () => {
       (await cardOf(firstTextOf(scamCommentItem))).getByRole('button', { name: 'Retirer' }),
     )
 
-    // R9 : la feuille « Retirer » s'ouvre sur le détail, qui montre le contenu visé en entier ; la
-    // feuille rappelle la partie visée dans son titre (RemoveSheet.test), pas le texte.
+    // Le texte paraît deux fois : sur la carte (le détail), et rappelé dans la feuille.
     expect(screen.getByRole('header', { name: 'Retirer ce contenu ?' })).toBeTruthy()
-    expect(screen.getAllByText(firstTextOf(scamCommentItem))).toHaveLength(1)
+    expect(screen.getAllByText(firstTextOf(scamCommentItem))).toHaveLength(2)
   })
 
   it('says « not found » to a member who is not an administrator, and shows nothing of the queue', async () => {
@@ -437,7 +436,8 @@ describe('removing a content', () => {
     const dialog = await openRemove()
 
     // R9 : la feuille « Retirer » (RemoveSheet) ; le fondement, la loi ou les règles, dans un menu.
-    expect(dialog.getByText(containing(fr.t(($) => $.moderation.removeSheet.message)))).toBeTruthy()
+    // Un commentaire entier : « Les autres membres ne le verront plus… », non « cette partie ».
+    expect(dialog.getByText(containing(fr.t(($) => $.moderation.removeMessage)))).toBeTruthy()
     await chooseGround('illegal')
     expect(
       screen.getByRole('button', { name: containing(fr.t(($) => $.moderation.grounds.illegal)) }),
