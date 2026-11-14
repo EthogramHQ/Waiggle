@@ -750,6 +750,8 @@ describe('reports and removals of an account', () => {
           targetId: meteo.id,
           reason: 'privacy',
           details: 'Ma photo.',
+          // R9 : le contenu entier, pas une partie.
+          part: null,
           createdAt: stored[0]?.createdAt.toISOString(),
           outcome: 'dismissed',
           decidedAt: decision.createdAt,
@@ -759,6 +761,7 @@ describe('reports and removals of an account', () => {
           targetId: published.id,
           reason: 'harassment',
           details: null,
+          part: null,
           createdAt: stored[1]?.createdAt.toISOString(),
           outcome: 'open',
           decidedAt: null,

@@ -26,6 +26,7 @@ import { existingAccountEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
 import { describeError, writeAuthLog } from '../log'
 import type { FileStorage } from '../media/storage'
+import { releaseAvatarKey } from '../moderation/replaced'
 import { suspensionEmailKey } from '../moderation/suspend'
 import { mediaKeysOf } from '../projects/load'
 import { createRateLimiter, deleteAddressCounters, deleteMemberCounters } from '../rate-limit'
@@ -292,11 +293,26 @@ export const createAuth = ({
             .from(schema.testerMedia)
             .where(eq(schema.testerMedia.ownerId, user.id))
           const all = [...new Set([...keys, ...ownedImages.map((image) => image.storageKey)])]
-          filesToDelete.set(user.id, row?.avatarKey ? [row.avatarKey, ...all] : all)
+          // R9 : une photo de profil retirée par la modération porte la clé `withheld/<id>` ; le
+          // vrai fichier est gardé dans son retrait (hidden_value.storageKey). releaseAvatarKey
+          // rend la vraie clé, pour qu'il parte aussi du stockage et ne reste pas orphelin.
+          const avatarKey = row?.avatarKey
+            ? await releaseAvatarKey(db, user.id, row.avatarKey)
+            : null
+          filesToDelete.set(user.id, avatarKey ? [avatarKey, ...all] : all)
           // Ses commentaires (tranche 5) : effacés, sauf ses racines auxquelles d'autres ont
           // répondu, qui deviennent « Commentaire supprimé » (voir comments/erase.ts). Ici et pas
           // après : une fois le compte parti, on ne saurait plus lesquels étaient les siens.
           await eraseCommentsOf(db, user.id)
+          // R9 (sécurité P2) : les décisions qui visent son profil gardent son ancien nom et son
+          // ancien pseudo (pour un rétablissement). Une fois le compte parti, ces valeurs
+          // désigneraient un membre disparu : on les vide ici et pas après, car la base remet
+          // target_member_id à null à la suppression et on ne retrouverait plus les lignes. La
+          // décision elle-même reste (garde d'un an). La requête suit moderation_decision_target_idx.
+          await db
+            .update(schema.moderationDecision)
+            .set({ previousValue: null, provisionalValue: null })
+            .where(eq(schema.moderationDecision.targetMemberId, user.id))
         },
         // Juste après : on efface les fichiers eux-mêmes du stockage, les compteurs anti-abus
         // qui portent son identifiant, et les commentaires restés sans auteur (un commentaire

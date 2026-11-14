@@ -15,12 +15,16 @@ import {
   type NotifiedCover,
   REACTION_KINDS,
   type ReactionKind,
+  type ReportPartField,
 } from '@ruche/contracts'
+import type { Translation } from '@ruche/i18n'
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
+import { contestSubjectOf, partContestSubject } from '../ui/contestSubject'
 import type { IconName } from '../ui/Icon'
 import { type Part, splitMarks } from '../ui/marks'
 import { parisDateTime } from '../ui/parisTime'
+import { partText } from '../ui/partText'
 
 type T = ReturnType<typeof useTranslation>['t']
 
@@ -49,8 +53,52 @@ export type Presented = {
   version?: string | null
   detail: string | null
   quote: string | null
+  /**
+   * R9 : un geste sous la ligne, qui n'est pas son toucher. `target` : un lien dans l'appli
+   * (« Choisir un pseudo ») ; `contact` : l'adresse de contact, avec un objet qui nomme la
+   * décision et sa date (« Contester »). Absent ou null : aucun.
+   */
+  action?: { label: string; target: Href } | { label: string; contact: { subject: string } } | null
   target: Href | null
 }
+
+/** Les réglages du profil, où l'on choisit un nouveau nom ou pseudo. */
+const PROFILE_SETTINGS: Href = '/settings/profile'
+
+/** La clé de la phrase d'une partie retirée (`notifications.removedPart`), ou null si elle n'en a pas. */
+const removedPartKey = (
+  targetKind: 'project' | 'update' | 'comment' | 'call' | 'message',
+  field: ReportPartField,
+): keyof Translation['notifications']['removedPart'] | null => {
+  if (field === 'photo') {
+    return targetKind === 'update'
+      ? 'updatePhoto'
+      : targetKind === 'call'
+        ? 'callPhoto'
+        : targetKind === 'message'
+          ? 'capture'
+          : targetKind === 'project'
+            ? 'photo'
+            : null
+  }
+  if (targetKind !== 'project') return null
+  return field === 'description' ||
+    field === 'tools' ||
+    field === 'demoUrl' ||
+    field === 'cover' ||
+    field === 'photoDescription' ||
+    field === 'prompt'
+    ? field
+    : null
+}
+
+/** Le rang d'une photo (« 1re », « 2e »), ou rien si on ne sait plus où elle était. */
+const rankOf = (position: number | null, t: T): string =>
+  position === null
+    ? ''
+    : position === 1
+      ? t(($) => $.report.rank.first)
+      : t(($) => $.report.rank.other, { n: position })
 
 const projectRoute = (id: string): Href => ({ pathname: '/projects/[id]', params: { id } })
 
@@ -411,11 +459,14 @@ export const presentNotification = (
     }
     case 'suspension_ended': {
       // À la date prévue, ou levée plus tôt (J6) ; une levée dit pourquoi.
-      const { lifted, explanation } = notification
+      // R9 (jur-R6) : levée parce que c'était une erreur de la modération, elle le dit.
+      const { lifted, cause, explanation } = notification
       const said = say({}, () =>
-        lifted
-          ? t(($) => $.notifications.suspensionEnded.lifted)
-          : t(($) => $.notifications.suspensionEnded.ended),
+        cause === 'error'
+          ? t(($) => $.notifications.suspensionEnded.liftedError)
+          : lifted
+            ? t(($) => $.notifications.suspensionEnded.lifted)
+            : t(($) => $.notifications.suspensionEnded.ended),
       )
       return {
         ...plain,
@@ -433,14 +484,47 @@ export const presentNotification = (
       // qui, ni l'administrateur), qu'elle mène quelque part ou non : elle mène au projet, que son
       // auteur voit toujours, sauf pour un commentaire sur le projet d'un membre qui l'a bloqué
       // (tranche 7b règle 9).
-      const { targetKind, project, excerpt, ground, explanation, afterReport, projectHidden } =
-        notification
+      const {
+        targetKind,
+        project,
+        excerpt,
+        part,
+        ground,
+        explanation,
+        afterReport,
+        projectHidden,
+      } = notification
       const elsewhere = targetKind === 'comment' && projectHidden
+      // R9 : une partie retirée seule se nomme (« La 2e photo de Météo… ») ; une partie que
+      // l'auteur ne voit pas comme telle retombe sur la phrase du contenu entier.
+      const partKey = part ? removedPartKey(targetKind, part.field) : null
       const said = elsewhere
         ? say({}, () => t(($) => $.notifications.removed.commentElsewhere))
-        : say({ title: project.title }, (params) =>
-            t(($) => $.notifications.removed[targetKind], params as { title: string }),
-          )
+        : part && partKey
+          ? say({ title: project.title }, (params) =>
+              t(($) => $.notifications.removedPart[partKey], {
+                ...params,
+                rank: rankOf(part.position, t),
+              } as { title: string; rank: string }),
+            )
+          : say({ title: project.title }, (params) =>
+              t(($) => $.notifications.removed[targetKind], params as { title: string }),
+            )
+      // « Contester » : l'adresse de contact, avec un objet qui nomme la partie, le contenu et la
+      // date (J12). Seulement pour une partie : un contenu entier garde « Voir la raison ».
+      const action: Presented['action'] =
+        part && partKey && !elsewhere
+          ? {
+              label: t(($) => $.notifications.contest),
+              contact: {
+                subject: partContestSubject(t, language, {
+                  part: partText({ ...part, mediaId: null }, t, targetKind),
+                  title: project.title,
+                  at: notification.at,
+                }),
+              },
+            }
+          : null
       const target: Href | null = elsewhere
         ? null
         : // R7b : un appel ou un message retiré mène au coin des testeurs, à son onglet (Appels,
@@ -459,21 +543,123 @@ export const presentNotification = (
         // Toute la motivation, qu'il y ait un lien ou non (article 17 du DSA) : « Voir la raison et
         // comment contester » ne la remplace jamais.
         detail: [
-          t(($) => $.removal.onlyYou),
+          part && partKey ? t(($) => $.removal.part.onlyYou) : t(($) => $.removal.onlyYou),
           afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
           t(($) => $.removal.grounds[ground]),
           t(($) => $.removal.explanation, { explanation }),
           t(($) => $.removal.contest),
         ].join('\n'),
         quote: excerpt,
+        action,
         target,
+      }
+    }
+    case 'profile_removed': {
+      // R9 (L2) : une partie du profil retirée. Le nom et le pseudo sont remplacés d'office : la
+      // phrase dit par quoi, et « Choisir un pseudo » (ou un nom) mène aux réglages du profil, où le
+      // membre en choisit un autre ; comme l'action ne mène pas à « Contester », l'adresse reste
+      // écrite dans la motivation (article 17 du DSA). Une bio, des outils ou une photo n'ont rien
+      // à choisir : l'action est « Contester », avec un objet qui nomme la décision et sa date.
+      const { part, replacedBy, ground, explanation, afterReport } = notification
+      const field = part.field
+      const said =
+        field === 'name' || field === 'handle'
+          ? say({ replacedBy: replacedBy ?? '' }, (params) =>
+              t(($) => $.notifications.profileRemoved[field], params as { replacedBy: string }),
+            )
+          : say({}, () => t(($) => $.notifications.profileRemoved[field]))
+      const action: Presented['action'] =
+        field === 'handle'
+          ? { label: t(($) => $.notifications.chooseHandle), target: PROFILE_SETTINGS }
+          : field === 'name'
+            ? { label: t(($) => $.notifications.chooseName), target: PROFILE_SETTINGS }
+            : {
+                label: t(($) => $.notifications.contest),
+                contact: {
+                  subject: contestSubjectOf(
+                    t,
+                    language,
+                    t(($) => $.removal.contestDecision.profilePart, {
+                      part: partText({ field, mediaId: null, position: null }, t),
+                    }),
+                    notification.at,
+                  ),
+                },
+              }
+      return {
+        ...plain,
+        ...said,
+        icon: 'prohibit',
+        leading: iconLeading('prohibit', 'danger'),
+        detail: [
+          t(($) => $.removal.part.onlyYou),
+          afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
+          t(($) => $.removal.grounds[ground]),
+          t(($) => $.removal.explanation, { explanation }),
+          t(($) => $.removal.contest),
+        ].join('\n'),
+        action,
+        target: null,
+      }
+    }
+    case 'restored': {
+      // R9 (L3) : un contenu ou une partie rétablis, signés par l'équipe (jamais par qui a décidé).
+      // Une partie nommée par son rang (« La 2e photo de Météo ») ; le pseudo ou le nom revient ou
+      // non : le membre a pu en choisir un autre entre-temps (`valueBack`).
+      const { targetKind, project, part, handle, valueBack } = notification
+      const field = part?.field
+      const rank = rankOf(part?.position ?? null, t)
+      const said =
+        targetKind === 'member'
+          ? field === 'name'
+            ? say({}, () =>
+                valueBack
+                  ? t(($) => $.notifications.restored.nameBack)
+                  : t(($) => $.notifications.restored.nameNotBack),
+              )
+            : field === 'bio' || field === 'favoriteTools' || field === 'avatar'
+              ? say({}, () => t(($) => $.notifications.restored[field]))
+              : say({ handle: handle ?? '' }, (params) =>
+                  valueBack
+                    ? t(($) => $.notifications.restored.handleBack, params as { handle: string })
+                    : t(
+                        ($) => $.notifications.restored.handleNotBack,
+                        params as { handle: string },
+                      ),
+                )
+          : project && field
+            ? say({ title: project.title }, (params) =>
+                t(($) => $.notifications.restored.part, {
+                  ...params,
+                  part: t(($) => $.report.parts[field], { rank }),
+                }),
+              )
+            : project
+              ? say({ title: project.title }, (params) =>
+                  t(($) => $.notifications.restored[targetKind], params as { title: string }),
+                )
+              : say({}, () => t(($) => $.notifications.restored.commentElsewhere))
+      return {
+        ...plain,
+        ...said,
+        icon: 'check-circle',
+        leading: iconLeading('check-circle', 'honey'),
+        thumb: project ? projectThumb(project) : null,
+        detail: t(($) => $.notifications.team),
+        target: project ? projectRoute(project.id) : null,
       }
     }
     case 'report_handled': {
       // Tranche 7a, règle 2 : la sorte de contenu et l'issue, et comment contester ; ni titre, ni
       // extrait, ni auteur. Un lien seulement si la cible est encore visible (l'API le décide).
       const { targetKind, outcome, link } = notification
-      const said = say({}, () => t(($) => $.notifications.reportHandled[targetKind][outcome]))
+      // R9 (relectures) : un signalement qui ne visait qu'une partie le dit (`part`), sans nommer
+      // laquelle ; les autres gardent le texte de leur sorte de contenu.
+      const said = say({}, () =>
+        notification.part
+          ? t(($) => $.notifications.reportHandled.part[outcome])
+          : t(($) => $.notifications.reportHandled[targetKind][outcome]),
+      )
       return {
         ...plain,
         ...said,

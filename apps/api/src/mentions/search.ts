@@ -7,7 +7,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, isNull, ne, or, sql } from 'drizzle-orm'
 import { notBlockedWith } from '../blocks/visibility'
 import { seesSql, type Viewer } from '../comments/load'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf } from '../profile/me'
 import { contains, foldSql } from '../search/fold'
 
 type Reader = Pick<Database, 'select'>
@@ -158,6 +158,6 @@ export const searchMentionable = async (
     id: row.id,
     name: row.name,
     handle: row.handle,
-    avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
+    avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
   }))
 }

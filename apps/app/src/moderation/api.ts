@@ -11,7 +11,9 @@ import {
   type ModerationDecisionInput,
   type ModerationQueueItem,
   ModerationQueuePage,
+  type PartOut,
   RemovedPage,
+  type ReportPart,
 } from '@ruche/contracts'
 import { type InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
@@ -75,6 +77,36 @@ export const useModerationQueue = (enabled = true) =>
     refetchOnReconnect: false,
   })
 
+/**
+ * Hook : ce que la file sait du membre `memberId` (`authorRecord` : pseudo, inscription, retraits et
+ * suspensions déjà décidés), ou `undefined` si aucune de ses cartes lues ne le vise. La fenêtre
+ * « Suspendre » en écrit son sous-titre (R9, C10) : elle a sa propre adresse (`/suspend`), et ne
+ * recevait pas la fiche que la file a pourtant en main. Elle la retrouve ici, quel que soit le
+ * chemin : la file déjà lue (la fenêtre ouverte depuis la modération), ou lue pour elle (un lien
+ * direct, la page du membre). Une file déjà lue ne se relit pas à l'ouverture de la fenêtre
+ * (`refetchOnMount: false`) : elle est affichée dessous, et rien ne doit y bouger. `enabled` : faux
+ * avant l'hydratation et sans session (rien n'est demandé).
+ */
+export const useQueueAuthor = (memberId: string, enabled: boolean) => {
+  const queue = useInfiniteQuery({
+    queryKey: queueKey,
+    queryFn: ({ pageParam }) => getQueuePage(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: enabled && memberId !== '',
+    retry,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+  if (!enabled) return undefined
+  for (const page of queue.data?.pages ?? []) {
+    const found = page.items.find((item) => item.authorRecord?.memberId === memberId)
+    if (found?.authorRecord) return found.authorRecord
+  }
+  return undefined
+}
+
 /** Hook : les contenus retirés, du plus récent au plus ancien, pour pouvoir les rétablir. */
 export const useRemovedItems = (enabled = true) =>
   useInfiniteQuery({
@@ -131,18 +163,48 @@ export const postDecision = (input: ModerationDecisionInput) =>
     ModerationDecision,
   )
 
-/** Les pages d'une liste sans la cible donnée (même sorte, même identifiant). */
-const without = <Item extends { target: { kind: string; id: string } }>(
+/**
+ * Vrai si l'élément de liste (cible et partie) est celui que la décision vise. R9 : une même cible
+ * donne un élément par partie (« Projet » entier, « Projet · la 2e photo »), donc la cible seule ne
+ * suffit plus.
+ * - décision sur une partie : seul l'élément de cette partie (même champ, même photo) ; retirer une
+ *   photo clôt aussi les signalements de sa description (même photo) ;
+ * - décision sans partie : l'élément du contenu entier ; un retrait entier clôt aussi ceux des
+ *   parties (`wholeClosesParts`), un classement ou un rétablissement entier non.
+ */
+const isDecided = (
+  item: { target: { kind: string; id: string }; part: PartOut | null },
+  target: { kind: string; id: string },
+  part: ReportPart | undefined,
+  wholeClosesParts: boolean,
+) => {
+  if (item.target.kind !== target.kind || item.target.id !== target.id) return false
+  if (!part) return item.part === null || wholeClosesParts
+  if (!item.part) return false
+  if (item.part.field === part.field && (item.part.mediaId ?? null) === (part.mediaId ?? null)) {
+    return true
+  }
+  return (
+    wholeClosesParts &&
+    part.field === 'photo' &&
+    item.part.field === 'photoDescription' &&
+    part.mediaId !== undefined &&
+    item.part.mediaId === part.mediaId
+  )
+}
+
+/** Les pages d'une liste sans l'élément décidé (voir `isDecided`). */
+const without = <Item extends { target: { kind: string; id: string }; part: PartOut | null }>(
   data: InfiniteData<{ items: Item[]; nextCursor: string | null }> | undefined,
   target: { kind: string; id: string },
+  part: ReportPart | undefined,
+  wholeClosesParts: boolean,
 ) =>
   data && {
     ...data,
     pages: data.pages.map((page) => ({
       ...page,
-      items: page.items.filter(
-        (item) => !(item.target.kind === target.kind && item.target.id === target.id),
-      ),
+      items: page.items.filter((item) => !isDecided(item, target, part, wholeClosesParts)),
     })),
   }
 
@@ -191,8 +253,12 @@ export const useDecide = (): {
     async (input: ModerationDecisionInput) => {
       const result = await postDecision(input)
       if (result.ok) {
-        // L'historique se relira à sa prochaine ouverture, avec cette décision en tête.
-        void queryClient.invalidateQueries({ queryKey: historyKey, refetchType: 'none' })
+        // La décision entre en tête de l'historique. Monté et lu (la colonne de droite, sur
+        // ordinateur), il se relit tout de suite : sinon la décision qu'on vient de prendre n'y
+        // paraissait qu'après un rechargement (R9, C9). Fermé (sur téléphone, sa lecture est
+        // coupée), il est seulement marqué périmé et se relira à son ouverture. `active` : seules
+        // les lectures en service (montées, `enabled`) repartent.
+        void queryClient.invalidateQueries({ queryKey: historyKey, refetchType: 'active' })
       }
       if (input.action === 'suspend' || input.action === 'lift') {
         if (result.ok) {
@@ -220,7 +286,7 @@ export const useDecide = (): {
         // Une lecture de la liste déjà en route est annulée : elle remettrait la cible décidée.
         await queryClient.cancelQueries({ queryKey: touched })
         queryClient.setQueryData(touched, (data: Parameters<typeof without>[0]) =>
-          without(data, input.target),
+          without(data, input.target, input.part, input.action === 'remove'),
         )
         // L'autre liste a changé aussi (un contenu retiré y entre, un rétabli peut revenir dans la
         // file) : marquée périmée, elle se relira quand on l'ouvrira, pas sous les yeux.

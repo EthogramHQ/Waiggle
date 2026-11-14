@@ -37,6 +37,8 @@ const olderUpdate: ProjectUpdate = {
   beforeAfter: false,
   createdAt: '2026-10-12T09:00:00.000Z',
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 }
 
 /** La mise à jour publiée par les tests : sans photo, et sans version. */
@@ -49,6 +51,8 @@ const freshUpdate: ProjectUpdate = {
   beforeAfter: false,
   createdAt: '2026-10-20T09:00:00.000Z',
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 }
 
 /** Ce que la feuille envoie pour `freshUpdate`. */

@@ -19,6 +19,8 @@ export const rocketUpdate: ProjectUpdate = {
   beforeAfter: true,
   createdAt: '2026-10-19T09:00:00.000Z',
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
 }
 
 /** La version courte d'une mise à jour, comme sur une carte du fil. */

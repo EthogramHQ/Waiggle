@@ -345,6 +345,8 @@ describe('sending feedback', () => {
       createdAt: at,
       settled: null,
       removal: null,
+      // R9 : aucune partie retirée.
+      removedParts: [],
       mine: true,
     })
     expect(await thread(project.id, inesId, ines)).toEqual({ items: [message], nextCursor: null })
@@ -564,6 +566,8 @@ describe('replying', () => {
       createdAt: new Date().toISOString(),
       settled: null,
       removal: null,
+      // R9 : aucune partie retirée.
+      removedParts: [],
       mine: true,
     })
     const back = await sent(project.id, inesId, ines, reply('Super, merci Papi Jean !'))

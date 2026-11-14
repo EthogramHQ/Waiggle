@@ -17,7 +17,7 @@
 // Les dates se disent par rapport à maintenant (« il y a 2 h », « hier » : R4, F-Fil3), sauf celle
 // d'une décision de la modération, qui reste absolue et visible sans survol (jur-J2).
 import type { Notification } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+import { type Href, useRouter } from 'expo-router'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
@@ -40,6 +40,7 @@ import { FeedEnd, type FirstArrived, useFirstArrived } from '../ui/FeedEnd'
 import { IconButton } from '../ui/IconButton'
 import { LiveStatus } from '../ui/LiveStatus'
 import {
+  type NotificationAction,
   NotificationCard,
   type NotificationLeading,
   type NotificationThumb,
@@ -162,6 +163,7 @@ function MemberNotifications() {
         }
         isNew={honey.isNew(notification.id)}
         onPress={target ? () => router.push(target) : null}
+        action={actionOf(shown.action, (href) => router.push(href))}
       />
     )
   }
@@ -317,6 +319,19 @@ const leadingOf = (shown: Presented, toSource: MediaSource): NotificationLeading
   shown.leading.kind === 'avatar'
     ? { kind: 'avatar', name: shown.leading.name, image: toSource(shown.leading.image) }
     : shown.leading
+
+/**
+ * Sous la ligne (R9) : un lien dans l'appli devient un toucher qui l'ouvre ; l'adresse de contact
+ * passe telle quelle, la carte ouvre elle-même le brouillon.
+ */
+const actionOf = (
+  action: Presented['action'],
+  open: (target: Href) => void,
+): NotificationAction | undefined => {
+  if (!action) return undefined
+  if ('contact' in action) return action
+  return { label: action.label, onPress: () => open(action.target) }
+}
 
 /**
  * À droite : la couverture du projet, elle aussi par la session ; son résumé flou s'affiche le

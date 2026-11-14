@@ -18,12 +18,20 @@
 // lecteurs d'écran entendent son nom, qui reprend tout ce qu'elle écrit. Avec `onPress: null` (les
 // abonnés à son compte, sans nom), elle ne mène nulle part : ni lien ni bouton, ses textes se lisent
 // l'un après l'autre.
+//
+// R9 (7d) : une notification de la modération peut porter un geste à elle (`action`), sous la
+// phrase et la citation : « Contester » (un lien vers notre adresse de contact, avec un objet qui
+// nomme la décision) ou « Choisir un pseudo » (un geste de l'écran). Il est posé à côté du lien de
+// la ligne, jamais dedans : un lien dans un lien ne se toucherait pas seul, et le lecteur d'écran
+// dirait « Contester » dans le nom de la ligne. Le cadre de la ligne (fond et liseré d'une
+// nouvelle) entoure alors les deux.
 import { borders, radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
-import type { Ref } from 'react'
+import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
-import { View } from 'react-native'
+import { View, type ViewStyle } from 'react-native'
 import { Avatar } from './Avatar'
+import { ContactLink } from './ContactLink'
 import { hiddenFrame } from './HiddenHeading'
 import { Icon, type IconName } from './Icon'
 import { InitialTile } from './InitialTile'
@@ -34,7 +42,17 @@ import { ProjectThumb } from './ProjectThumb'
 import { ReactionIcon } from './ReactionCapsule'
 import { useRelativeDate } from './RelativeTime'
 import { Text } from './Text'
+import { TextLink } from './TextLink'
 import { useTheme } from './theme/ThemeProvider'
+
+/**
+ * Le geste propre à une notification, nommé par son texte affiché (WCAG 2.5.3) : un geste de
+ * l'écran (`onPress`, « Choisir un pseudo »), ou notre adresse de contact (`contact`,
+ * « Contester »), ouverte avec un objet qui nomme la décision (J12).
+ */
+export type NotificationAction =
+  | { label: string; onPress: () => void }
+  | { label: string; contact: { subject: string } }
 
 /** Ce qui se pose à gauche : la photo d'un membre, ou l'icône de la sorte de notification. */
 export type NotificationLeading =
@@ -88,6 +106,11 @@ type Props = {
   isNew: boolean
   /** Où elle mène ; `null` : elle ne se touche pas (ni lien ni bouton). */
   onPress: (() => void) | null
+  /**
+   * Un geste à elle, sous la phrase et la citation, hors du lien de la ligne ; il reste là quand
+   * la ligne ne mène nulle part. Absent : rien de plus.
+   */
+  action?: NotificationAction | undefined
   /**
    * La vue qui reçoit le focus quand la ligne arrive avec la page suivante (`useFirstArrived` de
    * l'écran) : le lien lui-même, que le lecteur d'écran du téléphone lit en entier, ou la ligne
@@ -150,6 +173,7 @@ function Row({
   thumb,
   isNew,
   onPress,
+  action,
   dateShown,
   dateName,
   ref,
@@ -157,6 +181,21 @@ function Row({
   const { t } = useTranslation()
   const { colors, shadows } = useTheme()
   const newWord = t(($) => $.notifications.new)
+  // L'identifiant de la phrase, qui décrit le geste de la ligne : sur la page Activité, plusieurs
+  // « Contester » portent le même nom, la phrase dit lequel est lequel (stable entre le pré-rendu
+  // web et le navigateur : useId).
+  const sentenceId = useId()
+  const frame: ViewStyle = {
+    // Le miel pâle d'une nouvelle (relecture du plan : jamais `honeySoft`, trop proche du rond miel
+    // posé dessus). Sans fond sinon : la ligne est posée sur la page.
+    backgroundColor: isNew ? colors.highlightSoft : 'transparent',
+    // Et son liseré miel (relecture de design de R8) : sur la lumière miel d'Activité, le miel pâle
+    // seul ne se voyait presque pas (1,16:1 sur téléphone, 1,04:1 sur ordinateur). Une ligne vue
+    // garde un bord de même épaisseur, transparent : ses textes restent alignés sur ceux d'une
+    // nouvelle.
+    borderWidth: borders.strong,
+    borderColor: isNew ? colors.highlightEdge : 'transparent',
+  }
   const content = (
     <View
       // La ligne qui ne mène nulle part reçoit elle-même le focus d'arrivée ; un lien le prend.
@@ -166,16 +205,14 @@ function Row({
         alignItems: 'flex-start',
         gap: space.md,
         padding: space.md,
+        // Avec un geste dessous, presque rien en bas : sa zone de 44 points apporte déjà l'air
+        // entre la citation et lui.
+        ...(action ? { paddingBottom: space.xxs } : null),
+        // Le rayon reste sur la ligne même quand le cadre l'entoure : l'anneau du focus du clavier
+        // le suit (Pressed le lit ici).
         borderRadius: radii.group,
-        // Le miel pâle d'une nouvelle (relecture du plan : jamais `honeySoft`, trop proche du rond
-        // miel posé dessus). Sans fond sinon : la ligne est posée sur la page.
-        backgroundColor: isNew ? colors.highlightSoft : 'transparent',
-        // Et son liseré miel (relecture de design de R8) : sur la lumière miel d'Activité, le miel
-        // pâle seul ne se voyait presque pas (1,16:1 sur téléphone, 1,04:1 sur ordinateur). Une
-        // ligne vue garde un bord de même épaisseur, transparent : ses textes restent alignés sur
-        // ceux d'une nouvelle.
-        borderWidth: borders.strong,
-        borderColor: isNew ? colors.highlightEdge : 'transparent',
+        // Avec un geste, le fond et le liseré passent au cadre qui entoure la ligne et le geste.
+        ...(action ? null : frame),
       }}
     >
       <Leading leading={leading} />
@@ -183,8 +220,9 @@ function Row({
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="callout" breakAnywhere>
           {/* La phrase seule dans son propre texte (sans la date qui suit) : on la retrouve, et
-              les lecteurs d'écran la lisent, sans la date collée au dernier mot. */}
-          <Text variant="callout">
+              les lecteurs d'écran la lisent, sans la date collée au dernier mot. Avec un geste, elle
+              le décrit (son `nativeID`). */}
+          <Text variant="callout" {...(action ? { nativeID: sentenceId } : null)}>
             {parts.map((part, index) =>
               // Le rang pour clé : deux morceaux peuvent porter le même texte (« de », « sur »).
               part.style === 'strong' ? (
@@ -278,16 +316,72 @@ function Row({
       {thumb ? <Thumb thumb={thumb} /> : null}
     </View>
   )
-  if (!onPress) return content
-  // Le nom du lien : tout ce que la ligne écrit, en phrases, puis « Nouveau ».
+  // Le nom du lien : tout ce que la ligne écrit, en phrases, puis « Nouveau » (jamais le geste,
+  // posé hors du lien).
   const label = [partsText(parts), dateName, quote, detail, isNew ? newWord : null]
     .filter((part): part is string => Boolean(part))
     .map(sentence)
     .join(' ')
-  return (
+  const row = onPress ? (
     <Pressed label={label} onPress={onPress} role="link" ref={ref}>
       {content}
     </Pressed>
+  ) : (
+    content
+  )
+  if (!action) return row
+  return (
+    // Le cadre de la ligne entoure le lien et le geste : une nouvelle les éclaire tous les deux.
+    <View style={{ ...frame, borderRadius: radii.group }}>
+      {row}
+      <Action action={action} describedById={sentenceId} hint={partsText(parts)} />
+    </View>
+  )
+}
+
+/**
+ * Le geste de la ligne, sous la colonne du texte (aligné sur la phrase, pas sur le rond de gauche).
+ * Un lien souligné, comme dans une phrase : jamais un bouton miel, réservé à l'action de l'écran.
+ */
+function Action({
+  action,
+  describedById,
+  hint,
+}: {
+  action: NotificationAction
+  describedById: string
+  hint: string
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        // Le bord de la ligne, le rond de gauche et l'écart qui le suit : le geste commence sous
+        // la première lettre de la phrase.
+        paddingLeft: space.md + LEADING + space.md,
+        paddingRight: space.md,
+        paddingBottom: space.xxs,
+      }}
+    >
+      {/* flexShrink et maxWidth : un libellé long passe à la ligne au lieu de sortir du cadre,
+          à 320 points et à 200 % (react-native-web ne laisse rétrécir aucune vue sans eux). */}
+      <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+        {'contact' in action ? (
+          <ContactLink subject={action.contact.subject} describedById={describedById} hint={hint}>
+            {action.label}
+          </ContactLink>
+        ) : (
+          // « Choisir un pseudo » ouvre une feuille, sur place : un bouton, à l'allure d'un lien.
+          <TextLink
+            label={action.label}
+            role="button"
+            onPress={action.onPress}
+            describedById={describedById}
+            hint={hint}
+          />
+        )}
+      </View>
+    </View>
   )
 }
 

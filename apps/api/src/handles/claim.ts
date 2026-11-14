@@ -278,22 +278,35 @@ export const claimHandle = async (
 
   const cutoff = reservationCutoff(now)
   const [owner] = await tx
-    .select({ userId: h.userId, releasedAt: h.releasedAt })
+    .select({ userId: h.userId, releasedAt: h.releasedAt, heldByRemoval: h.heldByRemoval })
     .from(h)
     .where(eq(h.handle, handle))
   if (owner) {
     const expired = owner.releasedAt !== null && owner.releasedAt <= cutoff
     if (expired) {
       await tx.delete(h).where(and(eq(h.handle, handle), lte(h.releasedAt, cutoff)))
-    } else if (owner.userId !== userId) {
+    } else if (owner.userId !== userId || owner.heldByRemoval !== null) {
+      // Un pseudo retiré par la modération (held_by_removal) est refusé à tout le monde pendant
+      // les 30 jours, son ancien propriétaire compris, avec la même erreur (R9, sécurité P3).
       throw new HandleTakenError()
     }
   }
 
   // Ses anciens pseudos, sauf celui qu'il reprend peut-être (index member_handle_user_idx). Ses
   // réservations finies partent donc ici aussi : après un changement, il ne lui reste au plus que
-  // l'ancien pseudo qu'il vient de quitter.
-  await tx.delete(h).where(and(eq(h.userId, userId), isNotNull(h.releasedAt), ne(h.handle, handle)))
+  // l'ancien pseudo qu'il vient de quitter. Les pseudos retirés par la modération (held_by_removal)
+  // restent : aucun changement de pseudo ne raccourcit leurs 30 jours (ceux qui sont finis sont
+  // déjà partis ci-dessus, ou partent à la purge).
+  await tx
+    .delete(h)
+    .where(
+      and(
+        eq(h.userId, userId),
+        isNotNull(h.releasedAt),
+        isNull(h.heldByRemoval),
+        ne(h.handle, handle),
+      ),
+    )
   if (current) {
     await tx.update(h).set({ releasedAt: now }).where(eq(h.handle, current))
   }

@@ -17,10 +17,11 @@
 //
 // Tranche R5a (F-Mb1) : « Partager » en haut à droite ouvre la feuille de partage (`ShareSheet`),
 // avec l'adresse de la page ; sur sa propre page, à côté de la roue.
-import { type Member, PROJECT_LIST_MAX } from '@ruche/contracts'
+import { type Member, PROJECT_LIST_MAX, type RemovedPart as RemovedPartOut } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Platform } from 'react-native'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
@@ -32,10 +33,13 @@ import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { ProvisionalNameBanner } from '../profile/ProvisionalNameBanner'
 import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
+import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { CountedTitle } from '../ui/CountedTitle'
+import { contestSubjectOf } from '../ui/contestSubject'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
@@ -44,9 +48,11 @@ import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { parisDateTime } from '../ui/parisTime'
+import { RemovedPart } from '../ui/RemovedPart'
 import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
+import { Text } from '../ui/Text'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -54,6 +60,99 @@ import {
   SessionErrorScreen,
   SignedOutScreen,
 } from './states'
+
+/** Les parties d'un profil que la modération peut retirer (les autres sont celles d'un projet). */
+const PROFILE_FIELDS = ['name', 'handle', 'bio', 'favoriteTools', 'avatar'] as const
+type ProfileField = (typeof PROFILE_FIELDS)[number]
+type RemovedProfilePart = RemovedPartOut & { field: ProfileField }
+
+const isProfilePart = (part: RemovedPartOut): part is RemovedProfilePart =>
+  (PROFILE_FIELDS as readonly string[]).includes(part.field)
+
+/**
+ * R9 (planche R9-Partie-Retiree, décision L2 de Louis) : les parties de son profil retirées par la
+ * modération, que leur auteur seul voit sur « Moi ». Chacune dans son encadré (`RemovedPart`) : ce
+ * qui a été retiré, le fondement, l'explication, la date, « Contester » (l'objet de l'e-mail nomme
+ * « …de mon profil » et la date), la justice. Un pseudo ou un nom retiré dit aussi celui qu'il porte
+ * en attendant, avec de quoi en choisir un autre dans les réglages du profil.
+ */
+function RemovedProfileParts({ member }: { member: Member }) {
+  const { t, i18n } = useTranslation()
+  const router = useRouter()
+  const toSource = useMediaSources()
+  const parts = member.removedParts.filter(isProfilePart)
+  if (parts.length === 0) return null
+  // La rubrique « Mon profil » des réglages, où se changent le nom, le pseudo, la bio et la photo
+  // (comme « Modifier mon profil »).
+  const toProfile = () => router.push('/settings/profile')
+
+  return (
+    <Stack gap="lg">
+      {parts.map((part) => {
+        // Le champ, recopié dans une constante avant les sélecteurs de texte (clés fabriquées).
+        const field = part.field
+        const { value } = part
+        // « Contestation : retrait de la bio de mon profil du 12 novembre » (J12).
+        const subject = contestSubjectOf(
+          t,
+          i18n.language,
+          t(($) => $.removal.contestDecision.profilePart, {
+            part: t(($) => $.moderation.parts[field]),
+          }),
+          part.removal.at,
+        )
+        // Ce qui a été retiré, relu par son auteur seul : de quoi savoir quoi remplacer.
+        const removedValue =
+          field === 'avatar' ? null : Array.isArray(value) ? value.join(', ') : value
+        // Une bio, des outils, une photo : « Remplacer » mène aux réglages. Le nom et le pseudo
+        // ont leur propre geste, sous la valeur provisoire.
+        const replaceable = field === 'bio' || field === 'favoriteTools' || field === 'avatar'
+        return (
+          <RemovedPart
+            key={`${field}-${part.mediaId ?? ''}`}
+            title={t(($) => $.removal.part.titles[field])}
+            removal={part.removal}
+            contestSubject={subject}
+            onReplace={replaceable ? toProfile : null}
+            onDelete={null}
+          >
+            {field === 'avatar' && part.imageUrl ? (
+              <Avatar name={member.name} source={toSource(part.imageUrl)} label={member.name} />
+            ) : null}
+            {removedValue ? (
+              <Text tone="secondary" breakAnywhere>
+                {field === 'handle'
+                  ? t(($) => $.member.handle, { handle: removedValue })
+                  : removedValue}
+              </Text>
+            ) : null}
+            {field === 'handle' ? (
+              <>
+                <Text>{t(($) => $.removal.part.provisionalHandle, { handle: member.handle })}</Text>
+                <Button
+                  label={t(($) => $.removal.part.chooseHandle)}
+                  variant="secondary"
+                  icon="pencil-simple"
+                  onPress={toProfile}
+                />
+              </>
+            ) : field === 'name' ? (
+              <>
+                <Text>{t(($) => $.removal.part.provisionalName, { name: member.name })}</Text>
+                <Button
+                  label={t(($) => $.removal.part.chooseName)}
+                  variant="secondary"
+                  icon="pencil-simple"
+                  onPress={toProfile}
+                />
+              </>
+            ) : null}
+          </RemovedPart>
+        )
+      })}
+    </Stack>
+  )
+}
 
 export function MemberScreen({ id }: { id: string }) {
   const { t } = useTranslation()
@@ -127,18 +226,31 @@ function MemberView({ member }: { member: Member }) {
   const unblockedRef = useRef<Focusable>(null)
   const focusAfterClose = useRef(false)
 
+  // R9 : la fenêtre nomme le membre (« Bloquer Léa Martin (@lea) ? ») et montre sa photo.
   const ask = (gesture: BlockAsking['gesture']) =>
-    setAsking({ gesture, member: { id: member.id, handle } })
+    setAsking({
+      gesture,
+      member: { id: member.id, name: member.name, handle, avatar: toSource(member.avatarUrl) },
+    })
 
-  const done = ({ gesture }: BlockAsking) => {
+  const report = () =>
+    router.push({ pathname: '/report', params: { kind: 'member', id: member.id } })
+
+  // R9 : « Signaler aussi son profil » cochée dans la fenêtre. Le signalement s'ouvre une fois le
+  // blocage enregistré, jamais avant. Sur le web, après le fondu de la fenêtre (`onClosed`) : une
+  // feuille ouverte par-dessus une fenêtre qui se ferme se disputerait le focus avec elle. Android
+  // ne prévient pas de la fin du fondu (pas d'`onDismiss`) : on l'ouvre tout de suite.
+  const reportAfterClose = useRef(false)
+
+  const done = ({ gesture }: BlockAsking, alsoReport: boolean) => {
     setExpected(gesture === 'block')
     setUnblocked(gesture === 'unblock')
     focusAfterClose.current = gesture === 'unblock'
     setAsking(null)
+    if (!alsoReport) return
+    if (Platform.OS === 'web') reportAfterClose.current = true
+    else report()
   }
-
-  const report = () =>
-    router.push({ pathname: '/report', params: { kind: 'member', id: member.id } })
 
   // Le menu « … » : rien sur sa propre page (ni se signaler, ni se bloquer soi-même). Bloqué, il
   // garde « Signaler ce profil » ; « Débloquer » est un bouton de la page (le scénario le promet).
@@ -283,6 +395,8 @@ function MemberView({ member }: { member: Member }) {
         action={
           member.isMe ? (
             <Stack gap="sm" align="center">
+              {/* R9 : le pseudo ou le nom provisoire, au-dessus de « Modifier mon profil ». */}
+              <ProvisionalNameBanner />
               <FollowerCount text={followers} />
               {/* R3 (F-Nav8) : la rubrique « Mon profil » des réglages. */}
               <Button
@@ -349,6 +463,9 @@ function MemberView({ member }: { member: Member }) {
           )
         }
       />
+      {/* R9 : sur « Moi », les parties de son profil retirées par la modération (l'API ne les
+          donne qu'à leur auteur). */}
+      {member.isMe ? <RemovedProfileParts member={member} /> : null}
       {/* Bloqué : ni projets, ni « Pas encore de projet public » (l'API n'en donne aucun). */}
       {blocked ? null : (
         <>
@@ -368,14 +485,20 @@ function MemberView({ member }: { member: Member }) {
         </>
       )}
       {/* Bloquer et débloquer passent par la même fenêtre, qui dit ce qui change (J9, J10). */}
+      {/* R9 : la case « Signaler aussi son profil » (`offerReport`), jamais cochée d'avance. */}
       <BlockDialog
         asking={asking}
+        offerReport
         send={({ gesture, member: target }) =>
           gesture === 'block' ? block(target.id) : unblock(target.id)
         }
         onDone={done}
         onCancel={() => setAsking(null)}
         onClosed={() => {
+          if (reportAfterClose.current) {
+            reportAfterClose.current = false
+            report()
+          }
           if (!focusAfterClose.current) return
           focusAfterClose.current = false
           // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.

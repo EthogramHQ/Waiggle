@@ -341,6 +341,11 @@ describe('the queue', () => {
     ])
     expect(page.items[0]).toEqual({
       target: projectTarget(),
+      // R9 : le projet entier (pas une partie), son propre contexte (titre ; miniature nulle : le
+      // projet n'a pas de photo ici) et sa date de publication.
+      part: null,
+      context: { projectId: meteo.id, title: 'Météo', image: null },
+      contentCreatedAt: expect.any(String),
       projectId: meteo.id,
       // Tranche 7b : la copie la plus récente, champ par champ, ses images, et si les copies diffèrent.
       snapshot: expect.arrayContaining([{ field: 'title', value: 'Météo' }]),
@@ -359,6 +364,13 @@ describe('the queue', () => {
       // Tranche 7c : le rappel de ce que la modération a déjà décidé pour Léa (rien encore).
       authorRecord: {
         memberId: leaId,
+        // R9 : la fiche de Léa : son nom, son pseudo, son inscription et ses nombres (un projet,
+        // aucun commentaire).
+        name: 'Léa',
+        handle: expect.any(String),
+        joinedAt: expect.any(String),
+        projectCount: 1,
+        commentCount: 0,
         removals: 0,
         suspensions: 0,
         suspendedNow: false,
@@ -916,6 +928,7 @@ describe('the list of removed contents', () => {
     expect(page.items).toEqual([
       {
         target: projectTarget(),
+        part: null,
         projectId: meteo.id,
         text: expect.stringContaining('Météo'),
         ground: 'rules',
@@ -925,6 +938,7 @@ describe('the list of removed contents', () => {
       },
       {
         target: updateTarget(update.id),
+        part: null,
         projectId: meteo.id,
         // Le titre et les lignes d'une mise à jour (contrat, RemovedItem.text).
         text: expect.stringContaining('Une offre'),
@@ -1599,8 +1613,18 @@ describe('the record of the author on a card', () => {
     expect((await suspend(leaId, '7d')).status).toBe(201)
     expect((await lift(leaId, 'early')).status).toBe(201)
 
+    // R9 : la fiche porte aussi son nom, son pseudo, son inscription et ses nombres (un projet,
+    // trois commentaires non supprimés, le retiré compris).
+    const record = {
+      name: 'Léa',
+      handle: expect.any(String),
+      joinedAt: expect.any(String),
+      projectCount: 1,
+      commentCount: 3,
+    }
     expect((await cardOf(third as ReportTarget))?.authorRecord).toEqual({
       memberId: leaId,
+      ...record,
       removals: 1,
       suspensions: 1,
       suspendedNow: false,
@@ -1611,6 +1635,7 @@ describe('the record of the author on a card', () => {
     expect((await suspend(leaId, '30d', { password: LOUIS_PASSWORD })).status).toBe(201)
     expect((await cardOf(third as ReportTarget))?.authorRecord).toEqual({
       memberId: leaId,
+      ...record,
       removals: 1,
       suspensions: 2,
       suspendedNow: true,
@@ -2054,6 +2079,7 @@ describe('the testers corner, seen by the moderation', () => {
       expect((await readRemoved()).items).toEqual([
         {
           target: messageTarget(sent.id),
+          part: null,
           projectId: corner.id,
           text: FEEDBACK_TEXT,
           ground: 'rules',
@@ -2063,6 +2089,7 @@ describe('the testers corner, seen by the moderation', () => {
         },
         {
           target: callTarget(call.id),
+          part: null,
           projectId: corner.id,
           text: 'Un appel publicitaire.',
           ground: 'rules',

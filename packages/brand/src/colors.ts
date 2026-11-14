@@ -120,6 +120,15 @@ const day = {
   outcomeNoSurface: '#FEE4E2',
   outcomeNoIcon: '#D92D20',
   outcomeNoText: '#B42318',
+  // R9, l'historique récent de la modération (DecisionCard `compact`) : une couleur par sorte de
+  // décision, celle de l'icône qui précède sa ligne. La couleur ne porte jamais seule le sens : la
+  // phrase dit l'action en mots. Chacune fait 3:1 au moins sur la page et sur une carte.
+  decisionRemove: '#D92D20', // retrait : rouge
+  decisionRemovePart: '#C2410C', // retrait d'une partie : orange brûlé
+  decisionRestore: '#12805C', // rétablissement : vert
+  decisionDismiss: '#5E5A51', // classement sans suite : gris encre
+  decisionSuspend: '#6D3FD6', // suspension : violet
+  decisionLift: '#0E7490', // levée : bleu-vert
   // « Réglé dans la v1.3 », sous un retour : un vert plus sombre que `success`, qui tombait à
   // 4,3:1 sur la crème d'une bulle de l'auteur.
   settledText: '#0F7453',
@@ -245,6 +254,12 @@ const night = {
   outcomeNoSurface: '#3A1A17',
   outcomeNoIcon: '#F97066',
   outcomeNoText: '#FDA29B',
+  decisionRemove: '#F97066',
+  decisionRemovePart: '#FB923C',
+  decisionRestore: '#3CCB8E',
+  decisionDismiss: '#A8A399',
+  decisionSuspend: '#B69CFF',
+  decisionLift: '#4FC3D9',
   settledText: '#3CCB8E',
   // La bulle de l'auteur, un brun miel (planche R7b-Fil-Nuit) ; celle du testeur, la carte.
   bubbleAuthor: '#3F3417',
@@ -357,6 +372,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'text', on: 'glass', min: 4.5, base: ['#000000', '#FFFFFF'] },
   // Le bandeau d'erreur d'un formulaire et la tuile de miel (icône ou initiale brune).
   { text: 'dangerText', on: 'errorBand', min: 4.5 },
+  // L'encadré d'une partie retirée par la modération (R9, ui/RemovedPart.tsx) : ses phrases en
+  // `textSecondary`, le lien de l'adresse de contact à l'encre (`text`).
+  { text: 'textSecondary', on: 'errorBand', min: 4.5 },
+  { text: 'text', on: 'errorBand', min: 4.5 },
   { text: 'onHoneyTile', on: 'honey', min: 4.5 },
   // La barre fixe des formulaires sur téléphone (fond « feuille »).
   { text: 'text', on: 'sheet', min: 4.5 },
@@ -434,6 +453,20 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'outcomeYesIcon', on: 'surface', min: 3 },
   { text: 'outcomePartlyIcon', on: 'surface', min: 3 },
   { text: 'outcomeNoIcon', on: 'surface', min: 3 },
+  // R9 : les six icônes de l'historique récent, sur la page et sur une carte.
+  ...(
+    [
+      'decisionRemove',
+      'decisionRemovePart',
+      'decisionRestore',
+      'decisionDismiss',
+      'decisionSuspend',
+      'decisionLift',
+    ] as const
+  ).flatMap((text) => [
+    { text, on: 'background', min: 3 } as const,
+    { text, on: 'surface', min: 3 } as const,
+  ]),
   // « Réglé dans la v1.3 » : sous un retour, dans la bulle du testeur, sur une carte, et dans la
   // bulle de l'auteur.
   { text: 'settledText', on: 'surface', min: 4.5 },

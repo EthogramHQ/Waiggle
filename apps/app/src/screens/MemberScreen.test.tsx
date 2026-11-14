@@ -359,7 +359,8 @@ describe('reporting a member from her page', () => {
 // ApiResult et relisent la page du membre (['member', id]) une fois faits.
 
 describe('blocking a member from her page', () => {
-  const blockTitle = fr.t(($) => $.block.title, { handle: 'lea' })
+  // R9 (planche R9-Bloquer) : le titre nomme le membre et son pseudo.
+  const blockTitle = fr.t(($) => $.block.titleNamed, { name: 'Léa', handle: 'lea' })
 
   /**
    * Ouvre le menu, choisit « Bloquer » : la fenêtre de confirmation s'ouvre, et l'on attend la fin

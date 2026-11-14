@@ -183,6 +183,9 @@ export const testerMedia = pgTable(
     // l'appel, relecture juridique J8) ; null pour une capture et pour une photo sans description.
     description: text('description'),
     createdAt: timestamp('created_at').notNull(),
+    // R9 (7d) : le retrait de cette seule image par la modération ; null : visible. Comme pour
+    // `project_media` : la ligne reste pour son auteur, 'restrict' protège la décision de la purge.
+    removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'restrict' }),
   },
   (t) => [
     // Les images d'un appel, et celles d'un message (les lire avec eux, les compter).

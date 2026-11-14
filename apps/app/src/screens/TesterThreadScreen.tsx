@@ -269,6 +269,7 @@ export function AuthorThreadPane({
       reader="author"
       authorName={project.author.name}
       testerName={tester.name}
+      projectTitle={project.title}
       readOnly={readOnly}
       closed={corner.closed}
       openAtLatest={openAtLatest}

@@ -5,7 +5,7 @@ import { CategoryCode } from './categories'
 import { FollowState } from './follows'
 import { TOOL_MAX_LENGTH } from './profile'
 import { ReactionState } from './reactions'
-import { Removal } from './removal'
+import { Removal, RemovedPart } from './removal'
 import { FreeText, removeForbiddenCharacters, ShortLabel } from './text'
 import {
   ProjectTool,
@@ -303,6 +303,11 @@ export const Project = z
      * auteur : c'est donc à lui seul que ce champ est rempli ; null pour un projet visible.
      */
     removal: Removal.nullable(),
+    /**
+     * R9 (7d) : les parties de ce projet retirées seules par la modération, pour son auteur seul
+     * (vide pour tout autre membre, qui ne les voit plus, comme si elles n'avaient jamais été là).
+     */
+    removedParts: z.array(RemovedPart),
     createdAt: z.iso.datetime(),
     /**
      * La dernière modification du projet lui-même. Depuis R7a, « Mis à jour » sous le titre ne la

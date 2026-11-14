@@ -16,6 +16,7 @@ import {
   NOTIFICATION_PAGE_SIZE,
   type Notification,
   RemovalGround,
+  ReportPartField,
   StoredReportTargetKind,
   UNREAD_COUNT_MAX,
 } from '@ruche/contracts'
@@ -23,10 +24,12 @@ import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { blockedWith, notBlockedWith } from '../blocks/visibility'
-import { mediaUrl } from '../profile/me'
+import { avatarUrlOf, mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
+import { mediaOnCoversSql } from '../projects/media-visibility'
 import { listedProject, listedProjectFor } from '../projects/visibility'
 import { afterReportSql, toRemoval } from '../removals/load'
+import { photoRankSql } from '../reports/part-rank'
 // suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
 // C'est sans risque ici, car chacun n'utilise l'autre que dans ses fonctions, jamais au chargement.
 import { activeSuspensionSql } from '../suspension/load'
@@ -225,8 +228,87 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       join tester_message m on m.project_id = project.id
       where project.author_id = ${me} and m.sender_id = ${me} and m.removed_at is not null
         and ${during('m.removed_at')}
+      union all
+      -- R9 : une seule partie retirée (la 2e photo, la description…) d'un projet, d'une mise à jour,
+      -- d'un appel ou d'un message. La ligne content_part_removal vit tant que le retrait dure :
+      -- rétablie (ou remplacée par l'auteur), elle s'efface, et la notification avec elle. Datée du
+      -- retrait, repérée par sa décision. Index content_part_removal_author_idx (author_id), puis les
+      -- clés primaires de l'objet. Un message sur le projet d'un autre : seulement sur un projet
+      -- encore listé, comme un message retiré entier.
+      select cpr.object_kind, project.id, null, cpr.update_id, cpr.removal_id, cpr.created_at,
+        coalesce(cpr.call_id, cpr.message_id)
+      from content_part_removal cpr
+      left join project_update pu on pu.id = cpr.update_id
+      left join tester_call tc on tc.id = cpr.call_id
+      left join tester_message m on m.id = cpr.message_id
+      join project on project.id = coalesce(cpr.project_id, pu.project_id, tc.project_id, m.project_id)
+      where cpr.author_id = ${me} and cpr.object_kind <> 'member'
+        and ${during('cpr.created_at')}
+        and (project.author_id = ${me} or ${listedProject()})
     ) x
     where x.removal_id is not null
+
+    union all
+
+    -- 7 bis (R9, 7d). Une partie de son profil retirée : la bio, les outils favoris, la photo (leur
+    --    ligne content_part_removal, index content_part_removal_author_idx), le nom ou le pseudo
+    --    (remplacés d'office, sans ligne de retrait : la décision elle-même, index
+    --    moderation_decision_member_idx), tant qu'aucun rétablissement de ce champ ne l'a suivie
+    --    (« not exists », par moderation_decision_target_idx ; la cible d'un profil est le membre,
+    --    passé comme valeur connue). La partie, le nom provisoire, le fondement et l'explication se
+    --    lisent ensuite par la décision (loadDetailedRows).
+    select 'profile_removed', 'profile_removed:' || pr.removal_id, pr.removed_at,
+      null, null, null, null, null, null, null, null, null, null, null,
+      'member', null, pr.removal_id, null, null, null, null
+    from (
+      select cpr.removal_id, cpr.created_at as removed_at
+      from content_part_removal cpr
+      where cpr.author_id = ${me} and cpr.object_kind = 'member' and ${during('cpr.created_at')}
+      union all
+      select d.id, d.created_at
+      from moderation_decision d
+      where d.target_member_id = ${me} and d.target_kind = 'member' and d.action = 'remove'
+        and d.part_field in ('name', 'handle') and ${during('d.created_at')}
+        and not exists (
+          select 1 from moderation_decision rs
+          where rs.target_kind = 'member' and rs.target_id = ${me}
+            and rs.part_field = d.part_field and rs.action = 'restore'
+            and rs.created_at > d.created_at)
+    ) pr
+
+    union all
+
+    -- 7 ter (R9). Un de ses contenus, ou une partie, rétabli par la modération : chaque décision
+    --    « restore » qui le vise (décision de la tranche : toujours notifiée), signée par l'équipe.
+    --    Index moderation_decision_member_idx (target_member_id, created_at). Le projet, comme pour
+    --    la source 8 : seulement s'il le voit encore (« case » ne lance que la branche de la sorte ;
+    --    l'identifiant n'est converti en uuid que pour ces sortes, jamais pour un profil).
+    select 'restored', 'restored:' || d.id, d.created_at,
+      case d.target_kind
+        when 'project' then (
+          select project.id from project
+          where project.id = d.target_id::uuid and ${visibleTo(me)})
+        when 'update' then (
+          select project.id from project_update pu
+          join project on project.id = pu.project_id
+          where pu.id = d.target_id::uuid and ${visibleTo(me)})
+        when 'comment' then (
+          select project.id from project_comment c
+          join project on project.id = c.project_id
+          where c.id = d.target_id::uuid and c.deleted_at is null and ${visibleTo(me)})
+        when 'call' then (
+          select project.id from tester_call tc
+          join project on project.id = tc.project_id
+          where tc.id = d.target_id::uuid and ${visibleTo(me)})
+        when 'message' then (
+          select project.id from tester_message m
+          join project on project.id = m.project_id
+          where m.id = d.target_id::uuid and ${visibleTo(me)})
+      end,
+      null, null, null, null, null, null, null, null, null, null,
+      d.target_kind, null, d.id, null, null, null, null
+    from moderation_decision d
+    where d.target_member_id = ${me} and d.action = 'restore' and ${during('d.created_at')}
 
     union all
 
@@ -689,6 +771,9 @@ const ListRow = z.object({
     'feedback_settled',
     'project_category',
     'tool_added',
+    // R9 : une partie du profil retirée, et un contenu ou une partie rétablis.
+    'profile_removed',
+    'restored',
   ]),
   key: z.string(),
   at: z.string(),
@@ -749,8 +834,27 @@ const ListRow = z.object({
   notice_typed_name: z.string().nullable(),
   tool_slug: z.string().nullable(),
   tool_name: z.string().nullable(),
+  // R9 : la partie d'une décision (son champ, le rang de sa photo), le nom ou pseudo mis d'office,
+  // la raison d'une levée, et si la valeur d'un nom ou d'un pseudo rétabli est revenue.
+  part_field: z.string().nullable(),
+  part_position: z.number().int().positive().nullable(),
+  provisional_value: z.string().nullable(),
+  lift_cause: z.string().nullable(),
+  report_part: z.boolean().nullable(),
+  value_back: z.boolean().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
+
+/** La partie d'une ligne, validée par le contrat ; null pour un contenu entier ou une valeur inconnue. */
+const partOf = (row: ListRow) => {
+  const field = ReportPartField.safeParse(row.part_field)
+  return field.success ? { field: field.data, position: row.part_position } : null
+}
+
+/** Les parties d'un profil qu'une notification `profile_removed` peut nommer (contrat). */
+const ProfilePartField = z.enum(['name', 'handle', 'bio', 'favoriteTools', 'avatar'])
+/** Les sortes de contenu d'une notification `restored` (contrat) ; une ancienne note n'en est pas. */
+const RestoredKind = z.enum(['project', 'update', 'comment', 'call', 'message', 'member'])
 
 /**
  * L'extrait d'un commentaire : son texte actuel sur une ligne, 80 caractères au plus, suivi de
@@ -771,7 +875,7 @@ export const excerptOf = (body: string) => {
 const authorOf = (row: ListRow, publicApiUrl: string) => ({
   id: row.author_id ?? '',
   name: row.author_name ?? '',
-  avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+  avatarUrl: avatarUrlOf(publicApiUrl, row.author_avatar_key),
 })
 
 /**
@@ -839,7 +943,7 @@ export const present = (
         author: {
           id: row.author_id,
           name: row.author_name,
-          avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+          avatarUrl: avatarUrlOf(publicApiUrl, row.author_avatar_key),
           handle: row.author_handle,
         },
       }
@@ -864,7 +968,7 @@ export const present = (
         author: {
           id: row.author_id,
           name: row.author_name,
-          avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+          avatarUrl: avatarUrlOf(publicApiUrl, row.author_avatar_key),
         },
         update: {
           id: row.update_id,
@@ -971,6 +1075,8 @@ export const present = (
           ...common,
           kind: 'removed',
           targetKind,
+          // R9 : la photo retirée seule (son rang), ou null pour tout l'appel ou tout le message.
+          part: partOf(row),
           project,
           excerpt: text === null ? null : testerExcerptOf(text),
           ground: removal.ground,
@@ -992,6 +1098,10 @@ export const present = (
         ...common,
         kind: 'removed',
         targetKind,
+        // R9 : la partie retirée seule (« La 2e photo de Météo ») ; null : le contenu entier. Une
+        // partie d'une mise à jour garde l'extrait de celle-ci : il dit de quelle mise à jour il
+        // s'agit.
+        part: partOf(row),
         project,
         excerpt: text === null ? null : excerptOf(text),
         ground: removal.ground,
@@ -999,6 +1109,47 @@ export const present = (
         afterReport: removal.afterReport,
         // Calculé dans la requête (loadDetailedRows), avec le titre vidé : plus de devinette.
         projectHidden: row.project_hidden,
+      }
+    }
+    case 'profile_removed': {
+      // R9 (7d) : la partie du profil, et ce qui a été mis à la place d'un nom ou d'un pseudo
+      // (« Membre », « membre_4f2a ») ; jamais l'ancienne valeur, qui est retirée.
+      const field = ProfilePartField.safeParse(row.part_field)
+      const removal =
+        row.ground === null
+          ? null
+          : toRemoval({
+              ground: row.ground,
+              explanation: row.explanation,
+              createdAt: new Date(row.at),
+              afterReport: row.after_report ?? false,
+            })
+      if (!field.success || !removal) return null
+      const replaced = field.data === 'name' || field.data === 'handle'
+      return {
+        ...common,
+        kind: 'profile_removed',
+        part: { field: field.data },
+        replacedBy: replaced ? row.provisional_value : null,
+        ground: removal.ground,
+        explanation: removal.explanation,
+        afterReport: removal.afterReport,
+      }
+    }
+    case 'restored': {
+      // R9 : signée par l'équipe, sans l'administrateur. Le projet, s'il le voit encore ; la
+      // partie ; et, pour un pseudo, celui qu'il porte aujourd'hui.
+      const targetKind = RestoredKind.safeParse(row.target_kind)
+      if (!targetKind.success) return null
+      const part = partOf(row)
+      return {
+        ...common,
+        kind: 'restored',
+        targetKind: targetKind.data,
+        project,
+        part,
+        valueBack: row.value_back ?? true,
+        handle: part?.field === 'handle' ? row.my_handle : null,
       }
     }
     case 'suspended': {
@@ -1021,6 +1172,9 @@ export const present = (
         ...common,
         kind: 'suspension_ended',
         lifted: row.lifted,
+        // R9 (jur-R6) : la cause, lue sur la décision de levée (lift_cause) : une levée pour erreur
+        // le dit ; toute autre levée est « plus tôt » ; sans levée, la fin prévue est arrivée.
+        cause: row.lifted ? (row.lift_cause === 'error' ? 'error' : 'early') : 'end',
         explanation: row.lifted ? (row.explanation ?? '') : null,
       }
     case 'report_handled': {
@@ -1037,6 +1191,8 @@ export const present = (
         kind: 'report_handled',
         targetKind: row.target_kind,
         outcome: outcome.data,
+        // Seulement le fait qu'une partie était visée, jamais laquelle (règle 2 : l'issue seulement).
+        ...(row.report_part === true && { part: true }),
         link,
       }
     }
@@ -1089,7 +1245,32 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       cn.category_code as notice_category,
       case when cn.id is not null then cn.kind = 'tool_merged' end as notice_merged,
       cn.typed_name as notice_typed_name,
-      notice_tool.slug as tool_slug, notice_tool.name as tool_name
+      notice_tool.slug as tool_slug, notice_tool.name as tool_name,
+      -- R9 : la partie de la décision et le rang de sa photo (part-rank.ts), le nom ou pseudo mis
+      -- d'office, la raison d'une levée. « valueBack » d'un nom ou d'un pseudo rétabli : le
+      -- pseudo d'avant a été repris à l'instant du rétablissement (restoreHandle note cette date
+      -- dans claimed_at), ou le nom d'avant est celui d'aujourd'hui ; toute autre partie revient
+      -- toujours (rétablir échoue si l'auteur l'a remplacée entre-temps : sa ligne n'existe plus).
+      md.part_field,
+      case when md.part_media_id is not null then ${photoRankSql(sql.raw('md.part_media_id'))} end
+        as part_position,
+      md.provisional_value, md.lift_cause,
+      -- R9 (relectures) : un signalement traité visait-il une partie ? Le signalement se retrouve par
+      -- sa clé (« report:<id> », clé primaire de content_report) ; seule la notification de
+      -- signalement lance cette sous-requête. Le champ de la partie n'est jamais lu, seulement sa présence.
+      case when n.kind = 'report_handled' then (
+        select r.part_field is not null from content_report r
+        where r.id = substr(n.key, 8)::uuid
+      ) end as report_part,
+      case
+        when n.kind <> 'restored' then null
+        when md.part_field = 'handle' then exists (
+          select 1 from member_handle vh
+          where vh.handle = prev.previous_value and vh.user_id = ${me}
+            and vh.claimed_at = md.created_at)
+        when md.part_field = 'name' then a_me.name = prev.previous_value
+        else true
+      end as value_back
     from (${chosen}) n
     left join project on project.id = n.project_id
     -- « lateral » : une sous-requête qui lit les colonnes des tables déjà jointes (ici, l'auteur du
@@ -1102,11 +1283,24 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join "user" a on a.id = n.author_id
     left join profile ap on ap.user_id = n.author_id
     left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
-    left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
+    left join member_handle mh on n.kind in ('handle', 'restored') and mh.user_id = ${me}
+      and mh.released_at is null
     -- Tranche 7a : la décision d'un retrait. R7a : la mise à jour annoncée ou retirée, à la place
     -- de la note (clés primaires).
     left join project_update pu on pu.id = n.update_id
     left join moderation_decision md on md.id = n.decision_id
+    -- R9 : pour un nom ou un pseudo rétabli, le retrait qu'il défait (le dernier retrait de ce champ
+    -- avant lui, index moderation_decision_target_idx) et son ancienne valeur ; et le nom actuel du
+    -- membre (clé primaire de user).
+    left join lateral (
+      select rm.previous_value from moderation_decision rm
+      where n.kind = 'restored' and md.part_field in ('name', 'handle')
+        and rm.target_kind = 'member' and rm.target_id = ${me} and rm.part_field = md.part_field
+        and rm.action = 'remove' and rm.created_at < md.created_at
+      order by rm.created_at desc
+      limit 1
+    ) prev on true
+    left join "user" a_me on n.kind = 'restored' and md.part_field = 'name' and a_me.id = ${me}
     -- Tranche 7c : la suspension d'une notification de suspension ou de fin (clé primaire).
     left join account_suspension sus on sus.id = n.suspension_id
     -- R7b : l'appel ou le message de item_id, par la clé primaire de sa table. La sorte de la
@@ -1123,6 +1317,8 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join lateral (
       select m.storage_key, m.thumbhash from project_media m
       where m.project_id = project.id and m.slot in ('gallery', 'portrait')
+        -- R9 : jamais une photo retirée seule par la modération (projects/media-visibility.ts).
+        and ${mediaOnCoversSql('m')}
         and not coalesce(hid.hidden, false)
       order by m.slot = 'portrait', m.position, m.created_at
       limit 1

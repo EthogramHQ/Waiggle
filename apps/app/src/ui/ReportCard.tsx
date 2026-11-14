@@ -26,20 +26,34 @@
 // ne plus ressembler à la citation ; et la carte rappelle ce que la modération a déjà décidé pour le
 // membre visé (`record` : « 2 retraits », « 1 suspension »), avant les boutons, pour décider en le
 // sachant. Ce rappel reste une fois la carte décidée : il est toujours vrai.
+//
+// R9 (planches `R9-Moderation-Desktop` et `R9-Moderation-Telephone`) : le nombre de signalements
+// devient un nombre, que la carte écrit « Signalé 2 fois », en rouge, à partir de deux (un seul
+// signalement ne dit rien de plus que sa présence dans la file) ; la partie visée suit la sorte
+// (« Projet · la photo 2 ») ; l'heure du signalement est relative (« il y a 12 min »), l'heure
+// exacte au survol et dans le nom lu. Avec une adresse (`href`), la carte devient un **élément de
+// la file** : une ligne compacte, dont le motif est le titre, et qui est un lien vers son détail
+// (`?item=`), marqué « actuel » quand le détail le montre (`current`). Ses actions, s'il y en a,
+// restent hors du lien : un bouton dans un lien est interdit en HTML, et le toucher ouvrirait aussi
+// l'élément.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { type Ref, useId, useState } from 'react'
+import { type Ref, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
+import { describedBy } from './aria'
 import { Button } from './Button'
 import { ActionDescription } from './CommentAction'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
+import { enterActivates } from './keyboard'
+import type { PressEvent } from './ListGroup'
 import { Notice } from './Notice'
 import { PICTURE_MAX_HEIGHT } from './OpenableImage'
 import { ProjectCover } from './ProjectCover'
-import { StatusPill } from './StatusPill'
+import { STATUS_PILL_HEIGHT, StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
+import { useLargeText } from './textScale'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Un champ de la copie : son libellé (« Pitch ») et sa valeur, telle que le membre l'a écrite. */
@@ -63,8 +77,43 @@ export type ReportCardAction = {
 type Props = {
   /** La sorte de contenu, déjà traduite (« Commentaire », « Profil »). */
   kind: string
-  /** Le nombre de signalements, en toutes lettres (« 3 signalements ») ; rien pour un retiré. */
-  count?: string
+  /**
+   * R9 : la partie signalée, déjà traduite, en minuscules (« la photo 2 »), écrite après la sorte
+   * (« Projet · la photo 2 »). `null` ou absente : le contenu entier.
+   */
+  part?: string | null | undefined
+  /**
+   * Le nombre de signalements (R9 : un nombre, la carte écrit « Signalé 2 fois », en rouge, à partir
+   * de 2 ; rien pour un seul). Absent pour un contenu retiré.
+   */
+  count?: number | undefined
+  /**
+   * R9 : l'heure du (premier) signalement, déjà écrite : relative (« il y a 12 min »), montrée sur la
+   * carte, et exacte (« aujourd'hui à 17:48 »), au survol et dans le nom lu.
+   */
+  reportedAt?: { relative: string; exact: string } | undefined
+  /**
+   * R9 : l'adresse du détail de cet élément (`/moderation?item=…`). Avec elle, la carte devient un
+   * élément de la file : une ligne compacte, motif en titre, qui est un lien (un vrai `<a>` sur le
+   * web) ; ses actions restent hors du lien.
+   */
+  href?: string | undefined
+  /** R9 : vrai si le détail montre cet élément (`aria-current`, « sélectionné » sur téléphone). */
+  current?: boolean
+  /**
+   * R9 : le geste sur l'élément, que l'écran branche sur son routeur (comme `ListRow`). Sur le web,
+   * le navigateur ne recharge pas la page.
+   */
+  onSelect?: ((event?: PressEvent) => void) | undefined
+  /** R9 : l'icône de la sorte de contenu, dans une tuile à gauche de l'élément de la file. */
+  icon?: IconName | undefined
+  /**
+   * R9 : la ligne qui dit où et de qui, déjà écrite (« Gains Rapides (@gains_rapides), sur
+   * Décollage ! »), sous la citation de l'élément de la file.
+   */
+  context?: string | undefined
+  /** R9 : vrai pour un auteur inscrit depuis moins de 14 jours (pastille « Compte récent »). */
+  recentAccount?: boolean
   /**
    * Ce qui a été signalé, en texte brut : un texte seul (le texte actuel d'un contenu retiré), ou,
    * depuis la tranche 7b, la copie champ par champ, chacun avec son libellé déjà traduit
@@ -133,9 +182,31 @@ type Props = {
   error?: string | undefined
 }
 
-export function ReportCard({
+export function ReportCard(props: Props) {
+  return props.href === undefined ? <FullCard {...props} /> : <QueueItem {...props} />
+}
+
+/**
+ * Le haut de la carte : la sorte et la partie (« Projet · la photo 2 »). Une seule phrase traduite :
+ * chaque langue y garde son ordre des mots.
+ */
+const useKindLine = (kind: string, part: string | null | undefined): string => {
+  const { t } = useTranslation()
+  return part ? t(($) => $.moderation.kindPart, { kind, part }) : kind
+}
+
+/** « Signalé 2 fois », à partir de deux signalements ; rien en dessous. */
+const useReportedTimes = (count: number | undefined): string | null => {
+  const { t } = useTranslation()
+  return count !== undefined && count >= 2 ? t(($) => $.moderation.reportedTimes, { count }) : null
+}
+
+/** La carte entière (la file d'avant R9, les retirés) : tout se lit sur place. */
+function FullCard({
   kind,
+  part,
   count,
+  reportedAt,
   snapshot,
   snapshotLabel,
   snapshotNote,
@@ -157,6 +228,8 @@ export function ReportCard({
 }: Props) {
   const { colors, shadows } = useTheme()
   const { t } = useTranslation()
+  const kindLine = useKindLine(kind, part)
+  const reportedTimes = useReportedTimes(count)
   // Une copie de plus de trois champs (un projet entier : titre, pitch, description, prompts…)
   // faisait une carte plus haute qu'un écran de téléphone : elle se replie après les trois premiers,
   // et « Afficher tout » montre le reste sur place (relecture de design 7b). Jamais pour cacher un
@@ -193,10 +266,12 @@ export function ReportCard({
           rowGap: space.xs,
         }}
       >
-        <StatusPill label={kind} />
-        {count ? (
-          <Text variant="callout" weight={600} tone="secondary">
-            {count}
+        <StatusPill label={kindLine} />
+        {reportedTimes ? <ReportedTimes label={reportedTimes} /> : null}
+        {/* L'heure, relative puis exacte : sans lien ni survol, tout s'écrit. */}
+        {reportedAt ? (
+          <Text variant="caption" tone="muted">
+            {t(($) => $.moderation.detail.at, reportedAt)}
           </Text>
         ) : null}
       </View>
@@ -407,6 +482,235 @@ export function ReportCard({
 
       {status ? <InfoLine text={status} /> : null}
 
+      <CardEnd
+        actions={actions}
+        decided={decided}
+        decidedRef={decidedRef}
+        error={error}
+        description={description}
+        descriptionId={descriptionId}
+      />
+    </View>
+  )
+}
+
+/**
+ * R9 : un élément de la file. Une ligne compacte (planches de la file) : la tuile de la sorte, la
+ * sorte et la partie, l'heure, le motif en titre, le début de la copie, la ligne « de qui, où », et
+ * les pastilles « Signalé 2 fois » et « Compte récent ». Le tout est un lien vers le détail ; les
+ * actions, la panne et le résultat restent dessous, hors du lien.
+ */
+function QueueItem({
+  kind,
+  part,
+  count,
+  reportedAt,
+  snapshot,
+  reasons = [],
+  status,
+  href = '',
+  current = false,
+  onSelect,
+  icon,
+  context,
+  recentAccount = false,
+  actions = [],
+  description,
+  decided,
+  decidedRef,
+  error,
+}: Props) {
+  const { colors } = useTheme()
+  const { t } = useTranslation()
+  const kindLine = useKindLine(kind, part)
+  const reportedTimes = useReportedTimes(count)
+  const recent = recentAccount ? t(($) => $.moderation.authorCard.recent) : null
+  // Le motif est le titre : c'est ce qu'on lit pour trier la file (« Arnaque ou spam »).
+  const title = reasons.join(', ')
+  // Le début de ce qui a été signalé : un texte seul, ou le premier champ de la copie.
+  const excerpt = typeof snapshot === 'string' ? snapshot : (snapshot[0]?.value ?? '')
+  const at = reportedAt ? t(($) => $.moderation.detail.at, reportedAt) : null
+  // Le nom lu du lien : le titre d'abord, puis tout ce que la ligne montre, l'heure exacte comprise
+  // (que l'œil ne voit qu'au survol). Le début de la copie n'y est pas : il est lu en description,
+  // avec celle des boutons (« Commentaire : Gagne 500 €… »), après le nom.
+  const name = [title, kindLine, reportedTimes, context, recent, status, at]
+    .filter((piece): piece is string => Boolean(piece))
+    .join(', ')
+  const descriptionId = useId()
+  const { large, probe } = useLargeText()
+  const select = () => onSelect?.()
+  // Sur le web, l'heure exacte s'affiche au survol de l'heure relative (attribut `title`, que
+  // react-native-web ne transmet pas : posé à la main sur l'élément du navigateur).
+  const timeRef = useRef<View>(null)
+  const exact = reportedAt?.exact
+  useEffect(() => {
+    // Dans les tests (Jest), l'élément n'est pas celui d'un navigateur : rien à poser.
+    const element = timeRef.current as unknown as Partial<HTMLElement> | null
+    if (Platform.OS !== 'web' || !exact || typeof element?.setAttribute !== 'function') return
+    element.setAttribute('title', exact)
+  }, [exact])
+  return (
+    <View style={{ alignSelf: 'stretch', gap: space.sm }}>
+      {probe}
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={name}
+        // Sur téléphone, VoiceOver et TalkBack ignorent `aria-current` : « sélectionné ».
+        accessibilityState={{ selected: current }}
+        accessibilityHint={Platform.OS === 'web' ? undefined : description}
+        {...describedBy(description ? descriptionId : undefined)}
+        // `href` et `aria-current` manquent aux types de React Native (sur téléphone, ils sont
+        // ignorés ; sur le web, react-native-web dessine un vrai `<a>`).
+        {...{ href, ...(current ? { 'aria-current': 'page' } : null) }}
+        // Entrée ouvre l'élément une fois : le navigateur n'y ajoute pas son propre clic.
+        {...enterActivates(select)}
+        onPress={(event) => {
+          // Le routeur change l'adresse ; le navigateur ne recharge pas la page (vrai `<a>`).
+          if (Platform.OS === 'web') event?.preventDefault?.()
+          onSelect?.(event)
+        }}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: space.md,
+          padding: space.md,
+          borderRadius: radii.group,
+          // L'élément montré dans le détail : le miel pâle et un liseré, qui se voit même sans les
+          // couleurs (un fond seul ne suffit pas sur la lumière d'ambiance). Le liseré existe
+          // toujours, transparent : rien ne bouge quand on choisit un autre élément.
+          borderWidth: borders.strong,
+          borderColor: current ? colors.highlightEdge : 'transparent',
+          backgroundColor: current
+            ? colors.highlightSoft
+            : pressed
+              ? colors.surfaceGrouped
+              : 'transparent',
+        })}
+      >
+        {/* La tuile de la sorte n'est qu'un repère (la sorte est écrite à côté) : à texte très
+            agrandi, elle laisse sa place au titre, qui se coupait au milieu d'un mot à 320 px. */}
+        {icon && !large ? (
+          <View
+            style={{
+              width: layout.touchTarget,
+              height: layout.touchTarget,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              borderRadius: radii.small,
+              backgroundColor: current ? colors.surface : colors.surfaceGrouped,
+            }}
+          >
+            <Icon name={icon} size={20} tone="secondary" />
+          </View>
+        ) : null}
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: space.xxs }}>
+          {/* La sorte et la partie, l'heure au bout ; à texte agrandi, l'heure passe dessous. */}
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              columnGap: space.sm,
+            }}
+          >
+            <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+              <Text variant="caption" weight={700}>
+                {kindLine}
+              </Text>
+            </View>
+            {reportedAt ? (
+              <View ref={timeRef}>
+                <Text variant="caption" tone="muted">
+                  {reportedAt.relative}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text variant="headline">{title}</Text>
+          {/* Le début de la copie, sur une ligne : le détail la donne entière. */}
+          {excerpt ? (
+            <View
+              style={{
+                borderLeftWidth: borders.quote,
+                borderLeftColor: colors.honey,
+                paddingLeft: space.sm,
+              }}
+            >
+              <Text variant="callout" tone="secondary" numberOfLines={1}>
+                {excerpt}
+              </Text>
+            </View>
+          ) : null}
+          {context ? (
+            <Text variant="caption" tone="muted">
+              {context}
+            </Text>
+          ) : null}
+          {reportedTimes || recent ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: space.xs,
+                paddingTop: space.xxs,
+              }}
+            >
+              {reportedTimes ? <ReportedTimes label={reportedTimes} /> : null}
+              {recent ? <StatusPill label={recent} /> : null}
+            </View>
+          ) : null}
+          {status ? <InfoLine text={status} /> : null}
+        </View>
+      </Pressable>
+      {/* Les actions, la panne et le résultat, sous le lien, alignés sur son contenu. Rien du tout
+          sans eux : pas d'écart vide sous un élément de la file sans action. */}
+      {actions.length > 0 || decided || error ? (
+        <View style={{ gap: space.sm, paddingHorizontal: space.md, paddingBottom: space.sm }}>
+          <CardEnd
+            actions={actions}
+            decided={decided}
+            decidedRef={decidedRef}
+            error={error}
+            description={description}
+            descriptionId={descriptionId}
+            ownsDescription={false}
+          />
+        </View>
+      ) : null}
+      {/* La description cachée, lue après le nom du lien et de chaque bouton. */}
+      {description ? <ActionDescription id={descriptionId} text={description} /> : null}
+    </View>
+  )
+}
+
+/**
+ * La fin de la carte : la panne d'une décision, puis les boutons des décisions, ou le résultat à
+ * leur place ; et la description cachée qui relie chaque bouton à sa carte.
+ */
+function CardEnd({
+  actions,
+  decided,
+  decidedRef,
+  error,
+  description,
+  descriptionId,
+  ownsDescription = true,
+}: {
+  actions: readonly ReportCardAction[]
+  decided: Props['decided']
+  decidedRef: Props['decidedRef']
+  error: string | undefined
+  description: string | undefined
+  descriptionId: string
+  /** Faux : la carte pose elle-même la description cachée (l'élément de la file, dont le lien la lit aussi). */
+  ownsDescription?: boolean
+}) {
+  const describes = description
+    ? { describedById: descriptionId, hint: description }
+    : { describedById: undefined, hint: undefined }
+  return (
+    <>
       {/* Une panne : le message reste au-dessus des boutons jusqu'à la réponse suivante. */}
       {error && !decided ? <Notice message={error} /> : null}
 
@@ -441,7 +745,43 @@ export function ReportCard({
           ))}
         </View>
       ) : null}
-      {description ? <ActionDescription id={descriptionId} text={description} /> : null}
+      {description && ownsDescription ? (
+        <ActionDescription id={descriptionId} text={description} />
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * « Signalé 2 fois » : une pastille rouge pâle, avec un drapeau, pour un contenu que plusieurs
+ * membres ont signalé. Le texte dit le nombre : la couleur n'est jamais seule.
+ */
+function ReportedTimes({ label }: { label: string }) {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        maxWidth: '100%',
+        // La hauteur de la pastille de statut (« Compte récent »), posée à côté : même ligne.
+        minHeight: STATUS_PILL_HEIGHT,
+        gap: space.xxs,
+        paddingHorizontal: space.sm,
+        paddingVertical: space.xxs,
+        borderRadius: radii.pill,
+        backgroundColor: colors.dangerSoft,
+      }}
+    >
+      <View style={{ flexShrink: 0 }}>
+        <Icon name="flag" size={14} tone="danger" />
+      </View>
+      <View style={{ flexShrink: 1 }}>
+        <Text variant="caption" weight={700} tone="danger">
+          {label}
+        </Text>
+      </View>
     </View>
   )
 }

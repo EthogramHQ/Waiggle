@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import { FollowState } from './follows'
 import { PROJECT_LIST_MAX, ProjectSummary } from './projects'
+import { RemovedPart } from './removal'
 import { Suspension } from './suspension'
 import { ProjectTool } from './tools'
 
@@ -36,6 +37,11 @@ export const Member = z
     ...FollowState.shape,
     /** Ses projets que le visiteur a le droit de voir, du plus récent au plus ancien. */
     projects: z.array(ProjectSummary).max(PROJECT_LIST_MAX),
+    /**
+     * R9 (7d) : les parties de son profil retirées par la modération (nom, pseudo, bio, outils
+     * favoris, photo), sur sa propre page seulement (`isMe`) ; vide pour tout autre visiteur.
+     */
+    removedParts: z.array(RemovedPart),
     /**
      * Ce que seul un administrateur voit de ce membre (tranche 7c) ; null pour tout autre visiteur.
      * `canSuspend` : faux pour soi-même, pour un administrateur en fonction ou un membre déjà

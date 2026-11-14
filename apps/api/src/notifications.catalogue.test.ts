@@ -669,7 +669,10 @@ describe('the thumbnail of a notified project', () => {
 
   /** Les notifications qui nomment un projet, avec la sorte et la miniature de chacune. */
   const covers = (items: Notification[]) =>
-    items.flatMap((n) => ('project' in n ? [{ kind: n.kind, cover: n.project.cover }] : []))
+    // Depuis R9, la notification d'un retrait de profil n'a pas de projet (`project` vaut null).
+    items.flatMap((n) =>
+      'project' in n && n.project !== null ? [{ kind: n.kind, cover: n.project.cover }] : [],
+    )
 
   it('gives the cover of the project in each notification that names one, and null without a photo', async () => {
     const papillon = await publish(ines, 'Quel papillon ?')

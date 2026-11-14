@@ -14,36 +14,64 @@ import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey, ApiResult } from '../api/errors'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { Button } from '../ui/Button'
+import { Checkbox } from '../ui/Checkbox'
 import { Dialog } from '../ui/Dialog'
 import type { Focusable } from '../ui/focus'
+import type { ImageSource } from '../ui/image'
+import { KeyPoints } from '../ui/KeyPoints'
+import { MarkedAvatar } from '../ui/MarkedAvatar'
 import { Notice } from '../ui/Notice'
 
 /** Le geste à confirmer. */
 export type BlockGesture = 'block' | 'unblock'
 
-/** Ce qu'on demande de confirmer : le geste, et le membre visé (de quoi le nommer). */
-export type BlockAsking = { gesture: BlockGesture; member: { id: string; handle: string } }
+/**
+ * Ce qu'on demande de confirmer : le geste, et le membre visé (de quoi le nommer, R9 : son nom et
+ * son pseudo). `avatar` : sa photo, si l'écran l'a ; sans elle, ses initiales.
+ */
+export type BlockAsking = {
+  gesture: BlockGesture
+  member: { id: string; name: string; handle: string; avatar?: ImageSource | null }
+}
 
 type Props = {
   /** La demande en cours ; null : la fenêtre est fermée. */
   asking: BlockAsking | null
+  /**
+   * R9 : la case « Signaler aussi son profil », jamais cochée d'avance (faux par défaut). Absente
+   * quand la fenêtre vient de « Bloquer aussi » d'un signalement : il est déjà parti.
+   */
+  offerReport?: boolean
   /** Le geste lui-même : la fenêtre attend sa réponse (ok, ou la raison du refus). */
   send: (asking: BlockAsking) => Promise<ApiResult<null>>
-  /** Le geste a réussi : l'écran ferme la fenêtre (asking à null) et dit ce qui est fait. */
-  onDone: (asking: BlockAsking) => void
+  /**
+   * Le geste a réussi : l'écran ferme la fenêtre (asking à null) et dit ce qui est fait.
+   * `alsoReport` : la case « Signaler aussi » était cochée ; l'écran ouvre alors le signalement,
+   * après le blocage (jamais avant, ni s'il est refusé).
+   */
+  onDone: (asking: BlockAsking, alsoReport: boolean) => void
   /** « Annuler », Échap, le voile ou le retour d'Android, hors envoi : l'écran ferme la fenêtre. */
   onCancel: () => void
   /** La fenêtre a tout à fait disparu (voir Dialog) : le moment de poser le focus ailleurs. */
   onClosed?: () => void
 }
 
-export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props) {
+export function BlockDialog({
+  asking,
+  offerReport = false,
+  send,
+  onDone,
+  onCancel,
+  onClosed,
+}: Props) {
   const { t } = useTranslation()
   const signInAgain = useSignInAgain()
   // La dernière demande montrée : pendant le fondu de fermeture (asking déjà à null), le titre
   // garde son pseudo et son geste, au lieu de « Débloquer @ ? » (relecture de l'interface, 7b).
   const [shown, setShown] = useState<BlockAsking | null>(asking)
   const [refusal, setRefusal] = useState<ApiErrorKey | null>(null)
+  // La case « Signaler aussi son profil » : jamais cochée d'avance, décochée à chaque demande.
+  const [alsoReport, setAlsoReport] = useState(false)
   const [busy, setBusy] = useState(false)
   // Une ref en plus de l'état : deux tapes dans la même image (double tape) voient toutes deux
   // l'ancien `busy` ; la ref, elle, est déjà à vrai pour la seconde.
@@ -57,6 +85,7 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
   if (asking && asking !== shown) {
     setShown(asking)
     setRefusal(null)
+    setAlsoReport(false)
   }
 
   // Pendant l'envoi, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
@@ -77,13 +106,15 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
       setRefusal(result.error)
       return
     }
-    onDone(shown)
+    onDone(shown, shown.gesture === 'block' && offerReport && alsoReport)
   }
 
   if (!shown) return null
   const { gesture } = shown
-  const { handle } = shown.member
+  const { name, handle } = shown.member
   const blocking = gesture === 'block'
+  // La case n'existe que pour bloquer, et seulement là où l'écran la propose.
+  const offering = blocking && offerReport
 
   // Le message d'un refus. Le quota du jour a son nombre (un pour bloquer, un pour débloquer), la
   // session expirée son lien « Me reconnecter » ; le reste, « Réessaie ».
@@ -99,22 +130,50 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
   return (
     <Dialog
       visible={asking !== null}
-      title={
-        blocking ? t(($) => $.block.title, { handle }) : t(($) => $.block.unblockTitle, { handle })
+      // R9 (planche R9-Bloquer) : « Bloquer Léa Martin (@lea) ? », sous son avatar marqué
+      // « bloqué » : on voit d'un coup d'œil qui, et ce qu'il deviendra.
+      illustration={
+        blocking ? (
+          <MarkedAvatar
+            name={name}
+            source={shown.member.avatar ?? null}
+            label={name}
+            mark={{ icon: 'prohibit', label: t(($) => $.block.badge) }}
+          />
+        ) : undefined
       }
-      // Bloquer : ce qu'on ne verra plus, ce qui reste visible (R1), les abonnements, que @x n'est
-      // pas prévenu, et que la modération non plus ; chacun son paragraphe. Débloquer : ce qui
-      // revient et ce qui ne revient pas (J10, R7).
-      message={
+      title={
         blocking
-          ? [
-              t(($) => $.block.hidden),
-              t(($) => $.block.remains, { handle }),
-              t(($) => $.block.follows),
-              t(($) => $.block.notTold, { handle }),
-              t(($) => $.block.notModeration),
-            ]
-          : t(($) => $.block.unblockMessage)
+          ? t(($) => $.block.titleNamed, { name, handle })
+          : t(($) => $.block.unblockTitle, { handle })
+      }
+      // Débloquer : ce qui revient et ce qui ne revient pas (J10, R7).
+      message={blocking ? undefined : t(($) => $.block.unblockMessage)}
+      // Bloquer (R9) : un résumé en gras, quatre puces courtes, puis le texte complet d'avant R9,
+      // visible sans rien déplier : ce qu'on ne verra plus, ce qui reste visible (R1), les
+      // abonnements, que @x n'est pas prévenu, et que la modération non plus (J9).
+      body={
+        blocking ? (
+          <KeyPoints
+            summary={t(($) => $.block.summary, { name })}
+            points={[
+              { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
+              { icon: 'users', text: t(($) => $.block.bullets.follows) },
+              { icon: 'bell-slash', text: t(($) => $.block.bullets.notTold) },
+              { icon: 'flag', text: t(($) => $.block.bullets.moderation) },
+            ]}
+            details={{
+              title: t(($) => $.block.fullText),
+              paragraphs: [
+                t(($) => $.block.hidden),
+                t(($) => $.block.remains, { handle }),
+                t(($) => $.block.follows),
+                t(($) => $.block.notTold, { handle }),
+                t(($) => $.block.notModeration),
+              ],
+            }}
+          />
+        ) : undefined
       }
       // Elle s'ouvre là où l'on vient de toucher (un menu, « Bloquer aussi ») : la seconde tape
       // d'une double tape ne confirme rien (relecture de design, 7b).
@@ -127,6 +186,17 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
         <Notice
           message={refusalMessage}
           action={refusal === 'unauthorized' ? signInAgain(onCancel) : undefined}
+        />
+      ) : null}
+      {/* R9 : signaler aussi son profil, après le blocage. Jamais cochée d'avance ; cocher ne
+          bloque rien, seul « Bloquer » agit. Dans la zone des boutons : la garde des tapes de
+          l'ouverture la protège aussi. Inactive pendant l'envoi, comme « Annuler ». */}
+      {offering ? (
+        <Checkbox
+          label={t(($) => $.block.alsoReport)}
+          value={alsoReport}
+          onValueChange={setAlsoReport}
+          disabled={busy}
         />
       ) : null}
       {/* Bloquer en rouge plein, comme une suppression ; débloquer en miel, partout le même. */}

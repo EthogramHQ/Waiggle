@@ -25,9 +25,11 @@
 // envoie un retour sur « Recettes » de Zoé ; Zoé, l'autre personne de chaque objet, les signale.
 import {
   AccountExport,
+  isRemovablePart,
   Project,
   ProjectUpdate,
   ProjectVisual,
+  ReportPartField,
   ReportSnapshot,
   TesterCall,
   TesterMedia,
@@ -448,6 +450,85 @@ describe('the register of member inputs', () => {
     )
 
     expect(wrong).toEqual([])
+  })
+
+  // Tranche R9 (7d), migration 0022 : les retraits d'une partie. Aucune de ces colonnes n'est tapée
+  // par un membre : la modération et l'API les écrivent (la partie visée, choisie dans une liste
+  // fermée ; l'ancien nom ou pseudo remplacé d'office ; la valeur retirée, sortie de sa colonne). Les
+  // colonnes de texte et de JSON ont chacune leur raison écrite (règle 19) ; `content_part_removal`
+  // ne peut pas être classée en entier (« * ») : elle a une colonne JSON (`hidden_value`).
+  const SLICE_R9 = {
+    content_part_removal: [
+      'id',
+      'removal_id',
+      'author_id',
+      'object_kind',
+      'project_id',
+      'update_id',
+      'call_id',
+      'message_id',
+      'field',
+      'project_media_id',
+      'tester_media_id',
+      'hidden_value',
+      'created_at',
+    ],
+    content_report: ['part_field', 'part_media_id'],
+    moderation_decision: ['part_field', 'part_media_id', 'previous_value', 'provisional_value'],
+    member_handle: ['held_by_removal'],
+    project_media: ['removal_id'],
+    tester_media: ['removal_id'],
+  }
+
+  it('reads the tables and columns of slice R9', () => {
+    for (const [table, columns] of Object.entries(SLICE_R9)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+  })
+
+  it('classes the columns of slice R9 as written by the moderation or the API, with a reason for each text', () => {
+    const wrong = Object.entries(SLICE_R9).flatMap(([table, columns]) => {
+      const entry = NOT_MEMBER_INPUTS[table]
+      const type = (column: string) =>
+        tables.find((t) => t.name === table)?.columns.find((c) => c.name === column)?.type ?? ''
+      return columns
+        .filter(
+          (column) =>
+            inRegister(table, column) ||
+            !notAnInput(table, column) ||
+            entry === '*' ||
+            (isFreeType(type(column)) && (entry?.[column] ?? '').trim().length < 10),
+        )
+        .map((column) => `${table}.${column}`)
+    })
+
+    expect(wrong).toEqual([])
+  })
+
+  // R9 (scénario, « Les parties ») : « le registre des entrées dit, pour chaque champ, s'il se retire
+  // seul ; un test échoue si un champ n'y est pas classé ». La colonne `removable` du registre suit
+  // le contrat (REMOVABLE_PARTS) : un champ qui n'est pas une partie (la version, une ligne d'une mise
+  // à jour, un commentaire, la précision d'un signalement) ne se retire pas seul.
+  it('says for every field of the register whether it can be removed alone, as the contract does', () => {
+    const parts = new Set<string>(ReportPartField.options)
+    const expected = (input: MemberInput) =>
+      input.object !== 'report' &&
+      input.field !== null &&
+      parts.has(input.field) &&
+      isRemovablePart(input.object, input.field as ReportPartField)
+    const wrong = MEMBER_INPUTS.filter(
+      (input) => typeof input.removable !== 'boolean' || input.removable !== expected(input),
+    ).map((input) => `${input.object} ${input.table}.${input.column}: ${String(input.removable)}`)
+
+    expect(wrong).toEqual([])
+    // Témoin : la description d'un projet se retire seule, son titre non.
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({ object: 'project', field: 'description', removable: true }),
+    )
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({ object: 'project', field: 'title', removable: false }),
+    )
   })
 
   // R7a, migration 0018 : le Journal et les anciennes colonnes des outils sont effacés. Le schéma

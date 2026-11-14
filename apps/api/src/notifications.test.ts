@@ -1020,6 +1020,7 @@ describe('the notifications of the moderation', () => {
           targetKind: 'project',
           project: { id: meteo.id, title: 'Météo', cover: null },
           excerpt: null,
+          part: null,
           ground: 'rules',
           explanation: 'Publicité déguisée.',
           afterReport: true,
@@ -1194,6 +1195,7 @@ describe('the notifications of the moderation', () => {
           at: iso(end),
           isNew: true,
           lifted: false,
+          cause: 'end',
           explanation: null,
         },
       ])
@@ -2412,6 +2414,7 @@ describe('the testers corner (R7b)', () => {
           targetKind: 'call',
           project: { id: meteo.id, title: 'Météo', cover: null },
           excerpt: 'Un appel publicitaire',
+          part: null,
           ground: 'rules',
           explanation: REMOVAL_TEXT,
           afterReport: false,

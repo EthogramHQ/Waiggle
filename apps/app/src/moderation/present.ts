@@ -1,6 +1,12 @@
 // Ce que la page « Modération » écrit d'un signalement, et où mène son lien « Voir ». Des fonctions
 // pures, à part des hooks de api.ts : les tests de l'écran remplacent api.ts sans perdre celles-ci.
-import type { ReportReason, StoredReportTarget } from '@ruche/contracts'
+import {
+  isReportablePart,
+  type PartOut,
+  ReportPart,
+  type ReportReason,
+  StoredReportTarget,
+} from '@ruche/contracts'
 import type { Href } from 'expo-router'
 
 /**
@@ -14,6 +20,7 @@ export const reasonTextKey = {
   scam_spam: 'scamSpam',
   impersonation: 'impersonation',
   privacy: 'privacy',
+  dangerous_link: 'dangerousLink',
   other: 'other',
 } as const satisfies Record<ReportReason, string>
 
@@ -40,3 +47,40 @@ export const viewHref = (target: StoredReportTarget, projectId: string | null): 
 
 /** Une clé stable pour une cible (« comment:c0d1… »), pour les listes et l'action en cours. */
 export const targetKey = (target: StoredReportTarget) => `${target.kind}:${target.id}`
+
+/** Le nom d'une partie en minuscules : écrit dans `ui/partText.ts` (la carte compacte le lit aussi). */
+export { partText } from '../ui/partText'
+
+// Une clé d'élément tient dans une adresse (`?item=`) : seulement des lettres, chiffres, « : », « - »
+// et « _ ». Forme : `sorte:id` pour le contenu entier, `sorte:id:champ` pour une partie,
+// `sorte:id:champ:photo` pour une photo. Les identifiants (uuid, id de membre) n'ont pas de « : ».
+const SEPARATOR = ':'
+
+/**
+ * La clé d'un élément de la file : la cible **et** la partie. Deux éléments d'un même projet (le
+ * projet entier, sa 2e photo) ont deux clés. `part` : celle d'un élément de l'API (`PartOut`), d'une
+ * décision (`ReportPart`), ou `null` pour le contenu entier.
+ */
+export const itemKey = (target: StoredReportTarget, part: PartOut | ReportPart | null): string =>
+  part
+    ? [target.kind, target.id, part.field, ...(part.mediaId ? [part.mediaId] : [])].join(SEPARATOR)
+    : targetKey(target)
+
+/**
+ * L'inverse d'`itemKey`, pour lire `?item=` : la cible et la partie, ou `null` si la clé est mal
+ * formée. Tout passe par les schémas du contrat : une adresse écrite à la main ne donne jamais une
+ * cible ou une partie que l'API refuserait.
+ */
+export const parseItemKey = (
+  key: string,
+): { target: StoredReportTarget; part: ReportPart | null } | null => {
+  const [kind, id, field, mediaId, ...rest] = key.split(SEPARATOR)
+  if (rest.length > 0) return null
+  const target = StoredReportTarget.safeParse({ kind, id })
+  if (!target.success) return null
+  if (field === undefined) return mediaId === undefined ? { target: target.data, part: null } : null
+  const part = ReportPart.safeParse({ field, ...(mediaId === undefined ? {} : { mediaId }) })
+  // Une partie que cette sorte de contenu n'a pas (une photo d'un commentaire) n'existe pas.
+  if (!part.success || !isReportablePart(target.data.kind, part.data.field)) return null
+  return { target: target.data, part: part.data }
+}

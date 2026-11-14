@@ -56,7 +56,15 @@ export const formerHandleOf = async (db: Database, userId: string, now: Date) =>
   const [row] = await db
     .select({ handle: h.handle, releasedAt: h.releasedAt })
     .from(h)
-    .where(and(eq(h.userId, userId), isNotNull(h.releasedAt), gt(h.releasedAt, cutoff)))
+    .where(
+      and(
+        eq(h.userId, userId),
+        isNotNull(h.releasedAt),
+        // Un pseudo retiré par la modération n'est pas son « ancien pseudo » : il ne le choisira pas.
+        isNull(h.heldByRemoval),
+        gt(h.releasedAt, cutoff),
+      ),
+    )
     .orderBy(desc(h.releasedAt))
     .limit(1)
   if (!row?.releasedAt) return null

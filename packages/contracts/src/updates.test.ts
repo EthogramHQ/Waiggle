@@ -212,6 +212,7 @@ describe('what the API reads back without trusting it (sec-A7)', () => {
       beforeAfter: false,
       createdAt: '2026-10-19T09:00:00.000Z',
       removal: null,
+      removedParts: [], // R9 : aucune partie retirée
     }
     expect(ProjectUpdate.safeParse(update).success).toBe(true)
     expect(ProjectUpdate.safeParse({ ...update, lines: [] }).success).toBe(false)

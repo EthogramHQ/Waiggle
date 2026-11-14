@@ -8,9 +8,12 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
+import { dropProjectPartRemovals, replacedProjectParts } from '../moderation/replaced'
 import { categoriesExist } from '../projects/categories'
 import { loadVisibleProject, mediaKeysOf, projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { suspendedProjectChange } from '../suspension/guard'
+import { isSuspended } from '../suspension/load'
 import { chargeOtherTools } from '../tools/quota'
 import {
   countChargedOtherTools,
@@ -77,7 +80,9 @@ const updateProjectRoute = createRoute({
     200: projectResponse('The changed project.'),
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
-    403: errorResponse('Someone else’s project.'),
+    403: errorResponse(
+      'Someone else’s project, or a suspended account sending more than { visibility: private }.',
+    ),
     404: errorResponse('No such project.'),
     409: errorResponse('My project, removed by the moderation (`removed`).'),
     429: errorResponse('Too many changes, or too many new tools today (`too_many_other_tools`).'),
@@ -150,6 +155,15 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!user) return unauthorized(c)
     const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    // Un compte suspendu (R9, relecture de sécurité P7, décision L6) : la garde des suspendus le
+    // laisse entrer ici, et seul `{ "visibility": "private" }` passe (suspension/guard.ts) ; tout
+    // autre corps reçoit 403 `suspended`, avant le validateur. Le corps n'est lu qu'une fois :
+    // `c.req.json()` garde sa lecture, que le validateur reprend telle quelle ; une clé répétée
+    // est donc jugée sur la valeur qui sera écrite (JSON garde la dernière).
+    if (await isSuspended(db, user.id, new Date())) {
+      const body: unknown = await c.req.json().catch(() => null)
+      if (!suspendedProjectChange(body)) return c.json(errorBody(languageOf(c), 'suspended'), 403)
+    }
     await next()
   })
 
@@ -346,6 +360,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             .set(fullSet)
             .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
         }
+        // R9 (P5) : une nouvelle valeur non vide d'une partie retirée la remplace ; sa marque
+        // s'efface, dans la même transaction que l'écriture (moderation/replaced.ts). Le titre, la
+        // visibilité ou l'ordre des photos ne touchent à aucune marque.
+        await dropProjectPartRemovals(tx, user.id, id, replacedProjectParts(changes))
         return 'ok' as const
       })
       .catch(noFreeToolSlug)

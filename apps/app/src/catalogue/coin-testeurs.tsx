@@ -58,6 +58,10 @@ const fr = {
   description: 'La fusée du quiz sur son pas de tir, au crépuscule',
   removedTitle: 'Retiré par la modération',
   removedLine: 'Motif : contenu blessant. Tu peux contester cette décision depuis tes réglages.',
+  // R9 : la photo d'un appel retirée seule, vue par son auteur.
+  photoRemoved: 'Photo retirée seule par la modération, vue par l’auteur',
+  photoWhy: 'La photo montre le visage d’un enfant, sans l’accord de ses parents.',
+  photoSubject: 'Contestation : retrait de la photo de « Décollage ! » du 12 novembre',
   ines: 'Inès Morel',
   hugo: 'Hugo Lefèvre',
   lea: 'Léa Martin',
@@ -105,6 +109,9 @@ const en: typeof fr = {
   description: 'The quiz rocket on its launch pad, at dusk',
   removedTitle: 'Removed by the moderation',
   removedLine: 'Reason: hurtful content. You can appeal this decision from your settings.',
+  photoRemoved: 'Photo removed alone by moderation, seen by the author',
+  photoWhy: 'The photo shows a child’s face, without their parents’ consent.',
+  photoSubject: 'Appeal: removal of the photo of “Lift-off!” of November 12',
   ines: 'Inès Morel',
   hugo: 'Hugo Lefèvre',
   lea: 'Léa Martin',
@@ -351,6 +358,23 @@ export function TestersCornerCatalogue() {
             </Example>
             <Example caption={`${l.removed} — ${l[scheme]}`}>
               <CallCard text={l.callPlain} at={OLDER} removal={removal} menu={authorMenu} />
+            </Example>
+            <Example caption={`${l.photoRemoved} — ${l[scheme]}`}>
+              <CallCard
+                text={l.callPhoto}
+                at={RECENT}
+                photo={{ source: rocket, description: l.description }}
+                photoRemoval={{
+                  removal: {
+                    ground: 'rules',
+                    explanation: l.photoWhy,
+                    at: '2026-11-12T11:00:00.000Z',
+                    afterReport: false,
+                  },
+                  contestSubject: l.photoSubject,
+                }}
+                menu={authorMenu}
+              />
             </Example>
             <Example caption={`${l.noMenu} — ${l[scheme]}`}>
               <CallCard text={l.callShort} at={OLDER} />

@@ -61,6 +61,16 @@ const isUnfolded = (button: Element) =>
     .queryAllByRole('button', { name: fr.t(($) => $.suspension.details), expanded: true })
     .includes(button)
 
+/**
+ * L'e-mail ouvert par le dernier appel de `Linking.openURL` : l'adresse (« mailto:… ») et l'objet,
+ * décodé (R9, `ContactLink` : `mailto:<contactEmail>?subject=…`).
+ */
+const mailOf = (openURL: jest.SpyInstance) => {
+  const url = String(openURL.mock.calls.at(-1)?.[0] ?? '')
+  const [address = '', query = ''] = url.split('?')
+  return { address, subject: new URLSearchParams(query).get('subject') }
+}
+
 /** Ce texte de l'appli est à l'écran, seul ou dans un paragraphe plus long. */
 const shows = (text: string) => screen.queryAllByText(containing(text)).length > 0
 
@@ -149,9 +159,35 @@ describe('SuspensionBanner', () => {
       expect(shows(fr.t(($) => $.suspension.contestLead))).toBe(true)
       expect(contactEmail).toMatch(/@/)
       await fireEvent.press(screen.getByRole('link', { name: contactEmail }))
-      expect(openURL).toHaveBeenCalledWith(`mailto:${contactEmail}`)
+      // R9 (J12) : l'e-mail part vers l'adresse de contact, avec un objet (test suivant).
+      expect(openURL).toHaveBeenCalledTimes(1)
+      expect(mailOf(openURL).address).toBe(`mailto:${contactEmail}`)
       expect(fr.t(($) => $.suspension.contestCourt)).toMatch(/justice/)
       expect(shows(fr.t(($) => $.suspension.contestCourt))).toBe(true)
+    } finally {
+      openURL.mockRestore()
+    }
+  })
+
+  // R9 (J12, compliance-backlog n° 17) : « Contester » est un `ContactLink` dont l'objet nomme la
+  // décision et sa date, « Contestation : suspension de mon compte du 27 oct. ». La suspension a
+  // été posée le 26 octobre à 23 h 30 UTC : le 27 à 0 h 30, heure de Paris (J4) ; le 26 trahirait
+  // une date UTC.
+  it('opens mailto with a subject naming the decision and its date', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+    try {
+      await renderBanner()
+
+      await fireEvent.press(screen.getByRole('link', { name: contactEmail }))
+
+      const { address, subject } = mailOf(openURL)
+      expect(address).toBe(`mailto:${contactEmail}`)
+      const decision = fr.t(($) => $.removal.contestDecision.suspension)
+      const expected = fr
+        .t(($) => $.removal.contestSubject, { decision, date: 'DATE' })
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace('DATE', '27 oct[a-zé.]*(?: 2026)?')
+      expect(subject).toMatch(new RegExp(`^${expected}$`))
     } finally {
       openURL.mockRestore()
     }

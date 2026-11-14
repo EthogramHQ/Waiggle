@@ -273,6 +273,8 @@ describe('the notifications of the testers corner (R7b)', () => {
       kind: 'removed',
       project: meteo,
       excerpt: 'Un appel publicitaire',
+      // R9 : null, le contenu entier.
+      part: null,
       ground: 'rules',
       explanation: 'Publicité déguisée.',
       afterReport: false,

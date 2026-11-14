@@ -136,7 +136,8 @@ function BlockedMembers() {
                         onPress={() =>
                           setAsking({
                             gesture: 'unblock',
-                            member: { id: member.id, handle: member.handle },
+                            // R9 : la fenêtre reçoit aussi le nom (son titre de blocage le porte).
+                            member: { id: member.id, name: member.name, handle: member.handle },
                           })
                         }
                       />

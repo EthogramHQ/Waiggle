@@ -256,6 +256,7 @@ describe('the caps of the pages', () => {
     photo: media,
     createdAt: '2026-11-02T08:00:00.000Z',
     removal: null,
+    removedParts: [], // R9 : aucune partie retirée
   })
   const aMessage = (i: number) => ({
     id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
@@ -268,6 +269,7 @@ describe('the caps of the pages', () => {
     createdAt: '2026-11-02T08:00:00.000Z',
     settled: null,
     removal: null,
+    removedParts: [], // R9 : aucune partie retirée
     mine: true,
   })
 

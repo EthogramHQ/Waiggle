@@ -1,0 +1,252 @@
+// Une partie d'un projet retirée seule par la modération, telle que son auteur la lit sur la page du
+// projet (R9, scénario « Retirer une partie », décision L2 de Louis du 13/11/2026 ; planche
+// `R9-Partie-Retiree`). L'encadré lui-même (fondement, explication, date, « Contester », la justice,
+// les boutons) est `ui/RemovedPart` ; ici, ce qui dépend du projet :
+// - le titre (« La photo 2 a été retirée par la modération ») : le rang d'une photo est sa place
+//   dans la galerie de l'auteur, où elle est encore ;
+// - l'objet de l'e-mail de « Contester », qui nomme la décision et sa date (J12) : « Contestation :
+//   retrait de la photo 2 de « Mon agent de recettes » du 12 novembre » ;
+// - la partie elle-même, sous les yeux de l'auteur : la vignette de la photo, ou le texte retiré
+//   (sorti de sa colonne, l'API le lui rend dans `value`). Un texte retiré s'écrit en texte simple,
+//   jamais en Markdown ni en lien : il a été retiré, ses liens ne s'ouvrent plus d'ici.
+//
+// « Supprimer » ouvre d'abord une fenêtre de confirmation (la photo part pour de bon).
+//
+// Et `useDeleteRemovedPhoto`, le « Supprimer » d'une photo retirée : la photo part pour de bon
+// (`deleteVisual`), une seule fois même sur une double tape.
+import type { Project, RemovedPart as RemovedPartData, ReportPartField } from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { ApiErrorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
+import { Button } from '../ui/Button'
+import { partContestSubject } from '../ui/contestSubject'
+import { Dialog } from '../ui/Dialog'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import { Notice } from '../ui/Notice'
+import { ProjectThumb } from '../ui/ProjectThumb'
+import { partText } from '../ui/partText'
+import { RemovedPart } from '../ui/RemovedPart'
+import { Row, Stack } from '../ui/Stack'
+import { Tag } from '../ui/Tag'
+import { Text } from '../ui/Text'
+import { deleteVisual } from './api'
+import { projectQueryKey, useSetProject } from './hooks'
+
+/** Les parties d'un projet que la modération retire seules, et qui ont un titre à elles. */
+const PROJECT_PART_FIELDS = [
+  'description',
+  'tools',
+  'demoUrl',
+  'cover',
+  'photo',
+  'photoDescription',
+  'prompt',
+] as const satisfies readonly ReportPartField[]
+export type ProjectPartField = (typeof PROJECT_PART_FIELDS)[number]
+
+/** Une partie retirée d'un projet, son champ rétréci aux parties qu'un projet peut perdre seules. */
+export type ProjectRemovedPartData = RemovedPartData & { field: ProjectPartField }
+
+/** Vrai si la partie est une partie de projet que cette page sait montrer. */
+export const isProjectPart = (part: RemovedPartData): part is ProjectRemovedPartData =>
+  (PROJECT_PART_FIELDS as readonly ReportPartField[]).includes(part.field)
+
+/**
+ * Vrai si « Supprimer » a un sens : la partie est la photo elle-même (la photo ou la couverture).
+ * Sous la description d'une photo retirée, il supprimerait la photo avec sa bonne description :
+ * « Remplacer » suffit (le formulaire change le texte).
+ */
+export const isDeletablePhoto = (part: ProjectRemovedPartData): boolean =>
+  (part.field === 'photo' || part.field === 'cover') && part.mediaId !== null
+
+type Props = {
+  project: Project
+  part: ProjectRemovedPartData
+  /** « Remplacer » : le formulaire du projet ; null, le bouton n'est pas là (suspendu, retiré). */
+  onReplace: (() => void) | null
+  /** « Supprimer » : null, le bouton n'est pas là (un texte retiré ne se supprime pas d'ici). */
+  onDelete: (() => void) | null
+  /** Le refus de la dernière suppression de cette partie, lu sous l'encadré ; null, rien. */
+  error?: string | null
+  /** La suppression de cette photo est en cours : « Supprimer » charge, « Remplacer » attend. */
+  deleting?: boolean
+}
+
+export function ProjectRemovedPart({
+  project,
+  part,
+  onReplace,
+  onDelete,
+  error = null,
+  deleting = false,
+}: Props) {
+  const { t, i18n } = useTranslation()
+  const toSource = useMediaSources()
+  // Le rang d'une photo dans la galerie de l'auteur, à partir de 1 ; null si elle n'y est plus.
+  const visualIndex = part.mediaId
+    ? project.visuals.findIndex((visual) => visual.id === part.mediaId)
+    : -1
+  const visual = visualIndex >= 0 ? project.visuals[visualIndex] : undefined
+  const position = visualIndex >= 0 ? visualIndex + 1 : null
+
+  // Le champ, recopié dans une constante avant le sélecteur (typage des textes).
+  const field: ProjectPartField = part.field
+  const title = t(($) => $.removal.part.titles[field], { n: position ?? undefined })
+  // « la photo 2 », « la description » : le nom de la partie dans les phrases de la modération.
+  const partName = partText({ field, mediaId: part.mediaId, position }, t, 'project')
+  const subject = partContestSubject(t, i18n.language, {
+    part: partName,
+    title: project.title,
+    at: part.removal.at,
+  })
+
+  // La partie elle-même. Une valeur en liste (outils, prompts) : un élément par ligne ou par
+  // étiquette ; une photo : sa vignette, pour savoir laquelle sans revenir à la galerie.
+  const values = part.value === null ? [] : Array.isArray(part.value) ? part.value : [part.value]
+  const content = visual ? (
+    <Stack gap="sm">
+      <Row>
+        <ProjectThumb
+          size="row"
+          image={{
+            source: toSource(visual.url),
+            thumbhash: visual.thumbhash,
+            label: visual.description ?? '',
+          }}
+        />
+      </Row>
+      {field === 'photoDescription' && values.length > 0 ? <RemovedText values={values} /> : null}
+    </Stack>
+  ) : field === 'tools' && values.length > 0 ? (
+    <Stack direction="row" gap="sm" wrap>
+      {values.map((label, rank) => (
+        // Une étiquette sans page : texte simple, rien à toucher (`inCatalogue` faux). La liste
+        // retirée ne change jamais d'ordre, et deux valeurs peuvent être égales : le rang en clé.
+        // biome-ignore lint/suspicious/noArrayIndexKey: liste figée, valeurs pas forcément uniques
+        <Tag key={`${rank}-${label}`} label={label} inCatalogue={false} />
+      ))}
+    </Stack>
+  ) : values.length > 0 ? (
+    <RemovedText values={values} />
+  ) : null
+
+  // « Supprimer » ne supprime pas tout de suite : la photo part pour de bon, une fenêtre le redit
+  // d'abord (R9, relectures). « Supprimer » de la fenêtre ferme celle-ci et envoie `onDelete` ; le
+  // bouton de l'encadré montre alors son chargement (`deleting`).
+  const [confirming, setConfirming] = useState(false)
+  // « Annuler » reçoit le focus à l'ouverture (supprimer ne se défait pas : Entrée à l'arrivée ne
+  // doit rien supprimer) et le rend à « Supprimer » en partant.
+  const cancelRef = useRef<Focusable>(null)
+  const deleteRef = useRef<Focusable>(null)
+  // Une ref en plus de l'état : deux tapes dans la même image voient toutes deux la fenêtre ouverte.
+  const confirmed = useRef(false)
+
+  // Chaque ouverture repart de zéro : sur Android, `onClosed` n'est pas appelé, et une suppression
+  // refusée doit pouvoir être renvoyée.
+  const open = () => {
+    confirmed.current = false
+    setConfirming(true)
+  }
+  const cancel = () => setConfirming(false)
+  const confirm = () => {
+    if (confirmed.current) return
+    confirmed.current = true
+    setConfirming(false)
+    onDelete?.()
+  }
+  // La fenêtre est tout à fait partie : sans suppression, le focus revient à « Supprimer ». Après
+  // une suppression, l'encadré s'en va (ou son titre a déjà le focus) : rien à rendre.
+  const closed = () => {
+    if (confirmed.current) return
+    const node = deleteRef.current
+    if (node && !focusWithoutScroll(node)) moveReaderTo(node)
+  }
+
+  return (
+    <Stack gap="md">
+      <RemovedPart
+        title={title}
+        removal={part.removal}
+        contestSubject={subject}
+        onReplace={onReplace}
+        onDelete={onDelete ? open : null}
+        deleting={deleting}
+        deleteRef={deleteRef}
+      >
+        {content}
+      </RemovedPart>
+      {/* Sous l'encadré, près des boutons : le refus reste où le membre regarde. */}
+      {error ? <Notice message={error} /> : null}
+      <Dialog
+        visible={confirming}
+        guardTaps
+        title={t(($) => $.removal.part.deleteConfirmTitle)}
+        message={t(($) => $.removal.part.deleteConfirmBody)}
+        onDismiss={cancel}
+        onClosed={closed}
+        initialFocusRef={cancelRef}
+      >
+        <Button label={t(($) => $.removal.part.delete)} variant="confirm" onPress={confirm} />
+        <Button
+          ref={cancelRef}
+          label={t(($) => $.common.cancel)}
+          variant="secondary"
+          onPress={cancel}
+        />
+      </Dialog>
+    </Stack>
+  )
+}
+
+/** Un texte retiré, ligne par ligne : jamais du Markdown, et coupé plutôt que de déborder. */
+function RemovedText({ values }: { values: readonly string[] }) {
+  return (
+    <Stack gap="sm">
+      {values.map((value, rank) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: liste figée, deux prompts peuvent être égaux
+        <Text key={`${rank}-${value}`} variant="body" tone="secondary" breakAnywhere>
+          {value}
+        </Text>
+      ))}
+    </Stack>
+  )
+}
+
+/**
+ * Hook : « Supprimer » une photo retirée. Une seule suppression à la fois (une ref : deux tapes
+ * dans la même image) ; réussie, le projet renvoyé par l'API remplace celui du cache (la photo et sa
+ * marque partent ensemble) et `onDeleted` est appelé ; refusée, `failed` dit quelle photo et
+ * pourquoi, jusqu'au prochain essai. Un 404 : la photo n'est déjà plus là, ce que le membre voulait ;
+ * la page se relit.
+ */
+export const useDeleteRemovedPhoto = (projectId: string, onDeleted: () => void) => {
+  const setProject = useSetProject()
+  const queryClient = useQueryClient()
+  const sending = useRef(false)
+  const [failed, setFailed] = useState<{ mediaId: string; error: ApiErrorKey } | null>(null)
+  // La photo en cours de suppression : son encadré montre « Supprimer » en chargement.
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  const remove = async (mediaId: string) => {
+    if (sending.current) return
+    sending.current = true
+    setFailed(null)
+    setDeleting(mediaId)
+    const result = await deleteVisual(projectId, mediaId)
+    sending.current = false
+    setDeleting(null)
+    if (result.ok) {
+      setProject(result.data)
+    } else if (result.error === 'notFound') {
+      void queryClient.invalidateQueries({ queryKey: projectQueryKey(projectId), exact: true })
+    } else {
+      setFailed({ mediaId, error: result.error })
+      return
+    }
+    onDeleted()
+  }
+
+  return { remove, failed, deleting }
+}

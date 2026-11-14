@@ -222,6 +222,7 @@ describe('Project with its visuals', () => {
     reactions: NO_REACTIONS,
     commentCount: 0,
     removal: null,
+    removedParts: [], // R9 : aucune partie retirée
     createdAt: '2026-10-16T10:00:00.000Z',
     updatedAt: '2026-10-16T10:00:00.000Z',
   }

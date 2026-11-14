@@ -23,6 +23,7 @@ import {
   useModerationQueue,
   useRemovedItems,
 } from '../moderation/api'
+import { SuspendSheet } from '../moderation/SuspendSheet'
 import { useMarkSeen, useNotifications, useUnreadCount } from '../notifications/api'
 import { getMe } from '../profile/api'
 import { getProject } from '../projects/api'
@@ -43,9 +44,8 @@ import { NotificationsScreen } from './NotificationsScreen'
 import { ProfileScreen } from './ProfileScreen'
 import { ProjectFormScreen } from './ProjectFormScreen'
 import { ProjectScreen } from './ProjectScreen'
-import { ReportScreen } from './ReportScreen'
+import { ReportSheet } from './ReportSheet'
 import { SettingsScreen } from './SettingsScreen'
-import { SuspendScreen } from './SuspendScreen'
 import { TagScreen } from './TagScreen'
 
 // Les comptes : la session (choisie par chaque test) et les gestes des pages de R2.
@@ -123,7 +123,7 @@ jest.mock('../moderation/api', () => ({
   useDecide: jest.fn(),
   useDecisionHistory: jest.fn(),
 }))
-// Le signalement : la lecture de la cible par un vrai React Query, comme dans ReportScreen.test.tsx.
+// Le signalement : la lecture de la cible par un vrai React Query, comme dans ReportSheet.test.tsx.
 jest.mock('../reports/api', () => {
   const { useQuery } = jest.requireActual('@tanstack/react-query')
   const getReportTarget = jest.fn()
@@ -163,6 +163,9 @@ jest.mock('expo-router', () => {
       canGoBack: () => true,
     }),
     useLocalSearchParams: jest.fn(),
+    // R9 : la feuille « Signaler » garde une précision écrite contre le retour (useLeaveGuard, qui
+    // écoute `beforeRemove`) ; ici, aucun retour n'arrive.
+    useNavigation: () => ({ addListener: () => () => {}, dispatch: jest.fn() }),
     Link: ({ href, children, ...rest }: { href: string; children: unknown }) =>
       createElement(Text, { role: 'link', href, ...rest }, children),
   }
@@ -266,12 +269,15 @@ const screens: [string, () => ReactElement, string][] = [
     () => <ProjectFormScreen id={recipesProject.id} />,
     '/page/actuelle',
   ],
+  // R9 : la page `/report` est devenue la feuille « Signaler » (ReportSheet), mêmes props.
   [
-    'ReportScreen',
-    () => <ReportScreen kind="comment" id="c0d1e2f3-0415-4a26-8b37-48596a7b8c9d" />,
+    'ReportSheet',
+    () => <ReportSheet kind="comment" id="c0d1e2f3-0415-4a26-8b37-48596a7b8c9d" />,
     '/report',
   ],
-  ['SuspendScreen', () => <SuspendScreen memberId="u1" />, '/suspend'],
+  // R9 : la page `/suspend` est devenue la fenêtre « Suspendre » (moderation/SuspendSheet), ouverte
+  // par sa route ; la même attente vaut pour elle.
+  ['SuspendSheet', () => <SuspendSheet memberId="u1" open onClose={jest.fn()} />, '/suspend'],
   ['TagScreen', () => <TagScreen slug="claude-code" />, '/page/actuelle'],
   ['BlockedMembersScreen', () => <BlockedMembersScreen />, '/blocks'],
   ['ProfileScreen', () => <ProfileScreen />, '/page/actuelle'],

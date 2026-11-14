@@ -2,8 +2,9 @@
 // Le pseudo actuel d'un membre est sa ligne sans date de fin (released_at null) ; son ancien pseudo,
 // réservé 30 jours après un changement, est sa ligne avec une date de fin.
 import { sql } from 'drizzle-orm'
-import { index, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { moderationDecision } from './moderation'
 
 export const memberHandle = pgTable(
   'member_handle',
@@ -24,6 +25,13 @@ export const memberHandle = pgTable(
     // null : le pseudo actuel. Une date : le moment du changement ; il reste réservé à son ancien
     // propriétaire jusqu'à cette date + 30 jours, puis il est libre.
     releasedAt: timestamp('released_at'),
+    // R9 (relecture de sécurité P3) : le retrait qui a ôté ce pseudo à son propriétaire. Un pseudo
+    // retiré reste réservé 30 jours, refusé à tous, son ancien propriétaire compris (409
+    // `handle_taken`), et n'est pas son « ancien pseudo » (`formerHandle`). 'set null' : la purge
+    // d'une décision, un an après, ne touche pas au pseudo, libre depuis longtemps.
+    heldByRemoval: uuid('held_by_removal').references(() => moderationDecision.id, {
+      onDelete: 'set null',
+    }),
   },
   (t) => [
     // Un index « unique partiel » : il ne range que les lignes qui vérifient la condition (ici, les

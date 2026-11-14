@@ -246,6 +246,8 @@ describe('launching a call', () => {
       photo: null,
       createdAt: at,
       removal: null,
+      // R9 : aucune partie retirée.
+      removedParts: [],
     })
     expect(await calls(project.id, jean)).toEqual({ items: [call], nextCursor: null })
     expect(await calls(project.id, ines)).toEqual({ items: [call], nextCursor: null })

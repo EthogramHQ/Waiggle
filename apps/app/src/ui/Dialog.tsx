@@ -37,13 +37,31 @@
 // fenêtre entre donc dans la pile des couches ouvertes (`modalLayers`, que la feuille lit pour lui
 // laisser ce focus), et, son ouverture finie (`onShow`), repose le focus sur `initialFocusRef` s'il
 // n'est plus chez elle.
-import { borders, layout, space } from '@ruche/brand'
-import { type ReactNode, type RefObject, useEffect, useId, useRef } from 'react'
-import { Modal, Platform, Pressable, ScrollView, View } from 'react-native'
+//
+// Correction après la relecture de design de R9 (la fenêtre « Bloquer », longue) : ses boutons
+// restent en vue. Sur un écran assez haut (`PINNED_MIN_HEIGHT`), la fenêtre ne dépasse jamais de
+// l'écran : son haut (image, titre, citation, texte) défile **dans** la fenêtre, avec le fondu des
+// feuilles quand il reste du texte plus bas, et le message d'échec et les boutons restent collés en
+// bas, comme le pied d'une feuille. « Bloquer » et « Annuler » étaient sous le pli à 390 × 844 et à
+// 1440 × 900. Sur un écran bas (téléphone en paysage), toute la couche défile, comme avant : un pied
+// collé y mangerait presque toute la hauteur.
+import { layout, space } from '@ruche/brand'
+import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react'
+import {
+  type LayoutChangeEvent,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from './focus'
 import { openModalLayer, sameLayer } from './modalLayers'
 import { Notice } from './Notice'
+import { QuotedContent } from './QuotedContent'
 import { Surface } from './Surface'
+import { SheetFade, useBelowFold } from './sheetFade'
 import { Text } from './Text'
 import { useTapsAllowed } from './tapGuard'
 import { useTheme } from './theme/ThemeProvider'
@@ -63,7 +81,12 @@ type Props = {
    * Le texte sous le titre. Une liste : un paragraphe par élément, alignés à gauche (au-delà d'une
    * phrase ou deux, un texte centré se lit mal : chaque ligne commence ailleurs).
    */
-  message: string | string[]
+  message?: string | string[]
+  /**
+   * R9 : un texte plus riche que des paragraphes (un résumé en gras, des puces : `KeyPoints`), sous
+   * le message ou à sa place. Il fait partie de ce qui décrit la fenêtre (web), comme le message.
+   */
+  body?: ReactNode
   /**
    * Les boutons ignorent les tapes juste après l'ouverture (TAP_GUARD_MS) : pour une fenêtre qui
    * s'ouvre là où l'on vient de toucher (un menu, un bouton à la même hauteur que sa confirmation).
@@ -137,8 +160,21 @@ const webScrim = (onPress: (() => void) | undefined): object => ({
   onClick: onPress,
 })
 
-/** Le nombre de lignes du texte rappelé : de quoi le reconnaître, sans pousser les boutons loin. */
-const QUOTE_LINES = 3
+/**
+ * La hauteur d'écran (points) à partir de laquelle les boutons peuvent rester collés en bas de la
+ * fenêtre. En dessous (un téléphone en paysage : 390 points), deux boutons et leur marge
+ * prendraient presque tout : le texte n'aurait plus qu'une fente pour défiler.
+ *
+ * Cette hauteur ne suffit pas : à 320 × 568 avec le texte à 200 %, les boutons font à eux seuls
+ * plus de la moitié de l'écran et la zone du texte tombait à 198 points (contre-visite de R9). Les
+ * boutons ne sont donc collés que si leur hauteur **mesurée** laisse à la zone du texte au moins la
+ * moitié de l'écran (`PINNED_TEXT_SHARE`) ; sinon toute la couche défile, titre et boutons ensemble.
+ */
+const PINNED_MIN_HEIGHT = 480
+/** La part de l'écran que la zone du texte doit garder pour que les boutons soient collés. */
+const PINNED_TEXT_SHARE = 0.5
+/** La marge autour de la fenêtre (celle de la couche qui défile). */
+const DIALOG_MARGIN = space.xl
 
 /** Le peu d'une touche du navigateur que la fenêtre lit (les types de React Native l'ignorent). */
 type BrowserKey = { key?: string; preventDefault?: () => void }
@@ -195,7 +231,8 @@ export { TAP_GUARD_MS } from './tapGuard'
 export function Dialog({
   visible,
   title,
-  message,
+  message = [],
+  body,
   guardTaps = false,
   illustration,
   quote,
@@ -207,6 +244,27 @@ export function Dialog({
   initialFocusRef,
 }: Props) {
   const { colors } = useTheme()
+  // La hauteur de l'écran : assez haut, et des boutons assez courts, ils restent collés en bas de
+  // la fenêtre, qui ne dépasse jamais (voir `PINNED_MIN_HEIGHT`). `buttonsHeight` : la hauteur
+  // mesurée du bloc des boutons (`null` : pas encore mesuré, on colle comme avant). Elle suit la
+  // taille du texte ; elle ne dépend ni du message d'échec (hors du bloc), ni du mode (la largeur
+  // des boutons est la même collés ou non) : aucune boucle.
+  const screenHeight = useWindowDimensions().height
+  const [buttonsHeight, setButtonsHeight] = useState<number | null>(null)
+  // Ce qui reste à la zone du texte : l'écran, moins la marge autour de la fenêtre, le bas de son
+  // remplissage, l'écart au-dessus des boutons, et les boutons eux-mêmes.
+  const textRoom =
+    buttonsHeight === null
+      ? screenHeight
+      : screenHeight - 2 * DIALOG_MARGIN - space.xxl - space.lg - buttonsHeight
+  const pinned = screenHeight >= PINNED_MIN_HEIGHT && textRoom >= screenHeight * PINNED_TEXT_SHARE
+  const measureButtons = (event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout
+    // Une mesure à 0 (vue pas encore dessinée) ne dit rien.
+    if (height > 0) setButtonsHeight(height)
+  }
+  // Le fondu du bas de la zone qui défile, tant qu'il reste du texte plus bas (celui des feuilles).
+  const fold = useBelowFold()
   const tapsAllowed = useTapsAllowed(visible, guardTaps)
   const escapePressedHere = useEscapePressedHere(visible)
   // Les identifiants du titre et du message, uniques dans la page : la boîte de dialogue s'y réfère
@@ -239,6 +297,19 @@ export function Dialog({
   const paragraphs = typeof message === 'string' ? [message] : message
   // Une phrase ou deux, centrées sous le titre ; plusieurs paragraphes, à gauche.
   const align = paragraphs.length > 1 ? 'left' : 'center'
+  // Le haut de la fenêtre, qui défile quand les boutons sont collés.
+  const top = (
+    <DialogTop
+      illustration={illustration}
+      title={title}
+      titleId={titleId}
+      quote={quote}
+      messageId={messageId}
+      paragraphs={paragraphs}
+      align={align}
+      body={body}
+    />
+  )
 
   // Le Modal appelle onRequestClose au retour d'Android, et sur le web quand Échap est relâchée.
   // Pendant l'action, rien ne ferme. Sur le web, une Échap enfoncée ailleurs ne ferme pas non plus.
@@ -306,51 +377,56 @@ export function Dialog({
           <View
             ref={boxRef}
             accessibilityViewIsModal // les lecteurs d'écran restent dans la fenêtre
-            style={{ width: '100%', maxWidth: layout.formWidth - 120 }}
+            style={{
+              width: '100%',
+              maxWidth: layout.formWidth - 120,
+              // Boutons collés : la fenêtre tient dans l'écran, marges comprises ; son haut défile.
+              ...(pinned ? { maxHeight: screenHeight - 2 * DIALOG_MARGIN } : null),
+            }}
           >
-            <Surface variant="sheet" radius="sheet" padding="xxl" gap="lg" centered>
-              {illustration ? <View style={{ alignItems: 'center' }}>{illustration}</View> : null}
-              {/* Niveau 2 : la fenêtre s'ouvre par-dessus une page qui a déjà son titre. */}
-              <Text variant="heading" align="center" heading={2} nativeID={titleId}>
-                {title}
-              </Text>
-              {quote ? (
-                // Le contenu visé, souligné d'un trait de miel à gauche comme une citation (la
-                // carte de la modération, une note). Aligné à gauche : c'est un texte qu'on lit.
-                <View
-                  style={{
-                    gap: space.xxs,
-                    borderLeftWidth: borders.quote,
-                    borderLeftColor: colors.honey,
-                    paddingLeft: space.md,
-                  }}
-                >
-                  <Text variant="caption" weight={600} tone="muted">
-                    {quote.label}
-                  </Text>
-                  <Text numberOfLines={QUOTE_LINES} breakAnywhere>
-                    {quote.text}
-                  </Text>
+            <Surface
+              variant="sheet"
+              radius="sheet"
+              padding="xxl"
+              gap="lg"
+              centered
+              {...(pinned ? { fit: 'shrink' as const } : null)}
+            >
+              {pinned ? (
+                // minHeight 0 : la zone peut être moins haute que son contenu, qui défile alors. La
+                // zone déborde dans la marge de la fenêtre (marges négatives, rendues en dedans) :
+                // l'anneau de focus d'un lien du texte n'est pas rogné au bord, et le texte défile
+                // jusqu'au bord haut de la fenêtre.
+                <View style={{ flexShrink: 1, minHeight: 0 }}>
+                  <ScrollView
+                    style={{ flexShrink: 1, marginHorizontal: -space.xxl, marginTop: -space.xxl }}
+                    contentContainerStyle={{
+                      paddingHorizontal: space.xxl,
+                      paddingTop: space.xxl,
+                      gap: space.lg,
+                    }}
+                    scrollEventThrottle={16}
+                    onScroll={fold.onScroll}
+                    onLayout={fold.onLayout}
+                    onContentSizeChange={fold.onContentSizeChange}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {top}
+                  </ScrollView>
+                  {fold.more ? <SheetFade /> : null}
                 </View>
-              ) : null}
-              {/* Les paragraphes plus serrés entre eux qu'avec le titre et les boutons. Leur bloc
-                  porte l'identifiant qui décrit la boîte de dialogue (web). */}
-              <View nativeID={messageId} style={{ gap: space.md }}>
-                {paragraphs.map((paragraph, index) => (
-                  // Le rang comme clé : deux paragraphes peuvent dire la même chose, et leur liste
-                  // ne change pas pendant que la fenêtre est ouverte.
-                  // biome-ignore lint/suspicious/noArrayIndexKey: liste fixe, voir ci-dessus.
-                  <Text key={index} tone="secondary" align={align}>
-                    {paragraph}
-                  </Text>
-                ))}
-              </View>
+              ) : (
+                top
+              )}
               {/* L'échec de l'action, juste au-dessus des boutons : on le lit, puis on réessaie ou
                   on annule sans chercher. Une alerte (`Notice`), lue dès qu'elle paraît. */}
               {error ? <Notice message={error} /> : null}
               {/* pointerEvents « none » pendant la garde : une tape traverse les boutons et tombe
                   sur la fenêtre elle-même, qui n'en fait rien (sur le web comme sur téléphone). */}
-              <View style={{ gap: space.md, pointerEvents: tapsAllowed ? 'auto' : 'none' }}>
+              <View
+                onLayout={measureButtons}
+                style={{ gap: space.md, pointerEvents: tapsAllowed ? 'auto' : 'none' }}
+              >
                 {children}
               </View>
               {initialFocusRef ? <FocusOnShow target={initialFocusRef} /> : null}
@@ -359,5 +435,51 @@ export function Dialog({
         </ScrollView>
       </View>
     </Modal>
+  )
+}
+
+/** Le haut de la fenêtre : son image, son titre, la citation, son texte. */
+function DialogTop({
+  illustration,
+  title,
+  titleId,
+  quote,
+  messageId,
+  paragraphs,
+  align,
+  body,
+}: {
+  illustration: ReactNode
+  title: string
+  titleId: string
+  quote: DialogQuote | undefined
+  messageId: string
+  paragraphs: string[]
+  align: 'left' | 'center'
+  body: ReactNode
+}) {
+  return (
+    <>
+      {illustration ? <View style={{ alignItems: 'center' }}>{illustration}</View> : null}
+      {/* Niveau 2 : la fenêtre s'ouvre par-dessus une page qui a déjà son titre. */}
+      <Text variant="heading" align="center" heading={2} nativeID={titleId}>
+        {title}
+      </Text>
+      {/* Le contenu visé, en citation (voir QuotedContent), aligné à gauche : c'est un texte qu'on lit. */}
+      {quote ? <QuotedContent label={quote.label} text={quote.text} /> : null}
+      {/* Les paragraphes plus serrés entre eux qu'avec le titre et les boutons. Leur bloc
+                  porte l'identifiant qui décrit la boîte de dialogue (web). */}
+      <View nativeID={messageId} style={{ gap: space.md }}>
+        {paragraphs.map((paragraph, index) => (
+          // Le rang comme clé : deux paragraphes peuvent dire la même chose, et leur liste
+          // ne change pas pendant que la fenêtre est ouverte.
+          // biome-ignore lint/suspicious/noArrayIndexKey: liste fixe, voir ci-dessus.
+          <Text key={index} tone="secondary" align={align}>
+            {paragraph}
+          </Text>
+        ))}
+        {body}
+      </View>
+    </>
   )
 }

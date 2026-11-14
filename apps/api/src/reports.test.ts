@@ -46,6 +46,17 @@ import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { jpegImage, visualForm } from './testing/images'
 
+/**
+ * R9 : les champs de l'aperçu (rappel, parties, déjà signalé, reste du jour) dont les valeurs exactes
+ * sont vérifiées dans reports.parts.test.ts ; ici, leur seule présence garde la comparaison stricte.
+ */
+const R9_PREVIEW_FIELDS = {
+  head: expect.any(Object),
+  parts: expect.any(Array),
+  reportedByMe: false,
+  remainingToday: expect.any(Number),
+}
+
 let ctx: TestContext
 let act: ReturnType<typeof activity>
 let lea: string // cookies de session
@@ -700,6 +711,7 @@ describe('the preview of the target', () => {
       text: expect.stringContaining('Météo'),
       projectId: meteo.id,
       author, // tranche 7b : l’autrice de la cible, pour « Bloquer aussi @x »
+      ...R9_PREVIEW_FIELDS,
     })
     expect((await readPreview(max, 'project', meteo.id)).text).toContain(
       'La pluie de demain, quartier par quartier.',
@@ -711,6 +723,7 @@ describe('the preview of the target', () => {
       text: expect.any(String),
       projectId: meteo.id,
       author,
+      ...R9_PREVIEW_FIELDS,
     })
     for (const text of ['Un titre à lire', 'Une ligne à lire', 'Une autre ligne à lire']) {
       expect(updatePreview.text).toContain(text)
@@ -720,6 +733,7 @@ describe('the preview of the target', () => {
       text: 'Un commentaire à lire',
       projectId: meteo.id,
       author,
+      ...R9_PREVIEW_FIELDS,
     })
     const member = await readPreview(max, 'member', leaId)
     expect(member).toMatchObject({ target: { kind: 'member', id: leaId }, projectId: null, author })
@@ -1523,6 +1537,7 @@ describe('reporting in the testers corner', () => {
         text: 'Essayez le mode nuit.',
         projectId: corner.id,
         author: { id: leaId, name: 'Léa', handle, isBlocked: false },
+        ...R9_PREVIEW_FIELDS,
       })
     })
   })
@@ -1621,6 +1636,7 @@ describe('reporting in the testers corner', () => {
         text: 'Merci Max, je regarde ça ce soir.',
         projectId: corner.id,
         author: { id: leaId, name: 'Léa', handle, isBlocked: false },
+        ...R9_PREVIEW_FIELDS,
       })
 
       later()

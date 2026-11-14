@@ -11,7 +11,8 @@
 // haut ou le bas sur iOS, les flèches sur le web). `onIndexChange` prévient la page de la photo
 // montrée : elle en donne la couleur à la lumière d'ambiance (`Screen thumbhash`). Depuis R6a, une
 // photo décrite par son auteur est lue par sa description, avec sa place (« Le ciel de ce soir,
-// photo 1 sur 3 ») ; « 1 sur 3 » reste affiché à côté pour l'œil.
+// photo 1 sur 3 ») ; « 1 sur 3 » reste affiché à côté pour l'œil. Depuis R9, une photo peut porter
+// une marque (`mark`, « Retiré par la modération ») : écrite au milieu de la photo, dite après sa place.
 //
 // `overlay` : une couche posée sur la galerie, pour les boutons de verre (`CoverControls`) et ce qui
 // se pose à cheval sur son bas (`CoverStraddle`, la capsule sur ordinateur), tous deux dans
@@ -39,6 +40,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CoverDecor } from './coverTransition'
 import { focusWithoutScroll } from './focus'
+import { Icon } from './Icon'
 import { IconButton } from './IconButton'
 import type { ImageSource } from './image'
 import {
@@ -68,6 +70,12 @@ export type GalleryPhoto = {
    * texte à remplir (sec-M3). Absente, null ou vide : la photo n'est pas décrite.
    */
   description?: string | null
+  /**
+   * R9 : une marque écrite sur la photo, au milieu, dans une pastille de verre avec un bouclier
+   * (« Retiré par la modération », que seul l'auteur voit encore). Le lecteur d'écran l'entend
+   * après la place de la photo. Absente ou null : la photo n'est pas marquée.
+   */
+  mark?: string | null
 }
 
 type Props = {
@@ -113,6 +121,9 @@ type KeyEvent = { key: string; preventDefault: () => void }
 /** La description d'une photo, si elle en a une (des blancs seuls ne décrivent rien). */
 const describedBy = (photo: GalleryPhoto | undefined): string | null =>
   photo?.description?.trim() ? photo.description : null
+
+/** La taille du bouclier de la marque d'une photo (R9) : celle d'une ligne de légende. */
+const MARK_ICON = 16
 
 export function PhotoGallery({
   photos,
@@ -261,6 +272,10 @@ export function PhotoGallery({
     [edge, insets.top],
   )
 
+  /** Le nom d'une photo, suivi de sa marque si elle en a une (« Photo 2 sur 3. Retiré par… »). */
+  const withMark = (name: string, photo: GalleryPhoto | undefined) =>
+    photo?.mark ? t(($) => $.gallery.marked, { photo: name, mark: photo.mark }) : name
+
   /**
    * Ce que le lecteur d'écran dit de la photo de rang `rank` : sa description et sa place
    * (« Le ciel de ce soir, photo 1 sur 3 », ui-M2), ou « Photo 2 sur 3 » sans description. La
@@ -270,16 +285,18 @@ export function PhotoGallery({
    */
   const spokenPhoto = (rank: number) => {
     const description = describedBy(photos[rank])
-    return description
+    const photo = description
       ? t(($) => $.gallery.photoDescribed, { description, index: rank + 1, count })
       : t(($) => $.gallery.photoOf, { index: rank + 1, count })
+    return withMark(photo, photos[rank])
   }
 
   const label = named ?? t(($) => $.gallery.label)
   const valueText = spokenPhoto(index)
   // Une seule photo décrite : son nom est sa description (le texte de remplacement d'une image),
-  // sans « photo 1 sur 1 » ; pas décrite, « Photos du projet » comme avant.
+  // sans « photo 1 sur 1 » ; pas décrite, « Photos du projet » comme avant. Marquée, la marque suit.
   const single = count === 1 ? describedBy(photos[0]) : null
+  const singleName = count === 1 ? withMark(single ?? label, photos[0]) : label
   // Ce que le lecteur d'écran entend : à plusieurs photos, un élément réglable et sa valeur ; à une
   // seule, une image nommée ; sans photo (la lumière miel), un décor, que la page titre déjà.
   const reader = several
@@ -308,7 +325,7 @@ export function PhotoGallery({
       ? {
           accessible: true,
           accessibilityRole: 'image' as const,
-          accessibilityLabel: single ?? label,
+          accessibilityLabel: singleName,
         }
       : {
           accessibilityElementsHidden: true,
@@ -339,6 +356,46 @@ export function PhotoGallery({
               label: single ? '' : spokenPhoto(rank),
             }}
           />
+          {photo.mark ? (
+            // La marque, au milieu de la part visible de la photo (loin des boutons de verre posés
+            // dans les coins, des points et de « 1 sur 3 ») ; elle glisse avec sa photo. Le nom de
+            // la galerie la dit déjà au lecteur d'écran.
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: edge ? insets.top : 0,
+                bottom,
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: space.lg,
+              }}
+            >
+              <Surface variant="glass" radius="pill" padding="xs" fill={false}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: space.xs,
+                    paddingHorizontal: space.sm,
+                    maxWidth: '100%',
+                  }}
+                >
+                  {/* Une vue autour du dessin : sur le web, un dessin seul rétrécit près d'un texte. */}
+                  <View style={{ flexShrink: 0 }}>
+                    <Icon name="shield-warning" size={MARK_ICON} tone="danger" />
+                  </View>
+                  <View style={{ flexShrink: 1, minWidth: 0 }}>
+                    <Text variant="caption" weight={600}>
+                      {photo.mark}
+                    </Text>
+                  </View>
+                </View>
+              </Surface>
+            </View>
+          ) : null}
         </View>
       ))
     )

@@ -45,6 +45,8 @@ export const recipesProject: Project = {
   reactions: noReactions,
   commentCount: 0,
   removal: null,
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
   createdAt: '2026-10-12T08:00:00.000Z',
   updatedAt: '2026-10-12T08:00:00.000Z',
 }
@@ -132,6 +134,8 @@ export const leaPage: Member = {
   handle: 'lea',
   avatarUrl: null,
   bio: 'Je bricole des agents pour la maison.',
+  // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
+  removedParts: [],
   favoriteTools: [
     { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
     { label: 'Python', slug: 'python', inCatalogue: true },

@@ -9,10 +9,15 @@
 //
 // Le retrait est noté sur le contenu lui-même (removed_at et removal_id) : ce sont les lectures
 // (projects/visibility.ts et les fichiers qui s'en servent) qui l'excluent pour les autres.
-import type {
-  ModerationDecision,
-  ModerationDecisionInput,
-  StoredReportTarget,
+//
+// R9 (7d) : retirer, classer et rétablir visent aussi UNE partie (`part`), avec les mêmes gardes
+// (verrous, 50 par jour, mot de passe, son propre contenu). Le travail sur la partie elle-même est
+// dans moderation/parts.ts ; ici, l'ordre des refus et les signalements que la décision clôt.
+import {
+  isRemovablePart,
+  type ModerationDecision,
+  type ModerationDecisionInput,
+  type StoredReportTarget,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
@@ -22,6 +27,13 @@ import {
   removalNeedsPassword,
   type Tx,
 } from '../moderation/guard'
+import {
+  hidePart,
+  PartAlreadyDecided,
+  partMediaOf,
+  reportsOfPart,
+  restorePart,
+} from '../moderation/parts'
 import { SuspensionChanged, type SuspensionError, suspendOrLift } from '../moderation/suspend'
 import { isActiveAdmin } from './admin'
 import { loadDecidable } from './target'
@@ -33,6 +45,10 @@ export type DecideError =
   | 'profile'
   | 'already_decided'
   | 'password_required'
+  // R9 : une partie qui ne se retire qu'avec tout le contenu (422), ou qu'aucun signalement ouvert
+  // ne vise (409).
+  | 'part_whole_only'
+  | 'part_not_reported'
   | SuspensionError
 
 export type DecideResult =
@@ -177,15 +193,38 @@ export const decide = async (
     }
   }
   const { target } = input
-  // Un profil n'accepte que « classer » (il n'y a rien à retirer : une photo ou un pseudo illicite
-  // se traite par script, docs/ops/moderation.md).
-  if (target.kind === 'member' && input.action !== 'dismiss') return { ok: false, error: 'profile' }
+  // R9 : la partie visée (« La 2e photo », la bio…) ; absente, le contenu entier.
+  const part = input.part
+  // Un profil entier ne se retire ni ne se rétablit (il se suspend) : seules ses parties.
+  if (target.kind === 'member' && input.action !== 'dismiss' && !part) {
+    return { ok: false, error: 'profile' }
+  }
+  // Le titre, le pitch, la catégorie, le texte d'une mise à jour : on retire tout le contenu
+  // (REMOVABLE_PARTS du contrat). Refusé avant toute lecture en base.
+  if (input.action === 'remove' && part && !isRemovablePart(target.kind, part.field)) {
+    return { ok: false, error: 'part_whole_only' }
+  }
 
   const r = schema.contentReport
   const openOfTarget = and(
     eq(r.targetKind, target.kind),
     eq(r.targetId, target.id),
     eq(r.status, 'open'),
+  )
+  // Les signalements qu'elle concerne : ceux de la partie, ou pour le contenu entier, tous ceux de
+  // la cible (un retrait clôt aussi ceux des parties) ou seulement les siens (un classement entier
+  // laisse ouverts ceux des parties). Toujours par l'index content_report_target_idx.
+  const ofPart = part ? reportsOfPart(part) : null
+  const required = and(openOfTarget, ofPart ? ofPart.exact : undefined)
+  const toClose = and(
+    openOfTarget,
+    ofPart
+      ? input.action === 'remove'
+        ? ofPart.closedByRemoval
+        : ofPart.exact
+      : input.action === 'remove'
+        ? undefined
+        : isNull(r.partField),
   )
   try {
     return await db.transaction(async (tx): Promise<DecideResult> => {
@@ -209,14 +248,24 @@ export const decide = async (
         return { ok: false, error: 'own_content' }
       }
 
+      // R9 : la photo d'une partie doit appartenir à la cible ; sinon le 404 d'une cible inconnue,
+      // mot pour mot (relecture de sécurité P4).
+      const media = part ? await partMediaOf(tx, target, part) : null
+      if (part && !media) return { ok: false, error: 'not_found' }
+
       // Une décision à la fois (plan 7c) : retirer et classer répondent à des signalements
       // ouverts ; sans eux, une autre décision vient de les clore. Jamais un contenu retiré avec
       // des signalements classés. Rétablir exige un contenu retiré. Index content_report_target_idx.
+      // R9 : retirer une partie exige un signalement ouvert de CETTE partie (P4) ; celui du contenu
+      // entier ou d'une autre partie ne suffit pas (409 part_not_reported).
       if (input.action === 'restore') {
-        if (!found.removed) return { ok: false, error: 'already_decided' }
+        if (!part && !found.removed) return { ok: false, error: 'already_decided' }
       } else {
-        const [open] = await tx.select({ id: r.id }).from(r).where(openOfTarget).limit(1)
-        if (!open) return { ok: false, error: 'already_decided' }
+        const [open] = await tx.select({ id: r.id }).from(r).where(required).limit(1)
+        if (!open) {
+          const error = part && input.action === 'remove' ? 'part_not_reported' : 'already_decided'
+          return { ok: false, error }
+        }
       }
 
       // Au-delà de 10 retraits dans l'heure, le mot de passe (compté sous le verrou de
@@ -240,14 +289,43 @@ export const decide = async (
         explanation: input.action === 'remove' ? input.explanation : null,
         adminId,
         targetMemberId: found.authorId,
+        partField: part?.field ?? null,
+        partMediaId: part?.mediaId ?? null,
       })
-      if (input.action === 'remove' || input.action === 'restore') {
+      if (part && media && found.authorId !== null) {
+        // R9 : seule la partie (moderation/parts.ts) ; le contenu reste affiché.
+        if (input.action === 'remove') {
+          const replaced = await hidePart(tx, {
+            target,
+            part,
+            media,
+            authorId: found.authorId,
+            removalId: decision.id,
+            now,
+          })
+          // Un nom ou un pseudo remplacé : l'ancien est gardé avec la décision, pour le rétablir.
+          if (replaced) {
+            await tx
+              .update(schema.moderationDecision)
+              .set(replaced)
+              .where(eq(schema.moderationDecision.id, decision.id))
+          }
+        } else if (input.action === 'restore') {
+          const restored = await restorePart(tx, target, part, media, {
+            now,
+            restoreId: decision.id,
+          })
+          if (!restored) throw new AlreadyDecided()
+        }
+      } else if (part) {
+        // Un contenu sans auteur (compte supprimé) : rien à retirer ni à rendre.
+        if (input.action !== 'dismiss') throw new AlreadyDecided()
+      } else if (input.action === 'remove' || input.action === 'restore') {
         const removal = input.action === 'remove' ? { at: now, id: decision.id } : null
         if ((await mark(tx, target, removal)) === 0) throw new AlreadyDecided()
       }
       if (input.action !== 'restore') {
-        // Retirer ou classer clôt tous les signalements ouverts de la cible (index
-        // content_report_target_idx).
+        // Retirer ou classer clôt les signalements ouverts qu'elle concerne (toClose, plus haut).
         await tx
           .update(r)
           .set({
@@ -255,7 +333,7 @@ export const decide = async (
             decidedAt: now,
             decisionId: decision.id,
           })
-          .where(openOfTarget)
+          .where(toClose)
       }
       return {
         ok: true,
@@ -263,7 +341,11 @@ export const decide = async (
       }
     })
   } catch (error) {
-    if (error instanceof AlreadyDecided || isDecisionConflict(error)) {
+    if (
+      error instanceof AlreadyDecided ||
+      error instanceof PartAlreadyDecided ||
+      isDecisionConflict(error)
+    ) {
       return { ok: false, error: 'already_decided' }
     }
     throw error

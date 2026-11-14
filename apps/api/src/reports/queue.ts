@@ -15,23 +15,38 @@ import {
   RemovalGround,
   type RemovedItem,
   type RemovedPage,
+  ReportPartField,
   ReportReason,
   type ReportSnapshot,
   ReportSnapshotEntry,
   type SnapshotImage,
   StoredReportTarget,
+  Thumbhash,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+  type SQLWrapper,
+  sql,
+} from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { isoDate } from '../jobs/shared'
 import { utc } from '../notifications/load'
 import { mediaUrl } from '../profile/me'
+import { mediaOnCoversSql } from '../projects/media-visibility'
 import { activeSuspensionSql } from '../suspension/load'
 import { readLines } from '../updates/load'
 import { blockedByAdmin } from './decide'
+import { photoRankSql } from './part-rank'
 import { targetUuid, updateText } from './target'
 
 const r = schema.contentReport
@@ -46,7 +61,8 @@ const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 /**
  * Les signalements ouverts dont la cible n'existe plus (projet, mise à jour ou commentaire supprimé
  * par son auteur, appel ou message du coin des testeurs effacé, compte supprimé, ancienne note du
- * Journal) passent à « void », datés de `now` : la purge les efface 30 jours
+ * Journal, ou photo supprimée quand le signalement ne visait qu'elle) passent à « void », datés de
+ * `now` : la purge les efface 30 jours
  * plus tard. La personne qui a signalé n'est pas prévenue (règle 29).
  *
  * « not exists (select 1 …) » est vrai quand la sous-requête ne trouve rien. Chaque sous-requête
@@ -68,16 +84,29 @@ export const voidReportsOfGoneTargets = async (db: Database, now: Date) => {
     .where(
       and(
         eq(r.status, 'open'),
-        sql`case content_report.target_kind
-          when 'project' then not exists (select 1 from project p where p.id = ${id})
-          when 'update' then not exists (select 1 from project_update u where u.id = ${id})
-          when 'note' then true
-          when 'comment' then not exists (
-            select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
-          when 'call' then not exists (select 1 from tester_call tc where tc.id = ${id})
-          when 'message' then not exists (select 1 from tester_message tm where tm.id = ${id})
-          else not exists (select 1 from "user" u where u.id = content_report.target_id)
-        end`,
+        or(
+          sql`case content_report.target_kind
+            when 'project' then not exists (select 1 from project p where p.id = ${id})
+            when 'update' then not exists (select 1 from project_update u where u.id = ${id})
+            when 'note' then true
+            when 'comment' then not exists (
+              select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
+            when 'call' then not exists (select 1 from tester_call tc where tc.id = ${id})
+            when 'message' then not exists (select 1 from tester_message tm where tm.id = ${id})
+            else not exists (select 1 from "user" u where u.id = content_report.target_id)
+          end`,
+          // R9 (relecture juridique, jur-B1) : une photo supprimée par son auteur (sa photo, sa
+          // couverture ou sa description) ne laisse aucune ligne dans project_media ni dans
+          // tester_media ; sans cette condition, le signalement de cette seule partie resterait
+          // ouvert pour toujours (retirer et classer répondent 404), avec le motif, la précision et
+          // la copie. Les deux tables se cherchent par leur clé primaire. Un retrait de la
+          // modération, lui, garde la ligne (elle est seulement marquée) : il n'entre pas ici.
+          sql`(content_report.part_media_id is not null
+            and not exists (
+              select 1 from project_media pm where pm.id = content_report.part_media_id)
+            and not exists (
+              select 1 from tester_media tmd where tmd.id = content_report.part_media_id))`,
+        ),
       ),
     )
     .returning({ id: r.id })
@@ -102,15 +131,37 @@ export const voidReportsOfDepartedAuthors = async (db: Database, now: Date) => {
 
 // ─── La file ─────────────────────────────────────────────────────────────────────────────────────
 
-/** Une cible de la file : ses signalements ouverts, regroupés. */
+/**
+ * Un élément de la file : les signalements ouverts d'une cible, regroupés. R9 : d'une cible ET d'une
+ * partie (le projet entier et sa 2e photo font deux éléments) ; `part_field` null pour le contenu
+ * entier. `part_position` : le rang de la photo visée (part-rank.ts).
+ */
 const Group = z.object({
   target_kind: z.string(),
   target_id: z.string(),
+  part_field: z.string().nullable(),
+  part_media_id: z.string().nullable(),
+  part_position: z.number().int().positive().nullable(),
   first_at: isoDate.pipe(z.date()),
   last_at: isoDate.pipe(z.date()),
   first_id: z.string(),
   count: z.coerce.number(),
 })
+type Group = z.infer<typeof Group>
+
+/** La clé d'un élément : sa cible, puis sa partie (vide pour le contenu entier). */
+const itemKey = (
+  target: StoredReportTarget,
+  partField: string | null,
+  partMediaId: string | null,
+) => `${keyOf(target)}|${partField ?? ''}|${partMediaId ?? ''}`
+
+/** La partie d'un élément, validée par le contrat ; null pour le contenu entier. */
+const partOut = (field: string | null, mediaId: string | null, position: number | null) => {
+  const parsed = ReportPartField.safeParse(field)
+  if (!parsed.success) return null
+  return { field: parsed.data, mediaId, position: mediaId === null ? null : position }
+}
 
 /**
  * Une page de la file, du signalement le plus ancien au plus récent : les cibles rangées par leur
@@ -142,16 +193,21 @@ export const loadQueuePage = async (
     ? sql`where (g.first_at, g.first_id) > (${utc(cursor.at)}, ${cursor.id}::uuid)`
     : sql``
   // « array_agg(id order by created_at, id) » met les identifiants des signalements dans l'ordre ;
-  // [1] prend le premier, celui du plus ancien.
+  // [1] prend le premier, celui du plus ancien. R9 : un groupe par cible et par partie ; le rang de
+  // la photo visée n'est calculé que pour les lignes de la page (après « limit »).
   const result = await db.execute(sql`
-    select g.target_kind, g.target_id, to_char(g.first_at, ${ISO}) as first_at,
+    select g.target_kind, g.target_id, g.part_field, g.part_media_id::text as part_media_id,
+      case when g.part_media_id is not null then ${photoRankSql(sql.raw('g.part_media_id'))} end
+        as part_position,
+      to_char(g.first_at, ${ISO}) as first_at,
       to_char(g.last_at, ${ISO}) as last_at, g.first_id::text as first_id, g.count
     from (
-      select target_kind, target_id, min(created_at) as first_at, max(created_at) as last_at,
+      select target_kind, target_id, part_field, part_media_id, min(created_at) as first_at,
+        max(created_at) as last_at,
         (array_agg(id order by created_at, id))[1] as first_id, count(*) as count
       from content_report
       where status = 'open'
-      group by target_kind, target_id
+      group by target_kind, target_id, part_field, part_media_id
     ) g
     ${afterCursor}
     order by g.first_at, g.first_id
@@ -171,11 +227,14 @@ export const loadQueuePage = async (
   // du plus récent au plus ancien, et `case when … = 1` ne rend la copie que pour le premier. Les
   // autres ne donnent que son empreinte (md5 de son texte : jsonb s'écrit toujours de la même
   // façon, clés rangées, espaces fixes), qui suffit pour dire si les copies diffèrent.
-  const newest = sql`row_number() over (partition by ${r.targetKind}, ${r.targetId} order by ${r.createdAt} desc, ${r.id} desc) = 1`
+  // R9 : la copie la plus récente de chaque élément, donc de chaque partie.
+  const newest = sql`row_number() over (partition by ${r.targetKind}, ${r.targetId}, ${r.partField}, ${r.partMediaId} order by ${r.createdAt} desc, ${r.id} desc) = 1`
   const reports = await db
     .select({
       targetKind: r.targetKind,
       targetId: r.targetId,
+      partField: r.partField,
+      partMediaId: r.partMediaId,
       projectId: r.projectId,
       targetAuthorId: r.targetAuthorId,
       reason: r.reason,
@@ -210,40 +269,63 @@ export const loadQueuePage = async (
   // Chaque groupe avec sa cible validée, appariés par la clé `kind:id` (tranche 7c) : une ligne
   // invalide en base (identifiant mal formé, sorte inconnue) est écartée avec un avertissement
   // sans donnée personnelle, et ne décale ni les nombres ni les dates des cartes voisines.
-  const groupsByKey = new Map<string, z.infer<typeof Group>>()
-  const targets = page.flatMap((g) => {
+  const items = page.flatMap((g) => {
     // StoredReportTarget : une cible `note` d'avant R7a se lit encore, comme une cible disparue.
     const parsed = StoredReportTarget.safeParse({ kind: g.target_kind, id: g.target_id })
     if (!parsed.success) {
       console.warn(`Moderation queue: report ${g.first_id} has an invalid target, left out`)
       return []
     }
-    groupsByKey.set(keyOf(parsed.data), g)
-    return [parsed.data]
+    return [{ target: parsed.data, group: g }]
   })
+  // Une cible a pu être signalée entière et par parties : son état ne se lit qu'une fois.
+  const targets = [...new Map(items.map(({ target }) => [keyOf(target), target])).values()]
   const states = await statesOf(db, targets)
 
-  // La copie la plus récente de chaque cible, validée entrée par entrée.
+  // La copie la plus récente de chaque élément, validée entrée par entrée ; et, pour les images
+  // encore là, toutes les copies d'une même cible ensemble (imagesStillThere cherche par cible).
   const copies = new Map<string, ReportSnapshot>()
+  const copiesOfTargets = new Map<string, ReportSnapshot>()
   for (const report of reports) {
     if (report.snapshot === null || report.snapshot === undefined) continue
-    copies.set(`${report.targetKind}:${report.targetId}`, readCopy(report.snapshot))
+    const copy = readCopy(report.snapshot)
+    const target = `${report.targetKind}:${report.targetId}`
+    copies.set(`${target}|${report.partField ?? ''}|${report.partMediaId ?? ''}`, copy)
+    copiesOfTargets.set(target, [...(copiesOfTargets.get(target) ?? []), ...copy])
   }
-  const present = await imagesStillThere(db, copies)
+  const present = await imagesStillThere(db, copiesOfTargets)
   // Règle 17 : les auteurs visés que cet administrateur a bloqués (une requête pour la page).
   const authorIds = [
     ...new Set(reports.flatMap((x) => (x.targetAuthorId ? [x.targetAuthorId] : []))),
   ]
   const blocked = await blockedByAdmin(db, adminId, authorIds)
-  // Tranche 7c : le rappel des décisions passées pour chaque membre visé (trois requêtes pour la
+  // Tranche 7c : le rappel des décisions passées pour chaque membre visé (quatre requêtes pour la
   // page).
   const records = await authorRecords(db, authorIds, new Date())
+  // R9 (ui-P1) : le projet qui porte chaque cible (une requête pour la page).
+  const contexts = await projectContexts(
+    db,
+    [...new Set(reports.flatMap((x) => (x.projectId ? [x.projectId] : [])))],
+    publicApiUrl,
+  )
 
-  const items = targets.map((target): ModerationQueueItem => {
-    const group = groupsByKey.get(keyOf(target))
-    const mine = reports.filter((x) => x.targetKind === target.kind && x.targetId === target.id)
+  const contextOf = (projectId: string | null, kind: StoredReportTarget['kind']) => {
+    const context = projectId === null ? undefined : contexts.get(projectId)
+    if (!context) return null
+    return kind === 'project' ? { ...context, image: null } : context
+  }
+
+  const toItem = (target: StoredReportTarget, group: Group): ModerationQueueItem => {
+    const mine = reports.filter(
+      (x) =>
+        x.targetKind === target.kind &&
+        x.targetId === target.id &&
+        x.partField === group.part_field &&
+        x.partMediaId === group.part_media_id,
+    )
     const first = mine[0]
-    const copy = copies.get(keyOf(target)) ?? []
+    const copy = copies.get(itemKey(target, group.part_field, group.part_media_id)) ?? []
+    const state = states.get(keyOf(target))
     // Le membre visé : l'auteur du contenu, ou le membre lui-même pour un profil ; null si son
     // compte est parti (la base a remis target_author_id à null).
     const memberId = mine.find((x) => x.targetAuthorId !== null)?.targetAuthorId ?? null
@@ -260,9 +342,20 @@ export const loadQueuePage = async (
     const reasons = [...counts.entries()]
       .sort(([a, x], [b, y]) => y - x || order.indexOf(a) - order.indexOf(b))
       .map(([reason, count]) => ({ reason, count }))
+    const projectId = first?.projectId ?? null
     return {
       target,
-      projectId: first?.projectId ?? null,
+      // R9 : la partie signalée, et le rang de sa photo ; null : le contenu entier.
+      part: partOut(group.part_field, group.part_media_id, group.part_position),
+      // R9 (ui-P1) : le projet porteur (le projet lui-même pour un projet) ; null pour un profil, ou
+      // un projet supprimé depuis.
+      // Pour un projet signalé lui-même, sans miniature : sa couverture est une image de la copie,
+      // que la file montre sans sa clé (tranche 7b, « without its key ») ; la miniature sert à
+      // situer un commentaire, une mise à jour, un appel ou un message.
+      context: contextOf(projectId, target.kind),
+      // R9 : la date de publication de la cible ; null si elle a disparu.
+      contentCreatedAt: state?.createdAt.toISOString() ?? null,
+      projectId,
       // Les textes de la copie ; ses images à part, sans leur clé : encore là, ou parties depuis.
       authorRecord: memberId === null ? null : recordOf(records, memberId, adminId, blocked),
       snapshot: copy.filter((entry) => !isImageField(entry.field)),
@@ -282,7 +375,9 @@ export const loadQueuePage = async (
         ]
       }),
       snapshotsDiffer: new Set(mine.map((x) => x.snapshotHash)).size > 1,
-      state: states.get(keyOf(target)) ?? 'gone',
+      // L'état de la cible, pour le contenu entier comme pour une de ses parties : une partie déjà
+      // retirée n'a plus de signalement ouvert (le retrait les clôt, le signalement la refuse).
+      state: state?.state ?? 'gone',
       // Son contenu ou son profil, ou celui d'un membre qu'il a bloqué (règle 17) : il n'en décide
       // pas. Que l'auteur ait bloqué l'administrateur ne compte pas (précision 7).
       concernsMe: mine.some(
@@ -296,12 +391,62 @@ export const loadQueuePage = async (
         .flatMap((x) => (x.details ? [x.details] : []))
         .reverse()
         .slice(0, MODERATION_DETAILS_SHOWN),
-      count: group?.count ?? mine.length,
-      firstReportedAt: (group?.first_at ?? new Date(0)).toISOString(),
-      lastReportedAt: (group?.last_at ?? new Date(0)).toISOString(),
+      count: group.count,
+      firstReportedAt: group.first_at.toISOString(),
+      lastReportedAt: group.last_at.toISOString(),
     }
-  })
-  return { items, nextCursor }
+  }
+  return { items: items.map(({ target, group }) => toItem(target, group)), nextCursor }
+}
+
+/**
+ * Le projet porteur de chaque cible de la page (R9, ui-P1) : son titre et sa miniature, la première
+ * photo de sa galerie dans l'ordre de l'auteur, sinon sa couverture verticale (la règle des
+ * notifications, R8). Une requête : les projets par leur clé primaire, et pour chacun, par une
+ * sous-requête « lateral » limitée à une ligne, ses photos par project_media_project_idx (project_id,
+ * slot, position). Un projet supprimé depuis n'y est pas : son contexte est null.
+ */
+const projectContexts = async (db: Database, projectIds: string[], publicApiUrl: string) => {
+  const contexts = new Map<string, NonNullable<ModerationQueueItem['context']>>()
+  if (projectIds.length === 0) return contexts
+  const result = await db.execute(sql`
+    select p.id::text as id, p.title, cover.storage_key, cover.thumbhash
+    from project p
+    left join lateral (
+      select m.storage_key, m.thumbhash from project_media m
+      where m.project_id = p.id and m.slot in ('gallery', 'portrait')
+        -- R9 : jamais une photo retirée seule par la modération (projects/media-visibility.ts) :
+        -- la miniature est la 1re photo visible.
+        and ${mediaOnCoversSql('m')}
+      order by m.slot = 'portrait', m.position, m.created_at
+      limit 1
+    ) cover on true
+    where p.id in (${inList(projectIds)})
+  `)
+  const rows = z
+    .object({
+      rows: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          storage_key: z.string().nullable(),
+          thumbhash: z.string().nullable(),
+        }),
+      ),
+    })
+    .parse(result).rows
+  for (const row of rows) {
+    const thumbhash = Thumbhash.safeParse(row.thumbhash)
+    contexts.set(row.id, {
+      projectId: row.id,
+      title: row.title,
+      image:
+        row.storage_key !== null && thumbhash.success
+          ? { url: mediaUrl(publicApiUrl, row.storage_key), thumbhash: thumbhash.data }
+          : null,
+    })
+  }
+  return contexts
 }
 
 const keyOf = (target: StoredReportTarget) => `${target.kind}:${target.id}`
@@ -314,6 +459,12 @@ type Records = {
   suspensions: Map<string, number>
   suspendedNow: ReadonlySet<string>
   admins: ReadonlySet<string>
+  // Le nom, le pseudo actuel et la date d'inscription de chaque membre (la carte du membre visé).
+  // R9 : et ses nombres de projets et de commentaires.
+  cards: Map<
+    string,
+    { name: string; handle: string; joinedAt: string; projectCount: number; commentCount: number }
+  >
 }
 
 const MemberCount = z.object({ member_id: z.string(), n: z.coerce.number() })
@@ -343,12 +494,25 @@ const inList = (ids: string[]) =>
  *    S10). Index account_suspension_user_idx ;
  * 3. lesquels sont administrateurs en fonction (clé primaire de admin_member).
  */
+/**
+ * R9 (relecture juridique P4) : un rétablissement `rs` défait le retrait `d` s'il vise la même
+ * partie : le contenu entier pour un retrait entier, le même champ pour une partie, la même image
+ * pour une photo (qu'elle ait été retirée comme couverture ou comme photo, moderation/parts.ts).
+ * Rétablir une partie ne défait donc jamais le retrait du contenu entier, ni l'inverse.
+ * « is not distinct from » : l'égalité qui tient aussi entre deux null (le contenu entier).
+ */
+const samePartSql = sql.raw(`(case when d.part_field in ('cover', 'photo')
+  then rs.part_field in ('cover', 'photo') and rs.part_media_id = d.part_media_id
+  else rs.part_field is not distinct from d.part_field
+    and rs.part_media_id is not distinct from d.part_media_id end)`)
+
 const authorRecords = async (db: Database, memberIds: string[], now: Date): Promise<Records> => {
   const records: Records = {
     removals: new Map(),
     suspensions: new Map(),
     suspendedNow: new Set(),
     admins: new Set(),
+    cards: new Map(),
   }
   if (memberIds.length === 0) return records
   const yearAgo = new Date(now.getTime() - REPORT_RETENTION_DAYS * DAY)
@@ -362,7 +526,8 @@ const authorRecords = async (db: Database, memberIds: string[], now: Date): Prom
       and not exists (
         select 1 from moderation_decision rs
         where rs.target_kind = d.target_kind and rs.target_id = d.target_id
-          and rs.action = 'restore' and rs.created_at > d.created_at)
+          and rs.action = 'restore' and rs.created_at > d.created_at
+          and ${samePartSql})
     group by d.target_member_id
   `)
   for (const row of z.object({ rows: z.array(MemberCount) }).parse(removals).rows) {
@@ -395,6 +560,38 @@ const authorRecords = async (db: Database, memberIds: string[], now: Date): Prom
     .from(a)
     .where(and(inArray(a.userId, memberIds), isNull(a.revokedAt)))
   records.admins = new Set(admins.map((row) => row.id))
+
+  // 4. sa carte : son nom et sa date d'inscription (table user), son pseudo actuel (la ligne de
+  // member_handle sans date de fin). left join : un membre sans pseudo n'est pas écarté. R9 : ses
+  // nombres de projets (tous : privés et retirés compris ; un projet supprimé n'a plus de ligne) et
+  // de commentaires non supprimés, chacun par une sous-requête « count » servie par l'index de
+  // l'auteur (project_author_created_idx, project_comment_author_idx). La colonne est écrite avec
+  // sa table (sql.raw) : la sous-requête lit d'autres tables.
+  const u = schema.user
+  const h = schema.memberHandle
+  const memberId = sql.raw('"user"."id"')
+  const cards = await db
+    .select({
+      id: u.id,
+      name: u.name,
+      joinedAt: u.createdAt,
+      handle: h.handle,
+      projectCount: sql<number>`(select count(*)::int from project p where p.author_id = ${memberId})`,
+      commentCount: sql<number>`(select count(*)::int from project_comment c
+        where c.author_id = ${memberId} and c.deleted_at is null)`,
+    })
+    .from(u)
+    .leftJoin(h, and(eq(h.userId, u.id), isNull(h.releasedAt)))
+    .where(inArray(u.id, memberIds))
+  for (const card of cards) {
+    records.cards.set(card.id, {
+      name: card.name,
+      handle: card.handle ?? '',
+      joinedAt: card.joinedAt.toISOString(),
+      projectCount: card.projectCount,
+      commentCount: card.commentCount,
+    })
+  }
   return records
 }
 
@@ -410,8 +607,14 @@ const recordOf = (
   blocked: ReadonlySet<string>,
 ): NonNullable<ModerationQueueItem['authorRecord']> => {
   const suspendedNow = records.suspendedNow.has(memberId)
+  const card = records.cards.get(memberId)
   return {
     memberId,
+    name: card?.name ?? '',
+    handle: card?.handle ?? '',
+    joinedAt: card?.joinedAt ?? new Date(0).toISOString(),
+    projectCount: card?.projectCount ?? 0,
+    commentCount: card?.commentCount ?? 0,
     removals: records.removals.get(memberId) ?? 0,
     suspensions: records.suspensions.get(memberId) ?? 0,
     suspendedNow,
@@ -510,19 +713,23 @@ const imagesStillThere = async (db: Database, copies: Map<string, ReportSnapshot
 }
 
 /**
- * L'état actuel de chaque cible : présente, retirée, ou disparue (absente de la Map). Une requête
- * par sorte, servie par la clé primaire de sa table (inArray : « id in (…) »).
+ * L'état actuel de chaque cible : présente, retirée, ou disparue (absente de la Map), et sa date de
+ * publication (R9 : `contentCreatedAt` ; l'inscription pour un profil). Une requête par sorte,
+ * servie par la clé primaire de sa table (inArray : « id in (…) »).
  */
 const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
-  const states = new Map<string, 'present' | 'removed'>()
+  const states = new Map<string, { state: 'present' | 'removed'; createdAt: Date }>()
   const idsOf = (kind: StoredReportTarget['kind']) =>
     targets.filter((t) => t.kind === kind).map((t) => t.id)
   const note = (
     kind: StoredReportTarget['kind'],
-    rows: { id: string; removedAt: Date | null }[],
+    rows: { id: string; removedAt: Date | null; createdAt: Date }[],
   ) => {
     for (const row of rows) {
-      states.set(`${kind}:${row.id}`, row.removedAt === null ? 'present' : 'removed')
+      states.set(`${kind}:${row.id}`, {
+        state: row.removedAt === null ? 'present' : 'removed',
+        createdAt: row.createdAt,
+      })
     }
   }
   const projects = idsOf('project')
@@ -530,7 +737,10 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
     const p = schema.project
     note(
       'project',
-      await db.select({ id: p.id, removedAt: p.removedAt }).from(p).where(inArray(p.id, projects)),
+      await db
+        .select({ id: p.id, removedAt: p.removedAt, createdAt: p.createdAt })
+        .from(p)
+        .where(inArray(p.id, projects)),
     )
   }
   // Une cible `note` n'a plus d'état : elle reste absente de la Map, donc « disparue ».
@@ -539,7 +749,10 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
     const u = schema.projectUpdate
     note(
       'update',
-      await db.select({ id: u.id, removedAt: u.removedAt }).from(u).where(inArray(u.id, updates)),
+      await db
+        .select({ id: u.id, removedAt: u.removedAt, createdAt: u.createdAt })
+        .from(u)
+        .where(inArray(u.id, updates)),
     )
   }
   const comments = idsOf('comment')
@@ -548,7 +761,7 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
     note(
       'comment',
       await db
-        .select({ id: c.id, removedAt: c.removedAt })
+        .select({ id: c.id, removedAt: c.removedAt, createdAt: c.createdAt })
         .from(c)
         .where(and(inArray(c.id, comments), isNull(c.deletedAt))),
     )
@@ -559,7 +772,10 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
     const tc = schema.testerCall
     note(
       'call',
-      await db.select({ id: tc.id, removedAt: tc.removedAt }).from(tc).where(inArray(tc.id, calls)),
+      await db
+        .select({ id: tc.id, removedAt: tc.removedAt, createdAt: tc.createdAt })
+        .from(tc)
+        .where(inArray(tc.id, calls)),
     )
   }
   const messages = idsOf('message')
@@ -568,7 +784,7 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
     note(
       'message',
       await db
-        .select({ id: tm.id, removedAt: tm.removedAt })
+        .select({ id: tm.id, removedAt: tm.removedAt, createdAt: tm.createdAt })
         .from(tm)
         .where(inArray(tm.id, messages)),
     )
@@ -576,12 +792,12 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
   const members = idsOf('member')
   if (members.length > 0) {
     const rows = await db
-      .select({ id: schema.user.id })
+      .select({ id: schema.user.id, createdAt: schema.user.createdAt })
       .from(schema.user)
       .where(inArray(schema.user.id, members))
     note(
       'member',
-      rows.map((row) => ({ id: row.id, removedAt: null })),
+      rows.map((row) => ({ ...row, removedAt: null })),
     )
   }
   return states
@@ -613,9 +829,32 @@ export const loadRemovedPage = async (
   const up = alias(schema.project, 'up')
   // De même pour l'auteur d'un appel : celui de son projet (sous le nom « cp »).
   const cp = alias(schema.project, 'cp')
+  // R9 : une partie retirée seule. Sa ligne de retrait en cours (content_part_removal_removal_idx),
+  // ou, pour un nom ou un pseudo (sans ligne), aucun rétablissement de ce champ depuis (« not
+  // exists », par moderation_decision_target_idx). Le membre d'un profil, par la clé primaire de user.
+  const cpr = schema.contentPartRemoval
+  const mu = alias(schema.user, 'mu')
+  const mh = alias(schema.memberHandle, 'mh')
+  const partStillRemoved = sql`(${cpr.id} is not null or (${d.targetKind} = 'member'
+    and ${d.partField} in ('name', 'handle') and not exists (
+      select 1 from moderation_decision rs
+      where rs.target_kind = 'member' and rs.target_id = ${d.targetId}
+        and rs.part_field = ${d.partField} and rs.action = 'restore'
+        and rs.created_at > ${d.createdAt})))`
+  // Le contenu d'une décision : retiré par elle (contenu entier), ou qui porte encore la partie
+  // qu'elle a retirée (le contenu lui-même reste affiché).
+  const wholeOrCurrentPart = (removalId: SQLWrapper) =>
+    sql`((${d.partField} is null and ${removalId} = ${d.id}) or (${d.partField} is not null and ${partStillRemoved}))`
   const conditions: (SQL | undefined)[] = [
     eq(d.action, 'remove'),
-    or(isNotNull(p.id), isNotNull(u.id), isNotNull(c.id), isNotNull(tc.id), isNotNull(tm.id)),
+    or(
+      isNotNull(p.id),
+      isNotNull(u.id),
+      isNotNull(c.id),
+      isNotNull(tc.id),
+      isNotNull(tm.id),
+      isNotNull(mu.id),
+    ),
   ]
   // « Après le curseur », dans l'ordre décroissant de la page (cursor.ts).
   if (cursor) conditions.push(after(cursor, d.createdAt, d.id))
@@ -648,32 +887,52 @@ export const loadRemovedPage = async (
       messageProjectId: tm.projectId,
       messageSenderId: tm.senderId,
       messageRemovedAt: tm.removedAt,
+      // R9 : la partie, sa photo et son rang ; le membre d'un profil.
+      partField: d.partField,
+      partMediaId: d.partMediaId,
+      partPosition: photoRankSql(sql.raw('"moderation_decision"."part_media_id"')),
+      memberId: mu.id,
+      memberName: mu.name,
+      memberHandle: mh.handle,
     })
     .from(d)
+    // R9 : la ligne du retrait en cours d'une partie (index content_part_removal_removal_idx).
+    .leftJoin(cpr, eq(cpr.removalId, d.id))
     .leftJoin(
       p,
-      and(eq(d.targetKind, 'project'), sql`${p.id} = ${id}`, sql`${p.removalId} = ${d.id}`),
+      and(eq(d.targetKind, 'project'), sql`${p.id} = ${id}`, wholeOrCurrentPart(p.removalId)),
     )
     .leftJoin(
       u,
-      and(eq(d.targetKind, 'update'), sql`${u.id} = ${id}`, sql`${u.removalId} = ${d.id}`),
+      and(eq(d.targetKind, 'update'), sql`${u.id} = ${id}`, wholeOrCurrentPart(u.removalId)),
     )
     .leftJoin(up, eq(up.id, u.projectId))
     // R7b : un appel ou un message retiré, retrouvé par la clé primaire de sa table, tant que sa
     // décision de retrait est encore la sienne.
     .leftJoin(
       tc,
-      and(eq(d.targetKind, 'call'), sql`${tc.id} = ${id}`, sql`${tc.removalId} = ${d.id}`),
+      and(eq(d.targetKind, 'call'), sql`${tc.id} = ${id}`, wholeOrCurrentPart(tc.removalId)),
     )
     .leftJoin(cp, eq(cp.id, tc.projectId))
     .leftJoin(
       tm,
-      and(eq(d.targetKind, 'message'), sql`${tm.id} = ${id}`, sql`${tm.removalId} = ${d.id}`),
+      and(eq(d.targetKind, 'message'), sql`${tm.id} = ${id}`, wholeOrCurrentPart(tm.removalId)),
     )
     .leftJoin(
       c,
       and(eq(d.targetKind, 'comment'), sql`${c.id} = ${id}`, sql`${c.removalId} = ${d.id}`),
     )
+    // R9 : un profil n'est retiré que par parties ; son membre, et son pseudo actuel.
+    .leftJoin(
+      mu,
+      and(
+        eq(d.targetKind, 'member'),
+        eq(mu.id, d.targetId),
+        isNotNull(d.partField),
+        partStillRemoved,
+      ),
+    )
+    .leftJoin(mh, and(eq(mh.userId, mu.id), isNull(mh.releasedAt)))
     .where(and(...conditions))
     .orderBy(desc(d.createdAt), desc(d.id))
     .limit(MODERATION_PAGE_SIZE + 1)
@@ -694,6 +953,7 @@ export const loadRemovedPage = async (
       row.commentAuthorId,
       row.callAuthorId,
       row.messageSenderId,
+      row.memberId,
     ].filter((id): id is string => id !== null),
   )
   const blocked = await blockedByAdmin(db, adminId, [...new Set(authors)])
@@ -706,25 +966,46 @@ export const loadRemovedPage = async (
     // toute la page.
     const ground = RemovalGround.safeParse(row.ground)
     if (!target.success || !ground.success || row.explanation === null) return []
-    const base = { target: target.data, ground: ground.data, explanation: row.explanation }
-    if (row.projectTitle !== null && row.projectRemovedAt !== null) {
+    // R9 : une partie retirée seule (la requête n'a gardé que celles dont le retrait dure) ; son
+    // contenu, lui, n'est pas retiré : la date est celle de la décision.
+    const part = partOut(row.partField, row.partMediaId, row.partPosition)
+    const base = { target: target.data, part, ground: ground.data, explanation: row.explanation }
+    const removedAt = (contentRemovedAt: Date | null) =>
+      part !== null ? row.decidedAt : contentRemovedAt
+    // Le profil d'un membre (R9) : seulement par parties ; son texte est son nom et son pseudo
+    // actuels, comme sur la page « Signaler ».
+    if (part !== null && row.memberId !== null && row.memberName !== null) {
+      return [
+        {
+          ...base,
+          projectId: null,
+          text:
+            row.memberHandle === null ? row.memberName : `${row.memberName} (@${row.memberHandle})`,
+          removedAt: row.decidedAt.toISOString(),
+          concernsMe: concerns(row.memberId),
+        },
+      ]
+    }
+    const projectRemovedAt = removedAt(row.projectRemovedAt)
+    if (row.projectTitle !== null && projectRemovedAt !== null) {
       return [
         {
           ...base,
           projectId: row.targetId,
           text: `${row.projectTitle}\n\n${row.projectPitch ?? ''}`,
-          removedAt: row.projectRemovedAt.toISOString(),
+          removedAt: projectRemovedAt.toISOString(),
           concernsMe: concerns(row.projectAuthorId),
         },
       ]
     }
-    if (row.updateLines !== null && row.updateRemovedAt !== null) {
+    const updateRemovedAt = removedAt(row.updateRemovedAt)
+    if (row.updateLines !== null && updateRemovedAt !== null) {
       return [
         {
           ...base,
           projectId: row.updateProjectId,
           text: updateText(row.updateTitle, readLines(row.updateLines)),
-          removedAt: row.updateRemovedAt.toISOString(),
+          removedAt: updateRemovedAt.toISOString(),
           concernsMe: concerns(row.updateAuthorId),
         },
       ]
@@ -740,25 +1021,27 @@ export const loadRemovedPage = async (
         },
       ]
     }
-    if (row.callText !== null && row.callRemovedAt !== null) {
+    const callRemovedAt = removedAt(row.callRemovedAt)
+    if (row.callText !== null && callRemovedAt !== null) {
       return [
         {
           ...base,
           projectId: row.callProjectId,
           text: row.callText,
-          removedAt: row.callRemovedAt.toISOString(),
+          removedAt: callRemovedAt.toISOString(),
           concernsMe: concerns(row.callAuthorId),
         },
       ]
     }
     // Le texte d'un retour peut manquer (une capture seule) : on se fie à la date de retrait.
-    if (row.messageProjectId !== null && row.messageRemovedAt !== null) {
+    const messageRemovedAt = removedAt(row.messageRemovedAt)
+    if (row.messageProjectId !== null && messageRemovedAt !== null) {
       return [
         {
           ...base,
           projectId: row.messageProjectId,
           text: row.messageText ?? '',
-          removedAt: row.messageRemovedAt.toISOString(),
+          removedAt: messageRemovedAt.toISOString(),
           concernsMe: concerns(row.messageSenderId),
         },
       ]

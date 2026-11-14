@@ -114,6 +114,11 @@ export const projectMedia = pgTable(
     // R6a : ce que la photo montre, lu à voix haute par les lecteurs d'écran. Null : pas de description.
     description: text('description'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    // R9 (7d) : le retrait de cette seule photo par la modération ; null : visible. La ligne reste,
+    // pour que son auteur la voie « Retiré par la modération » ; toutes les lectures des autres la
+    // cachent (`visibleMedia`, apps/api/src/projects/media-visibility.ts). 'restrict' : la purge ne
+    // peut pas effacer la décision tant que la photo est là (relecture de sécurité P2).
+    removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'restrict' }),
   },
   (t) => [
     index('project_media_project_idx').on(t.projectId, t.slot, t.position),

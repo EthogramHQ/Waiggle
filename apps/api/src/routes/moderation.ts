@@ -71,7 +71,9 @@ const decisionRoute = createRoute({
   path: '/v1/moderation/decisions',
   summary: 'Remove a content, dismiss its reports, restore it, suspend an account or lift it',
   description:
-    'A decision closes every open report of its target. A profile only accepts « dismiss ». ' +
+    'A decision closes every open report of its target. A whole profile only accepts « dismiss »; ' +
+    'its parts (name, handle, bio, favorite tools, photo) can be removed and restored one by one. ' +
+    'A part removal needs an open report of that part, and closes only the reports of that part. ' +
     'An administrator never decides on his own content or profile. At most 50 decisions a day; ' +
     'the password is asked again beyond 10 removals in an hour, beyond 3 suspensions in a day, ' +
     'and for a suspension without end.',
@@ -89,8 +91,13 @@ const decisionRoute = createRoute({
     400: errorResponse('Invalid decision (an explanation is required to remove).'),
     403: errorResponse('The password is required, or wrong.'),
     404: errorResponse('Not an administrator, or no such target.'),
-    409: errorResponse('Already decided in the meantime.'),
-    422: errorResponse('His own content or profile, or another action than dismiss on a profile.'),
+    409: errorResponse(
+      'Already decided in the meantime, or a part that no open report targets (part_not_reported).',
+    ),
+    422: errorResponse(
+      'His own content or profile, another action than dismiss on a whole profile, or a part ' +
+        'that is only removed with the whole content (part_whole_only).',
+    ),
     429: errorResponse('Too many decisions today, or too many wrong passwords.'),
   },
 })
@@ -222,6 +229,12 @@ export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl }: De
         return c.json(errorBody(languageOf(c), 'already_decided'), 409)
       case 'password_required':
         return c.json(errorBody(languageOf(c), 'password_required'), 403)
+      // R9 : le titre, le pitch, la catégorie, le texte d'une mise à jour ne se retirent qu'avec
+      // tout le contenu ; une partie sans signalement ouvert ne se retire pas.
+      case 'part_whole_only':
+        return c.json(errorBody(languageOf(c), 'part_whole_only'), 422)
+      case 'part_not_reported':
+        return c.json(errorBody(languageOf(c), 'part_not_reported'), 409)
     }
   })
 

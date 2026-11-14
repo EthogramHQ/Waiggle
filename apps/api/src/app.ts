@@ -371,7 +371,7 @@ export const createApp = ({
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
-  app.route('/', reportRoutes({ db, limiter }))
+  app.route('/', reportRoutes({ db, limiter, publicApiUrl }))
   app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter }))
