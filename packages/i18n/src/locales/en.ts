@@ -2040,6 +2040,7 @@ export const en: Translation = {
       suggestions: 'My suggestions',
       desktopNote: 'Part of the hive reaches your Sunday recap. Challenges will come later.',
       loadError: 'This hive could not load.',
+      handleYou: '{{handle}} · {{you}}',
     },
     hideFromSuggestions: 'Don’t suggest me to others',
     hideFromSuggestionsHint:
