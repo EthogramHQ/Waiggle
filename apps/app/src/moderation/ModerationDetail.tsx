@@ -103,7 +103,10 @@ export const detailTitle = (
   if (item.target.kind === 'comment' && item.context) {
     return t(($) => $.moderation.detail.commentOn, { title: item.context.title })
   }
-  return where ?? kind
+  // Un profil entier : le nom du membre. Un autre contenu entier : le titre de son projet, ou sa
+  // sorte (« Commentaire ») ; jamais le nom de l'auteur, qui ferait croire à un profil.
+  if (item.target.kind === 'member') return item.authorRecord?.name ?? kind
+  return item.context?.title ?? kind
 }
 
 /** Le résultat d'une décision, à la place des boutons : une confirmation, ou « déjà décidé ». */
