@@ -1889,7 +1889,7 @@ export const fr = {
     // Quitter la feuille « Suspendre » avec une explication écrite ou une durée choisie : la
     // fenêtre demande d'abord (même forme que `report.discard`).
     discard: {
-      title: 'Abandonner la décision ?',
+      title: 'Abandonner la décision ?',
       body: 'Ce que tu as écrit ou choisi dans cette feuille sera perdu.',
       keep: 'Continuer',
       confirm: 'Abandonner',
