@@ -65,6 +65,7 @@ const T = {
   closed: fr.t(($) => $.myFeedback.closed),
   closedNote: fr.t(($) => $.myFeedback.closedNote),
   goneBody: fr.t(($) => $.myFeedback.deleteBody),
+  goneBodyRemoved: fr.t(($) => $.myFeedback.deleteBodyRemoved),
   more: fr.t(($) => $.myFeedback.more),
   loadError: fr.t(($) => $.myFeedback.loadError),
   deleteTitle: fr.t(($) => $.project.testers.thread.deleteTitle),
@@ -390,6 +391,17 @@ describe('MyTesterMessagesScreen, deleting', () => {
     await askToDelete(removed)
 
     expect(screen.getAllByText(containing(removedBody(jardin.author.name)))).toBeTruthy()
+  })
+
+  it('says what the moderation keeps when a removed message belongs to a project no longer visible', async () => {
+    const removedGone = { ...goneFeedback, removed: true }
+    firstPage = { items: [jardinFeedback, removedGone], nextCursor: null }
+    await openPage()
+
+    await askToDelete(removedGone)
+
+    expect(screen.getByText(T.goneBodyRemoved)).toBeTruthy()
+    expect(screen.queryByText(T.goneBody)).toBeNull()
   })
 
   it('describes each Supprimer by its excerpt', async () => {

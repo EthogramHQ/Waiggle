@@ -1,7 +1,8 @@
 // Section du catalogue : « Mes retours envoyés » (tranche R11, planche R11-Mes-Retours), la carte
 // d'un projet et ses messages (`ui/SentFeedback`), dans tous leurs états : coin ouvert, avec issue,
 // capture et réponse ; coin fermé (« Seuls tes messages restent ici. ») ; projet qu'on ne voit
-// plus ; message retiré par la modération. De jour et de nuit, dans une colonne de téléphone.
+// plus ; message retiré par la modération. Dans chaque message, « Supprimer » est un texte rouge
+// sans fond (`CommentActionButton`, comme « Mes commentaires »), pas une pastille. De jour et de nuit, dans une colonne de téléphone.
 // Les textes d'exemple sont écrits ici (exception du catalogue, outil de développement).
 import { palettes } from '@ruche/brand'
 import type { ReactNode } from 'react'

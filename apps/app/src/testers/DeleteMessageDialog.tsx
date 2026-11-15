@@ -97,7 +97,11 @@ export function DeleteMessageDialog({ testerId, message, onDeleted, onClose, onG
   const otherName = shown?.otherName ?? null
   const body =
     otherName === null
-      ? t(($) => $.myFeedback.deleteBody)
+      ? // Projet qu'on ne voit plus : pas de nom à citer ; un message retiré dit aussi ce que la
+        // modération garde (la décision et la copie du signalement, un an).
+        shown?.removed
+        ? t(($) => $.myFeedback.deleteBodyRemoved)
+        : t(($) => $.myFeedback.deleteBody)
       : shown?.removed
         ? t(($) => $.project.testers.thread.deleteBodyRemoved, { name: otherName })
         : t(($) => $.project.testers.thread.deleteBody, { name: otherName })
