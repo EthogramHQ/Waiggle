@@ -3337,7 +3337,6 @@ export const fr = {
     // R4 (F-Fil9, planche R4-Fil-Premier) : un membre qui ne suit encore personne.
     firstRun: {
       hello: 'Bonjour {{name}} !',
-      title: 'Ton fil t’attend',
       body: 'Suis des proches pour voir leurs projets ici.',
     },
     /** Les rubriques de la colonne de droite, sur ordinateur (F-Fil11). */
@@ -3350,7 +3349,6 @@ export const fr = {
   // nombre d'abonnés : jur-J5). « Suivre » reprend follow.member et follow.memberFollowing.
   suggestions: {
     title: 'Proches à suivre',
-    caption: 'Des membres de tes ruches et des membres qui ont publié récemment',
     /** Le nom lu du « × » d'une ligne. */
     dismiss: 'Ne plus suggérer {{name}}',
     /** Le texte du bouton une fois le membre suivi, avec sa coche. */

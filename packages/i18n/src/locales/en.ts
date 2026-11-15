@@ -2779,7 +2779,6 @@ export const en: Translation = {
     },
     firstRun: {
       hello: 'Hi {{name}}!',
-      title: 'Your feed is waiting',
       body: 'Follow people you know to see their projects here.',
     },
     side: {
@@ -2789,7 +2788,6 @@ export const en: Translation = {
   },
   suggestions: {
     title: 'People to follow',
-    caption: 'Members of your hives and members who published recently',
     dismiss: 'Stop suggesting {{name}}',
     following: 'Following',
     dismissed: 'You won’t see {{name}} here again.',
