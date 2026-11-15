@@ -58,6 +58,9 @@ const fillForm = async (password = 'correct-horse-battery', inviteCode = 'miel-2
   await fireEvent.changeText(screen.getByLabelText('Nom affiché'), 'Léa')
   await fireEvent.changeText(screen.getByLabelText('Adresse e‑mail'), 'lea@example.com')
   await fireEvent.changeText(screen.getByLabelText('Mot de passe'), password)
+  // R11 : sans les deux cases (les règles, l'âge), l'écran refuse l'envoi (SignUpForm.rules.test.tsx).
+  await fireEvent.press(screen.getByRole('checkbox', { name: fr.t(($) => $.rules.accept) }))
+  await fireEvent.press(screen.getByRole('checkbox', { name: fr.t(($) => $.rules.age) }))
   await fireEvent.press(screen.getByRole('button', { name: submitLabel }))
 }
 
@@ -130,6 +133,8 @@ describe('SignUpScreen', () => {
       password: 'correct-horse-battery',
       inviteCode: 'miel-2026-noel',
       language: 'fr',
+      acceptRules: true,
+      ageDeclared: true,
     })
     expect(paths()).toContain('/check-email')
     expect(JSON.stringify(visited(mockPush, mockReplace))).not.toContain('lea@example.com')

@@ -3121,21 +3121,6 @@ const pages = [
     signedIn: false,
   },
   { name: 'inscription', path: '/sign-up', signedIn: false },
-  // R11 : les quatre champs remplis, les deux cases laissées vides, « Créer mon compte » touché :
-  // chaque case dit pourquoi, et « Il manque deux choses… » au-dessus du bouton. Rien ne part.
-  {
-    name: 'inscription-cases',
-    path: '/sign-up',
-    signedIn: false,
-    prepare: async (page) => {
-      await page.getByLabel('Code d’invitation').fill('famille-7k2q')
-      await page.getByLabel('Nom affiché').fill('Max Durand')
-      await page.getByLabel('Adresse e‑mail').fill('max.durand@exemple.fr')
-      await page.getByLabel('Mot de passe', { exact: true }).fill('abeilles-dorees-2026')
-      await page.getByRole('button', { name: 'Créer mon compte' }).click()
-      await page.getByText(/Il manque deux choses/).waitFor()
-    },
-  },
   // R2, « Trop d'essais » : l'API refuse la connexion pour 10 minutes (429, Retry-After : 600) ; le
   // bouton reste bloqué, l'heure du prochain essai est écrite en clair (décision D3).
   {
