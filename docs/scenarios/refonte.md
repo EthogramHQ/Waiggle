@@ -3265,15 +3265,16 @@ Hors de R11, et où ça va :
 - Les sauvegardes (14 jours, puis la copie hebdomadaire de l'hébergeur) et les journaux du serveur
 - Les sous-traitants, ce que chacun reçoit et où : Hostinger (le serveur, à Paris), Scaleway (les
   e-mails, à Paris), GitHub (le code et les images du logiciel, aucune donnée de membre) ; puis, à
-  part, un destinataire qui n'est pas un sous-traitant : Anthropic (Claude, l'assistant de code qui
-  aide à construire et exploiter {{appName}}), dit **tel qu'il est aujourd'hui** (décision de Louis
-  du 15/11/2026) : il peut lire des extraits des journaux et de la base pour corriger une panne ou
-  traiter un signalement ; l'offre utilisée est une offre pour les particuliers, sous laquelle
-  Anthropic décide lui-même de l'usage de ces données (il en est responsable, selon sa propre
-  politique de confidentialité, avec un lien vers elle) ; elles peuvent partir hors de l'Union
-  européenne ; elles ne servent pas à entraîner ses modèles (réglage coupé le 15/11/2026) et sont
-  gardées 30 jours chez lui. Le passage à une offre professionnelle, où Anthropic devient
-  sous-traitant, viendra au plus tard à l'ouverture au public ; la page changera alors
+  part, un destinataire qui n'est pas un sous-traitant : le fournisseur de l'assistant de code qui
+  aide à construire et exploiter {{appName}} (nommé par la page et par `docs/legal/registre.md`),
+  dit **tel qu'il est aujourd'hui** (décision du 15/11/2026) : il peut lire des extraits des
+  journaux et de la base pour corriger une panne ou traiter un signalement ; l'offre utilisée est une
+  offre pour les particuliers, sous laquelle le fournisseur décide lui-même de l'usage de ces données
+  (il en est responsable, selon sa propre politique de confidentialité, avec un lien vers elle) ;
+  elles peuvent partir hors de l'Union européenne ; elles ne servent pas à entraîner ses modèles
+  (réglage coupé le 15/11/2026) et sont gardées 30 jours chez lui. Le passage à une offre
+  professionnelle, où le fournisseur devient sous-traitant, viendra au plus tard à l'ouverture au
+  public ; la page changera alors
 - Tes droits (accès et export, rectification, effacement, opposition, limitation, portabilité), comment
   les exercer depuis l'appli ou par e-mail, le délai de réponse, et la CNIL
 
