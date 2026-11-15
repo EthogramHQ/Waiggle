@@ -14,6 +14,9 @@
 //    - R8 : les projets publiés cette semaine par les membres qu'il suit (« Nouveaux projets de tes
 //      proches »), et un projet « Testable » de l'un d'eux qu'il ne teste pas encore (« Ils
 //      cherchent des testeurs ») ;
+//    - R10 : ruche par ruche, les projets publiés et mis à jour cette semaine par les autres
+//      membres (« Dans tes ruches », sauf si « Ruches » vaut « Jamais »), et les invitations en
+//      attente si « Ruches » vaut « Dans le récap » (recap-hives.ts) ;
 // 2. rien de nouveau dans aucune partie : aucun e-mail ;
 // 3. sinon, « prendre » l'envoi : une seule requête note la date d'envoi, si et seulement si les
 //    conditions tiennent encore à cet instant, et rend l'adresse et les choix par type. Aucune
@@ -39,6 +42,7 @@ import { loadNotificationsSince, utc } from '../notifications/load'
 import { mediaOnCoversSql } from '../projects/media-visibility'
 import { listedVerifiedProjectFor } from '../projects/visibility'
 import { activeSuspensionSql } from '../suspension/load'
+import { hiveInvitationsOf, hiveNewsOf } from './recap-hives'
 import {
   BATCH_SIZE,
   isDeletedMember,
@@ -360,6 +364,7 @@ const ImageRow = z.object({
   primary_category: z.string().nullable(),
   cover_key: z.string().nullable(),
   reported: z.boolean(),
+  hive_reserved: z.boolean(),
 })
 
 /**
@@ -372,11 +377,13 @@ const ImageRow = z.object({
  * (project_id, slot, position) la trouve. Le signalement : content_report_target_idx
  * (target_kind, target_id) ; `target_id` est un texte, d'où `project.id::text` (la conversion est
  * du côté du projet, l'index de la colonne reste utilisable). Le projet lui-même : sa clé primaire.
+ * R10 : `hive_reserved`, le projet est réservé à une ruche (il n'aura pas de vignette).
  */
 const imageRows = async (db: Database, ids: string[]) => {
   if (ids.length === 0) return new Map<string, z.infer<typeof ImageRow>>()
   const query = sql`
     select project.id, project.primary_category,
+      project.visibility = 'hive' as hive_reserved,
       (select m.storage_key from project_media m
         where m.project_id = project.id and m.slot in ('gallery', 'portrait')
           and ${mediaOnCoversSql('m')}
@@ -454,6 +461,11 @@ const take = async (db: Database, userId: string, now: Date) => {
  * projet d'un autre membre qui a un signalement ouvert (jur-5) : sa photo ne part pas chez
  * l'envoyeur d'e-mails tant que la modération n'a pas décidé. Chaque image reçoit un nom fabriqué et
  * unique (thumb-1, projet-1.jpg), jamais tiré d'un texte de membre ni de la clé du stockage.
+ *
+ * R10 (plan, « Ce qui change au plan », point 1) : un projet réservé à une ruche n'a jamais de
+ * vignette, dans aucune partie, pas même chez son auteur : ni sa photo, ni la tuile de sa
+ * catégorie, ni une pièce jointe cachée. Les vignettes restent aux projets « Membres » ; l'e-mail
+ * passe par un envoyeur extérieur, et un projet réservé ne sort pas du cercle de sa ruche.
  */
 const imagesFor = async (
   deps: JobDeps,
@@ -466,7 +478,11 @@ const imagesFor = async (
   const images: (Attachment | null)[] = []
   for (const project of wanted) {
     const row = rows.get(project.id)
-    if (row === undefined || images.filter((image) => image !== null).length >= RECAP_IMAGES_MAX) {
+    if (
+      row === undefined ||
+      row.hive_reserved ||
+      images.filter((image) => image !== null).length >= RECAP_IMAGES_MAX
+    ) {
       images.push(null)
       continue
     }
@@ -501,13 +517,31 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   const friendsSince = latest(member.recap_sent_at, new Date(now.getTime() - RECAP_WINDOW_MS))
   const friends = await friendProjects(deps.db, member.id, friendsSince, now, false)
   const [wanted] = await friendProjects(deps.db, member.id, friendsSince, now, true)
+  // R10, « Dans tes ruches » : même fenêtre que les proches. Rien si « Ruches » vaut « Jamais » ;
+  // les invitations en attente seulement s'il vaut « Dans le récap » (« Tout de suite » : elles sont
+  // parties par l'e-mail « tout de suite »). Lues avec le choix du début du lot, refiltrées après
+  // la prise avec le choix relu.
+  const hivesChoice = member.email_hives as EmailChoice
+  const hives =
+    hivesChoice === 'never'
+      ? []
+      : await hiveNewsOf(deps.db, member.id, friendsSince, now, deps.appUrl)
+  const invitations =
+    hivesChoice === 'digest'
+      ? await hiveInvitationsOf(deps.db, member.id, now)
+      : { shown: [], more: 0 }
   // Un premier tri avec les choix lus au début du lot : il évite de prendre l'envoi pour rien. Le
   // tri qui compte se refait après la prise, avec les choix et la date relus à cet instant.
   const early = assemble(
     deps.appUrl,
     entries.filter((entry) => kept(entry, member, member.instant_sent_at)),
   )
-  if (isEmpty(early) && friends.length === 0 && wanted === undefined) return false
+  const nothingElse = (hiveParts: { hives: unknown[]; invitations: unknown[] }) =>
+    friends.length === 0 &&
+    wanted === undefined &&
+    hiveParts.hives.length === 0 &&
+    hiveParts.invitations.length === 0
+  if (isEmpty(early) && nothingElse({ hives, invitations: invitations.shown })) return false
   let taken: z.infer<typeof Taken> | null
   try {
     taken = await take(deps.db, member.id, now)
@@ -526,9 +560,16 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     deps.appUrl,
     entries.filter((entry) => kept(entry, taken, taken.instant_sent_at)),
   )
+  // R10 : le choix « Ruches » relu à la prise (passé à « Jamais » entre-temps : la partie sort ;
+  // quitté « Dans le récap » : les invitations sortent).
+  const takenHivesChoice = taken.email_hives as EmailChoice
+  const hivesKept = takenHivesChoice === 'never' ? [] : hives
+  const invitationsKept = takenHivesChoice === 'digest' ? invitations : { shown: [], more: 0 }
   // Tout était déjà parti : rien n'est envoyé. La date du récap reste notée (cas rare, une course
   // entre les deux tâches) ; le récap suivant repart de là, sans rien perdre de nouveau.
-  if (isEmpty(content) && friends.length === 0 && wanted === undefined) return false
+  if (isEmpty(content) && nothingElse({ hives: hivesKept, invitations: invitationsKept.shown })) {
+    return false
+  }
 
   const projects = content.projects
   const urlOf = (projectId: string) => new URL(`/projects/${projectId}`, deps.appUrl).toString()
@@ -576,6 +617,12 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     updatesMore: Math.max(0, content.updates.length - RECAP_MAX_LINES),
     testers: content.testers.slice(0, RECAP_MAX_LINES),
     testersMore: Math.max(0, content.testers.length - RECAP_MAX_LINES),
+    // R10 : sans aucune vignette (imagesFor n'en donne jamais à un projet réservé, et la partie
+    // n'en montre pas) ; le lien « Voir mes ruches » mène à l'onglet, jamais à une ruche.
+    hives: hivesKept,
+    hiveInvitations: invitationsKept.shown,
+    hiveInvitationsMore: invitationsKept.more,
+    hivesUrl: new URL('/hives', deps.appUrl).toString(),
     links: linksFor(deps, member.id, 'recap'),
   }
   const language = languageOfMember(taken)
