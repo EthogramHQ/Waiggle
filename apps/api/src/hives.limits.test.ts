@@ -180,6 +180,11 @@ describe('the quotas', () => {
   it('answers 429 to the 21st invitation of the day, and lets the member invite again the next day', async () => {
     later()
     const famille = await hives.create(ines.cookie)
+    // Le quota est celui d'Inès, pas de la ruche : Léa, membre, invitera encore. Elle entre la veille,
+    // car la faire entrer passe par une invitation d'Inès, qui compte dans son quota du jour.
+    later()
+    await hives.join(famille.id, ines.cookie, lea)
+    later(DAY)
     const invitees: TestMember[] = []
     for (let index = 0; index < HIVE_LIMITS.invitationsPerDay + 2; index += 1) {
       invitees.push(
@@ -198,8 +203,6 @@ describe('the quotas', () => {
       'rate_limited',
     )
     // Le quota est celui d'Inès, pas de la ruche : Léa, membre, invite encore.
-    later()
-    await hives.join(famille.id, ines.cookie, lea)
     later()
     expect((await inviteRaw(famille.id, lea.cookie, invitees[20]?.id ?? '')).status).toBe(201)
     // Le lendemain, Inès aussi.
