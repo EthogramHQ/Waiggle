@@ -1,6 +1,6 @@
 // Les accords des membres aux règles de Waiggle (tranche R11, « La conformité ») : une ligne par
 // version des règles acceptée, à l'inscription ou sur l'écran « Accepter ». Une table plutôt que des
-// colonnes sur `user` (choix 1 de la session) : l'historique entier est la preuve de chaque accord,
+// colonnes sur `user` (choix 1 du plan R11) : l'historique entier est la preuve de chaque accord,
 // et l'export du membre le montre tel quel.
 import { sql } from 'drizzle-orm'
 import { boolean, check, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core'

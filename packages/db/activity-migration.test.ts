@@ -1,4 +1,4 @@
-// Test de la reprise de la dernière visite par la migration 0024 (R11, choix 6 de la session). Un
+// Test de la reprise de la dernière visite par la migration 0024 (choix 6 du plan R11). Un
 // compte existant ne doit pas recevoir pour dernière visite l'heure de la migration : il prend la
 // plus récente des dates déjà connues (ses sessions, sa lecture du fil, sinon sa création), pour
 // qu'un compte abandonné depuis longtemps ne gagne pas 3 ans de plus avant sa suppression.

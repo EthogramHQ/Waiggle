@@ -28,7 +28,7 @@ export const RULES_CHANGES: readonly string[] = []
 
 /**
  * Un accord donné par un membre, tel que l'export le montre (une ligne par version acceptée,
- * choix 1 de la session : l'historique est la preuve). `ageDeclared` vaut toujours vrai : on ne
+ * choix 1 du plan R11 : l'historique est la preuve). `ageDeclared` vaut toujours vrai : on ne
  * garde un accord que s'il a déclaré avoir 15 ans ou plus.
  */
 export const RulesAcceptance = z

@@ -16,7 +16,7 @@ CREATE TABLE "rules_acceptance" (
 --> statement-breakpoint
 ALTER TABLE "email_preference" DROP CONSTRAINT "email_preference_choices_check";--> statement-breakpoint
 ALTER TABLE "user" ADD COLUMN "last_active_at" timestamp DEFAULT (now() at time zone 'utc') NOT NULL;--> statement-breakpoint
--- Reprise des données, ajoutée à la main (R11, choix 6 de la session) : sans elle, chaque compte
+-- Reprise des données, ajoutée à la main (choix 6 du plan R11) : sans elle, chaque compte
 -- existant aurait pour dernière visite l'heure de la migration, et un compte abandonné depuis des
 -- années gagnerait 3 ans de plus avant sa suppression. On prend donc la plus récente des dates que
 -- la base connaît déjà : la dernière activité d'une de ses sessions (Better Auth la met à jour quand
