@@ -337,7 +337,6 @@ function SettingsPage({ page, leaving }: PageProps) {
         <ListGroup>
           <ListRow
             label={t(($) => $.hives.settings.handOver)}
-            detail={t(($) => $.hives.settings.handOverDetail)}
             icon="crown"
             trailing="chevron"
             onPress={() => setHandOverOpen(true)}
