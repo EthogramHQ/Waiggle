@@ -13,13 +13,19 @@ import {
   type ProjectDifficulty,
   ProjectInput,
   type ProjectStatus,
+  type ProjectVisibility,
 } from '@ruche/contracts'
 
 /**
- * Qui peut voir le projet. L'API garde les codes `public` / `private` ; l'appli dit « Membres de
- * Waiggle » (les seuls à voir un projet « public », jamais le web ouvert) ou « Privé ».
+ * Qui peut voir le projet. L'API garde les codes `public` / `hive` / `private` ; l'appli dit
+ * « Membres de Waiggle » (les seuls à voir un projet « public », jamais le web ouvert), « Une
+ * ruche » (R10 : les seuls membres de la ruche choisie, `hiveId`) ou « Privé ».
  */
-export type ProjectAudience = 'members' | 'private'
+export type ProjectAudience = 'members' | 'hive' | 'private'
+
+/** Le code de l'API pour chaque audience : « Membres de Waiggle » s'appelle `public`. */
+export const visibilityOf = (audience: ProjectAudience): ProjectVisibility =>
+  audience === 'members' ? 'public' : audience
 
 /** Le formulaire tel qu'affiché. Les outils sont une liste (le champ à suggestions `ToolField`). */
 export type ProjectForm = {
@@ -28,6 +34,11 @@ export type ProjectForm = {
   description: string
   status: ProjectStatus
   audience: ProjectAudience
+  /**
+   * R10 : la ruche choisie quand l'audience est « Une ruche » ; null tant que le membre n'en a pas
+   * choisi une, et toujours null pour « Membres de Waiggle » ou « Privé » (`settleAudience`).
+   */
+  hiveId: string | null
   demoUrl: string
   tools: string[]
   prompts: string[]
@@ -46,6 +57,7 @@ export const emptyProjectForm: ProjectForm = {
   description: '',
   status: 'idea',
   audience: 'members',
+  hiveId: null,
   demoUrl: '',
   tools: [],
   prompts: [],
@@ -55,13 +67,19 @@ export const emptyProjectForm: ProjectForm = {
   startedOn: null,
 }
 
+/** L'audience de l'appli pour chaque code de l'API (l'inverse de `visibilityOf`). */
+const audienceOf = (visibility: ProjectVisibility): ProjectAudience =>
+  visibility === 'public' ? 'members' : visibility
+
 /** Le formulaire pré-rempli avec un projet existant, pour le modifier. */
 export const formFromProject = (project: Project): ProjectForm => ({
   title: project.title,
   pitch: project.pitch,
   description: project.description,
   status: project.status,
-  audience: project.visibility === 'private' ? 'private' : 'members',
+  audience: audienceOf(project.visibility),
+  // Un projet réservé relit sa ruche ; tout autre projet n'en a pas.
+  hiveId: project.visibility === 'hive' ? (project.hive?.id ?? null) : null,
   demoUrl: project.demoUrl ?? '',
   tools: project.tools.map((tool) => tool.label),
   prompts: project.prompts,
@@ -79,7 +97,17 @@ export type ProjectFormErrors = {
   tools?: 'tooManyTools' | 'toolTooLong' | 'invalidCharacters'
   prompts?: 'tooManyPrompts' | 'promptTooLong' | 'invalidCharacters'
   primaryCategory?: 'chooseCategory'
+  /** R10 : « Une ruche » sans ruche choisie. */
+  hiveId?: 'hiveRequired'
 }
+
+/**
+ * R10 : le formulaire après un changement. Repasser en « Membres de Waiggle » ou en « Privé »
+ * efface la ruche choisie : elle ne vaut que pour « Une ruche », et revenir à « Une ruche » la
+ * redemande (le membre redit qui verra le projet).
+ */
+export const settleAudience = (form: ProjectForm): ProjectForm =>
+  form.audience !== 'hive' && form.hiveId !== null ? { ...form, hiveId: null } : form
 
 /** Un lien vide veut dire « pas de démo » : l'API reçoit `null`. */
 const demoUrlOf = (form: ProjectForm) => {
@@ -107,7 +135,10 @@ const changedKeys = (initial: ProjectForm, form: ProjectForm) => ({
   pitch: initial.pitch !== form.pitch,
   description: initial.description !== form.description,
   status: initial.status !== form.status,
-  audience: initial.audience !== form.audience,
+  // Passer d'une ruche à une autre change aussi qui voit le projet.
+  audience:
+    initial.audience !== form.audience ||
+    (form.audience === 'hive' && initial.hiveId !== form.hiveId),
   demoUrl: initial.demoUrl !== form.demoUrl,
   tools: !sameList(initial.tools, form.tools),
   prompts: !sameList(initial.prompts, form.prompts),
@@ -135,7 +166,12 @@ export const changedFields = (initial: ProjectForm, form: ProjectForm): ProjectC
   if (changed.pitch) update.pitch = form.pitch
   if (changed.description) update.description = form.description
   if (changed.status) update.status = form.status
-  if (changed.audience) update.visibility = form.audience === 'private' ? 'private' : 'public'
+  if (changed.audience) {
+    // La visibilité et la ruche partent toujours ensemble (le contrat refuse l'une sans l'autre) ;
+    // vers « Membres de Waiggle » ou « Privé », la visibilité seule (l'API oublie la ruche).
+    update.visibility = visibilityOf(form.audience)
+    if (form.audience === 'hive' && form.hiveId) update.hiveId = form.hiveId
+  }
   if (changed.demoUrl) update.demoUrl = demoUrlOf(form)
   if (changed.tools) update.tools = form.tools
   if (changed.prompts) update.prompts = form.prompts
@@ -182,6 +218,10 @@ export function toProjectChanges(
   initial?: ProjectForm,
 ): { ok: true; changes: ProjectChanges } | { ok: false; errors: ProjectFormErrors } {
   const waived = initial !== undefined && onlyGoesPrivate(initial, form)
+  // R10 : « Une ruche » demande la ruche. Sans elle, on valide comme un projet privé (jamais
+  // envoyé) : l'erreur de la ruche est la seule à en dire quelque chose.
+  const hiveId = form.audience === 'hive' ? form.hiveId : null
+  const hiveMissing = form.audience === 'hive' && hiveId === null
   // Le schéma exige une catégorie : sans elle on valide avec une catégorie d'emprunt (jamais
   // envoyée), pour ne pas cacher les autres erreurs derrière celle-là.
   const parsed = ProjectInput.safeParse({
@@ -189,7 +229,8 @@ export function toProjectChanges(
     pitch: form.pitch,
     description: form.description,
     status: form.status,
-    visibility: form.audience === 'private' ? 'private' : 'public', // « members » = public
+    visibility: hiveMissing ? 'private' : visibilityOf(form.audience),
+    ...(hiveId ? { hiveId } : null),
     demoUrl: demoUrlOf(form),
     tools: form.tools,
     prompts: form.prompts,
@@ -236,6 +277,7 @@ export function toProjectChanges(
     }
   }
   if (form.primaryCategory === null && !waived) errors.primaryCategory = 'chooseCategory'
+  if (hiveMissing) errors.hiveId = 'hiveRequired'
   if (Object.keys(errors).length > 0) return { ok: false, errors }
   if (!parsed.success) return { ok: false, errors }
 

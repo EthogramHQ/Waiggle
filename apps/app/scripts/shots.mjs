@@ -4268,6 +4268,8 @@ const pages = [
     feed: 'nobody',
     hives: 'invited',
   },
+  // Le témoin : un membre sans ruche n'a que « Membres de Waiggle » et « Privé ».
+  { name: 'publier-sans-ruche', path: '/projects/new', signedIn: true, hives: 'none' },
   {
     name: 'publier-ruche',
     path: '/projects/new',
@@ -4275,6 +4277,8 @@ const pages = [
     fullPage: true,
     prepare: async (page) => {
       await page.getByRole('radio', { name: fr.project.form.hive }).click()
+      // Puis la ruche : la phrase du bas dit « Seuls les membres de Famille verront ce projet. »
+      await page.getByRole('radio', { name: 'Famille', exact: true }).click()
     },
   },
   {
