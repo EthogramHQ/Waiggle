@@ -4,12 +4,28 @@
 // droit de voir quel projet est décidé ailleurs (projects/load.ts).
 import { NO_REACTIONS, ReactionKind, type ReactionState } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
-import { listedProject } from '../projects/visibility'
+import { and, asc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
+import { hiveMemberOf, listedProject, reservedProject } from '../projects/visibility'
 
 type Reader = Pick<Database, 'select'>
 
 const r = schema.projectReaction
+
+/**
+ * La ligne de `hive_member` de celui qui a réagi, dans la ruche du projet (R10), posée à côté de
+ * chaque réaction par une jointure « left join » : sans ligne, `hive_member.user_id` vaut nul. Elle
+ * sert à ne compter, sur un projet réservé, que les réactions de ceux qui le voient aujourd'hui : un
+ * ancien membre n'a plus de ligne, sa réaction reste en base (elle revient s'il rejoint de nouveau)
+ * mais ne compte plus. L'index est la clé primaire de hive_member (hive_id, user_id), lue une fois
+ * par réaction ; sur un projet public la jointure ne trouve rien et ne coûte rien de plus.
+ */
+const reactorMembership = and(
+  eq(schema.hiveMember.hiveId, schema.project.hiveId),
+  eq(schema.hiveMember.userId, r.memberId),
+)
+
+/** La ligne de `hive_member` existe : celui qui a réagi est encore membre de la ruche du projet. */
+const reactorStillMember = isNotNull(schema.hiveMember.userId)
 
 /**
  * Les réactions de plusieurs projets, telles que les voit `viewerId`, en une seule requête quel que
@@ -21,7 +37,12 @@ const r = schema.projectReaction
  * En SQL :
  *   select project_id, kind, count(*)::int, bool_or(member_id = $viewer)
  *   from project_reaction inner join project on project.id = project_reaction.project_id
- *   where project_id in (…) and project.visibility = 'public' and project.removed_at is null
+ *   left join hive_member on hive_member.hive_id = project.hive_id
+ *     and hive_member.user_id = project_reaction.member_id
+ *   where project_id in (…) and project.removed_at is null
+ *     and (project.visibility = 'public'
+ *       or (project.visibility = 'hive' and project.hive_id in (ruches de $viewer)
+ *           and hive_member.user_id is not null))
  *   group by project_id, kind
  *
  * La jointure (« inner join ») met à côté de chaque réaction la ligne de son projet, trouvée par
@@ -47,7 +68,14 @@ export const reactionStatesOf = async (
     })
     .from(r)
     .innerJoin(schema.project, eq(schema.project.id, r.projectId))
-    .where(and(inArray(r.projectId, projectIds), listedProject()))
+    .leftJoin(schema.hiveMember, reactorMembership)
+    .where(
+      and(
+        inArray(r.projectId, projectIds),
+        // Public, ou réservé à une ruche du lecteur et réaction d'un membre actuel de cette ruche.
+        or(listedProject(), and(reservedProject(), hiveMemberOf(viewerId), reactorStillMember)),
+      ),
+    )
     .groupBy(r.projectId, r.kind)
   for (const row of rows) {
     // Chaque projet part de « aucune réaction » : les cinq types sont présents, même à zéro.
@@ -74,7 +102,11 @@ export const reactionStatesOf = async (
  * En SQL :
  *   select project_id, count(*)::int
  *   from project_reaction inner join project on project.id = project_reaction.project_id
- *   where project_id in (…) and project.visibility = 'public' and project.removed_at is null
+ *   left join hive_member on hive_member.hive_id = project.hive_id
+ *     and hive_member.user_id = project_reaction.member_id
+ *   where project_id in (…) and project.removed_at is null
+ *     and (project.visibility = 'public'
+ *       or (project.visibility = 'hive' and hive_member.user_id is not null))
  *   group by project_id
  *
  * Index : la clé primaire de project_reaction (project_id, member_id, kind) commence par
@@ -93,7 +125,15 @@ export const reactionTotalsOf = async (
     .select({ projectId: r.projectId, total: sql<number>`count(*)::int` })
     .from(r)
     .innerJoin(schema.project, eq(schema.project.id, r.projectId))
-    .where(and(inArray(r.projectId, projectIds), listedProject()))
+    .leftJoin(schema.hiveMember, reactorMembership)
+    .where(
+      and(
+        inArray(r.projectId, projectIds),
+        // Sans lecteur (comme commentCountsOf) : un projet réservé compte les réactions de ses
+        // membres actuels ; les routes ne demandent le total que de cartes que le lecteur voit déjà.
+        or(listedProject(), and(reservedProject(), reactorStillMember)),
+      ),
+    )
     .groupBy(r.projectId)
   return new Map(rows.map((row) => [row.projectId, row.total]))
 }
