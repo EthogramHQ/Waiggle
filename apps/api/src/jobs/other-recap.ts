@@ -134,14 +134,12 @@ export const otherRecap = async (deps: JobDeps, now: Date) => {
     try {
       await deps.mailer.send({
         to: admin.email,
-        // Sans le pied de la Confidentialité (R11) : other-recap.test.ts veut que cet e-mail ne
-        // mène qu'aux deux pages de la modération ; la ligne attend que ce test l'admette.
-        ...otherRecapEmail(languageOfMember(admin), {
-          name: admin.name,
-          ...numbers,
-          toolsUrl,
-          projectsUrl,
-        }),
+        // Le pied donne l'adresse de la Confidentialité (R11), en texte : seul lien de plus.
+        ...otherRecapEmail(
+          languageOfMember(admin),
+          { name: admin.name, ...numbers, toolsUrl, projectsUrl },
+          deps.appUrl,
+        ),
       })
       sent++
     } catch (error) {

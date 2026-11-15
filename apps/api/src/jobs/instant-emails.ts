@@ -369,6 +369,7 @@ const instantOne = async (deps: JobDeps, member: Candidate, now: Date) => {
         links: linksFor(deps, member.id, 'instant'),
       },
       language,
+      deps.appUrl,
     ),
   })
   return true

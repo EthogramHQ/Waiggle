@@ -18,7 +18,7 @@ import { appName, palettes, radii } from '@ruche/brand'
 import type { InstantEmailType } from '@ruche/contracts'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
-import { type EmailContent, emailButton, type NotificationLinks } from './templates'
+import { type EmailContent, emailButton, type NotificationLinks, privacyLine } from './templates'
 import { createUnsubscribeToken } from './unsubscribe-token'
 
 /** Les types qu'un e-mail « tout de suite » peut contenir (ceux qui admettent « Tout de suite »). */
@@ -236,8 +236,15 @@ const c = palettes.day
  * en entier sous son libellé) ; le HTML montre chaque ligne dans un bloc : l'étiquette et l'heure,
  * la phrase, l'extrait en citation ou la note du coin, puis son bouton.
  */
-export const instantEmail = (data: InstantData, language: Language): EmailContent => {
+export const instantEmail = (
+  data: InstantData,
+  language: Language,
+  appUrl?: string,
+): EmailContent => {
   const email = resources[language].translation.email
+  // R11 : la dernière ligne du pied, l'adresse de la page Confidentialité ; facultative pour les
+  // seuls appels qui ne connaissent pas l'adresse de l'appli (sans elle, la ligne manque).
+  const privacy = appUrl === undefined ? undefined : privacyLine(language, appUrl)
   const t = email.instant
   const link = linkPlaceholder(language)
   const count = data.lines.length
@@ -270,6 +277,7 @@ export const instantEmail = (data: InstantData, language: Language): EmailConten
     '',
     ...footerLinks.flatMap(({ label, url }) => [label, url, '']),
     footer,
+    ...(privacy === undefined ? [] : [privacy]),
   ].join('\n')
 
   const body = 'font-size:16px;line-height:1.5'
@@ -319,7 +327,12 @@ export const instantEmail = (data: InstantData, language: Language): EmailConten
   <div style="max-width:520px;margin:16px auto 0">
     <p style="${small}">${escapeHtml(reason)}</p>
     ${htmlFooterLinks}
-    <p style="${small}">${escapeHtml(footer)}</p>
+    <p style="${small}">${escapeHtml(footer)}</p>${
+      privacy === undefined
+        ? ''
+        : `
+    <p style="${small}">${escapeHtml(privacy)}</p>`
+    }
   </div>
 </div>
 </body></html>`

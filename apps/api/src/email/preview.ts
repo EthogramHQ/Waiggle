@@ -171,7 +171,7 @@ const LONG_EXPLANATION =
 
 /** Les variantes montrées : le nom du fichier (sans la langue) et l'e-mail rendu. */
 const variants: [string, (language: Language) => EmailContent][] = [
-  ['recap-short', (language) => recapEmail(language, recap({}))],
+  ['recap-short', (language) => recapEmail(language, recap({}), APP_URL)],
   // Le récap le plus long : cinq lignes et « Et 2 autres », les nombres, puis (R7a) les cinq
   // projets suivis ou testés et « Et 2 autres projets », et (R7b) les cinq projets du coin des
   // testeurs et « Et 3 autres projets ». La liste des variantes est fixée par preview.test.ts :
@@ -291,6 +291,7 @@ const variants: [string, (language: Language) => EmailContent][] = [
           hiveInvitationsMore: 1,
           hivesUrl: `${APP_URL}/hives`,
         }),
+        APP_URL,
       ),
   ],
   [
@@ -303,11 +304,12 @@ const variants: [string, (language: Language) => EmailContent][] = [
           updates: updatedProjects.slice(3, 4),
           testers: testedProjects.slice(1, 2),
         }),
+        APP_URL,
       ),
   ],
-  ['recap-third-without-visit', (language) => recapEmail(language, recap({ last: true }))],
+  ['recap-third-without-visit', (language) => recapEmail(language, recap({ last: true }), APP_URL)],
   // R8 : la note unique du premier récap habillé, pour qui recevait déjà le récap.
-  ['recap-news', (language) => recapEmail(language, recap({ news: true }))],
+  ['recap-news', (language) => recapEmail(language, recap({ news: true }), APP_URL)],
   ['mentions', (language) => mentionEmail(language, mentions)],
   // R8 : l'e-mail « tout de suite » (instant.ts), avec une seule nouveauté (un commentaire), puis
   // avec une nouveauté de chaque sorte.
@@ -315,10 +317,14 @@ const variants: [string, (language: Language) => EmailContent][] = [
     'instant-one',
     (language) => {
       const data = instantPreviewData()
-      return instantEmail({ ...data, lines: data.lines.slice(0, 1), types: ['comments'] }, language)
+      return instantEmail(
+        { ...data, lines: data.lines.slice(0, 1), types: ['comments'] },
+        language,
+        APP_URL,
+      )
     },
   ],
-  ['instant-many', (language) => instantEmail(instantPreviewData(), language)],
+  ['instant-many', (language) => instantEmail(instantPreviewData(), language, APP_URL)],
   // Les trois e-mails de service du changement d'adresse : ni publicité ni désinscription.
   [
     'change-email',
@@ -380,26 +386,34 @@ const variants: [string, (language: Language) => EmailContent][] = [
   [
     'other-recap',
     (language) =>
-      otherRecapEmail(language, {
-        name: 'Malik',
-        tools: 3,
-        projects: 2,
-        older: 4,
-        toolsUrl: `${APP_URL}/moderation/tools`,
-        projectsUrl: `${APP_URL}/moderation/categories`,
-      }),
+      otherRecapEmail(
+        language,
+        {
+          name: 'Malik',
+          tools: 3,
+          projects: 2,
+          older: 4,
+          toolsUrl: `${APP_URL}/moderation/tools`,
+          projectsUrl: `${APP_URL}/moderation/categories`,
+        },
+        APP_URL,
+      ),
   ],
   [
     'other-recap-one-project',
     (language) =>
-      otherRecapEmail(language, {
-        name: `Malik${'o'.repeat(83)}`,
-        tools: 0,
-        projects: 1,
-        older: 0,
-        toolsUrl: `${APP_URL}/moderation/tools`,
-        projectsUrl: `${APP_URL}/moderation/categories`,
-      }),
+      otherRecapEmail(
+        language,
+        {
+          name: `Malik${'o'.repeat(83)}`,
+          tools: 0,
+          projects: 1,
+          older: 0,
+          toolsUrl: `${APP_URL}/moderation/tools`,
+          projectsUrl: `${APP_URL}/moderation/categories`,
+        },
+        APP_URL,
+      ),
   ],
   // La suspension d'un compte (tranche 7c), e-mail de service : 7 jours après un signalement, avec
   // la fin à l'heure de Paris (23 h 30 UTC un soir de novembre : le lendemain à 0 h 30), puis sans

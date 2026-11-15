@@ -846,8 +846,10 @@ const thumbRow = (thumb: string, size: number, content: string) =>
  * rien n'est chargé à distance (A5). Le texte d'un membre (nom, titre, texte de remplacement d'une
  * image) passe par defangLinks, puis par l'échappement du HTML.
  */
-export const recapEmail = (language: Language, data: RecapData): EmailContent => {
+export const recapEmail = (language: Language, data: RecapData, appUrl?: string): EmailContent => {
   const t = resources[language].translation.email
+  // R11 : la dernière ligne du pied, l'adresse de la page Confidentialité (comme `render`).
+  const privacy = privacyOf(language, appUrl)
   const r = t.recap
   const link = linkPlaceholder(language)
   const clean = (value: string) => defangLinks(value, link)
@@ -1028,6 +1030,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
     data.links.unsubscribe,
     '',
     fill(t.footer),
+    ...(privacy === undefined ? [] : [privacy]),
   ].join('\n')
 
   // ─── Le HTML ───
@@ -1201,6 +1204,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
       ${footerLink(t.changePreferences, data.links.manage)}
       ${footerLink(r.unsubscribe, data.links.unsubscribe)}
       <p style="margin:6px 0 0;${small}">${escapeHtml(fill(t.footer))}</p>
+      ${privacy === undefined ? '' : `<p style="margin:6px 0 0;${small}">${escapeHtml(privacy)}</p>`}
     </div>
   </div>
 </div>
