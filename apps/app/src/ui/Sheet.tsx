@@ -437,8 +437,12 @@ const pageLanding = (): unknown => {
   return null
 }
 
-/** Pose le focus sur la place d'arrivée de la page (rendue focalisable, hors de Tab). */
-const focusPageLanding = (): boolean => {
+/**
+ * Pose le focus sur la place d'arrivée de la page (rendue focalisable, hors de Tab). Exportée pour
+ * l'écran « Accepter » des règles (R11, `rules/RulesGate`), qui rend le focus à la page restée
+ * dessous quand il se referme, comme une feuille ouverte par son adresse.
+ */
+export const focusPageLanding = (): boolean => {
   const landing = pageLanding()
   return landing ? focusWithoutScroll(focusTarget(landing)) : false
 }
