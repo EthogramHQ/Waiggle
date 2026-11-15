@@ -18,24 +18,16 @@ import { fill, parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i1
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { eq } from 'drizzle-orm'
-import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
+import { accountDeletionHooks } from '../account/delete'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
 // L'e-mail de vérification part de auth/verification-resend.ts (tranche R2).
 import { existingAccountEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
-import { removeFromHive } from '../hives/write'
 import { describeError, writeAuthLog } from '../log'
 import type { FileStorage } from '../media/storage'
-import { releaseAvatarKey } from '../moderation/replaced'
-import { suspensionEmailKey } from '../moderation/suspend'
-import { mediaKeysOf } from '../projects/load'
-import { createRateLimiter, deleteAddressCounters, deleteMemberCounters } from '../rate-limit'
-import { voidReportsOfDepartedAuthors } from '../reports/queue'
+import { createRateLimiter } from '../rate-limit'
 import { acceptCurrentRules } from '../rules/accept'
-import { closeSuspensionsOfDeparted } from '../suspension/load'
-import { dropOrphanOthers } from '../tools/write'
 import { createEmailChange } from './change-email'
 import { createPasswordFlows, forgetResetLinks, RESET_LINK_LIFETIME_SECONDS } from './password'
 import { authSchemaOptions } from './schema-options'
@@ -147,9 +139,9 @@ export const createAuth = ({
   inviteCode,
   password,
 }: AuthOptions) => {
-  // Fichiers à effacer après la suppression d'un compte (identifiant du membre → ses fichiers :
-  // son avatar et les photos de tous ses projets).
-  const filesToDelete = new Map<string, string[]>()
+  // La suppression du compte par le membre (account/delete.ts) : ses deux rappels, avant et après
+  // l'effacement de la ligne par Better Auth.
+  const deletionHooks = accountDeletionHooks({ db, storage, secret })
   // Changer son adresse (tranche « adresse ») : les hooks et les envois de ce parcours, avec leurs
   // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes. Le secret sert
   // à chiffrer le jeton du second lien.
@@ -281,139 +273,10 @@ export const createAuth = ({
       // disparaissent avec lui (suppression « en cascade » dans la base).
       deleteUser: {
         enabled: true,
-        // Juste avant la suppression : on note les fichiers de l'avatar et des photos de ses
-        // projets (leurs lignes vont disparaître avec le compte, on ne pourrait plus les retrouver).
-        beforeDelete: async (user) => {
-          const [row] = await db
-            .select({ avatarKey: schema.profile.avatarKey })
-            .from(schema.profile)
-            .where(eq(schema.profile.userId, user.id))
-          const projects = await db
-            .select({ id: schema.project.id })
-            .from(schema.project)
-            .where(eq(schema.project.authorId, user.id))
-          const keys = await mediaKeysOf(
-            db,
-            projects.map((p) => p.id),
-          )
-          // R7b : ses images du coin des testeurs sur les projets des autres (ses captures, en
-          // attente comprises) : leurs lignes partent avec lui (owner_id, cascade), pas leurs
-          // fichiers. Celles de ses propres projets sont déjà dans `keys` (mediaKeysOf) : un Set
-          // retire les doublons. Cette lecture par owner_id seul n'a pas d'index (celui de
-          // tester_media a project_id en tête) : elle parcourt la table une fois par suppression de
-          // compte, rare ; un index dédié coûterait à chaque envoi d'image.
-          const ownedImages = await db
-            .select({ storageKey: schema.testerMedia.storageKey })
-            .from(schema.testerMedia)
-            .where(eq(schema.testerMedia.ownerId, user.id))
-          const all = [...new Set([...keys, ...ownedImages.map((image) => image.storageKey)])]
-          // R9 : une photo de profil retirée par la modération porte la clé `withheld/<id>` ; le
-          // vrai fichier est gardé dans son retrait (hidden_value.storageKey). releaseAvatarKey
-          // rend la vraie clé, pour qu'il parte aussi du stockage et ne reste pas orphelin.
-          const avatarKey = row?.avatarKey
-            ? await releaseAvatarKey(db, user.id, row.avatarKey)
-            : null
-          filesToDelete.set(user.id, avatarKey ? [avatarKey, ...all] : all)
-          // Ses commentaires (tranche 5) : effacés, sauf ses racines auxquelles d'autres ont
-          // répondu, qui deviennent « Commentaire supprimé » (voir comments/erase.ts). Ici et pas
-          // après : une fois le compte parti, on ne saurait plus lesquels étaient les siens.
-          await eraseCommentsOf(db, user.id)
-          // R9 (sécurité P2) : les décisions qui visent son profil gardent son ancien nom et son
-          // ancien pseudo (pour un rétablissement). Une fois le compte parti, ces valeurs
-          // désigneraient un membre disparu : on les vide ici et pas après, car la base remet
-          // target_member_id à null à la suppression et on ne retrouverait plus les lignes. La
-          // décision elle-même reste (garde d'un an). La requête suit moderation_decision_target_idx.
-          await db
-            .update(schema.moderationDecision)
-            .set({ previousValue: null, provisionalValue: null })
-            .where(eq(schema.moderationDecision.targetMemberId, user.id))
-          // R10 : il quitte chacune de ses ruches, comme par « Quitter la ruche »
-          // (hives/write.ts, `removeFromHive`), avec les mêmes verrous et le même ordre (la ruche,
-          // puis sa ligne de membre, puis ses projets réservés) : s'il animait, l'animation passe
-          // au membre le plus ancien, qui lit « Tu animes maintenant la ruche Famille. » ; s'il
-          // était le dernier, la ruche est supprimée avec ses invitations (cascade). Ici, avant la
-          // suppression du compte, et pas en laissant faire la base : la cascade effacerait bien sa
-          // ligne de membre, mais l'animateur deviendrait nul (set null) sans successeur, et une
-          // ruche vide resterait. Ses projets réservés passent un instant en privé (sinon leur clé
-          // étrangère retiendrait une ruche vide), puis partent avec le compte.
-          // Ses ruches par l'index hive_member_user_idx (20 au plus : HIVE_LIMITS.joined). Une
-          // transaction par ruche, l'une après l'autre : chacune ne verrouille que sa ruche, et un
-          // geste simultané d'un autre membre sur l'une n'attend pas les autres.
-          // Ce qu'il laisse chez les autres reste lisible sans lui : ses invitations encore en
-          // attente gardent leur ruche, sans inviteur (inviter_id remis à null par la base) ; une
-          // épingle qu'il a posée reste à la ruche, sans « épinglé par » (pinned_by remis à null).
-          const memberships = await db
-            .select({ hiveId: schema.hiveMember.hiveId })
-            .from(schema.hiveMember)
-            .where(eq(schema.hiveMember.userId, user.id))
-          const leftAt = new Date()
-          for (const { hiveId } of memberships) {
-            await removeFromHive(db, hiveId, user.id, user.id, leftAt)
-          }
-        },
-        // Juste après : on efface les fichiers eux-mêmes du stockage, les compteurs anti-abus
-        // qui portent son identifiant, et les commentaires restés sans auteur (un commentaire
-        // publié pendant la suppression, entre beforeDelete et maintenant : voir comments/erase.ts).
-        //
-        // D'abord, une ligne dans les journaux : seulement l'identifiant (ni nom, ni adresse). Une
-        // sauvegarde restaurée ramènerait ce compte ; cette ligne dit qu'il faut le supprimer de
-        // nouveau (docs/ops/serveur.md, « Sauvegardes »). Écrite en premier, elle ne dépend pas du
-        // ménage qui suit : le compte est déjà parti.
-        afterDelete: async (user) => {
-          console.log(`Account deleted ${user.id}`)
-          const keys = filesToDelete.get(user.id) ?? []
-          filesToDelete.delete(user.id)
-          for (const key of keys) await storage.delete(key)
-          await deleteMemberCounters(db, user.id)
-          // Tranche R2, jur-6 : ses liens de mot de passe oublié encore valides, et tous les
-          // compteurs de son adresse (mot de passe oublié, renvoi du lien, correction de l'adresse :
-          // des empreintes, mais qui désignent toujours cette adresse).
-          await forgetResetLinks(db, user.id)
-          await deleteAddressCounters(db, secret, user.email)
-          await sweepOrphanComments(db)
-          // R6b (sec-A5) : les « Autre » que ses projets et son profil étaient seuls à citer. Les
-          // lignes de project_tool et profile_tool sont parties avec le compte (cascade) ; la purge
-          // de nuit rattrape une panne ici.
-          try {
-            await dropOrphanOthers(db)
-          } catch (error) {
-            console.error(
-              'Other tools not swept after deletion',
-              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
-            )
-          }
-          // Les signalements qui visaient ses contenus ou son profil (tranche 7a, règle 16) : la
-          // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
-          // « sans objet » (effacés 30 jours plus tard), ceux suivis d'un retrait restent un an. Ici,
-          // après la suppression, et pas dans beforeDelete : une suppression refusée ne touche à
-          // rien. Ceux qu'elle a faits restent, sans son nom (reporter_id remis à null par la base).
-          // Une panne ici ne doit pas faire échouer la suppression, déjà faite : la purge de nuit
-          // rattrape (reports/retention.ts).
-          try {
-            await voidReportsOfDepartedAuthors(db, new Date())
-          } catch (error) {
-            console.error(
-              'Reports not voided after deletion',
-              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
-            )
-          }
-          // Sa suspension en cours (tranche 7c, J1) : partir est permis, et n'efface pas la
-          // preuve. Elle est close à la date du départ, sans décision de levée, et gardée un an
-          // avec ses décisions. Ici, après la suppression : une suppression refusée laisse la
-          // suspension en cours. Le compteur de ses e-mails de suspension (S18) porte son
-          // identifiant : effacé aussi. Une panne ne fait pas échouer la suppression, déjà faite.
-          try {
-            await closeSuspensionsOfDeparted(db, new Date())
-            await db
-              .delete(schema.apiRateLimit)
-              .where(eq(schema.apiRateLimit.key, suspensionEmailKey(user.id)))
-          } catch (error) {
-            console.error(
-              'Suspension not closed after deletion',
-              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
-            )
-          }
-        },
+        // Les étapes de la suppression, avant et après l'effacement de la ligne du membre : une
+        // seule liste (account/delete.ts), la même que pour la tâche des comptes inactifs (R11,
+        // S-C2). Better Auth efface la ligne entre les deux rappels.
+        ...deletionHooks,
       },
     },
 
