@@ -10,6 +10,7 @@
 // /v1/hives/<id> pour le nom ; GET /v1/hives/<id>/invitable?q= ; POST …/invitations `{ userId }`.
 // L'aperçu est `ui/HiveInvitation` en mode `preview` : ses boutons sont dessinés, sans rôle. Le
 // reste est dans `Hives.testkit.tsx`.
+import { HIVE_LIMITS } from '@ruche/contracts'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { passTapGuard } from '../testing/dialog'
 import { mockSession, renderWithProviders } from '../testing/render'
@@ -180,6 +181,32 @@ describe('inviting a member', () => {
 
     await waitFor(() => expect(shown(T.inviteError)).toBe(true))
     expect(screen.getByRole('button', { name: inviteNamed(max.name) })).toBeTruthy()
+  })
+
+  // R10, relecture du design (3) : la 21e invitation du jour disait « Réessaie dans quelques
+  // minutes », alors que le quota court sur 24 h. Son propre code, sa propre phrase, avec le quota
+  // du contrat.
+  it('says the invitations of the day are spent and the next ones can leave tomorrow', async () => {
+    hiveServer.answer('POST', INVITE, () => refusal(429, 'hive_invitations_limited'))
+    await openSheet()
+
+    await fireEvent.press(await findMax())
+
+    const limited = fr.t(($) => $.hives.invite.dailyLimit, {
+      count: HIVE_LIMITS.invitationsPerDay,
+    })
+    await waitFor(() => expect(shown(limited)).toBe(true))
+    expect(shown(fr.t(($) => $.errors.rateLimited))).toBe(false)
+    expect(screen.getByRole('button', { name: inviteNamed(max.name) })).toBeTruthy()
+  })
+
+  it('keeps « trop de demandes » for any other 429 (témoin)', async () => {
+    hiveServer.answer('POST', INVITE, () => refusal(429, 'rate_limited'))
+    await openSheet()
+
+    await fireEvent.press(await findMax())
+
+    await waitFor(() => expect(shown(fr.t(($) => $.errors.rateLimited))).toBe(true))
   })
 })
 

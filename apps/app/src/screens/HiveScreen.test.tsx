@@ -17,6 +17,8 @@
 // - le reste est dans `Hives.testkit.tsx` (faux serveur, routeur, textes).
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { passTapGuard } from '../testing/dialog'
+import { leaMe } from '../testing/fixtures'
+import { sevenDaySuspension } from '../testing/moderation'
 import { reportsOpened } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -339,6 +341,26 @@ describe('the members tab', () => {
     await fireEvent.press(screen.getByRole('button', { name: T.remove }))
 
     await waitFor(() => expect(hiveServer.received('DELETE', REMOVE)).toHaveLength(1))
+  })
+
+  // R10 (plan, « À couvrir par un test plus tard ») : l'API refuse à un compte suspendu d'inviter,
+  // de retirer un membre et d'épingler (403 `suspended`) ; la page ne les propose donc pas, comme
+  // les autres écrans retirent les actions d'un compte suspendu (`useSuspension`).
+  it('hides invite, remove and pin from a suspended animator', async () => {
+    asAnimator()
+    hiveServer.me = { ...leaMe, suspension: sevenDaySuspension }
+    await openMembers()
+    await waitFor(() => expect(hiveServer.received('GET', /^\/v1\/me$/)).not.toHaveLength(0))
+
+    await waitFor(() => expect(control(removeNamed(odile.name))).toBeNull())
+    expect(control(T.inviteOne)).toBeNull()
+    expect(control(T.invite)).toBeNull()
+    // Témoin : quitter la ruche reste permis à un compte suspendu.
+    expect(getControl(T.leave)).toBeTruthy()
+
+    await fireEvent.press(tab(projectsSpoken(5)))
+    await waitFor(() => expect(shown(biscotte.title)).toBe(true))
+    expect(control(fr.t(($) => $.hives.page.projectMenu, { title: biscotte.title }))).toBeNull()
   })
 })
 

@@ -40,6 +40,16 @@ describe('EmailSummary', () => {
     expect(screen.getByText(texts.note)).toBeTruthy()
   })
 
+  // R10, relecture juridique (C3) : la phrase des ruches (« Tout de suite » ne vaut que pour les
+  // invitations) se lit sous le résumé, dans la carte, en paragraphe à part.
+  it('says the detail under the summary, in its own paragraph', async () => {
+    const detail = 'Pour les ruches, « Tout de suite » ne vaut que pour les invitations.'
+    await renderWithProviders(<EmailSummary {...texts} detail={detail} onAction={() => {}} />)
+
+    expect(screen.getByText(texts.summary)).toBeTruthy()
+    expect(screen.getByText(detail)).toBeTruthy()
+  })
+
   it('leads to the notification settings', async () => {
     const onAction = jest.fn()
     await renderWithProviders(<EmailSummary {...texts} onAction={onAction} />)

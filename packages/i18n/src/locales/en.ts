@@ -266,7 +266,7 @@ export const en: Translation = {
       blocksDetail: 'Your blocks go with your account, and so do the blocks aimed at you.',
       hivesItem: 'Your hives',
       hivesDetail:
-        'You leave each of your hives. If you host a hive, hosting passes to its longest-standing member; if you are its last member, it is deleted. Your invitations go too.',
+        'You leave each of your hives. If you host a hive, hosting passes to its longest-standing member; if you are its last member, it is deleted. The invitations you received go too.',
       remains: {
         title: 'What stays',
         hiveNames:
@@ -275,6 +275,7 @@ export const en: Translation = {
         removals: 'A record of removals of your content stays for a year',
         reportCopies:
           'If your content or your profile was reported, the copy of its text stays 30 days (a year if it was removed)',
+        hiveInvitations: 'The invitations you sent stay valid, without your name',
       },
     },
   },
@@ -2071,6 +2072,8 @@ export const en: Translation = {
       // Places left in the hive: 50 at most, pending invitations included.
       placesLeft_one: '{{count}} place left in the hive.',
       placesLeft_other: '{{count}} places left in the hive.',
+      dailyLimit:
+        'You have sent your {{count}} invitations for today: the next ones can go tomorrow.',
       // Under 3 letters, only followed members and members of one's hives.
       shortQuery: 'From 3 letters on, you also find the other members of {{appName}}.',
       // 404: unknown member, or a block between the two (the API says the same).
@@ -2321,7 +2324,7 @@ export const en: Translation = {
       feedbackSettled: '{{name}} (@{{handle}}) fixed your feedback on “{{title}}”.',
       hiveInvited: '{{name}} (@{{handle}}) invites you to a hive on {{appName}}.',
       hiveInvitedExplain:
-        'A hive is a group of people close to you. Its name and members can be read in the app, before you accept or decline.',
+        'A hive is a group of people close to you. Before you accept or decline, the app shows you its name, its icon and how many members it has; its members and projects, only if you join.',
       openHives: 'See the invitation',
       private: 'The testers’ corner thread is private: its text stays in the app.',
       callPrivate: 'The call stays in the testers’ corner: its text does not leave the app.',
@@ -2614,6 +2617,12 @@ export const en: Translation = {
         'No emails for your notifications; the Sunday recap only brings new projects from people you follow.',
       nowFriends:
         '{{types}} right away; the Sunday recap only brings new projects from people you follow.',
+      nowFriendsHives:
+        '{{types}} right away; the Sunday recap only brings new projects from people you follow and news from your hives.',
+      hivesNow:
+        'For hives, “Right away” only means invitations: news from your hives goes in the Sunday recap.',
+      hivesNowRecapOff:
+        'For hives, “Right away” only means invitations: with the recap off, news from your hives isn’t emailed.',
       types: {
         reactions: 'reactions',
         comments: 'comments on your projects',
@@ -2816,6 +2825,8 @@ export const en: Translation = {
     alreadyHiveMember: 'This member is already in the hive.',
     alreadyInvited: 'This member already has an invitation to this hive.',
     invitationExpired: 'This invitation is no longer valid.',
+    hiveInvitationsLimited:
+      'You have sent all your invitations for today: the next ones can go tomorrow.',
     pinNotVisible: 'This project can’t be pinned: not the whole hive can see it.',
   },
 }

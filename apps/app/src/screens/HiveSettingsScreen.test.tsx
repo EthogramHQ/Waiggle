@@ -14,7 +14,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { passTapGuard } from '../testing/dialog'
 import { mockSession, renderWithProviders } from '../testing/render'
-import { containing } from '../testing/text'
+import { containing, fr } from '../testing/text'
 import { ToastProvider } from '../ui/theme/toast'
 import { HiveSettingsScreen } from './HiveSettingsScreen'
 import {
@@ -248,6 +248,24 @@ describe('handing over the animation', () => {
 
     await waitFor(() => expect(replaced()).toContain(`/hives/${hiveId}`))
     expect(pushed()).toEqual([])
+  })
+
+  // R10, relecture de l'interface (B1) : un membre sans pseudo (`handle` nul au contrat) montrait
+  // « @null » sous son nom. Le pseudo passe par la clé commune `member.handle`, et rien sans pseudo.
+  it('shows no handle for a member without one in the hand-over sheet', async () => {
+    hiveServer.members.set(
+      hiveId,
+      membersLeaAnimator.map((one) => (one.face.id === ines.id ? { ...one, handle: null } : one)),
+    )
+    await openSettings()
+
+    const opener = anyControl(containing(T.handOver))
+    if (opener) await fireEvent.press(opener)
+    await waitFor(() => expect(anyControl(containing(ines.name))).toBeTruthy())
+
+    // Témoin : le pseudo de Tante Odile se lit, par la même clé que la liste des membres.
+    expect(screen.getByText(fr.t(($) => $.member.handle, { handle: 'odile' }))).toBeTruthy()
+    expect(screen.queryByText(/@null/)).toBeNull()
   })
 })
 

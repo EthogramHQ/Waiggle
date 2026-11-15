@@ -219,6 +219,9 @@ export function DeleteAccountScreen() {
         <ListGroup title={t(($) => $.account.delete.remains.title)}>
           {/* R10 : le nom d'une ruche qu'on a créée reste (c'est un bien commun de ses membres). */}
           <ListRow icon="hexagon" label={t(($) => $.account.delete.remains.hiveNames)} />
+          {/* R10, relecture juridique (C4) : les invitations envoyées restent valables, sans le
+              nom de qui part (`inviter_id` remis à null) ; les reçues partent avec le compte. */}
+          <ListRow icon="user-plus" label={t(($) => $.account.delete.remains.hiveInvitations)} />
           <ListRow icon="flag" label={t(($) => $.account.delete.remains.reports)} />
           <ListRow icon="clock" label={t(($) => $.account.delete.remains.removals)} />
           {/* Tranche 7b (relecture juridique du plan, J11) : la copie des textes signalés, gardée

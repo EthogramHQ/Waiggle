@@ -45,6 +45,10 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
   // Le récap activé part même sans aucun type « dans le récap » : il apporte les nouveaux projets
   // des proches (choix 7 du scénario). La phrase ne dit donc jamais « rien ne part » dans ce cas.
   const friendsOnly = preferences.weeklyRecap && inRecap.length === 0
+  // R10, relecture juridique (C3) : « Ruches » à « Tout de suite » n'envoie tout de suite que les
+  // invitations ; les nouveautés des ruches partent quand même dans le récap (« Dans tes ruches »,
+  // jobs/weekly-recap.ts). « Seulement les nouveaux projets de tes proches » serait faux.
+  const hivesNewsInRecap = friendsOnly && preferences.hives === 'now'
 
   if (now.length === 0) {
     if (friendsOnly) return t(($) => $.notifications.summary.nothingFriends)
@@ -56,9 +60,24 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
 
   const names = now.map((type) => t(($) => $.notifications.summary.types[type]))
   const list = capitalize(joinList(names, language), language)
+  if (hivesNewsInRecap) return t(($) => $.notifications.summary.nowFriendsHives, { types: list })
   if (friendsOnly) return t(($) => $.notifications.summary.nowFriends, { types: list })
   if (inRecap.length === 0) return t(($) => $.notifications.summary.nowOnly, { types: list })
   return someLeftOut
     ? t(($) => $.notifications.summary.nowAndSome, { types: list })
     : t(($) => $.notifications.summary.nowAndRest, { types: list })
+}
+
+/**
+ * La phrase qui suit, dans la même carte, quand « Ruches » vaut « Tout de suite » : ce que ce choix
+ * veut dire pour elles (R10, relecture juridique, C3), seulement les invitations ; leurs nouveautés
+ * vont dans le récap, ou ne partent pas par e‑mail si le récap est coupé. Sans elle, « Les ruches
+ * tout de suite » laissait croire que chaque nouveauté d'une ruche partait aussitôt. Null pour un
+ * autre choix : rien à préciser.
+ */
+export const hivesNowNote = (preferences: EmailPreferences, t: T): string | null => {
+  if (preferences.hives !== 'now') return null
+  return preferences.weeklyRecap
+    ? t(($) => $.notifications.summary.hivesNow)
+    : t(($) => $.notifications.summary.hivesNowRecapOff)
 }

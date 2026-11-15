@@ -105,6 +105,12 @@ function InviteSheet({ id, me }: { id: string; me: Person }) {
     if (key === 'notFound') return { message: t(($) => $.hives.invite.notFound) }
     // 403 : l'animateur vient de se réserver les invitations.
     if (key === 'forbidden') return { message: t(($) => $.hives.page.animatorOnly) }
+    // 429 `hive_invitations_limited` : les invitations du jour sont parties ; le quota, celui du
+    // contrat (relecture du design de R10 : « dans quelques minutes » était faux, il court sur 24 h).
+    if (key === 'hiveInvitationsLimited')
+      return {
+        message: t(($) => $.hives.invite.dailyLimit, { count: HIVE_LIMITS.invitationsPerDay }),
+      }
     if (
       key === 'hiveFull' ||
       key === 'alreadyHiveMember' ||

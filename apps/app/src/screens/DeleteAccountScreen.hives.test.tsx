@@ -56,4 +56,18 @@ describe('the hives on the account deletion screen', () => {
     expect(placeOf(hivesItem)).toBeLessThan(remains)
     expect(remains).toBeLessThan(placeOf(hiveNames))
   })
+
+  // R10, relecture juridique (C4) : « Tes invitations partent aussi » était faux pour celles qu'on
+  // a envoyées. La suppression efface les invitations reçues (cascade sur `invitee_id`) ; celles
+  // envoyées gardent leur ruche, sans inviteur (`inviter_id` remis à null, auth/auth.ts).
+  it('says the received invitations go and the sent ones stay valid, without my name', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+    await screen.findByText(containing('@lea'))
+
+    const sent = fr.t(($) => $.account.delete.remains.hiveInvitations)
+    expect(screen.getAllByText(containing(sent)).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Tes invitations partent aussi/)).toBeNull()
+    // Les envoyées dans ce qui reste, après son titre.
+    expect(placeOf(fr.t(($) => $.account.delete.remains.title))).toBeLessThan(placeOf(sent))
+  })
 })
