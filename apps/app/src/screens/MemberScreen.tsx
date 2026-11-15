@@ -17,7 +17,15 @@
 //
 // Tranche R5a (F-Mb1) : « Partager » en haut à droite ouvre la feuille de partage (`ShareSheet`),
 // avec l'adresse de la page ; sur sa propre page, à côté de la roue.
-import { type Member, PROJECT_LIST_MAX, type RemovedPart as RemovedPartOut } from '@ruche/contracts'
+//
+// Tranche R10 (F-Et5) : les projets en mosaïque de tuiles (`TileMosaic`, `ProjectTile`), comme la
+// page d'un outil, avec la pastille « Privé » ou « Réservé à Famille ».
+import {
+  type Member,
+  PROJECT_LIST_MAX,
+  type ProjectSummary,
+  type RemovedPart as RemovedPartOut,
+} from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -34,7 +42,6 @@ import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { ProvisionalNameBanner } from '../profile/ProvisionalNameBanner'
-import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -53,6 +60,10 @@ import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
+import { ProjectTile } from '../ui/Tile'
+import { TileMosaic } from '../ui/TileMosaic'
+import { useTapGuard } from '../ui/tapGuard'
+import { useLayout } from '../ui/theme/layout'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -333,6 +344,26 @@ function MemberView({ member }: { member: Member }) {
     ? t(($) => $.member.projectCountMore, { max: PROJECT_LIST_MAX })
     : t(($) => $.member.projectCount, { count: projectCount })
 
+  // R10 : les tuiles de « Ses projets ». Deux colonnes sur téléphone, quatre ailleurs (comme la page
+  // d'un outil). Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas
+  // deux pages.
+  const phone = useLayout().sizeClass === 'compact'
+  const guard = useTapGuard()
+  const openProject = (projectId: string) =>
+    guard(() => router.push(`/projects/${encodeURIComponent(projectId)}`))
+  // La pastille de visibilité d'une tuile : « Privé » (sur « Moi » : l'API ne montre ses projets
+  // privés qu'à leur auteur), « Réservé à Famille » pour un projet réservé à une ruche, que l'API ne
+  // montre qu'aux membres de la ruche ; « Ruche sans nom » si son nom a été retiré, comme la ligne
+  // d'actualité d'une ruche (`HiveActivityRow`).
+  const visibilityBadge = (project: ProjectSummary): string | undefined => {
+    if (project.visibility === 'private') return t(($) => $.member.private)
+    if (project.visibility === 'hive' && project.hive)
+      return t(($) => $.hives.page.reserved, {
+        hive: project.hive.name ?? t(($) => $.hives.unnamed),
+      })
+    return undefined
+  }
+
   // La feuille « Partager » ouverte ou non, et son bouton (un bouton à icône seule : son nom
   // « Partager » est lu).
   const [sharing, setSharing] = useState(false)
@@ -475,13 +506,41 @@ function MemberView({ member }: { member: Member }) {
             more={capped}
             spokenCount={spokenCount}
           />
-          <ProjectGrid
-            empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}
-          >
-            {member.projects.map((project) => (
-              <SummaryCard key={project.id} project={project} />
-            ))}
-          </ProjectGrid>
+          {member.projects.length === 0 ? (
+            // Aucun projet : la phrase de la grille, sans mosaïque.
+            <ProjectGrid
+              empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}
+            >
+              {null}
+            </ProjectGrid>
+          ) : (
+            // R10 (F-Et5) : ses projets en mosaïque de tuiles, comme la page d'un outil ; deux
+            // colonnes sur téléphone, quatre ailleurs. La tuile garde la photo, le titre, l'auteur
+            // et la pastille de visibilité ; « Tester », « Suivre » et l'accroche restent au Fil.
+            <TileMosaic columns={phone ? 2 : 4}>
+              {member.projects.map((project) => {
+                const visual = project.portraitCover ?? project.cover
+                return (
+                  <ProjectTile
+                    key={project.id}
+                    title={project.title}
+                    author={project.author.name}
+                    image={
+                      visual
+                        ? {
+                            source: toSource(visual.url),
+                            thumbhash: visual.thumbhash,
+                            label: project.title,
+                          }
+                        : null
+                    }
+                    badge={visibilityBadge(project)}
+                    onPress={openProject(project.id)}
+                  />
+                )
+              })}
+            </TileMosaic>
+          )}
         </>
       )}
       {/* Bloquer et débloquer passent par la même fenêtre, qui dit ce qui change (J9, J10). */}

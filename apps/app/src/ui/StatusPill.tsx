@@ -5,7 +5,15 @@ import { View } from 'react-native'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
-type Props = { label: string; strong?: boolean }
+type Props = {
+  label: string
+  strong?: boolean
+  /**
+   * R10 : l'identifiant du texte, pour qu'un lien le désigne comme sa description
+   * (`aria-describedby`, voir aria.ts) : la pastille « Privé » d'une tuile (`ProjectTile`).
+   */
+  nativeID?: string
+}
 
 /**
  * La hauteur de la pastille, en points. Exportée : ce qui s'aligne sur elle (la catégorie écrite à
@@ -13,7 +21,7 @@ type Props = { label: string; strong?: boolean }
  */
 export const STATUS_PILL_HEIGHT = 26
 
-export function StatusPill({ label, strong = false }: Props) {
+export function StatusPill({ label, strong = false, nativeID }: Props) {
   const { colors } = useTheme()
   return (
     <View
@@ -26,7 +34,12 @@ export function StatusPill({ label, strong = false }: Props) {
         backgroundColor: strong ? colors.honey : colors.honeySoft,
       }}
     >
-      <Text variant="caption" weight={700} tone={strong ? 'onHoney' : 'status'}>
+      <Text
+        variant="caption"
+        weight={700}
+        tone={strong ? 'onHoney' : 'status'}
+        {...(nativeID ? { nativeID } : null)}
+      >
         {label}
       </Text>
     </View>
