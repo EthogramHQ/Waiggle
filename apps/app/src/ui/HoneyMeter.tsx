@@ -1,6 +1,7 @@
 // Une jauge en alvéoles de miel : une alvéole par unité, remplie au fur et à mesure.
 // Elle montre par exemple combien de caractères manquent au mot de passe. Les lecteurs d'écran
-// lisent la phrase (`label`), pas les alvéoles.
+// lisent la phrase (`label`), pas les alvéoles : c'est le nom de la barre de progression, et sa
+// valeur lue. Une fois la jauge pleine, la phrase ne s'affiche plus mais le nom reste.
 import { space } from '@ruche/brand'
 import { View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
@@ -22,7 +23,16 @@ export function HoneyMeter({ value, max, label }: Props) {
   const filled = Math.min(value, max)
   const done = value >= max
   return (
-    <View accessible accessibilityLabel={label} style={{ gap: space.sm }}>
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={filled}
+      aria-valuetext={label}
+      style={{ gap: space.sm }}
+    >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xxs }}>
         {Array.from({ length: max }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: les alvéoles n'ont pas d'autre identité que leur rang
@@ -36,14 +46,23 @@ export function HoneyMeter({ value, max, label }: Props) {
           </Svg>
         ))}
       </View>
-      {/* Discrète tant que la jauge est vide, ambre pendant la saisie, verte une fois remplie. */}
-      <Text
-        variant="caption"
-        weight={value === 0 ? 400 : 700}
-        tone={done ? 'success' : value === 0 ? 'muted' : 'accent'}
+      {/* Discrète tant que la jauge est vide, ambre pendant la saisie. Une fois remplie, les
+          alvéoles pleines suffisent : la phrase quitte l'écran (« moins de mots ») mais garde sa
+          place, transparente et cachée des lecteurs d'écran (elle est déjà le nom de la barre),
+          pour que ce qui suit la jauge ne remonte pas sous le doigt au dernier caractère. */}
+      <View
+        aria-hidden={done}
+        importantForAccessibility={done ? 'no-hide-descendants' : 'auto'}
+        style={{ opacity: done ? 0 : 1 }}
       >
-        {label}
-      </Text>
+        <Text
+          variant="caption"
+          weight={value === 0 ? 400 : 700}
+          tone={value === 0 ? 'muted' : 'accent'}
+        >
+          {label}
+        </Text>
+      </View>
     </View>
   )
 }
