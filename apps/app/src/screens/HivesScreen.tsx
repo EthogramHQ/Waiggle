@@ -315,12 +315,7 @@ function HivesView({ mine }: { mine: MyHives }) {
   }
 
   return (
-    <Screen
-      title={t(($) => $.hives.title)}
-      subtitle={t(($) => $.hives.intro)}
-      titleAside={createButton}
-      header={<TopNav />}
-    >
+    <Screen title={t(($) => $.hives.title)} titleAside={createButton} header={<TopNav />}>
       <Stack gap="xl" align="stretch">
         {limitText}
 

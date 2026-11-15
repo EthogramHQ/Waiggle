@@ -2562,7 +2562,6 @@ export const fr = {
     unnamedInline: 'sans nom',
     // Le nom lu de l'alvéole ; l'icône est décorative.
     badge: 'Ruche {{hive}}',
-    myHive: 'Ma ruche',
     // R11 (U4) : « Ma ruche » quitte l'écran ; le nom lu ne dit plus un mot absent.
     myHiveNamed: 'Ruche {{hive}}',
     members_one: '{{count}} membre',
@@ -2739,7 +2738,6 @@ export const fr = {
       handOverHint: 'Tu en resteras membre.',
       delete: 'Supprimer la ruche',
       // La précision de la ligne « Confier l'animation » (planche R10-Reglages-Ruche).
-      handOverDetail: 'Tu redeviens membre.',
       // La feuille « Confier l'animation » quand l'animateur est seul dans la ruche.
       handOverNone: 'Personne d’autre n’est membre de la ruche pour l’instant.',
       iconError: 'L’icône n’a pas pu s’enregistrer. Réessaie.',
