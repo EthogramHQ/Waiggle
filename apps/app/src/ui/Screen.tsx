@@ -322,16 +322,28 @@ export function Screen({
   // R7b (K12) : le pied peut aussi venir du contenu (`ScreenFooterSlot`, le compositeur d'un onglet).
   const canPinFooter = sizeClass !== 'wide' && !brand
   const footerSlot = useScreenFooterSlot(canPinFooter)
-  // R11 : la hauteur mesurée du contenu du pied (0 tant qu'elle ne l'est pas : collé d'abord, comme
-  // sur la planche). On mesure le même bloc, collé ou non (ses boutons, sans le cadre du pied
-  // collé) : la décision ne bascule pas d'un dessin à l'autre. Elle se refait à chaque rendu, avec
-  // la hauteur de la fenêtre du moment (téléphone tourné).
-  const [footerHeight, setFooterHeight] = useState(0)
+  // R11 : la hauteur du contenu du pied (ses boutons, sans le cadre du pied collé), mesurée une fois
+  // par hauteur de fenêtre (téléphone tourné : nouvelle mesure). Pas encore mesurée : collé, comme
+  // sur la planche. La mesure est gardée : un message qui paraît ensuite dans le pied (« Il manque
+  // deux choses… ») ne le décolle pas. Décollé, le pied passerait dans la zone qui défile, sous le
+  // pli : le bouton touché partirait sous le doigt et le focus serait perdu (essai à 390 × 844).
+  const [footerMeasure, setFooterMeasure] = useState<{ window: number; height: number } | null>(
+    null,
+  )
   const measureFooter =
     footerMaxShare === undefined
       ? undefined
-      : (event: LayoutChangeEvent) => setFooterHeight(event.nativeEvent.layout.height)
-  const footerFits = footerMaxShare === undefined || footerHeight <= windowHeight * footerMaxShare
+      : (event: LayoutChangeEvent) => {
+          const { height } = event.nativeEvent.layout
+          setFooterMeasure((kept) =>
+            kept?.window === windowHeight ? kept : { window: windowHeight, height },
+          )
+        }
+  const footerFits =
+    footerMaxShare === undefined ||
+    footerMeasure === null ||
+    footerMeasure.window !== windowHeight ||
+    footerMeasure.height <= windowHeight * footerMaxShare
   const pinnedFooter = (footer !== undefined || footerSlot.filled) && canPinFooter && footerFits
   // La place flottante (R5a) : sa hauteur mesurée (0 tant qu'elle ne l'est pas, ou sans place), la
   // distance entre elle et le bas de l'écran, et la réserve à laisser sous le contenu.

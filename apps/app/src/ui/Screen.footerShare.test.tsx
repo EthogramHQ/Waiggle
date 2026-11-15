@@ -57,16 +57,23 @@ const page = (share?: number) => (
 describe('Screen footerMaxShare (R11)', () => {
   const half = Dimensions.get('window').height / 2
 
-  it('pins the footer while it fits in half the window, and lets it follow the content beyond', async () => {
+  it('lets a footer taller than half the window follow the content', async () => {
     await renderWithProviders(page(0.5))
     // Pas encore mesuré : collé, comme sur la planche.
     expect(inScroller()).toBe(false)
 
     await footerMeasures(half + 10)
     expect(inScroller()).toBe(true)
+  })
 
-    // De nouveau assez bas (texte rendu à sa taille) : il recolle.
+  it('keeps a footer that fitted pinned when a message makes it grow', async () => {
+    await renderWithProviders(page(0.5))
+
     await footerMeasures(half - 10)
+    expect(inScroller()).toBe(false)
+    // « Il manque deux choses… » paraît dans le pied : décollé, il partirait sous le pli, et le
+    // bouton touché avec lui.
+    await footerMeasures(half + 60)
     expect(inScroller()).toBe(false)
   })
 

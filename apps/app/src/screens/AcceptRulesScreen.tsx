@@ -18,7 +18,7 @@
 // le texte à gauche, les cases et les sorties à droite.
 import { type Me, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { downloadMyData } from '../accounts/api'
 import { legalDocument } from '../legal/documents'
@@ -26,7 +26,7 @@ import { useAcceptRules } from '../rules/api'
 import { Button } from '../ui/Button'
 import { Checkbox } from '../ui/Checkbox'
 import { Columns } from '../ui/Columns'
-import { type Focusable, focusAndReveal } from '../ui/focus'
+import { type Focusable, focusAndReveal, focusWithoutScroll } from '../ui/focus'
 import { KeyPoints } from '../ui/KeyPoints'
 import { LegalVersionBadge } from '../ui/LegalDocument'
 import { ListBlock, ListGroup } from '../ui/ListGroup'
@@ -74,9 +74,14 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
   const sending = useRef(false)
   const rulesBox = useRef<Focusable>(null)
   const ageBox = useRef<Focusable>(null)
-  // Le titre est le premier élément focalisable de la couche : le piège à focus de la fenêtre (web)
-  // le choisit à l'ouverture, et le lecteur d'écran part de lui.
+  // Le focus du clavier part du titre (relecture du plan, U1). Le piège à focus de la fenêtre (web)
+  // prendrait sinon le premier élément focalisable, qui sur téléphone est la zone qui défile tout
+  // entière (Chrome rend une zone qui défile atteignable au clavier) ; il garde un focus déjà posé
+  // dans la couche. Une fois, à l'arrivée de l'écran.
   const titleRef = useRef<Focusable>(null)
+  useEffect(() => {
+    focusWithoutScroll(titleRef.current)
+  }, [])
 
   const onContinue = async () => {
     if (sending.current) return
