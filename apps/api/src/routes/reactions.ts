@@ -5,12 +5,12 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { ProjectId, REACTION_KINDS, ReactionKind } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ne, or, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { visibleTo } from '../projects/load'
-import { projectReachableBy } from '../projects/visibility'
+import { hiveMemberOf, projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -100,7 +100,26 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     const kind = ReactionKind.safeParse(rawKind)
     if (!ProjectId.safeParse(id).success || !kind.success) return notFound(c)
-    const reachable = undo ? projectReachableBy(userId) : visibleTo(userId)
+    // R10, relecture de sécurité (A3) : `projectReachableBy` trouve tout projet réservé, ce qui
+    // disait à une inconnue (204 contre 404) qu'il existe. En annulation, un projet réservé n'est
+    // trouvé que par un membre de sa ruche (`hiveMemberOf`), ou par qui y a une réaction (un
+    // ancien membre défait toujours son geste, décision Q2) : la sous-requête lit la clé primaire
+    // de project_reaction (project_id, member_id, …) par son début, identifiants liés.
+    // `sql.raw('project.id')` : écrit par Drizzle, la colonne perdrait le nom de sa table dans la
+    // sous-requête (piège de la charte, 6b).
+    const reachable = undo
+      ? and(
+          projectReachableBy(userId),
+          or(
+            ne(schema.project.visibility, 'hive'),
+            eq(schema.project.authorId, userId),
+            hiveMemberOf(userId),
+            sql`(select 1 from ${schema.projectReaction} pr
+                 where pr.project_id = ${sql.raw('project.id')} and pr.member_id = ${userId}
+                 limit 1) is not null`,
+          ),
+        )
+      : visibleTo(userId)
     const [project] = await db
       .select({ authorId: schema.project.authorId })
       .from(schema.project)
