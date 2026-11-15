@@ -1,24 +1,43 @@
 // Tables de l'authentification, générées par Better Auth (`pnpm --filter @ruche/api auth:schema`)
 // puis commentées. Drizzle décrit chaque table en TypeScript : pgTable('nom', { colonnes }).
 // Ne pas modifier la forme à la main sans régénérer : Better Auth s'attend exactement à celle-ci.
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { bigint, boolean, index, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 // Les membres. Le mot de passe n'est PAS ici : il est dans `account`, chiffré (haché).
-export const user = pgTable('user', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(), // unique : deux comptes ne peuvent pas partager une adresse
-  emailVerified: boolean('email_verified').default(false).notNull(),
-  image: text('image'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at')
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date()) // mis à jour automatiquement à chaque modification
-    .notNull(),
-  // Ajouté par Waiggle : langue des e-mails et notifications ('fr' ou 'en').
-  language: text('language').default('fr').notNull(),
-})
+export const user = pgTable(
+  'user',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    email: text('email').notNull().unique(), // unique : deux comptes ne peuvent pas partager une adresse
+    emailVerified: boolean('email_verified').default(false).notNull(),
+    image: text('image'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date()) // mis à jour automatiquement à chaque modification
+      .notNull(),
+    // Ajouté par Waiggle : langue des e-mails et notifications ('fr' ou 'en').
+    language: text('language').default('fr').notNull(),
+    // Ajoutés par Waiggle (R11, comptes inactifs) : Better Auth ne les connaît pas et ne les écrit
+    // jamais ; il les ignore à la lecture.
+    // La dernière visite connue du membre, posée au plus une fois par jour par l'API (heure de
+    // l'API, `new Date()`). Un compte sans visite depuis 3 ans est supprimé. Le défaut ne sert qu'à
+    // l'inscription (Better Auth crée la ligne sans elle) et aux lignes écrites à la main dans un
+    // test ; la migration a rempli les comptes existants avec leur vraie dernière date. Il donne
+    // l'heure UTC sans fuseau (`now() at time zone 'utc'`), comme l'API l'écrit, et non `now()`
+    // seul, qui suivrait le fuseau de la connexion (packages/db/migrations-time.test.ts).
+    lastActiveAt: timestamp('last_active_at').default(sql`(now() at time zone 'utc')`).notNull(),
+    // Quand l'e-mail « ton compte sera supprimé dans 30 jours » est parti ; null : pas envoyé, ou
+    // effacé par une visite depuis. Noté avant l'envoi, pour qu'une tâche relancée n'en envoie pas
+    // deux.
+    inactiveNoticeAt: timestamp('inactive_notice_at'),
+  },
+  // La tâche de nuit cherche les comptes dont la dernière visite est plus ancienne qu'une date
+  // (`last_active_at < …`) : cet index les lui donne dans l'ordre, sans lire tous les membres.
+  (table) => [index('user_last_active_idx').on(table.lastActiveAt)],
+)
 
 // Les sessions : une par appareil connecté. Le `token` est le badge que l'appli présente
 // à chaque requête pour prouver qui elle est.
