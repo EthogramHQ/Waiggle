@@ -259,3 +259,57 @@ describe('the hives read after the feed (R10, review)', () => {
     }
   })
 })
+
+// --- Les nouveautés sous une pastille de ruche ---
+
+/** Les lectures de ses ruches (GET /v1/hives). */
+const minesRead = () => hiveServer.received('GET', MINE).length
+/** Les lectures du Fil de « Famille ». */
+const familleReads = () =>
+  hiveServer.received('GET', FOLLOWING).filter((one) => one.query.get('hive') === hiveId).length
+const newsOf = (count: number) => fr.t(($) => $.feed.newMixed, { count })
+
+describe('the news button under a hive pill (R10, review)', () => {
+  it('reads the hives again once the first page of the hive feed is read', async () => {
+    mockRoute.params = { hive: hiveId }
+    await renderHome()
+    await screen.findByRole('link', { name: planDeTable.title })
+
+    // La première page a posé la date de visite : « Tes ruches » et le bouton relisent les ruches.
+    await waitFor(() => expect(minesRead()).toBeGreaterThanOrEqual(2))
+  })
+
+  it('shows the news of the chosen hive, read after its feed, and reads its feed again on press', async () => {
+    mockRoute.params = { hive: hiveId }
+    // Deux projets publiés dans Famille juste après la lecture de son Fil : les ruches relues disent 2.
+    await renderHome()
+    await screen.findByRole('link', { name: planDeTable.title })
+
+    const button = await screen.findByRole('button', { name: newsOf(2) })
+    const before = familleReads()
+    await fireEvent.press(button)
+
+    await waitFor(() => expect(familleReads()).toBeGreaterThan(before))
+  })
+
+  it('shows no news once the visit of the hive has been counted', async () => {
+    mockRoute.params = { hive: hiveId }
+    // Le serveur, comme le vrai : lire le Fil de Famille remet ses nouveautés à zéro.
+    hiveServer.answer('GET', FOLLOWING, ({ query }) => {
+      if (query.get('hive') !== hiveId) return ok(all)
+      hiveServer.mine = {
+        ...myHives,
+        hives: myHives.hives.map((one) => (one.id === hiveId ? { ...one, news: 0 } : one)),
+      }
+      return ok(famille)
+    })
+    await renderHome()
+    await screen.findByRole('link', { name: planDeTable.title })
+    await waitFor(() => expect(minesRead()).toBeGreaterThanOrEqual(2))
+    await act(async () => {})
+
+    expect(screen.queryByRole('button', { name: newsOf(2) })).toBeNull()
+    // Témoin : la phrase de la ruche est à la place du bouton.
+    expect(screen.getByText(fr.t(($) => $.hives.pills.caption, { hive: 'Famille' }))).toBeTruthy()
+  })
+})
