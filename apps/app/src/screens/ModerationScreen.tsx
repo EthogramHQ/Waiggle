@@ -123,6 +123,7 @@ const kindIcon: Record<StoredReportTarget['kind'], IconName> = {
   member: 'user',
   call: 'squares-four',
   message: 'chat-circle',
+  hive: 'hexagon',
 }
 
 /** La partie telle que l'API l'attend : sans `mediaId` pour une partie sans photo (schéma strict). */

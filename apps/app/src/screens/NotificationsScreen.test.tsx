@@ -570,7 +570,10 @@ describe('a content of mine removed by the moderation', () => {
     // venait avec `projectHidden: false`, un état que l'API n'envoie plus).
     const elsewhere = {
       ...removedCommentNotification,
-      project: { ...removedCommentNotification.project, title: '' },
+      project: removedCommentNotification.project && {
+        ...removedCommentNotification.project,
+        title: '',
+      },
       projectHidden: true,
     }
     mockPages([notificationPageOf([elsewhere])])
@@ -1096,13 +1099,46 @@ describe('the settings of the notifications (R8)', () => {
       expect(
         screen.getByRole('header', { name: t(($) => $.notifications.emailColumn.title) }),
       ).toBeTruthy()
-      // La planche R8-Activite-Desktop : les réponses et mentions « Tout de suite ».
+      // La planche R8-Activite-Desktop : les réponses et mentions « Tout de suite ». R10 : les
+      // ruches aussi, « Tout de suite » par défaut (scénario, « Le réglage Ruches ») ; elles viennent
+      // après, dans l'ordre du contrat (`EmailType`), liées par « et ».
       expect(
         screen.getByText(
-          t(($) => $.notifications.summary.nowAndRest, { types: 'Les réponses et les mentions' }),
+          t(($) => $.notifications.summary.nowAndRest, {
+            types: 'Les réponses et les mentions et les ruches',
+          }),
         ),
       ).toBeTruthy()
       expect(screen.getByText(t(($) => $.notifications.emailColumn.counts))).toBeTruthy()
+    } finally {
+      restoreWindow()
+    }
+  })
+
+  // R10 (option 8 des planches) : « Max a rejoint Famille » ouvre les membres de la ruche ; sur
+  // ordinateur, ils sont dans la colonne de gauche de sa page, et `?tab=members` y pose le focus.
+  it('opens the members from "Max a rejoint Famille" on desktop', async () => {
+    const familleId = '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c01'
+    mockPages([
+      notificationPageOf([
+        {
+          kind: 'hive_joined',
+          id: `hive_joined:${familleId}:u2`,
+          at: '2026-11-12T07:00:00.000Z',
+          isNew: true,
+          hive: { id: familleId, name: 'Famille', icon: 'house-line' },
+          member: { id: 'u2', name: 'Max', avatarUrl: null },
+        },
+      ]),
+    ])
+    const restoreWindow = setDesktopWindow()
+    try {
+      await renderWithProviders(<NotificationsScreen />)
+
+      const line = t(($) => $.notifications.hiveJoined, { name: 'Max', hive: 'Famille' })
+      await fireEvent.press(screen.getByRole('link', { name: containing(line) }))
+
+      expect(addressOf(mockPush.mock.calls[0]?.[0])).toBe(`/hives/${familleId}?tab=members`)
     } finally {
       restoreWindow()
     }

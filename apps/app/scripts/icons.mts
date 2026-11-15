@@ -138,6 +138,14 @@ const icons = [
   // R7a : la famille « Plus joli » d'une mise à jour, et la poignée de l'avant / après.
   'palette',
   'arrows-left-right',
+  // R10 : les icônes d'une ruche qui manquaient (HIVE_ICONS de @ruche/contracts ; les autres y sont
+  // déjà), l'animateur, l'alvéole et « Retirer de la ruche ».
+  'house-line',
+  'coffee',
+  'leaf',
+  'crown',
+  'hexagon',
+  'user-minus',
   // Versions pleines (onglet actif, réaction choisie)
   'house-fill',
   'compass-fill',

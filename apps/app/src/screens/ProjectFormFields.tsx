@@ -28,12 +28,7 @@ import {
 } from '@ruche/contracts'
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  demoUrlLooksValid,
-  type ProjectAudience,
-  type ProjectForm,
-  type ProjectFormErrors,
-} from '../projects/form'
+import { demoUrlLooksValid, type ProjectForm, type ProjectFormErrors } from '../projects/form'
 import { useCategory } from '../projects/useCategory'
 import type { PhotoActions } from '../projects/usePhotoTiles'
 import { Button } from '../ui/Button'
@@ -49,7 +44,11 @@ import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
-import { audienceSentence, ProjectAudienceChoice } from './ProjectAudienceChoice'
+import {
+  type AudienceChoice,
+  ProjectAudienceChoice,
+  useAudienceSentence,
+} from './ProjectAudienceChoice'
 import {
   type PhotoDescriptions,
   type PortraitCover,
@@ -65,6 +64,7 @@ export type ProjectFieldName =
   | 'category'
   | 'secondary'
   | 'tools'
+  | 'hive'
 
 /**
  * Les poignées (`ref`) de ces champs : la saisie d'un champ de texte, la vue d'une ligne. L'écran
@@ -79,6 +79,8 @@ export type ProjectFieldRefs = {
   category: RefObject<Focusable | null>
   secondary: RefObject<Focusable | null>
   tools: RefObject<Focusable | null>
+  /** R10 : l'entrée de « Quelle ruche ? » (le choix coché, sinon le premier). */
+  hive: RefObject<Focusable | null>
 }
 
 /** Les poignées des champs, à créer une fois par l'écran. */
@@ -90,6 +92,7 @@ export const useProjectFieldRefs = (): ProjectFieldRefs => ({
   category: useRef<Focusable>(null),
   secondary: useRef<Focusable>(null),
   tools: useRef<Focusable>(null),
+  hive: useRef<Focusable>(null),
 })
 
 /**
@@ -104,6 +107,8 @@ export const firstFieldWithError = (errors: ProjectFormErrors): ProjectFieldName
   if (errors.demoUrl) return 'demoUrl'
   if (errors.primaryCategory) return 'category'
   if (errors.tools) return 'tools'
+  // R10 : « Qui peut le voir ? » vient en dernier (sur ordinateur, dans la colonne de l'aperçu).
+  if (errors.hiveId) return 'hive'
   return null
 }
 
@@ -142,14 +147,19 @@ type Props = {
    */
   withAudience?: boolean
   /**
-   * L'audience enregistrée du projet modifié : la phrase passe au futur quand le choix en diffère
-   * (`audienceSentence`). Absente en modification : celle du formulaire (tests des seuls champs).
+   * L'audience enregistrée du projet modifié, et sa ruche (R10) : la phrase passe au futur quand
+   * le choix en diffère (`audienceSentence`). Absente en modification : celle du formulaire (tests
+   * des seuls champs).
    */
-  savedAudience?: ProjectAudience | undefined
+  savedAudience?: AudienceChoice | undefined
 }
 
-// Les erreurs du formulaire qui ont leur phrase dans `project.errors` (la catégorie a la sienne).
-type ErrorKey = Exclude<NonNullable<ProjectFormErrors[keyof ProjectFormErrors]>, 'chooseCategory'>
+// Les erreurs du formulaire qui ont leur phrase dans `project.errors` (la catégorie et la ruche ont
+// la leur, dans `project.form`).
+type ErrorKey = Exclude<
+  NonNullable<ProjectFormErrors[keyof ProjectFormErrors]>,
+  'chooseCategory' | 'hiveRequired'
+>
 
 /** La limite que cite chaque phrase d'erreur (« au plus {{max}} caractères »). */
 const LIMITS: Partial<Record<ErrorKey, number>> = {
@@ -210,6 +220,12 @@ export function ProjectFormFields({
   const primaryName = useCategory(form.primaryCategory)?.label ?? null
   const secondaryName = useCategory(form.secondaryCategory)?.label ?? null
   const categoryError = errors.primaryCategory ? t(($) => $.project.form.chooseCategory) : undefined
+  // R10 : « Une ruche » sans ruche choisie, et la phrase qui dit qui verra le projet.
+  const hiveError = errors.hiveId ? t(($) => $.project.form.hiveRequired) : undefined
+  const sentence = useAudienceSentence(
+    { audience: form.audience, hiveId: form.hiveId },
+    editing ? (savedAudience ?? { audience: form.audience, hiveId: form.hiveId }) : null,
+  )
   // Sans catégorie, la ligne dit quoi faire ; en erreur, la phrase passe en rouge sous le libellé
   // (et décrit la ligne), sans être écrite deux fois.
   const categoryValue =
@@ -472,9 +488,15 @@ export function ProjectFormFields({
 
       {withAudience ? (
         <Stack gap="md">
-          <ProjectAudienceChoice audience={form.audience} change={change} />
+          <ProjectAudienceChoice
+            audience={form.audience}
+            hiveId={form.hiveId}
+            change={change}
+            hiveError={hiveError}
+            hiveRef={fieldRefs.hive}
+          />
           <Text variant="callout" tone="secondary">
-            {audienceSentence(t, form.audience, editing ? (savedAudience ?? form.audience) : null)}
+            {sentence}
           </Text>
         </Stack>
       ) : null}

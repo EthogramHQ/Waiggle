@@ -2,18 +2,22 @@
 // défile (les projets d'une ruche). Depuis R6b, elles servent aussi dans la mosaïque de la page
 // d'un outil (`TileMosaic`) : là, une tuile prend la largeur de sa colonne, plus 150 points fixes.
 // - ProjectTile : un projet, en miel, en crème ou en encre ; sa photo s'il en a une, son titre et
-//   son auteur. C'est un lien vers sa page, nommé par son titre, comme la carte d'un projet.
+//   son auteur. C'est un lien vers sa page, nommé par son titre, comme la carte d'un projet. R10 :
+//   la pastille de visibilité (`badge` : « Privé », « Réservé à Famille »), et un menu « … »
+//   (`menu`) posé en haut à droite, à côté du lien, jamais dedans (« Épingler » dans une ruche).
 // - AddTile : la tuile « + Ajouter », en pointillés de miel, au bout de la rangée ; un bouton (ou un
 //   lien, quand elle mène à une autre page).
 // Toutes deux s'enfoncent sous le doigt (jeton `pressScale`), comme les boutons.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
-import { createContext, type ReactNode, type Ref, useContext } from 'react'
-import { Pressable, View } from 'react-native'
+import { createContext, type ReactNode, type Ref, useContext, useId } from 'react'
+import { Platform, Pressable, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import { describedBy } from './aria'
 import { Icon } from './Icon'
 import { enterActivates } from './keyboard'
 import type { CoverImage } from './ProjectCover'
+import { StatusPill } from './StatusPill'
 import { Text, type TextTone } from './Text'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -52,6 +56,7 @@ function TileFrame({
   style,
   children,
   frameRef,
+  description,
 }: {
   label: string
   role: 'button' | 'link'
@@ -59,6 +64,11 @@ function TileFrame({
   style: object
   children: ReactNode
   frameRef?: Ref<View> | undefined
+  /**
+   * Ce que le nom ne dit pas (la pastille « Privé ») : le `nativeID` du texte qui le dit, lu après
+   * le nom sur le web (`aria-describedby`), et le même texte en indice sur téléphone.
+   */
+  description?: { id: string; text: string } | undefined
 }) {
   const scale = useSharedValue(1)
   const pressed = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
@@ -71,6 +81,8 @@ function TileFrame({
         ref={frameRef}
         accessibilityRole={role}
         accessibilityLabel={label}
+        {...describedBy(description?.id)}
+        {...(description && Platform.OS !== 'web' ? { accessibilityHint: description.text } : null)}
         // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
         {...(role === 'link' ? enterActivates(onPress) : null)}
         onPress={onPress}
@@ -109,6 +121,18 @@ type ProjectTileProps = {
    * suite », quand le bouton disparaît).
    */
   ref?: Ref<View>
+  /**
+   * R10 : la pastille de visibilité, comme `ProjectCard badge` : « Privé » sur « Moi », « Réservé à
+   * Famille » pour un projet réservé à une ruche. Posée au-dessus du titre, dans le lien, et lue
+   * après son nom (le nom du lien reste le titre).
+   */
+  badge?: string | undefined
+  /**
+   * R10 : un menu « … » (`ActionMenu`, « Épingler » sur la tuile d'une ruche), posé en haut à droite
+   * de la tuile, à côté de son lien, jamais dedans (un bouton dans un lien ne se lit ni ne se touche
+   * bien : relecture du plan R10, interface 13). Il est lu après le lien.
+   */
+  menu?: ReactNode
 }
 
 export function ProjectTile({
@@ -118,8 +142,12 @@ export function ProjectTile({
   variant = 'honey',
   image = null,
   ref,
+  badge,
+  menu,
 }: ProjectTileProps) {
   const { colors } = useTheme()
+  const badgeId = useId()
+  const cell = useContext(TileCellContext)
   // Chaque teinte a son fond et ses deux couleurs de texte, toutes mesurées dans contrastPairs :
   // l'encre sur le miel, le brun sur le miel (onHoneyTile), l'encre et le brun de statut sur la
   // crème, et le fond de page sur l'encre (le même couple que l'encre sur la page).
@@ -129,14 +157,18 @@ export function ProjectTile({
     ink: { background: colors.text, title: 'onInk', author: 'onInk' },
   }
   const look = looks[variant]
-  return (
+  const tile = (
     <TileFrame
       label={title}
       role="link"
       onPress={onPress}
       frameRef={ref}
+      description={badge ? { id: badgeId, text: badge } : undefined}
       style={{ backgroundColor: look.background, padding: space.sm, gap: space.sm }}
     >
+      {/* Sans photo, le menu se pose sur le fond de la tuile : sa place est gardée en haut, pour
+          qu'un long titre (texte agrandi) ne passe pas dessous. Avec photo, il se pose sur elle. */}
+      {menu && !image ? <View style={{ height: layout.touchTarget }} /> : null}
       {image ? (
         // La photo remplit le haut de la tuile ; décorative ici, le nom du lien dit tout.
         <Image
@@ -162,19 +194,39 @@ export function ProjectTile({
           ...(image ? null : { flexGrow: 1, justifyContent: 'flex-end' }),
         }}
       >
-        <Text
-          variant={image ? 'callout' : 'headline'}
-          weight={700}
-          tone={look.title}
-          numberOfLines={image ? 2 : 4}
-        >
+        {badge ? (
+          // La pastille, au-dessus du titre : le titre garde sa hauteur dans la rangée. Un
+          // `nativeID` sur le texte, que le lien désigne comme sa description (voir TileFrame).
+          <View style={{ flexShrink: 1, maxWidth: '100%', marginBottom: space.xxs }}>
+            <StatusPill label={badge} nativeID={badgeId} />
+          </View>
+        ) : null}
+        {/* R10 : ni le titre ni l'auteur ne se coupent par « … » : à 320 px et texte à 200 %, un
+            titre de deux lignes perdait sa fin, et un nom de membre ne se coupe jamais (décision
+            du 1/11). La tuile s'allonge (sa hauteur n'est qu'un minimum) ; dans une mosaïque, la
+            rangée suit la plus haute, et la photo garde sa hauteur minimale. */}
+        <Text variant={image ? 'callout' : 'headline'} weight={700} tone={look.title}>
           {title}
         </Text>
-        <Text variant="caption" tone={look.author} numberOfLines={1}>
+        <Text variant="caption" tone={look.author}>
           {author}
         </Text>
       </View>
     </TileFrame>
+  )
+  if (!menu) return tile
+  return (
+    // Le menu, frère du lien et non son enfant : il se dessine par-dessus, en haut à droite.
+    // box-none : le calque laisse passer le doigt hors du bouton, vers la tuile dessous.
+    <View style={cell ? { flexGrow: 1 } : null}>
+      {tile}
+      <View
+        pointerEvents="box-none"
+        style={{ position: 'absolute', top: space.xs, right: space.xs, zIndex: 1 }}
+      >
+        {menu}
+      </View>
+    </View>
   )
 }
 

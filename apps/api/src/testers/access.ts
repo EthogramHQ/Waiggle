@@ -6,6 +6,7 @@ import { ProjectId } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
 import { blockedPair } from '../blocks/write'
+import { inViewerHiveColumn, sharedWith } from '../projects/visibility'
 import { isSuspended } from '../suspension/load'
 
 /** Une base ou une transaction : la règle se relit aussi sous un verrou (`tx`). */
@@ -57,12 +58,19 @@ export const cornerAccess = async (
       authorId: schema.project.authorId,
       visibility: schema.project.visibility,
       removedAt: schema.project.removedAt,
+      // R10 : sa ruche est-elle, aujourd'hui, l'une de celles du membre ? Relu à chaque accès
+      // (relecture du plan, point 1) : un membre qui quitte la ruche perd le coin à l'instant. La
+      // sous-requête lit ses ruches par l'index hive_member_user_idx (projects/visibility.ts).
+      inViewerHive: inViewerHiveColumn(viewerId),
     })
     .from(schema.project)
     .where(eq(schema.project.id, projectId))
   if (!project) return 'not_found'
-  // « Listé » : public et pas retiré par la modération. Sinon le coin est fermé.
-  const listed = project.visibility === 'public' && project.removedAt === null
+  // « Listé » : la règle commune (projects/visibility.ts, `sharedWith`) : public et pas retiré, ou
+  // réservé à l'une des ruches du membre et pas retiré (R10). Sinon le coin est fermé. L'auteur
+  // d'un projet réservé est toujours membre de sa ruche (la quitter le rend privé) : pour lui aussi,
+  // la même règle dit « ouvert ».
+  const listed = sharedWith(project)
 
   if (project.authorId === viewerId) {
     if (!listed || (await isSuspended(db, viewerId, now))) return 'author_closed'

@@ -203,6 +203,7 @@ describe('Project with its visuals', () => {
     description: '',
     status: 'idea',
     visibility: 'public',
+    hive: null,
     demoUrl: null,
     tools: [],
     prompts: [],

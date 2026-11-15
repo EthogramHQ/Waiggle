@@ -14,6 +14,8 @@
 //   journal du catalogue de plus d'un an (tranche R6b) ; les « Autre » laissés hors du catalogue
 //   depuis plus d'un an, quand plus rien ne les cite (relecture juridique jur-J5) ;
 // - les notifications du catalogue de plus de 90 jours (R8) ;
+// - les invitations dans une ruche de plus de 30 jours, et les traces des ruches de plus de 90 jours
+//   (R10) ;
 // - les photos de mise à jour restées « en attente » plus de 24 heures (R7a), ligne et fichier ;
 // - les images du coin des testeurs restées « en attente » plus de 24 heures (R7b), de même.
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
@@ -27,6 +29,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, eq, lt, sql } from 'drizzle-orm'
 import { AUTH_RATE_WINDOW_MAX_MS } from '../auth/auth'
 import { purgeExpiredHandles } from '../handles/claim'
+import { invitationValidSince } from '../hives/load'
 import type { FileStorage } from '../media/storage'
 import { notificationCutoff, utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
@@ -127,6 +130,20 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     .delete(schema.catalogueNotice)
     .where(sql`${schema.catalogueNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
     .returning({ id: schema.catalogueNotice.id })
+  // R10 : les invitations dans une ruche ne valent que 30 jours (invitationValidSince, la limite
+  // que lisent l'onglet Ruches et l'Activité) ; au-delà, refusées comprises, elles ne servent plus à
+  // rien et s'effacent. Les traces gardées pour l'Activité (`hive_notice`, avec la copie du nom
+  // d'une ruche) ne se gardent pas plus longtemps qu'elles ne se montrent : 90 jours. Deux tables
+  // petites (20 invitations par jour et par membre au plus, une trace par geste) : une lecture
+  // complète par nuit suffit, leurs index commençant par le membre.
+  const hiveInvitations = await db
+    .delete(schema.hiveInvitation)
+    .where(sql`${schema.hiveInvitation.createdAt} <= ${utc(invitationValidSince(now))}`)
+    .returning({ id: schema.hiveInvitation.id })
+  const hiveNotices = await db
+    .delete(schema.hiveNotice)
+    .where(sql`${schema.hiveNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
+    .returning({ id: schema.hiveNotice.id })
 
   // R7a (sécurité A5) : les photos « en attente » (slot 'update', jamais rattachées à une mise à
   // jour) de plus de 24 heures : téléversées, mais la mise à jour n'a pas été publiée. La ligne
@@ -187,6 +204,8 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     dismissedTools,
     catalogueChanges: catalogueChanges.length,
     catalogueNotices: catalogueNotices.length,
+    hiveInvitations: hiveInvitations.length,
+    hiveNotices: hiveNotices.length,
     ...moderation,
   }
   console.log('Nightly purge', purged)

@@ -59,6 +59,15 @@ const errorMessages = {
   // Tranche R9 : retirer une partie seule.
   part_whole_only: 'partWholeOnly',
   part_not_reported: 'partNotReported',
+  hive_full: 'hiveFull',
+  hives_created_limit: 'hivesCreatedLimit',
+  hives_joined_limit: 'hivesJoinedLimit',
+  already_hive_member: 'alreadyHiveMember',
+  already_invited: 'alreadyInvited',
+  invitation_expired: 'invitationExpired',
+  pin_not_visible: 'pinNotVisible',
+  // Relecture du design de R10 : le quota des invitations du jour a son propre message (« demain »).
+  hive_invitations_limited: 'hiveInvitationsLimited',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

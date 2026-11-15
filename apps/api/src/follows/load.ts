@@ -3,8 +3,8 @@
 // nombre sort d'ici.
 import type { FollowState } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, type Column, eq, inArray, sql } from 'drizzle-orm'
-import { listedProject } from '../projects/visibility'
+import { and, type Column, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm'
+import { sharedProjectWith } from '../projects/visibility'
 
 type Reader = Pick<Database, 'select'>
 
@@ -54,6 +54,14 @@ export const memberFollowState = async (
  * where project_id in (…) group by project_id. « group by » range les lignes en un groupe par
  * projet, et les deux calculs se font groupe par groupe. L'index project_follow_project_idx
  * trouve les abonnés de chaque projet de la liste.
+ *
+ * R10 : sur un projet réservé à une ruche, seuls comptent les abonnés qui le voient aujourd'hui,
+ * c'est-à-dire les membres actuels de sa ruche (l'auteur ne se suit pas). Un ancien membre garde sa
+ * ligne en base, mais elle ne compte plus et il n'est plus « abonné » pour lui-même. Pour cela, un
+ * « left join » met à côté de chaque abonnement la ligne de hive_member de l'abonné dans la ruche du
+ * projet (clé primaire (hive_id, user_id), une lecture par abonnement ; nulle si l'abonné est parti),
+ * et le « where » ne retient l'abonnement d'un projet réservé que si cette ligne existe. Les projets
+ * publics ou privés ne changent pas : la jointure n'y trouve rien et la condition les laisse passer.
  */
 export const projectFollowStates = async (
   db: Reader,
@@ -69,10 +77,21 @@ export const projectFollowStates = async (
       isFollowed: followedBy(schema.projectFollow.followerId, viewerId),
     })
     .from(schema.projectFollow)
+    .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
+    .leftJoin(
+      schema.hiveMember,
+      and(
+        eq(schema.hiveMember.hiveId, schema.project.hiveId),
+        eq(schema.hiveMember.userId, schema.projectFollow.followerId),
+      ),
+    )
     .where(
-      inArray(
-        schema.projectFollow.projectId,
-        projects.map((project) => project.id),
+      and(
+        inArray(
+          schema.projectFollow.projectId,
+          projects.map((project) => project.id),
+        ),
+        or(ne(schema.project.visibility, 'hive'), isNotNull(schema.hiveMember.userId)),
       ),
     )
     .groupBy(schema.projectFollow.projectId)
@@ -96,8 +115,9 @@ export const projectFollowStates = async (
  *
  * Un projet suivi qui est devenu privé ne compte pas : sinon, la réponse changerait selon qu'il est
  * privé (encore compté) ou supprimé (plus compté), et trahirait qu'il existe encore. On ne garde
- * que les projets publics et pas retirés (listedProject ; on ne peut pas suivre les siens, donc pas
- * besoin d'autre cas).
+ * que les projets publics et pas retirés, ou réservés à l'une des ruches du lecteur
+ * (sharedProjectWith, la règle commune : un ancien membre ne compte plus un projet réservé qu'il ne
+ * voit plus). On ne peut pas suivre les siens, donc pas besoin d'autre cas.
  */
 export const followsAnyone = async (db: Reader, viewerId: string): Promise<boolean> => {
   const [member, project] = await Promise.all([
@@ -110,7 +130,7 @@ export const followsAnyone = async (db: Reader, viewerId: string): Promise<boole
       .select({ id: schema.projectFollow.projectId })
       .from(schema.projectFollow)
       .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
-      .where(and(eq(schema.projectFollow.followerId, viewerId), listedProject()))
+      .where(and(eq(schema.projectFollow.followerId, viewerId), sharedProjectWith(viewerId)))
       .limit(1),
   ])
   return member.length > 0 || project.length > 0

@@ -24,6 +24,16 @@ export const FeedQuery = z.object({ cursor: FeedCursor.optional() })
 export type FeedQuery = z.infer<typeof FeedQuery>
 
 /**
+ * R10 : les paramètres de GET /v1/feed/following. `hive` : la pastille d'une ruche du sélecteur ; le
+ * fil montre alors les nouveaux projets et les mises à jour de tous les membres de cette ruche,
+ * suivis ou non, que le lecteur peut voir (réservés à cette ruche, ou « Membres »). Une ruche dont il
+ * n'est pas membre répond 404, comme une ruche qui n'existe pas. Sans `hive` : « Tout », le fil
+ * d'aujourd'hui (ses abonnements, leurs projets réservés à une ruche où il est compris).
+ */
+export const FollowingFeedQuery = FeedQuery.extend({ hive: z.uuid().optional() })
+export type FollowingFeedQuery = z.infer<typeof FollowingFeedQuery>
+
+/**
  * Les paramètres d'adresse du fil « Découvrir ». `testers=true` ne garde que les projets qui
  * cherchent des testeurs : au statut « testable », avec un lien de démo.
  */
@@ -92,6 +102,11 @@ export type DiscoverFeedPage = z.infer<typeof DiscoverFeedPage>
  * lecture-ci (lire une page ne l'avance jamais : seul PUT /v1/feed/read le fait) ; null si le
  * membre n'a jamais lu son fil. L'appli pose « Tu es à jour » avant le premier élément arrivé
  * jusqu'à cette date. C'est la seule trace gardée de ses lectures : aucune liste de ce qu'il a lu.
+ *
+ * R10, avec `hive` : même forme ; `followsAnyone` vaut toujours vrai, et `lastReadAt` est sa
+ * dernière visite de cette ruche (`seen_at`) avant cette lecture-ci. La première page (sans curseur)
+ * avance cette date à maintenant, comme l'ouverture de la page de la ruche : les nouveautés de la
+ * ruche et sa pastille partagent la même date (choix 4 du plan).
  */
 export const FollowingFeedPage = FeedPage.extend({
   followsAnyone: z.boolean(),

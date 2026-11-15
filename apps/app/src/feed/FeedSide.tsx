@@ -1,18 +1,23 @@
-// La colonne de droite du Fil sur ordinateur (R4, F-Fil11, planche R4-Fil-Desktop) : « Proches à
+// La colonne de droite du Fil sur ordinateur (R4, F-Fil11, planche R4-Fil-Desktop) : depuis R10,
+// « Tes ruches » en tête (pour un membre d'au moins une ruche), puis « Proches à
 // suivre » (trois lignes) puis « Ils cherchent des testeurs » (quelques projets à essayer, avec
 // « Tester » en miel). Sous la mise en colonnes (téléphone, fenêtre étroite), il n'y a pas de
 // colonne de droite : HomeScreen ne pose pas ce composant.
 //
 // Comme tout ce qui est dans feed/, ce fichier assemble des composants de ui/ sans écrire de style.
+import type { HiveSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
+import { useMyHives } from '../hives/api'
 import { useOpenDemo } from '../navigation/links'
 import { PeopleToFollow } from '../suggestions/PeopleToFollow'
+import { HiveRow } from '../ui/HiveRow'
 import { ListGroup } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Stack } from '../ui/Stack'
+import { Surface } from '../ui/Surface'
 import { TesterRow } from '../ui/TesterRow'
 import { Text } from '../ui/Text'
 import { useDiscoverFeed } from './api'
@@ -37,13 +42,55 @@ type Props = {
 }
 
 export function FeedSide({ withSuggestions, shownProjectIds }: Props) {
+  // Ses ruches, lues une seule fois (`useMyHives`, même cache que les pastilles du Fil).
+  const mine = useMyHives()
+  // Relecture du design de R10 : tant que ses ruches ne sont pas lues, la colonne attend, comme le
+  // Fil à côté d'elle. « Tes ruches » arrivait sinon en tête, après les proches à suivre, et les
+  // poussait vers le bas sous le pointeur. Une lecture ratée ne retient rien : la colonne se montre
+  // sans « Tes ruches ».
+  if (mine.isPending) return null
   return (
     <Stack gap="xxl" align="stretch">
+      {/* R10 (F-Fil11) : ses ruches d'abord, puis les proches à suivre et les testeurs. */}
+      <YourHives hives={mine.data?.hives ?? []} />
       {/* stacked : la colonne n'a que 320 points ; en rangée, le nom n'y avait qu'une centaine de
           points, et un nom long prenait trois lignes (relecture design A1). Empilée, la ligne pose
           la photo et le nom, puis le projet, puis « Suivre » et « × ». */}
       {withSuggestions ? <PeopleToFollow max={SIDE_SUGGESTIONS} stacked /> : null}
       <Testers exclude={shownProjectIds} />
+    </Stack>
+  )
+}
+
+/**
+ * « Tes ruches » (R10, F-Fil11, planche R4-Fil-Desktop) : chaque ruche du membre en ligne courte
+ * (`HiveRow compact` : son alvéole, son nom, ses nouveautés), qui ouvre sa page. Les ruches sont
+ * celles des pastilles du Fil, lues par FeedSide. Sans ruche, ou si la lecture échoue, rien : ni
+ * titre ni cadre vide. Une panne ne prive le membre de rien qu'il ne retrouve dans l'onglet Ruches,
+ * qui dit, lui, ce qui manque.
+ */
+function YourHives({ hives }: { hives: readonly HiveSummary[] }) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const toSource = useMediaSources()
+  if (hives.length === 0) return null
+  return (
+    <Stack gap="md" align="stretch">
+      <Text variant="heading" heading={2}>
+        {t(($) => $.hives.side)}
+      </Text>
+      {/* Le même cadre groupé que la liste de l'onglet Ruches (catalogue/ruches-lignes.tsx). */}
+      <Surface variant="grouped" padding="xs">
+        {hives.map((hive) => (
+          <HiveRow
+            key={hive.id}
+            hive={hive}
+            compact
+            toSource={toSource}
+            onPress={() => router.push({ pathname: '/hives/[id]', params: { id: hive.id } })}
+          />
+        ))}
+      </Surface>
     </Stack>
   )
 }

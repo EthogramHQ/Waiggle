@@ -176,6 +176,14 @@ export function DeleteAccountScreen() {
             detail={t(($) => $.account.delete.projectsDetail)}
           />
           <ListRow icon="users" label={t(($) => $.account.delete.followsItem)} />
+          {/* R10 (relecture juridique, C5) : on quitte chaque ruche ; l'animation passe au membre le
+            plus ancien, et la dernière ruche sans membre est supprimée. Même phrase pour tous : la
+            page s'affiche aussi à qui n'a aucune ruche. */}
+          <ListRow
+            icon="hexagon"
+            label={t(($) => $.account.delete.hivesItem)}
+            detail={t(($) => $.account.delete.hivesDetail)}
+          />
           {/* Tranche 5 : ses réactions et ses commentaires partent aussi ; un commentaire qui a des
             réponses devient « Commentaire supprimé », pour que les réponses des autres restent. */}
           <ListRow
@@ -209,6 +217,11 @@ export function DeleteAccountScreen() {
         {/* Tranche 7a (règle 24 de la relecture du plan) : ce qui ne part pas tout de suite. Ses
           signalements restent, sans son nom, et une trace des retraits de ses contenus, un an. */}
         <ListGroup title={t(($) => $.account.delete.remains.title)}>
+          {/* R10 : le nom d'une ruche qu'on a créée reste (c'est un bien commun de ses membres). */}
+          <ListRow icon="hexagon" label={t(($) => $.account.delete.remains.hiveNames)} />
+          {/* R10, relecture juridique (C4) : les invitations envoyées restent valables, sans le
+              nom de qui part (`inviter_id` remis à null) ; les reçues partent avec le compte. */}
+          <ListRow icon="user-plus" label={t(($) => $.account.delete.remains.hiveInvitations)} />
           <ListRow icon="flag" label={t(($) => $.account.delete.remains.reports)} />
           <ListRow icon="clock" label={t(($) => $.account.delete.remains.removals)} />
           {/* Tranche 7b (relecture juridique du plan, J11) : la copie des textes signalés, gardée

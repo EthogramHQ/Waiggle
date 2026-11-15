@@ -1,9 +1,20 @@
 // Les projets publiés par les membres. Les règles (longueurs, valeurs permises) sont vérifiées par
 // l'API avec les schémas de @ruche/contracts avant d'arriver ici ; la base garde les données.
 import { sql } from 'drizzle-orm'
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import {
+  type AnyPgColumn,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { user } from './auth'
 import { category } from './categories'
+import { hive } from './hives'
 import { moderationDecision } from './moderation'
 import { projectUpdate } from './updates'
 
@@ -23,6 +34,10 @@ export const project = pgTable(
     // Codes en anglais (idea, building…) : la liste permise est dans @ruche/contracts.
     status: text('status').default('idea').notNull(),
     visibility: text('visibility').default('public').notNull(),
+    // R10 : la ruche d'un projet réservé (`visibility` vaut 'hive', contrainte plus bas). Pas de
+    // cascade : la sortie de l'auteur, son retrait ou la suppression de la ruche passent le projet en
+    // 'private' dans la même transaction ; une clé étrangère simple refuse d'oublier ce pas.
+    hiveId: uuid('hive_id').references((): AnyPgColumn => hive.id),
     demoUrl: text('demo_url'), // null : pas de démo
     // Les outils du projet vivent dans project_tool (R6b) ; les colonnes tools et tool_slugs (et
     // leur index) sont effacées par la migration 0018 (R7a).
@@ -73,11 +88,23 @@ export const project = pgTable(
     index('project_public_published_idx')
       .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
       .where(sql`${t.visibility} = 'public'`),
+    // R10 : Explorer et les suggestions lisent les projets publics **ou réservés à une ruche** du
+    // lecteur. Le `or` de la règle d'accès empêche PostgreSQL d'utiliser l'index ci-dessus : sans
+    // celui-ci, Explorer triait 10 000 projets (300 ms et plus) au lieu de lire l'index (1,4 ms).
+    index('project_shared_published_idx')
+      .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
+      .where(sql`${t.visibility} in ('public', 'hive') and ${t.removedAt} is null`),
     index('project_author_published_idx').on(t.authorId, t.publishedAt),
     // Les filtres par catégorie (principale ou seconde) et les nombres de projets par catégorie ;
     // ils servent aussi aux vérifications de la clé étrangère quand une catégorie change de code.
     index('project_primary_category_idx').on(t.primaryCategory),
     index('project_secondary_category_idx').on(t.secondaryCategory),
+    // R10 : les projets réservés à une ruche, du plus récent au plus ancien (l'onglet Projets, le
+    // nombre « Projets · 5 », la sortie d'un membre).
+    index('project_hive_created_idx')
+      .on(t.hiveId, t.createdAt)
+      .where(sql`${t.visibility} = 'hive'`),
+    check('project_hive_check', sql`(${t.visibility} = 'hive') = (${t.hiveId} is not null)`),
   ],
 )
 
@@ -122,6 +149,9 @@ export const projectMedia = pgTable(
   },
   (t) => [
     index('project_media_project_idx').on(t.projectId, t.slot, t.position),
+    // R10 (noté en R9) : la purge des décisions vérifie qu'aucune photo retirée ne garde la sienne ;
+    // un index partiel, sur les seules photos retirées, lui évite de lire toute la table.
+    index('project_media_removal_idx').on(t.removalId).where(sql`${t.removalId} is not null`),
     // Un index « unique partiel » : une seule ligne par projet où slot = 'portrait'. C'est la base
     // elle-même qui garantit « une seule couverture verticale », même si deux envois se croisent.
     uniqueIndex('project_media_one_portrait_idx')

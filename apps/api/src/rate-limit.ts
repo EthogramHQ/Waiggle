@@ -190,6 +190,17 @@ export const memberCounterKeys = (userId: string) => ({
   testerSettle: `tester-settle:${userId}`,
   // « Marquer un fil lu » (R7b, sécurité A2) : une écriture, donc 300 par heure, mal formées comprises.
   testerRead: `tester-read:${userId}`,
+  // Les écritures des ruches (R10, relecture de sécurité du plan, point 7) : créer, changer,
+  // supprimer, quitter ou retirer, confier l'animation, toutes ruches ensemble, comptées avant tout
+  // examen de la demande (mal formées comprises) : 120 par heure.
+  hiveWrite: `hive-write:${userId}`,
+  // Les lectures des ruches (mes ruches, la page, l'actualité, les projets, les membres) : 600 par
+  // heure, un quota large comme celui du Fil ; chacune recalcule 30 jours d'actualité.
+  hiveRead: `hive-read:${userId}`,
+  // Les invitations envoyées (R10, choix 1 du scénario) : 20 par jour et par inviteur, toutes ruches
+  // ensemble, comptées avant tout examen (une invitation refusée en 404 ou 409 compte aussi : on ne
+  // sonde pas l'annuaire par les invitations). Le quota est celui du membre, pas de la ruche.
+  hiveInvitations: `hive-invitations:${userId}`,
 })
 
 /**

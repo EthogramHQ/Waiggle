@@ -52,6 +52,7 @@ import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
 import { ScreenFooterOutlet, useScreenFooterSlot } from './ScreenFooterSlot'
+import { ScreenSticky } from './ScreenSticky'
 import { rememberedTopBarSpace, ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
 import { Surface } from './Surface'
 import { useScreenFocused, useScreenShownCount } from './screenFocus'
@@ -187,6 +188,20 @@ type Props = {
    * nommée « Retour », partout, comme avant.
    */
   backLabel?: string
+  /**
+   * R10 : une place en tête du contenu (sous le titre), qui reste collée en haut de l'écran pendant
+   * que le contenu défile, sur téléphone (les pastilles des ruches du Fil). Sur tablette et
+   * ordinateur, où la barre du haut reste fixe, elle se pose dans la rangée du titre, à sa droite
+   * (planche R4-Fil-Desktop) ; sans titre, en tête du contenu. Très haute (texte agrandi, téléphone
+   * couché : plus d'un quart de l'écran), elle ne colle pas : elle mangerait l'écran (WCAG 1.4.10).
+   * Voir ui/ScreenSticky.tsx. Hors du miel seulement.
+   *
+   * `null` (ou `false`) : la place existe, vide pour l'instant (ce qui la remplit arrive d'une autre
+   * lecture). L'écran garde alors la même forme d'arbre, vide ou remplie : le contenu n'est jamais
+   * démonté quand elle arrive ou repart (relecture du design de R10 : le focus se perdait).
+   * `undefined` : l'écran n'a pas de place collée.
+   */
+  sticky?: ReactNode
 }
 
 export function Screen({
@@ -215,10 +230,11 @@ export function Screen({
   floating,
   overlay,
   backLabel,
+  sticky,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
-  const { padding, sizeClass, card, width: windowWidth } = useLayout()
+  const { padding, sizeClass, card, width: windowWidth, height: windowHeight } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
   // La barre d'onglets du téléphone (R3), quand elle est là : la place qu'elle prend en bas, à
@@ -380,27 +396,53 @@ export function Screen({
     ) : brand ? null : (
       backButton
     )
-  // Le contenu propre à l'écran, précédé de la rangée du haut (hors du miel), du titre et du
-  // sous-titre.
-  const body = (
+  // R10 : la place collée (`sticky`). Hors du miel et hors de la carte d'une scène (`hero`), elle
+  // devient un enfant direct du contenu de la zone qui défile (ui/ScreenSticky.tsx) : le contenu est
+  // alors coupé en trois, la tête (retour, titre), la place, puis le reste. Sans `sticky`, rien ne
+  // change. Ailleurs (miel, scène), la place est simplement posée sous le titre.
+  //
+  // Relecture du design de R10 (point 4, mesuré : focus perdu, cartes remontées) : la coupe dépend
+  // de la seule présence de la prop, pas de son contenu. Avant, des pastilles arrivées après le Fil
+  // faisaient passer la zone qui défile d'un seul enfant à trois : React y voyait un autre arbre et
+  // remontait tout le Fil. Une place vide (`null`) garde donc la coupe, sans rien dessiner à sa place.
+  const hasSticky = sticky !== undefined && sticky !== null && sticky !== false
+  const splitSticky = sticky !== undefined && !brand && !withHero
+  // Relecture du design de R10 (point 1, planche R4-Fil-Desktop) : sur tablette et ordinateur, la
+  // place va dans la rangée du titre, à droite. Sous le titre, la phrase qui change d'une pastille à
+  // l'autre (une ligne, puis deux) la faisait sauter de 24 à 32 points sous le pointeur.
+  const stickyInTitle = hasSticky && splitSticky && Boolean(title) && sizeClass !== 'compact'
+  const [stickyHeight, setStickyHeight] = useState(0)
+  // Collée seulement quand la barre du haut suit le contenu (téléphone, ou barre trop haute pour
+  // rester fixe), hors ordinateur, et si elle ne prend pas plus d'un quart de la hauteur de l'écran.
+  const stick =
+    hasSticky &&
+    splitSticky &&
+    !stickyInTitle &&
+    !barPinned &&
+    sizeClass !== 'wide' &&
+    stickyHeight <= windowHeight / 4
+  // Le titre et le sous-titre, sous la rangée du haut.
+  const heading =
+    title || subtitle ? (
+      <PageHeading
+        title={title}
+        aside={asideAway ? undefined : titleAside}
+        asideRef={asideBeside}
+        end={stickyInTitle ? sticky : undefined}
+        subtitle={subtitle}
+        titleRef={titleRef}
+        {...(keepAsideInView
+          ? {
+              onLayout: aside.onHeadingLayout,
+              onRowLayout: aside.onRowLayout,
+              rowMinHeight: asideAway ? aside.rowHeight : undefined,
+            }
+          : null)}
+      />
+    ) : null
+  // Ce qui suit la tête : le message gardé en vue, le contenu de l'écran et ses boutons.
+  const rest = (
     <>
-      {topRow}
-      {title || subtitle ? (
-        <PageHeading
-          title={title}
-          aside={asideAway ? undefined : titleAside}
-          asideRef={asideBeside}
-          subtitle={subtitle}
-          titleRef={titleRef}
-          {...(keepAsideInView
-            ? {
-                onLayout: aside.onHeadingLayout,
-                onRowLayout: aside.onRowLayout,
-                rowMinHeight: asideAway ? aside.rowHeight : undefined,
-              }
-            : null)}
-        />
-      ) : null}
       {pinned ? null : notice}
       {children}
       {footer !== undefined && !pinnedFooter ? (
@@ -408,6 +450,53 @@ export function Screen({
       ) : null}
     </>
   )
+  // La largeur de colonne du contenu de la zone qui défile (hors scène).
+  const column = { width: '100%', maxWidth: maxWidthFor(width, false) } as const
+  // Le contenu propre à l'écran, précédé de la rangée du haut (hors du miel), du titre et du
+  // sous-titre.
+  const body = splitSticky ? null : (
+    <>
+      {topRow}
+      {heading}
+      {hasSticky ? <View>{sticky}</View> : null}
+      {rest}
+    </>
+  )
+  // Le contenu coupé autour de la place collée : trois enfants directs de la zone qui défile, chacun
+  // avec sa clé (la tête peut manquer sans remonter les deux autres). Chacun a son fondu.
+  const splitBody = splitSticky
+    ? [
+        topRow || heading ? (
+          <ScreenFade key="head" fade={fade} style={column}>
+            <View style={{ width: '100%', gap: space.xl }}>
+              {topRow}
+              {heading}
+            </View>
+          </ScreenFade>
+        ) : null,
+        // Vide, ou posée dans la rangée du titre : rien ici. Les deux autres gardent leur clé, et
+        // donc leur place dans l'arbre.
+        hasSticky && !stickyInTitle ? (
+          <ScreenSticky
+            key="sticky"
+            stick={stick}
+            maxWidth={maxWidthFor(width, false)}
+            bleed={padding}
+            fade={fade}
+            onHeight={setStickyHeight}
+          >
+            {sticky}
+          </ScreenSticky>
+        ) : null,
+        <ScreenFade key="rest" fade={fade} style={{ ...column, flexGrow: 1 }}>
+          <View style={{ width: '100%', gap: space.xl }}>{rest}</View>
+        </ScreenFade>,
+      ]
+    : null
+  // Sur iOS et Android, la zone qui défile colle elle-même la place : son rang parmi ses enfants
+  // (après la tête, quand il y en a une). Sur le web, c'est le CSS de ScreenSticky.
+  const stickyIndices =
+    splitBody && stick && Platform.OS !== 'web' ? [splitBody[0] ? 1 : 0] : undefined
 
   // Le nom de l'onglet : « Page | Waiggle », ou le seul nom de l'appli (l'accueil). Assemblé ici
   // plutôt que par t() : le titre d'un projet est écrit par un membre, et t() interpréterait un
@@ -533,7 +622,28 @@ export function Screen({
                     // (`scroll-padding-bottom`), ni sous la barre fixe et ce qui se pose dessous
                     // (`scroll-padding-top`, jur-RF3). Les types de React Native ignorent ces deux
                     // propriétés ; react-native-web les transmet.
-                    style={scrollPadding(floatingTop, barPinned ? barSpace.scrollPaddingTop : 0)}
+                    // R10 : sous la place collée aussi (`sticky`), sa hauteur et un peu d'air. Et
+                    // au-dessus de la barre d'onglets du téléphone, même sans place flottante :
+                    // elle flotte sur le contenu, un champ ou un bouton du bas de la page finissait
+                    // dessous (noté au plan de R10, WCAG 2.4.11).
+                    style={scrollPadding(
+                      floatingTop > 0 ? floatingTop : tabBar.height,
+                      barPinned
+                        ? barSpace.scrollPaddingTop
+                        : stick && stickyHeight > 0
+                          ? stickyHeight + space.sm
+                          : 0,
+                    )}
+                    // L'équivalent sur téléphone (R10) : le contenu dépasse déjà de la barre
+                    // d'onglets (`paddingBottom`, plus bas) ; la barre de défilement de iOS, elle,
+                    // s'arrête au-dessus de la barre d'onglets et de la place flottante au lieu de
+                    // passer dessous. Le web l'ignore, Android aussi.
+                    scrollIndicatorInsets={
+                      floatingTop > 0 || tabBar.height > 0
+                        ? { bottom: floatingTop > 0 ? floatingTop : tabBar.height }
+                        : undefined
+                    }
+                    stickyHeaderIndices={stickyIndices}
                     contentContainerStyle={{
                       flexGrow: 1,
                       alignItems: 'center',
@@ -559,52 +669,55 @@ export function Screen({
                     onScroll={scroll.handleScroll}
                     scrollEventThrottle={SCROLL_EVENT_MS}
                   >
-                    {/* Le fondu des pages (RF) : autour du contenu seul, dans la zone qui défile. Il
+                    {/* R10 : avec une place collée, le contenu coupé en trois (plus haut). */}
+                    {splitBody ?? (
+                      /* Le fondu des pages (RF) : autour du contenu seul, dans la zone qui défile. Il
                       prend la largeur du contenu, que la colonne de la zone qui défile centre ; il
-                      s'étire en hauteur pour qu'un formulaire seul reste au milieu de l'écran. */}
-                    <ScreenFade
-                      fade={fade}
-                      style={{
-                        width: '100%',
-                        maxWidth: withHero ? layout.maxContentWidth : maxWidthFor(width, false),
-                        flexGrow: 1,
-                      }}
-                    >
-                      {withHero ? (
-                        // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
-                        <View
-                          style={{
-                            width: '100%',
-                            flexGrow: 1,
-                            // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-                            // mais s'affiche à droite de la scène.
-                            flexDirection: 'row-reverse',
-                            alignItems: 'center',
-                            gap: space.huge,
-                          }}
-                        >
-                          <View style={{ width: layout.formWidth - 80 }}>
-                            <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                              {body}
-                            </Surface>
+                      s'étire en hauteur pour qu'un formulaire seul reste au milieu de l'écran. */
+                      <ScreenFade
+                        fade={fade}
+                        style={{
+                          width: '100%',
+                          maxWidth: withHero ? layout.maxContentWidth : maxWidthFor(width, false),
+                          flexGrow: 1,
+                        }}
+                      >
+                        {withHero ? (
+                          // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+                          <View
+                            style={{
+                              width: '100%',
+                              flexGrow: 1,
+                              // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                              // mais s'affiche à droite de la scène.
+                              flexDirection: 'row-reverse',
+                              alignItems: 'center',
+                              gap: space.huge,
+                            }}
+                          >
+                            <View style={{ width: layout.formWidth - 80 }}>
+                              <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                                {body}
+                              </Surface>
+                            </View>
+                            <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
                           </View>
-                          <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
-                        </View>
-                      ) : (
-                        <View
-                          style={{
-                            width: '100%',
-                            gap: space.xl,
-                            // Un formulaire seul se place au milieu de la hauteur de l'écran.
-                            ...(width === 'form' && !onBack && !header
-                              ? { flexGrow: 1, justifyContent: 'center' }
-                              : null),
-                          }}
-                        >
-                          {body}
-                        </View>
-                      )}
-                    </ScreenFade>
+                        ) : (
+                          <View
+                            style={{
+                              width: '100%',
+                              gap: space.xl,
+                              // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                              ...(width === 'form' && !onBack && !header
+                                ? { flexGrow: 1, justifyContent: 'center' }
+                                : null),
+                            }}
+                          >
+                            {body}
+                          </View>
+                        )}
+                      </ScreenFade>
+                    )}
                   </ScrollView>
                   {pinnedFooter ? (
                     // Les boutons de la page font partie de son contenu : ils apparaissent avec lui,
@@ -684,11 +797,18 @@ export function PageHeading({
   rowMinHeight,
   titleRef,
   asideRef,
+  end,
 }: {
   title?: string | undefined
   /** La vue du titre, pour y poser le focus. */
   titleRef?: Ref<Focusable> | undefined
   aside?: ReactNode
+  /**
+   * R10 : ce qui se pose au bout de la rangée du titre, à droite (les pastilles des ruches sur
+   * ordinateur, planche R4-Fil-Desktop), après `aside` dans l'ordre de lecture. Quand la place
+   * manque, il passe à la ligne, toujours à droite, sans sortir de l'écran.
+   */
+  end?: ReactNode
   /** RF (ui-5) : la place de `aside`, pour Screen, qui y rend le focus quand l'élément revient. */
   asideRef?: Ref<View> | undefined
   subtitle?: string | undefined
@@ -705,7 +825,7 @@ export function PageHeading({
   rowMinHeight?: number | undefined
 }) {
   // La rangée du titre : avec l'élément d'à côté, ou sans lui mais à sa hauteur gardée.
-  const row = Boolean(title) && (Boolean(aside) || rowMinHeight !== undefined)
+  const row = Boolean(title) && (Boolean(aside) || Boolean(end) || rowMinHeight !== undefined)
   return (
     // L'écart entre le titre et le sous-titre est le seul `gap` de cette colonne (point des listes
     // R4 : 32 points sur le Fil, 8 ailleurs, quand le Fil avait son en-tête à lui).
@@ -738,6 +858,11 @@ export function PageHeading({
             <View ref={asideRef} style={{ flexShrink: 1, maxWidth: '100%' }}>
               {aside}
             </View>
+          ) : null}
+          {/* R10 : poussé à droite (`marginLeft: 'auto'`), qu'il soit sur la rangée du titre ou
+              passé à la ligne ; il rétrécit plutôt que de déborder (ses pastilles défilent). */}
+          {end ? (
+            <View style={{ marginLeft: 'auto', flexShrink: 1, maxWidth: '100%' }}>{end}</View>
           ) : null}
         </View>
       ) : title ? (

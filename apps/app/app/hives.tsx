@@ -1,4 +1,4 @@
-// Page : l'onglet Ruches (« /hives »), « Les ruches arrivent bientôt » jusqu'aux ruches (R10).
+// Page : l'onglet Ruches (« /hives ») : mes invitations, mes ruches, « Créer une ruche » (R10).
 import { HivesScreen } from '../src/screens/HivesScreen'
 
 export default HivesScreen

@@ -29,7 +29,7 @@
 // `{ visibility: 'private' }`). Chacune cite dans SUSPENSION_PROOFS les tests qui le prouvent. Et
 // chaque route qui montre le contenu d'un autre membre cite dans PART_PROOFS le test qui prouve
 // qu'une partie retirée par la modération n'y paraît plus (ou dit pourquoi elle n'en montre pas).
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { ErrorResponse } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { describe, expect, it } from 'vitest'
@@ -179,6 +179,31 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'POST /v1/moderation/projects/:id/category': ['admin', 'refused'],
   'POST /v1/moderation/categories': ['admin', 'refused'],
   'GET /v1/moderation/catalogue-changes': ['admin', 'allowed'],
+  // R10 : les ruches (routes/hives.ts, routes/hive-invitations.ts). Mes ruches, la page, l'actualité,
+  // les projets et les membres montrent d'autres membres : un blocage les cache (Q3 : sauf, chez
+  // l'animateur, le nom seul de qui l'a bloqué). Épingler (PATCH) refuse le projet d'un membre bloqué
+  // dans un sens ou dans l'autre comme un projet inconnu ; inviter répond le même 404 qu'à un membre
+  // inconnu, et la recherche « Inviter » ne le propose jamais. Retirer un membre (Q3 : même un membre
+  // qui a bloqué l'animateur), confier l'animation, supprimer la ruche, rejoindre ou refuser une
+  // invitation sont des gestes sur sa ruche ou son invitation.
+  // Pendant une suspension (relecture de sécurité du plan, point 2) : rien de neuf (créer, renommer,
+  // épingler, inviter, confier) ; la garde laisse passer tout DELETE, et la route refuse elle-même
+  // de retirer un membre ou de supprimer la ruche (403 `suspended`) mais laisse quitter : ces deux
+  // DELETE sont `partial`. Accepter une invitation est permis (ALLOWED_WRITES), refuser aussi.
+  'GET /v1/hives': ['hidesBlocked', 'allowed'],
+  'POST /v1/hives': ['own', 'refused'],
+  'GET /v1/hives/:id': ['hidesBlocked', 'allowed'],
+  'PATCH /v1/hives/:id': ['hidesBlocked', 'refused'],
+  'DELETE /v1/hives/:id': ['own', 'partial'],
+  'GET /v1/hives/:id/activity': ['hidesBlocked', 'allowed'],
+  'GET /v1/hives/:id/projects': ['hidesBlocked', 'allowed'],
+  'GET /v1/hives/:id/members': ['hidesBlocked', 'allowed'],
+  'DELETE /v1/hives/:id/members/:userId': ['own', 'partial'],
+  'POST /v1/hives/:id/animator': ['own', 'refused'],
+  'GET /v1/hives/:id/invitable': ['hidesBlocked', 'allowed'],
+  'POST /v1/hives/:id/invitations': ['hidesBlocked', 'refused'],
+  'POST /v1/hive-invitations/:id/accept': ['own', 'allowed'],
+  'DELETE /v1/hive-invitations/:id': ['own', 'allowed'],
 }
 
 /** La classe « blocage » d'une route (première colonne). */
@@ -325,6 +350,39 @@ const PROOFS: Record<string, { file: string; test: string }> = {
     file: 'reports.test.ts',
     test: 'answers 404 for a content of a member blocked either way, as for an unknown one',
   },
+  // R10 : les ruches. Mes ruches et la page : la pile des photos, l'animateur et l'épingle.
+  'GET /v1/hives': {
+    file: 'hives.blocks.test.ts',
+    test: 'hides the pin, the faces and the animator name of a member blocked either way',
+  },
+  'GET /v1/hives/:id': {
+    file: 'hives.blocks.test.ts',
+    test: 'hides the pin, the faces and the animator name of a member blocked either way',
+  },
+  'PATCH /v1/hives/:id': {
+    file: 'hives.test.ts',
+    test: 'refuses with the same 422 a project of a member blocked either way to pin',
+  },
+  'GET /v1/hives/:id/activity': {
+    file: 'hives.test.ts',
+    test: 'hides from the activity, the projects and the members a member blocked either way',
+  },
+  'GET /v1/hives/:id/projects': {
+    file: 'hives.test.ts',
+    test: 'hides from the activity, the projects and the members a member blocked either way',
+  },
+  'GET /v1/hives/:id/members': {
+    file: 'hives.test.ts',
+    test: 'hides from the activity, the projects and the members a member blocked either way',
+  },
+  'GET /v1/hives/:id/invitable': {
+    file: 'hives.invitations.test.ts',
+    test: 'finds any member from three characters in the invite search, never one blocked either way',
+  },
+  'POST /v1/hives/:id/invitations': {
+    file: 'hives.invitations.test.ts',
+    test: 'answers the same 404 for an unknown, unverified or blocked invitee, before any 409',
+  },
 }
 
 /**
@@ -415,7 +473,122 @@ const PART_PROOFS: Record<string, { file: string; test: string } | { none: strin
     none: 'des nombres de projets par catégorie : la catégorie ne se retire pas seule, elle se range (R6b)',
   },
   'GET /v1/notifications/unread': { none: 'un nombre seul, sans aucun contenu' },
+  // R10 : chaque route d'une ruche qui montre un membre (sa photo dans la pile, l'actualité, la
+  // carte d'un projet, la liste des membres, la recherche « Inviter », l'invitation reçue).
+  'GET /v1/hives': {
+    file: 'hives.test.ts',
+    test: 'never shows a removed avatar on any hive route that shows a member',
+  },
+  'GET /v1/hives/:id': {
+    file: 'hives.test.ts',
+    test: 'never shows a removed avatar on any hive route that shows a member',
+  },
+  'GET /v1/hives/:id/activity': {
+    file: 'hives.test.ts',
+    test: 'never shows a removed avatar on any hive route that shows a member',
+  },
+  'GET /v1/hives/:id/projects': {
+    file: 'hives.test.ts',
+    test: 'never shows a removed avatar on any hive route that shows a member',
+  },
+  'GET /v1/hives/:id/members': {
+    file: 'hives.test.ts',
+    test: 'never shows a removed avatar on any hive route that shows a member',
+  },
+  'GET /v1/hives/:id/invitable': {
+    file: 'hives.test.ts',
+    test: 'never shows a removed avatar on any hive route that shows a member',
+  },
 }
+
+/**
+ * R10 (relecture de sécurité du plan, point 1) : chaque route qui montre un projet (toute lecture
+ * qui montre le contenu d'un autre membre, celles de l'administration, et l'export) cite le test qui
+ * prouve qu'un projet réservé à une ruche n'y paraît pas pour qui n'en est pas membre ; ou, avec
+ * `none`, dit pourquoi elle ne montre aucun projet, ou pourquoi elle le montre (la modération). Une
+ * route ajoutée un jour sans preuve fait échouer « names a hive proof for every route that shows a
+ * project ».
+ */
+const RESERVED_BY_ADDRESS = {
+  file: 'hives.reserved.test.ts',
+  test: 'answers a stranger, an invitee and a former member as an unknown project, on every route that reads it by its address',
+}
+const RESERVED_IN_LISTS = {
+  file: 'hives.reserved.test.ts',
+  test: 'leaves every list and count of a stranger, an invitee and a former member unchanged',
+}
+const RESERVED_IN_CATALOGUE = {
+  file: 'hive-visibility.counts.test.ts',
+  test: 'never lists a hive-reserved project in the admin catalogue pages, even to an admin who is a member',
+}
+const SEEN_BY_MODERATION = {
+  none: 'la modération lit le projet signalé, réservé à une ruche ou non (contrat : « la modération quand il est signalé »)',
+}
+const HIVE_PROOFS: Record<string, { file: string; test: string } | { none: string }> = {
+  'GET /media/:folder/:file': {
+    file: 'hive-visibility.test.ts',
+    test: 'hides a hive-reserved project from a member who left the hive, in the testers corner and its photos',
+  },
+  'GET /v1/me/export': {
+    file: 'hive-visibility.counts.test.ts',
+    test: 'exports the follow of a hive-reserved project the member can see',
+  },
+  'GET /v1/projects/:id': RESERVED_BY_ADDRESS,
+  'GET /v1/projects/:id/updates': RESERVED_BY_ADDRESS,
+  'GET /v1/projects/:id/testers': RESERVED_BY_ADDRESS,
+  'GET /v1/projects/:id/calls': RESERVED_BY_ADDRESS,
+  'GET /v1/projects/:id/threads': RESERVED_BY_ADDRESS,
+  'GET /v1/projects/:id/threads/:testerId/messages': RESERVED_BY_ADDRESS,
+  'GET /v1/projects/:id/comments': RESERVED_BY_ADDRESS,
+  'GET /v1/comments/:commentId/context': RESERVED_BY_ADDRESS,
+  'GET /v1/reports/target': RESERVED_BY_ADDRESS,
+  'GET /v1/members/:id': RESERVED_IN_LISTS,
+  'GET /v1/tags/:slug': RESERVED_IN_LISTS,
+  'GET /v1/feed/following': RESERVED_IN_LISTS,
+  'GET /v1/feed/discover': RESERVED_IN_LISTS,
+  'GET /v1/suggestions/members': RESERVED_IN_LISTS,
+  'GET /v1/search': RESERVED_IN_LISTS,
+  'GET /v1/tools': RESERVED_IN_LISTS,
+  'GET /v1/categories': RESERVED_IN_LISTS,
+  'GET /v1/notifications': RESERVED_IN_LISTS,
+  'GET /v1/notifications/unread': RESERVED_IN_LISTS,
+  'GET /v1/members/mentionable': { none: 'des membres seulement, sans projet' },
+  // Les routes d'une ruche : seuls ses membres les lisent (le 404 commun, hives.test.ts) ; ce qui
+  // reste à prouver, c'est qu'elles ne montrent jamais un projet réservé à une autre ruche.
+  'GET /v1/hives': { none: 'des ruches et des invitations, sans projet' },
+  'GET /v1/hives/:id': {
+    file: 'hives.test.ts',
+    test: 'shows under looking for testers only the testable projects of members that the whole hive can see',
+  },
+  'GET /v1/hives/:id/activity': {
+    file: 'hives.test.ts',
+    test: 'lists, newest first, what members publish, reserved to the hive or for members, never another hive or a private project',
+  },
+  'GET /v1/hives/:id/projects': {
+    file: 'hives.test.ts',
+    test: 'lists in the projects tab the projects reserved to the hive, newest first, and nothing else',
+  },
+  'GET /v1/hives/:id/members': { none: 'des membres seulement, sans projet' },
+  'GET /v1/hives/:id/invitable': { none: 'des membres seulement, sans projet' },
+  // L'administration.
+  'GET /v1/moderation/reports': SEEN_BY_MODERATION,
+  'GET /v1/moderation/removed': SEEN_BY_MODERATION,
+  'GET /v1/moderation/decisions': SEEN_BY_MODERATION,
+  'GET /v1/moderation/tools/pending': RESERVED_IN_CATALOGUE,
+  'GET /v1/moderation/tools': RESERVED_IN_CATALOGUE,
+  'GET /v1/moderation/tools/:slug/impact': RESERVED_IN_CATALOGUE,
+  'GET /v1/moderation/categories/pending': RESERVED_IN_CATALOGUE,
+  'GET /v1/moderation/catalogue-changes': RESERVED_IN_CATALOGUE,
+}
+
+/**
+ * Les routes qui peuvent montrer un projet : les lectures qui montrent le contenu d'un autre membre
+ * (`showsOthers`, plus bas), les lectures de l'administration, et l'export (les projets suivis).
+ */
+const showsProjects = (route: string) =>
+  showsOthers(route) ||
+  route === 'GET /v1/me/export' ||
+  (route.startsWith('GET ') && blockClass(route) === 'admin')
 
 /** Les routes qui montrent le contenu d'un autre membre : les lectures « hidesBlocked », les fichiers. */
 const showsOthers = (route: string) =>
@@ -455,6 +628,24 @@ const SUSPENSION_PROOFS: Record<string, readonly { file: string; test: string }[
       test: 'judges a key sent twice on the value that would be written',
     },
   ],
+  // R10 (relecture de sécurité du plan, point 2) : la garde laisse passer ces DELETE ; la route
+  // refuse un animateur suspendu qui retire un membre ou supprime la ruche, et laisse quitter.
+  'DELETE /v1/hives/:id': [
+    {
+      file: 'hives.suspension.test.ts',
+      test: 'refuses a suspended animator deleting the hive, with 403 suspended',
+    },
+  ],
+  'DELETE /v1/hives/:id/members/:userId': [
+    {
+      file: 'hives.suspension.test.ts',
+      test: 'refuses a suspended animator removing a member, with 403 suspended',
+    },
+    {
+      file: 'hives.suspension.test.ts',
+      test: 'lets a suspended member leave a hive and accept an invitation',
+    },
+  ],
 }
 
 /** Échappe un texte pour qu'une expression régulière le lise mot pour mot (« ( », « . »…). */
@@ -467,7 +658,11 @@ const literally = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
  * (`import.meta.url` : l'adresse de ce fichier-ci).
  */
 const hasTest = (file: string, title: string) => {
-  const source = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
+  // Un fichier absent (pas encore écrit) ne contient aucun test : la preuve manque, et le test qui
+  // la cherche le dit, au lieu de s'arrêter sur une erreur de lecture.
+  const url = new URL(`./${file}`, import.meta.url)
+  if (!existsSync(url)) return false
+  const source = readFileSync(url, 'utf8')
   const call = new RegExp(
     String.raw`\bit(?:\.each\(\[[\s\S]*?\]\))?\(\s*(['"\x60])${literally(title)}\1`,
   )
@@ -525,11 +720,43 @@ describe('the inventory of routes', () => {
   })
 
   it('allows every GET and every DELETE during a suspension', () => {
+    // Tout GET est permis ; la garde laisse aussi passer tout DELETE. R10 : deux DELETE des ruches
+    // sont `partial` (la route refuse elle-même un animateur suspendu qui retire un membre ou
+    // supprime la ruche) ; aucun n'est refusé par la garde.
     const refused = Object.entries(ROUTES)
-      .filter(([route, [, during]]) => /^(GET|DELETE) /.test(route) && during !== 'allowed')
+      .filter(
+        ([route, [, during]]) =>
+          (route.startsWith('GET ') && during !== 'allowed') ||
+          (route.startsWith('DELETE ') && during === 'refused'),
+      )
       .map(([route]) => route)
 
     expect(refused).toEqual([])
+  })
+
+  it('names a hive proof for every route that shows a project', () => {
+    const showing = Object.keys(ROUTES).filter(showsProjects)
+    const withoutProof = showing.filter((route) => HIVE_PROOFS[route] === undefined)
+    const notShowing = Object.keys(HIVE_PROOFS).filter((route) => !showsProjects(route))
+    const notFound = Object.entries(HIVE_PROOFS).flatMap(([route, proof]) =>
+      'none' in proof || hasTest(proof.file, proof.test)
+        ? []
+        : [`${route}: ${proof.file} « ${proof.test} »`],
+    )
+
+    expect(withoutProof.join('\n')).toBe('')
+    expect(notShowing.join('\n')).toBe('')
+    expect(notFound.join('\n')).toBe('')
+    // Témoin : la page d'un projet, l'actualité d'une ruche, l'export et l'administration sont bien
+    // comptés parmi ces routes.
+    expect(showing).toEqual(
+      expect.arrayContaining([
+        'GET /v1/projects/:id',
+        'GET /v1/hives/:id/activity',
+        'GET /v1/me/export',
+        'GET /v1/moderation/reports',
+      ]),
+    )
   })
 
   it('cites a removed-part proof for every route that shows the content of another member', () => {

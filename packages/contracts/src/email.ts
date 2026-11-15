@@ -32,9 +32,10 @@ export const DigestOnlyChoice = z.enum(['digest', 'never'])
 export type DigestOnlyChoice = z.infer<typeof DigestOnlyChoice>
 
 /**
- * Les six types d'e-mail, dans l'ordre de l'écran. `comments` : les commentaires sur ses projets ;
+ * Les sept types d'e-mail, dans l'ordre de l'écran. `comments` : les commentaires sur ses projets ;
  * `replies` : les réponses et les mentions ; `testers` : le coin des testeurs (appels, retours,
- * réponses, « Réglé »).
+ * réponses, « Réglé ») ; `hives` (R10) : les invitations dans une ruche, et la partie « Dans tes
+ * ruches » du récap (absente si `never`).
  */
 export const EmailType = z.enum([
   'reactions',
@@ -43,6 +44,7 @@ export const EmailType = z.enum([
   'follows',
   'updates',
   'testers',
+  'hives',
 ])
 export type EmailType = z.infer<typeof EmailType>
 
@@ -51,6 +53,7 @@ export const INSTANT_EMAIL_TYPES = [
   'comments',
   'replies',
   'testers',
+  'hives',
 ] as const satisfies readonly EmailType[]
 export type InstantEmailType = (typeof INSTANT_EMAIL_TYPES)[number]
 
@@ -65,11 +68,15 @@ export const EmailPreferences = z
     follows: DigestOnlyChoice,
     updates: DigestOnlyChoice,
     testers: EmailChoice,
+    hives: EmailChoice,
   })
   .meta({ id: 'EmailPreferences' })
 export type EmailPreferences = z.infer<typeof EmailPreferences>
 
-/** Les réglages par défaut, ceux d'un membre qui n'a jamais rien changé. */
+/**
+ * Les réglages par défaut, ceux d'un membre qui n'a jamais rien changé. R10 : « Ruches » vaut
+ * « Tout de suite » par défaut (scénario, « Le réglage Ruches ») : une invitation attend une réponse.
+ */
 export const DEFAULT_EMAIL_PREFERENCES: EmailPreferences = {
   weeklyRecap: true,
   reactions: 'digest',
@@ -78,6 +85,7 @@ export const DEFAULT_EMAIL_PREFERENCES: EmailPreferences = {
   follows: 'digest',
   updates: 'digest',
   testers: 'digest',
+  hives: 'now',
 }
 
 /**
@@ -95,6 +103,7 @@ export const EmailPreferencesPatch = z
     z.strictObject({ follows: DigestOnlyChoice }),
     z.strictObject({ updates: DigestOnlyChoice }),
     z.strictObject({ testers: EmailChoice }),
+    z.strictObject({ hives: EmailChoice }),
   ])
   .meta({ id: 'EmailPreferencesPatch' })
 export type EmailPreferencesPatch = z.infer<typeof EmailPreferencesPatch>

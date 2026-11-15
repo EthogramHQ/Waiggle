@@ -24,6 +24,8 @@ import { commentRoutes } from './routes/comments'
 import { emailRoutes, UNSUBSCRIBE_PATH } from './routes/email'
 import { feedRoutes } from './routes/feed'
 import { followRoutes } from './routes/follows'
+import { hiveInvitationRoutes } from './routes/hive-invitations'
+import { hiveRoutes } from './routes/hives'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
@@ -366,6 +368,10 @@ export const createApp = ({
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
   // « Proches à suivre » : la liste et « × » (tranche R4).
   app.route('/', suggestionRoutes({ db, limiter, publicApiUrl }))
+  // Les ruches (R10) : mes ruches, créer, la page, l'actualité, les membres, l'animateur, quitter.
+  app.route('/', hiveRoutes({ db, limiter, publicApiUrl }))
+  // Les invitations : la recherche « Inviter », inviter, rejoindre, refuser (R10).
+  app.route('/', hiveInvitationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).

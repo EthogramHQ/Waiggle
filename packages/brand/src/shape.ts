@@ -103,4 +103,21 @@ export const layout = {
   // pour un petit bouton dessiné (sa zone à toucher, autour, fait quand même 44).
   controlHeight: { xl: 56, regular: 52, compact: 44, small: 36 },
   fab: 64, // le bouton rond flottant (« Publier »)
+  // R10 : l'alvéole d'une ruche (HiveBadge, planches R10), un hexagone pointe en haut, à trois
+  // tailles : la ligne compacte de « Tes ruches » (small), la ligne de l'onglet Ruches et
+  // l'invitation (regular), l'en-tête de la page d'une ruche et l'aperçu de la création (large).
+  // Son icône prend une part de sa hauteur (`iconRatio`). Le choix de l'icône (HiveIconPicker) :
+  // deux rangées de six alvéoles, chacune au plus `pickerCell` de large (assez pour 44 points de
+  // zone à toucher, même quand la rangée se resserre à 320 points) et `pickerHeight` de haut ; la
+  // coche du choix (`pickerCheck`) se pose sur son coin bas droit.
+  hive: {
+    small: 28,
+    regular: 44,
+    large: 64,
+    iconRatio: 0.5,
+    pickerCell: 52,
+    pickerHeight: 56,
+    pickerCheck: 20,
+    pickerColumns: 6,
+  },
 } as const

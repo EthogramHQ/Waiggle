@@ -9,7 +9,7 @@
 //
 // Le client réseau est remplacé par un faux serveur qui garde les réglages de Léa.
 import { appName } from '@ruche/brand'
-import type { EmailPreferences, EmailType } from '@ruche/contracts'
+import { DEFAULT_EMAIL_PREFERENCES, type EmailPreferences, type EmailType } from '@ruche/contracts'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { request } from '../../api/client'
 import type { ApiResult } from '../../api/errors'
@@ -54,6 +54,7 @@ const TYPE: Record<EmailType, string> = {
   follows: fr.t(($) => $.notificationSettings.types.follows),
   updates: fr.t(($) => $.notificationSettings.types.updates),
   testers: fr.t(($) => $.notificationSettings.types.testers),
+  hives: fr.t(($) => $.notificationSettings.types.hives),
 }
 const CHOICE = {
   now: fr.t(($) => $.notificationSettings.choices.now),
@@ -81,6 +82,8 @@ const leaChoices: EmailPreferences = {
   follows: 'digest',
   updates: 'never',
   testers: 'digest',
+  // R10 : « Ruches » (Tout de suite par défaut) mis au récap, pour garder ce que ces tests vérifient.
+  hives: 'digest',
 }
 
 const emailPath = '/v1/me/email-preferences'
@@ -427,9 +430,9 @@ describe('EmailSettings, the recap', () => {
     await renderWithProviders(<EmailSettings />)
 
     await screen.findByRole('button', { name: rowName('comments', 'digest') })
-    await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(4))
-    // Les quatre types « Dans le récap » (réactions, commentaires, abonnés, testeurs) gardent leur
-    // choix ; « Tout de suite » et « Jamais » n'ont pas la phrase.
+    await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5))
+    // Les cinq types « Dans le récap » (réactions, commentaires, abonnés, testeurs, et les ruches que
+    // Léa y a mises) gardent leur choix ; « Tout de suite » et « Jamais » n'ont pas la phrase.
     expect(screen.getByRole('button', { name: rowName('reactions', 'digest') })).toBeTruthy()
     expect(screen.getByRole('button', { name: rowName('testers', 'digest') })).toBeTruthy()
     expect(row('replies').props.accessibilityHint ?? null).toBeNull()
@@ -445,7 +448,7 @@ describe('EmailSettings, the recap', () => {
     expect(screen.queryByText(TEXT.recapOff)).toBeNull() // le récap est activé
 
     await fireEvent.press(await recapSwitch())
-    expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(4)
+    expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5)
 
     await fireEvent.press(await recapSwitch())
     expect(screen.queryByText(TEXT.recapOff)).toBeNull()
@@ -525,5 +528,50 @@ describe('EmailSettings, reading the settings', () => {
     )
     expect(screen.getByRole('link', { name: 'Me reconnecter' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
+  })
+})
+
+// R10 (scénario « Les notifications et le récap », « Le réglage Ruches ») : la ligne « Ruches »,
+// « Tout de suite · Dans le récap · Jamais », « Tout de suite » par défaut. Elle vient après le coin
+// des testeurs, dans l'ordre du contrat (`EmailType`), avant l'interrupteur du récap.
+describe('EmailSettings, the hives row (R10)', () => {
+  it('shows « Ruches » after the testers corner and before the recap switch, with its choice', async () => {
+    await renderWithProviders(<EmailSettings />)
+
+    const testers = await screen.findByRole('button', { name: rowName('testers', 'digest') })
+    const hives = screen.getByRole('button', { name: rowName('hives', 'digest'), expanded: false })
+    const places = readingOrder(testers, hives, await recapSwitch())
+    expect([...places].sort((a, b) => a - b)).toEqual(places)
+  })
+
+  it('says « Tout de suite » for « Ruches » by default', async () => {
+    storedEmails = { ...DEFAULT_EMAIL_PREFERENCES }
+    await renderWithProviders(<EmailSettings />)
+
+    expect(await screen.findByRole('button', { name: rowName('hives', 'now') })).toBeTruthy()
+  })
+
+  it('offers « Tout de suite », « Dans le récap » and « Jamais » for « Ruches »', async () => {
+    await renderWithProviders(<EmailSettings />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: rowName('hives', 'digest') }))
+
+    expect(row('hives')).toBeExpanded()
+    expect(screen.getAllByRole('radio').map((radio) => radio.props.accessibilityLabel)).toEqual([
+      CHOICE.now,
+      CHOICE.digest,
+      CHOICE.never,
+    ])
+    expect(screen.getByRole('radio', { name: CHOICE.digest, checked: true })).toBeTruthy()
+  })
+
+  it('saves « Jamais » for « Ruches » as soon as it is touched, that field only', async () => {
+    await renderWithProviders(<EmailSettings />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: rowName('hives', 'digest') }))
+    await fireEvent.press(screen.getByRole('radio', { name: CHOICE.never }))
+
+    expect(screen.getByRole('button', { name: rowName('hives', 'never') })).toBeExpanded()
+    await waitFor(() => expect(emailPatches()).toEqual([{ hives: 'never' }]))
   })
 })

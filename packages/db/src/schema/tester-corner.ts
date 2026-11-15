@@ -191,6 +191,8 @@ export const testerMedia = pgTable(
     // Les images d'un appel, et celles d'un message (les lire avec eux, les compter).
     index('tester_media_call_idx').on(t.callId),
     index('tester_media_message_idx').on(t.messageId),
+    // R10 (noté en R9) : comme `project_media_removal_idx`, pour la purge des décisions.
+    index('tester_media_removal_idx').on(t.removalId).where(sql`${t.removalId} is not null`),
     // Les plafonds de stockage (100 photos d'appel par projet, 100 captures par fil) comptent les
     // images d'un projet, d'un membre et d'une sorte, rattachées ou en attente : sans cet index, la
     // table entière serait lue à chaque envoi.

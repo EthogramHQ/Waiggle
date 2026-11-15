@@ -103,6 +103,15 @@
 		rewrite @project_new_call /projects/[id]/testers/new-call.html
 		@project_new_feedback path_regexp ^/projects/[^/.]+/testers/new-feedback$
 		rewrite @project_new_feedback /projects/[id]/testers/new-feedback.html
+		# R10 : les ruches. La page d'une ruche (/hives/<id> → hives/[id].html), sa feuille « Inviter » et
+		# ses réglages. /hives/new (la feuille « Créer une ruche ») a sa propre page, déjà trouvée à
+		# l'étape 1 : la règle de /hives/<id> ne la voit jamais.
+		@hive_invite path_regexp ^/hives/[^/.]+/invite$
+		rewrite @hive_invite /hives/[id]/invite.html
+		@hive_settings path_regexp ^/hives/[^/.]+/settings$
+		rewrite @hive_settings /hives/[id]/settings.html
+		@hive path_regexp ^/hives/[^/.]+$
+		rewrite @hive /hives/[id].html
 		@project path_regexp ^/projects/[^/.]+$
 		rewrite @project /projects/[id].html
 		@member path_regexp ^/members/[^/.]+$

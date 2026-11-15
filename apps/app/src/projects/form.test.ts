@@ -31,6 +31,8 @@ describe('emptyProjectForm', () => {
       description: '',
       status: 'idea',
       audience: 'members',
+      // R10 : aucune ruche choisie.
+      hiveId: null,
       demoUrl: '',
       tools: [],
       prompts: [],
@@ -175,6 +177,7 @@ describe('formFromProject', () => {
       description: '## Comment ça marche\n\nOn **photographie** le frigo.',
       status: 'testable',
       audience: 'members',
+      hiveId: null,
       demoUrl: 'https://recettes.example.com',
       tools: ['Claude Code', 'Cursor'],
       prompts: ['Propose trois recettes avec : {ingrédients}'],

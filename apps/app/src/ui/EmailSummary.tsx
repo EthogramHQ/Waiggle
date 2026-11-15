@@ -18,6 +18,11 @@ type Props = {
   title: string
   /** La phrase des réglages ; null : pas encore lus (ou illisibles), rien n'est promis. */
   summary: string | null
+  /**
+   * Une phrase de plus sous le résumé, dans la carte (R10, relecture juridique, C3 : « Pour les
+   * ruches, « Tout de suite » ne vaut que pour les invitations… ») ; absente ou null : rien.
+   */
+  detail?: string | null
   /** La note sous la carte (« On ne voit nulle part qui a réagi… »). */
   note: string
   /** Le nom du bouton qui mène aux réglages (« Régler les notifications »). */
@@ -25,7 +30,7 @@ type Props = {
   onAction: () => void
 }
 
-export function EmailSummary({ title, summary, note, actionLabel, onAction }: Props) {
+export function EmailSummary({ title, summary, detail, note, actionLabel, onAction }: Props) {
   return (
     // Une colonne : la carte, puis la note. Les textes s'étirent sur toute la largeur (ils se
     // replient au lieu de déborder) ; le bouton garde sa largeur, rangé à gauche.
@@ -37,6 +42,12 @@ export function EmailSummary({ title, summary, note, actionLabel, onAction }: Pr
         {summary ? (
           <Text variant="callout" tone="secondary">
             {summary}
+          </Text>
+        ) : null}
+        {/* Seulement avec un résumé : sans réglages lus, la carte ne promet rien. */}
+        {summary && detail ? (
+          <Text variant="callout" tone="secondary">
+            {detail}
           </Text>
         ) : null}
         <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>

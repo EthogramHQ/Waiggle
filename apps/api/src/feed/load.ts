@@ -16,6 +16,7 @@ import { and, desc, eq, inArray, isNotNull, ne, or, type SQL, sql } from 'drizzl
 import { unionAll } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { followedAmong, followsAnyone } from '../follows/load'
+import { authorIsMemberOf, hiveProjectFor } from '../hives/load'
 import { rowsToSummaries, selectProjects } from '../projects/load'
 import { listedProjectFor, listedVerifiedProjectFor } from '../projects/visibility'
 import { hasReadableLines, updateOnCards } from '../updates/load'
@@ -155,7 +156,21 @@ const selectFollowingEntries = (
   db: Database,
   viewerId: string,
   cursor: CursorContent | null,
+  hiveId: string | null = null,
 ): Promise<Entry[]> => {
+  // R10 : le Fil d'une ruche (`hiveId`) a les mêmes deux morceaux, mais ses projets ne sont plus
+  // « ceux que je suis » : ce sont ceux que la ruche montre au lecteur (hiveProjectFor : réservés à
+  // CETTE ruche, ou « Membres » d'un de ses membres, sans blocage), suivis ou non. La même condition
+  // remplace donc, dans chaque morceau, la liste des suivis ET `listedProjectFor` (qui ajouterait les
+  // projets réservés aux autres ruches du lecteur).
+  //
+  // `authorIsMemberOf` est redit en tête, AVANT cette condition (le projet réservé d'un membre parti
+  // est déjà devenu privé : la règle ne perd rien). Sans lui, le « or » de hiveProjectFor (réservé à
+  // la ruche, ou « Membres » d'un membre) fait lire toute la table project (mesuré : parcours complet
+  // de 10 000 projets, 53 ms) ; avec lui, PostgreSQL part des membres de la ruche (clé primaire de
+  // hive_member) et lit leurs projets par l'index d'auteur, comme le Fil des abonnements.
+  const inHive =
+    hiveId === null ? null : and(authorIsMemberOf(hiveId), hiveProjectFor(hiveId, viewerId))
   // Les auteurs dont le fil montre les nouveaux projets : les membres suivis ET le membre lui-même
   // (R6a : il retrouve son projet tout juste publié). « union all » ajoute une ligne, le visiteur,
   // à la liste des suivis ; plus sûr qu'un « or » avec un « in (sous-requête) », que PostgreSQL
@@ -177,9 +192,9 @@ const selectFollowingEntries = (
       and(
         // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur ; ni celui
         // d'un membre bloqué avec le visiteur (tranche 7b).
-        listedProjectFor(viewerId),
+        inHive ?? listedProjectFor(viewerId),
         isNotNull(t.publishedAt),
-        inArray(t.authorId, followedMembers),
+        inHive ? undefined : inArray(t.authorId, followedMembers),
         // Sa publication est son dernier événement : un des siens, ou aucune mise à jour plus
         // récente (sinon il est dans le morceau des mises à jour).
         or(eq(t.authorId, viewerId), sql`not ${raisedByAnUpdate()}`),
@@ -219,15 +234,18 @@ const selectFollowingEntries = (
     .crossJoinLateral(latest)
     .where(
       and(
-        inArray(t.id, followedProjects),
+        inHive ? undefined : inArray(t.id, followedProjects),
         // Ses propres projets ne remontent pas par leurs mises à jour ; un projet privé, retiré ou
         // d'un membre bloqué avec lui ne remonte jamais (listedProjectFor).
         ne(t.authorId, viewerId),
-        listedProjectFor(viewerId),
+        inHive ?? listedProjectFor(viewerId),
         // La mise à jour est son dernier événement : un projet suivi dont il ne suit pas l'auteur
         // (sa publication n'est pas dans le fil), ou une mise à jour plus récente que la
-        // publication. Le contraire exact de la condition du morceau 1.
-        sql`(not ${authorFollowed} or ${sql.raw('project.published_at')} is null or ${latest.createdAt} > ${sql.raw('project.published_at')})`,
+        // publication. Le contraire exact de la condition du morceau 1. Dans une ruche, toutes les
+        // publications sont dans le fil : seule la deuxième moitié compte.
+        inHive
+          ? sql`(${sql.raw('project.published_at')} is null or ${latest.createdAt} > ${sql.raw('project.published_at')})`
+          : sql`(not ${authorFollowed} or ${sql.raw('project.published_at')} is null or ${latest.createdAt} > ${sql.raw('project.published_at')})`,
         cursor ? after(cursor, latest.createdAt, t.id) : undefined,
       ),
     )
@@ -263,15 +281,64 @@ export const loadFollowingFeed = async (
     selectFollowingEntries(db, viewerId, cursor),
     followsAnyone(db, viewerId),
   ])
+  return completeEntries(db, viewerId, entries, anyone, listedProjectFor(viewerId), publicApiUrl)
+}
+
+/**
+ * Le Fil d'une ruche (R10) : GET /v1/feed/following?hive=<id>. Les nouveaux projets et les mises à
+ * jour des membres de la ruche, suivis ou non, que le lecteur voit par la règle commune (hiveProjectFor,
+ * hives/load.ts : réservés à cette ruche, ou « Membres » d'un membre de la ruche, sans blocage dans
+ * un sens ou l'autre). Même forme, même curseur, mêmes règles de « remonter » que le Fil des
+ * abonnements ; `followsAnyone` vaut toujours vrai (la pastille n'a pas d'état « tu ne suis
+ * personne »). L'appelant a déjà vérifié que le lecteur est membre (membershipOf) et note la
+ * visite : la date `lastReadAt` est le `seen_at` d'avant, lu par membershipOf.
+ *
+ * Requêtes : les lignes (une), puis les projets de la page et leurs cartes (rowsToSummaries), comme
+ * le Fil des abonnements, moins les deux de `followsAnyone`.
+ */
+export const loadHiveFeed = async (
+  db: Database,
+  viewerId: string,
+  hiveId: string,
+  cursor: CursorContent | null,
+  publicApiUrl: string,
+): Promise<FeedPage & { followsAnyone: true }> => {
+  const entries = await selectFollowingEntries(db, viewerId, cursor, hiveId)
+  return {
+    ...(await completeEntries(
+      db,
+      viewerId,
+      entries,
+      true,
+      hiveProjectFor(hiveId, viewerId),
+      publicApiUrl,
+    )),
+    followsAnyone: true,
+  }
+}
+
+/**
+ * La fin commune des deux fils « following » : les lignes lues (une de plus que la page, pour savoir
+ * s'il y a une suite) deviennent des éléments complets, avec leurs cartes. `visible` est la condition
+ * d'accès, redite sur les projets de la page.
+ */
+const completeEntries = async (
+  db: Database,
+  viewerId: string,
+  entries: Entry[],
+  anyone: boolean,
+  visible: SQL | undefined,
+  publicApiUrl: string,
+): Promise<Omit<FollowingFeedPage, 'lastReadAt'>> => {
   const page = entries.slice(0, FEED_PAGE_SIZE)
 
-  // Les projets de la page, lus en une requête. La condition « public » est redite : si un projet
+  // Les projets de la page, lus en une requête. La condition d'accès est redite : si un projet
   // est devenu privé entre les deux requêtes, son élément est laissé de côté.
   const projectIds = page.map((entry) => entry.projectId)
   const rows =
     projectIds.length === 0
       ? []
-      : await selectProjects(db).where(and(inArray(t.id, projectIds), listedProjectFor(viewerId)))
+      : await selectProjects(db).where(and(inArray(t.id, projectIds), visible))
   const summaries = new Map(
     (await rowsToSummaries(db, rows, viewerId, publicApiUrl)).map((summary) => [
       summary.id,

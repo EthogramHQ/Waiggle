@@ -14,7 +14,13 @@
 // droite propose des proches à suivre et des projets qui cherchent des testeurs.
 
 import { sourceUrl } from '@ruche/brand'
-import { type FollowingFeedPage, ProjectId } from '@ruche/contracts'
+import {
+  type FollowingFeedPage,
+  type HiveSummary,
+  type HiveInvitation as Invitation,
+  ProjectId,
+} from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   type ReactNode,
@@ -22,6 +28,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -29,12 +36,20 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { SessionData } from '../accounts/session'
 import { useMemberSession } from '../accounts/session'
-import { useFeedNews, useFollowingFeed, useMarkFeedRead } from '../feed/api'
+import { type ApiErrorKey, errorKey } from '../api/errors'
+import { type FeedNews as News, useFeedNews, useFollowingFeed, useMarkFeedRead } from '../feed/api'
 import { FeedError, FeedList, FeedNews } from '../feed/FeedList'
 import { FeedSide } from '../feed/FeedSide'
 import { FirstRun } from '../feed/FirstRun'
 import { firstOfOthers } from '../feed/items'
 import { useReadBefore } from '../feed/readBefore'
+import {
+  hiveFeedQueryKey,
+  useAcceptInvitation,
+  useHiveFeed,
+  useMyHives,
+  useRefuseInvitation,
+} from '../hives/api'
 import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
@@ -48,14 +63,18 @@ import type { Measurable } from '../ui/coverTransition'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HiddenHeading } from '../ui/HiddenHeading'
 import { Hint } from '../ui/Hint'
+import { HiveInvitation } from '../ui/HiveInvitation'
+import { ALL_HIVES, HivePills } from '../ui/HivePills'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { Logo } from '../ui/Logo'
+import { Notice } from '../ui/Notice'
 import { PublishDance } from '../ui/PublishDance'
 import { Screen } from '../ui/Screen'
 import { SkeletonList } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { useScreenFocused } from '../ui/screenFocus'
 import { ScreenScrollContext } from '../ui/scrollLight'
+import { TabPanel } from '../ui/Tabs'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
@@ -165,11 +184,22 @@ function MemberHome({ session }: { session: SessionData }) {
   const firstPage = feed.data?.pages[0]
   const items = feed.data?.pages.flatMap((page) => page.items) ?? []
   const viewerId = session.user.id
+  // R10 : la pastille choisie (« Tout », ou une de ses ruches), et ses invitations.
+  const hiveChoice = useHiveChoice()
+  const { chosen } = hiveChoice
   // R6a : ses propres projets sont dans son fil, mais jamais une nouveauté pour lui.
-  const news = useFeedNews('following', items[0], false, viewerId)
+  const followingNews = useFeedNews('following', items[0], false, viewerId)
+  // R10 (relecture) : sous la pastille d'une ruche, le bouton des nouveautés de cette ruche, lu dans
+  // « mes ruches » (voir hiveNewsOf). L'état du Fil de la ruche se lit dans le cache, sans hook : cet
+  // écran se redessine quand « mes ruches » sont relues, juste après chaque page de ce Fil.
+  const queryClient = useQueryClient()
+  const hiveFeedKey = chosen ? hiveFeedQueryKey(chosen.id) : undefined
+  const hiveFeedState = hiveFeedKey ? queryClient.getQueryState(hiveFeedKey) : undefined
+  const news = chosen ? hiveNewsOf(chosen, hiveChoice.read, hiveFeedState) : followingNews
   // Le fil est marqué lu jusqu'au premier élément de la première page, dès qu'il s'affiche (R4) ;
-  // R6a : le premier élément d'un autre, jamais un des siens (voir feed/api.ts).
-  useMarkFeedRead(firstOfOthers(firstPage?.items, viewerId))
+  // R6a : le premier élément d'un autre, jamais un des siens (voir feed/api.ts). R10 : seulement
+  // quand il s'affiche, sous « Tout » : le Fil d'une ruche a sa propre date, que sa lecture avance.
+  useMarkFeedRead(chosen ? undefined : firstOfOthers(firstPage?.items, viewerId))
   // R6a : arrivé de la feuille de publication (?published=<id>), la danse vers la nouvelle carte.
   const published = usePublishedArrival(feed, viewerId)
   // La date de la dernière lecture, lue sur la première page et figée pour la visite : la sphère
@@ -182,29 +212,81 @@ function MemberHome({ session }: { session: SessionData }) {
   // projet » (masqué pour un compte suspendu), la cloche et la photo.
   const topNav = <TopNav openSuspension />
   const onExplore = () => router.push('/explore')
-  const showNews = () => feed.refetch()
+  // Afficher les nouveautés : relire le fil montré (« Tout », ou celui de la ruche choisie).
+  const showNews = () =>
+    hiveFeedKey ? queryClient.refetchQueries({ queryKey: hiveFeedKey }) : feed.refetch()
   // Le bouton des nouveautés, avec la phrase qui dit ce que montre le fil quand rien n'est neuf.
   // Sur ordinateur, à côté du titre (la phrase passe en sous-titre) ; sur téléphone, en tête du fil.
-  const caption = t(($) => $.feed.followingCaption)
+  // R10 : sous une ruche, la phrase de la ruche (« … des membres de la ruche Famille. »).
+  const caption = chosen
+    ? t(($) => $.hives.pills.caption, { hive: chosen.name ?? t(($) => $.hives.unnamedInline) })
+    : t(($) => $.feed.followingCaption)
   const newsButton = <FeedNews news={news} onPress={showNews} {...(compact ? { caption } : null)} />
   // RF (ui-5) : le titre « Fil », où le focus revient quand le bouton des nouveautés est touché.
   const feedTitle = useRef<Focusable>(null)
+  // Deux colonnes de cartes dès la tablette (768 points) tant que la colonne de droite n'est pas
+  // là, comme Explorer (relecture de design de R4, A5) ; une seule quand elle prend la place,
+  // jusqu'à l'ordinateur (`wide`), où les deux tiennent à côté d'elle.
+  const cardColumns = compact || (columns && sizeClass !== 'wide') ? 1 : 2
+
+  // R10 : les pastilles, seulement pour un membre d'au moins une ruche. Elles commandent le
+  // panneau du Fil (`panelId`), posé autour de la colonne principale.
+  const panelId = useId()
+  const pills =
+    hiveChoice.hives.length > 0 ? (
+      <HivePills
+        hives={hiveChoice.hives}
+        value={chosen?.id ?? ALL_HIVES}
+        onChange={hiveChoice.choose}
+        panelId={panelId}
+      />
+    ) : null
+  // Sur téléphone, le titre « Fil » reste pourtant lu, caché à l'œil (relecture R3) : un lecteur
+  // d'écran parcourt la page par ses titres, et sans titre de niveau 1 il ne sait pas où il est.
+  // Posé en tête, à la place exacte du titre affiché sur ordinateur : avant les pastilles quand
+  // elles sont là (la place collée de Screen passe avant le contenu), sinon en tête du contenu.
+  const hiddenTitle = compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null
 
   const main = (
-    <FollowingFeed
-      feed={feed}
-      items={items}
-      readBefore={readBefore}
-      firstRun={firstRun}
-      name={name}
-      news={compact ? newsButton : null}
-      // Deux colonnes de cartes dès la tablette (768 points) tant que la colonne de droite n'est
-      // pas là, comme Explorer (relecture de design de R4, A5) ; une seule quand elle prend la
-      // place, jusqu'à l'ordinateur (`wide`), où les deux tiennent à côté d'elle.
-      columns={compact || (columns && sizeClass !== 'wide') ? 1 : 2}
-      onExplore={onExplore}
-      hideMascot={published.noticeUp}
-    />
+    <TabPanel
+      id={pills ? panelId : undefined}
+      label={chosen ? (chosen.name ?? t(($) => $.hives.unnamed)) : t(($) => $.hives.pills.all)}
+    >
+      {chosen ? (
+        // Une liste neuve par ruche (`key`) : sa date « Tu es à jour » et sa mémoire des cartes
+        // déjà vues sont celles de cette ruche.
+        <HiveFeed
+          key={chosen.id}
+          hiveId={chosen.id}
+          news={compact ? newsButton : null}
+          columns={cardColumns}
+          onExplore={onExplore}
+          hideMascot={published.noticeUp}
+        />
+      ) : hiveChoice.waiting ? (
+        // Ses ruches pas encore lues : le squelette du Fil. Une ruche demandée par l'adresse : on ne
+        // montre pas « Tout » pour le remplacer aussitôt, sous les yeux. Relecture du design de R10 :
+        // sans ruche demandée non plus, les pastilles arrivées après le Fil s'inséraient au-dessus
+        // des cartes et les faisaient descendre sous le doigt. Une lecture ratée ne retient pas le
+        // Fil : il se montre, sans pastilles.
+        <SkeletonList count={3} shape="feed" />
+      ) : (
+        <FollowingFeed
+          feed={feed}
+          items={items}
+          readBefore={readBefore}
+          firstRun={firstRun}
+          name={name}
+          news={compact ? newsButton : null}
+          columns={cardColumns}
+          onExplore={onExplore}
+          hideMascot={published.noticeUp}
+          // Toujours posé (il ne dessine rien sans invitation) : une invitation refusée garde sa
+          // place jusqu'à la prochaine visite, même quand la liste relue ne l'a plus.
+          invitations={<FeedInvitations invitations={hiveChoice.invitations} />}
+        />
+      )}
+    </TabPanel>
   )
   // Les projets déjà en carte dans le fil : la colonne de droite ne les propose pas une seconde fois.
   const shownProjectIds = new Set(
@@ -247,13 +329,24 @@ function MemberHome({ session }: { session: SessionData }) {
         }
         // La phrase qui dit ce que montre le fil ; pas au premier lancement, où le salut et « Ton fil
         // t'attend » le disent déjà, juste en dessous.
-        subtitle={compact || firstRun ? undefined : caption}
+        // R10 : sous une ruche, le premier lancement ne s'affiche pas : sa phrase reste.
+        subtitle={compact || (firstRun && !chosen) ? undefined : caption}
         pageTitle={t(($) => $.nav.feed)}
+        // R10 : les pastilles des ruches, sous l'en-tête. Sur téléphone, Screen les garde collées en
+        // haut pendant le défilement ; sur tablette et ordinateur, à droite du titre « Fil ».
+        // Relecture du design de R10 : `null` (et non `undefined`) tant qu'elles ne sont pas là. La
+        // place existe déjà, vide : quand les ruches arrivent après le Fil, Screen garde le même
+        // arbre, et le Fil n'est pas remonté (le focus du clavier restait sur toute la page).
+        sticky={
+          pills ? (
+            <>
+              {hiddenTitle}
+              {pills}
+            </>
+          ) : null
+        }
       >
-        {/* Sur téléphone, le titre « Fil » reste pourtant lu, caché à l'œil (relecture R3) : un lecteur
-          d'écran parcourt la page par ses titres, et sans titre de niveau 1 il ne sait pas où il
-          est. Posé en tête du contenu, à la place exacte du titre affiché sur ordinateur. */}
-        {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
+        {pills ? null : hiddenTitle}
         {/* Sur ordinateur (quand les deux colonnes tiennent), la colonne de droite. Sans proches à
           suivre au premier lancement : la colonne principale les montre déjà. */}
         {columns ? (
@@ -521,6 +614,8 @@ type FollowingFeedProps = {
   onExplore: () => void
   /** L'avis « Projet publié » est à l'écran : l'abeille de « Tu es à jour » s'efface (H1). */
   hideMascot: boolean
+  /** R10 : ses invitations dans une ruche, montrées au premier lancement seulement. */
+  invitations: ReactNode
 }
 
 /** Le fil « Abonnements » : les nouveaux projets des personnes suivies, les notes des projets suivis. */
@@ -534,6 +629,7 @@ function FollowingFeed({
   columns,
   onExplore,
   hideMascot,
+  invitations,
 }: FollowingFeedProps) {
   // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
   // les cartes déjà lues (voir FeedList).
@@ -560,8 +656,213 @@ function FollowingFeed({
   // après un « Suivre », arrive dessous, sans rien déplacer de ce qu'on touche.
   return (
     <Stack gap="xxl" align="stretch">
-      <FirstRun name={name} />
+      <FirstRun name={name} invitations={invitations} />
       {items.length > 0 ? list : null}
+    </Stack>
+  )
+}
+
+/** Rien de neuf : toujours le même objet, d'un rendu à l'autre. */
+const NO_NEWS: News = { count: null, more: false, authors: [], kinds: [] }
+
+/** « Mes ruches » relues chaque minute sous la pastille d'une ruche, comme la tête de « Tout ». */
+const HIVE_NEWS_INTERVAL_MS = 60_000
+
+/**
+ * R10 (relecture, scénario « le bouton des nouveautés vaut pour la pastille choisie ») : les
+ * nouveautés de la ruche choisie, lues dans « mes ruches » (`news`, compté depuis sa dernière
+ * visite). Relire la tête du Fil de la ruche, comme « Tout » le fait, avancerait la date de visite
+ * (la première page la pose, voir hives/api.ts) : la ruche se croirait vue sans l'être.
+ *
+ * Le compte n'est cru que si « mes ruches » ont été lues après la dernière page du Fil de la ruche
+ * (`dataUpdatedAt`), et ne sont pas en train de l'être : avant, il compte encore les cartes qu'on a
+ * sous les yeux (« 2 nouveautés » au-dessus des deux mêmes projets). Ni visages ni sortes : le
+ * compte seul, « 2 nouveautés », comme la ligne de « Tes ruches ».
+ */
+const hiveNewsOf = (
+  hive: HiveSummary,
+  read: { at: number; fetching: boolean },
+  feed: { data?: unknown; dataUpdatedAt: number } | undefined,
+): News =>
+  hive.news > 0 && feed?.data !== undefined && !read.fetching && read.at > feed.dataUpdatedAt
+    ? { count: hive.news, more: false, authors: [], kinds: [] }
+    : NO_NEWS
+
+/**
+ * Hook (R10) : la pastille du Fil. Elle vit dans l'adresse (`/?hive=<id>`), lue après l'hydratation
+ * (la page pré-rendue ne connaît pas l'adresse) ; une ruche dont le membre ne fait pas partie (plus
+ * membre, adresse recopiée) vaut « Tout ». Choisir une pastille change le seul paramètre, sans
+ * nouvelle entrée d'historique (`setParams`).
+ *
+ * - `hives` : ses ruches, dans l'ordre de l'API (les pastilles, « Tes ruches ») ;
+ * - `chosen` : la ruche choisie, ou `undefined` pour « Tout » ;
+ * - `waiting` : ses ruches ne sont pas encore lues (le Fil attend, voir plus haut) ;
+ * - `invitations` : ses invitations valables (le premier lancement les montre) ;
+ * - `read` : quand ses ruches ont été lues, et si elles le sont en ce moment.
+ */
+const useHiveChoice = () => {
+  const router = useRouter()
+  const hydrated = useHydrated()
+  const asked = useHiveParam()
+  const wanted = hydrated ? asked : undefined
+  // Sous la pastille d'une ruche, relues chaque minute : ses nouveautés (voir hiveNewsOf).
+  const mine = useMyHives(wanted ? { refetchInterval: HIVE_NEWS_INTERVAL_MS } : {})
+  const hives: HiveSummary[] = mine.data?.hives ?? []
+  const chosen = wanted ? hives.find((hive) => hive.id === wanted) : undefined
+  const choose = useCallback(
+    (value: string) => {
+      const hive = value === ALL_HIVES ? undefined : value
+      if (router.setParams) router.setParams({ hive })
+      else router.replace(hive ? `/?hive=${encodeURIComponent(hive)}` : '/')
+    },
+    [router],
+  )
+  return {
+    hives,
+    chosen,
+    waiting: mine.isPending,
+    invitations: mine.data?.invitations ?? [],
+    choose,
+    // Quand « mes ruches » ont été lues, et si elles le sont en ce moment (voir hiveNewsOf).
+    read: { at: mine.dataUpdatedAt, fetching: mine.isFetching },
+  }
+}
+
+/** Hook : le paramètre `hive` de l'adresse (même garde que `usePublishedParam`, plus bas). */
+const useHiveParam = (): string | undefined => {
+  try {
+    // biome-ignore lint/correctness/useHookAtTopLevel: l'issue du try est la même à chaque rendu (voir usePublishedParam)
+    return firstParam(useLocalSearchParams<{ hive?: string | string[] }>().hive)
+  } catch {
+    return undefined
+  }
+}
+
+type HiveFeedProps = {
+  hiveId: string
+  /** Le haut du fil (la phrase de la ruche), sur téléphone ; null sur ordinateur. */
+  news: ReactNode
+  columns: number
+  onExplore: () => void
+  hideMascot: boolean
+}
+
+/**
+ * R10 : le Fil d'une ruche (GET /v1/feed/following?hive=<id>), de même forme que « Tout ». « Tu es
+ * à jour » se pose d'après sa dernière visite de la ruche (`lastReadAt` de la première page), figée
+ * pour la visite comme celle de « Tout ». Un fil vide finit sur « Tu es à jour ».
+ */
+function HiveFeed({ hiveId, news, columns, onExplore, hideMascot }: HiveFeedProps) {
+  const feed = useHiveFeed(hiveId)
+  const firstPage = feed.data?.pages[0]
+  const readBefore = useReadBefore(firstPage)
+  if (!feed.data) {
+    return feed.isError ? (
+      <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+    ) : (
+      <SkeletonList count={3} shape="feed" />
+    )
+  }
+  return (
+    <FeedList
+      feed={feed}
+      items={feed.data.pages.flatMap((page) => page.items)}
+      news={news}
+      upToDate={{ readBefore: readBefore ?? null, onExplore, hideMascot }}
+      columns={columns}
+    />
+  )
+}
+
+/** Les refus d'une invitation dont l'appli a le message propre ; les autres disent « Réessaie. ». */
+const INVITATION_ERRORS: ReadonlySet<ApiErrorKey> = new Set([
+  'invitationExpired',
+  'hivesJoinedLimit',
+  'hiveFull',
+  'alreadyHiveMember',
+  'notFound',
+])
+
+/**
+ * R10 (F-Fil9, planche R4-Fil-Premier) : ses invitations au premier lancement, sous le salut et
+ * au-dessus des proches à suivre. « Rejoindre la ruche » ouvre la page de la ruche (comme l'onglet
+ * Ruches) ; « Refuser » laisse la carte à sa place, « Invitation refusée. », jusqu'à la prochaine
+ * visite. Les invitations vues pendant la visite sont gardées dans l'ordre où elles sont arrivées :
+ * la liste relue après un refus ne l'a plus, la carte reste. Un échec se dit sous la carte.
+ */
+function FeedInvitations({ invitations }: { invitations: readonly Invitation[] }) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const accept = useAcceptInvitation()
+  const refuse = useRefuseInvitation()
+  const [kept, setKept] = useState<readonly Invitation[]>([])
+  const [refused, setRefused] = useState<ReadonlySet<string>>(new Set())
+  const [failure, setFailure] = useState<{ id: string; message: string } | null>(null)
+  // Les invitations arrivées depuis le dernier rendu rejoignent la liste gardée (pendant le rendu,
+  // comme useReadBefore : aucun rendu sans elles).
+  const added = invitations.filter((one) => !kept.some((known) => known.id === one.id))
+  const all = added.length > 0 ? [...kept, ...added] : kept
+  if (added.length > 0) setKept(all)
+  // Une invitation partie de la liste (acceptée, expirée) part de l'écran ; une refusée reste.
+  const shown = all.filter(
+    (one) => refused.has(one.id) || invitations.some((current) => current.id === one.id),
+  )
+  if (shown.length === 0) return null
+
+  const messageOf = (error: unknown, fallback: string) => {
+    const key = errorKey(error)
+    return INVITATION_ERRORS.has(key) ? t(($) => $.errors[key]) : fallback
+  }
+  // Une seule action miel par écran (R10) : « Rejoindre » en miel sur la première carte qui a encore
+  // ses boutons, en blanc sur les autres.
+  const firstOpen = shown.findIndex((one) => !refused.has(one.id))
+  return (
+    <Stack gap="md" align="stretch">
+      {shown.map((invitation, index) => (
+        <Stack key={invitation.id} gap="sm" align="stretch">
+          <HiveInvitation
+            invitation={invitation}
+            refused={refused.has(invitation.id)}
+            primary={index === firstOpen}
+            // Relecture de l'interface de R10 (point 1) : signaler la ruche depuis le Fil aussi,
+            // comme depuis l'onglet Ruches (la carte refusée n'a plus de « … »).
+            onReport={() =>
+              router.push({ pathname: '/report', params: { kind: 'hive', id: invitation.hive.id } })
+            }
+            onAccept={async () => {
+              setFailure(null)
+              try {
+                const hive = await accept.mutateAsync(invitation.id)
+                router.push({ pathname: '/hives/[id]', params: { id: hive.id } })
+              } catch (error) {
+                setFailure({
+                  id: invitation.id,
+                  message: messageOf(
+                    error,
+                    t(($) => $.hives.invitations.acceptError),
+                  ),
+                })
+              }
+            }}
+            onRefuse={async () => {
+              setFailure(null)
+              try {
+                await refuse.mutateAsync(invitation.id)
+                setRefused((current) => new Set(current).add(invitation.id))
+              } catch (error) {
+                setFailure({
+                  id: invitation.id,
+                  message: messageOf(
+                    error,
+                    t(($) => $.hives.invitations.refuseError),
+                  ),
+                })
+              }
+            }}
+          />
+          {failure?.id === invitation.id ? <Notice message={failure.message} /> : null}
+        </Stack>
+      ))}
     </Stack>
   )
 }

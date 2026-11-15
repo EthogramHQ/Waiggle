@@ -1,7 +1,7 @@
 // Les réglages d'e-mail d'un membre (tranche 6c, R8), dans la table email_preference : les lire, les
 // changer (Réglages → Notifications), les baisser depuis un lien de désinscription, et les exporter.
 // Une ligne par membre, créée à la première écriture ; sans ligne, ce sont les valeurs par défaut (le
-// récap activé, chaque type « Dans le récap »).
+// récap activé, chaque type « Dans le récap », sauf « Ruches », « Tout de suite » depuis R10).
 //
 // R8 : un choix par type (`now`, `digest`, `never`). Jusqu'à R9, l'ancien interrupteur de 6c
 // (`mention_emails`) est encore écrit en copie : vrai seulement quand « Réponses et mentions » passe à
@@ -23,7 +23,7 @@ import { eq } from 'drizzle-orm'
 
 const t = schema.emailPreference
 
-/** Les sept réglages, chacun avec sa colonne : le nom du contrat → la colonne de la table. */
+/** Les huit réglages (R10 : « Ruches »), chacun avec sa colonne : le nom du contrat → la colonne de la table. */
 const columns = {
   weeklyRecap: t.weeklyRecap,
   reactions: t.emailReactions,
@@ -32,6 +32,8 @@ const columns = {
   follows: t.emailFollows,
   updates: t.emailUpdates,
   testers: t.emailTesters,
+  // R10 : les ruches.
+  hives: t.emailHives,
 }
 
 /**
@@ -56,6 +58,7 @@ const columnValues = (values: Partial<EmailPreferences>) => ({
   ...(values.follows !== undefined && { emailFollows: values.follows }),
   ...(values.updates !== undefined && { emailUpdates: values.updates }),
   ...(values.testers !== undefined && { emailTesters: values.testers }),
+  ...(values.hives !== undefined && { emailHives: values.hives }),
 })
 
 /**
@@ -118,7 +121,16 @@ export const updateEmailPreferences = async (
 
 /** Ce qui a baissé d'un état à l'autre, type par type (le récap d'abord, puis l'ordre du contrat). */
 const loweredBetween = (before: EmailPreferences, after: EmailPreferences): Lowered[] => {
-  const types = ['reactions', 'comments', 'replies', 'follows', 'updates', 'testers'] as const
+  // R10 : « Ruches » aussi, qui part de « Tout de suite » (son défaut) : le passer au récap le baisse.
+  const types = [
+    'reactions',
+    'comments',
+    'replies',
+    'follows',
+    'updates',
+    'testers',
+    'hives',
+  ] as const
   return [
     ...(before.weeklyRecap && !after.weeklyRecap ? [{ what: 'recap' as const }] : []),
     ...types.flatMap((type) => {

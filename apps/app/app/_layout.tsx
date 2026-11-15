@@ -126,6 +126,10 @@ function ThemedChrome() {
       <Stack.Screen name="report" options={sheetRoute} />
       {/* R9 : « Suspendre » aussi, posée sur la page du membre ou sur la file de la modération. */}
       <Stack.Screen name="suspend" options={sheetRoute} />
+      {/* R10 : « Créer une ruche » et « Inviter » sont des feuilles posées sur l'onglet Ruches et sur
+          la page de la ruche : le Retour du navigateur les ferme. (Les réglages sont une page.) */}
+      <Stack.Screen name="hives/new" options={sheetRoute} />
+      <Stack.Screen name="hives/[id]/invite" options={sheetRoute} />
     </Stack>
   )
   return (

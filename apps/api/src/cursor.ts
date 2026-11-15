@@ -20,8 +20,11 @@ import { z } from 'zod'
  * été publié avant l'an 2000 (et la date ISO a toujours une année de quatre chiffres : comparer les
  * textes suffit).
  */
+export const CursorDate = z.iso.datetime().refine((at) => at >= '2000', 'date trop ancienne')
+
+/** Le contenu du curseur : la date bornée ci-dessus (lue aussi par le marque-page d'une ruche, hives/load.ts) et l'identifiant. */
 const CursorContent = z.strictObject({
-  at: z.iso.datetime().refine((at) => at >= '2000', 'date trop ancienne'),
+  at: CursorDate,
   id: z.uuid(),
 })
 export type CursorContent = z.infer<typeof CursorContent>

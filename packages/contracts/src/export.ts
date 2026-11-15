@@ -5,6 +5,7 @@ import { Me } from './accounts'
 import { BlockExport } from './blocks'
 import { CommentId } from './comments'
 import { EmailPreferencesExport } from './email'
+import { HiveExport } from './hives'
 import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 import { Removal, RemovedPart } from './removal'
@@ -163,6 +164,11 @@ export const AccountExport = z
      * qui a signalé, ni le nom ou pseudo provisoire.
      */
     profileRemovedParts: z.array(RemovedPart),
+    /**
+     * R10 : ses ruches (nom, rôle, entrée, dernière visite), les invitations reçues et envoyées. Le
+     * réglage « Ne pas me proposer aux autres » est dans `user.hideFromSuggestions`.
+     */
+    hives: HiveExport,
     /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
     emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

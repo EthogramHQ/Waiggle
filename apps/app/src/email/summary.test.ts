@@ -10,7 +10,7 @@
 import type { EmailPreferences } from '@ruche/contracts'
 import { createI18n } from '../i18n'
 import { leaEmailPreferences } from '../testing/email'
-import { emailSummary } from './summary'
+import { emailSummary, hivesNowNote } from './summary'
 
 const fr = createI18n('fr')
 const en = createI18n('en')
@@ -29,16 +29,28 @@ const allTypes = (choice: 'digest' | 'never', weeklyRecap = true): EmailPreferen
   follows: choice,
   updates: choice,
   testers: choice,
+  hives: choice,
 })
 
+/** Les réglages de R8 : tous les types dans le récap (R10 : « Ruches » vaut « tout de suite » par
+ * défaut ; ces tests gardent leur point de départ). */
+const allInRecap: EmailPreferences = { ...leaEmailPreferences, hives: 'digest' }
+
 describe('emailSummary', () => {
-  it('says everything goes in the Sunday recap by default', () => {
-    expect(inFrench(leaEmailPreferences)).toBe(fr.t(($) => $.notifications.summary.recapAll))
+  // R10 : par défaut, les ruches partent tout de suite (contrat, `email.ts`) ; le reste, dans le récap.
+  it('says the hives go at once and the rest in the Sunday recap by default', () => {
+    expect(inFrench(leaEmailPreferences)).toBe(
+      fr.t(($) => $.notifications.summary.nowAndRest, { types: 'Les ruches' }),
+    )
+  })
+
+  it('says everything goes in the Sunday recap when every type is in it', () => {
+    expect(inFrench(allInRecap)).toBe(fr.t(($) => $.notifications.summary.recapAll))
   })
 
   it('names the types sent at once, then the recap', () => {
     // La planche R8-Activite-Desktop, mot pour mot.
-    expect(inFrench({ ...leaEmailPreferences, replies: 'now' })).toBe(
+    expect(inFrench({ ...allInRecap, replies: 'now' })).toBe(
       fr.t(($) => $.notifications.summary.nowAndRest, {
         types: 'Les réponses et les mentions',
       }),
@@ -48,14 +60,12 @@ describe('emailSummary', () => {
   it('joins several types sent at once in the order of the settings', () => {
     // Le coin des testeurs vient après les commentaires, comme sur l'écran des réglages, même s'il
     // a été réglé le premier.
-    expect(inFrench({ ...leaEmailPreferences, testers: 'now', comments: 'now' })).toBe(
+    expect(inFrench({ ...allInRecap, testers: 'now', comments: 'now' })).toBe(
       fr.t(($) => $.notifications.summary.nowAndRest, {
         types: 'Les commentaires sur tes projets et le coin des testeurs',
       }),
     )
-    expect(
-      inFrench({ ...leaEmailPreferences, testers: 'now', comments: 'now', replies: 'now' }),
-    ).toBe(
+    expect(inFrench({ ...allInRecap, testers: 'now', comments: 'now', replies: 'now' })).toBe(
       fr.t(($) => $.notifications.summary.nowAndRest, {
         types:
           'Les commentaires sur tes projets, les réponses et les mentions et le coin des testeurs',
@@ -64,7 +74,7 @@ describe('emailSummary', () => {
   })
 
   it('says only part of the rest goes in the recap when some types are « never »', () => {
-    expect(inFrench({ ...leaEmailPreferences, replies: 'now', follows: 'never' })).toBe(
+    expect(inFrench({ ...allInRecap, replies: 'now', follows: 'never' })).toBe(
       fr.t(($) => $.notifications.summary.nowAndSome, {
         types: 'Les réponses et les mentions',
       }),
@@ -72,7 +82,7 @@ describe('emailSummary', () => {
   })
 
   it('says the rest stays in the Activity when the recap is off', () => {
-    expect(inFrench({ ...leaEmailPreferences, weeklyRecap: false, replies: 'now' })).toBe(
+    expect(inFrench({ ...allInRecap, weeklyRecap: false, replies: 'now' })).toBe(
       fr.t(($) => $.notifications.summary.nowOnly, { types: 'Les réponses et les mentions' }),
     )
   })
@@ -93,7 +103,7 @@ describe('emailSummary', () => {
   })
 
   it('says part of it goes in the recap when some types are « never » and none « now »', () => {
-    expect(inFrench({ ...leaEmailPreferences, reactions: 'never' })).toBe(
+    expect(inFrench({ ...allInRecap, reactions: 'never' })).toBe(
       fr.t(($) => $.notifications.summary.recapSome),
     )
   })
@@ -117,13 +127,39 @@ describe('emailSummary', () => {
     expect(inFrench(allTypes('never'))).toBe(fr.t(($) => $.notifications.summary.nothingFriends))
   })
 
+  // R10, relecture juridique (C3) : le récap porte « Dans tes ruches » dès que « Ruches » n'est pas
+  // à « Jamais » (jobs/weekly-recap.ts) ; « Tout de suite » n'y change rien, il ne vaut que pour les
+  // invitations. La phrase ne dit donc pas « seulement les nouveaux projets de tes proches ».
+  it('says the recap also brings the hives news when only the hives go at once', () => {
+    expect(inFrench({ ...allTypes('never'), hives: 'now' })).toBe(
+      fr.t(($) => $.notifications.summary.nowFriendsHives, { types: 'Les ruches' }),
+    )
+    expect(inEnglish({ ...allTypes('never'), hives: 'now', replies: 'now' })).toBe(
+      en.t(($) => $.notifications.summary.nowFriendsHives, {
+        types: 'Replies and mentions and hives',
+      }),
+    )
+  })
+
+  // Même relecture : rien ne disait que « Tout de suite », pour les ruches, ne vaut que pour les
+  // invitations. La colonne de l'Activité ajoute, sous la phrase, celle qui le dit (`hivesNowNote`),
+  // et où vont leurs nouveautés, récap activé ou non.
+  it('says « Tout de suite » means only the invitations for the hives, and where their news go', () => {
+    const note = (preferences: EmailPreferences) => hivesNowNote(preferences, fr.t as unknown as T)
+    expect(note(leaEmailPreferences)).toBe(fr.t(($) => $.notifications.summary.hivesNow))
+    expect(note({ ...leaEmailPreferences, weeklyRecap: false })).toBe(
+      fr.t(($) => $.notifications.summary.hivesNowRecapOff),
+    )
+    // Les ruches dans le récap, ou à « Jamais » : rien à préciser.
+    expect(note(allInRecap)).toBeNull()
+    expect(note({ ...leaEmailPreferences, hives: 'never' })).toBeNull()
+  })
+
   it('writes the list the English way, with a capital first letter', () => {
-    expect(inEnglish({ ...leaEmailPreferences, replies: 'now' })).toBe(
+    expect(inEnglish({ ...allInRecap, replies: 'now' })).toBe(
       en.t(($) => $.notifications.summary.nowAndRest, { types: 'Replies and mentions' }),
     )
-    expect(
-      inEnglish({ ...leaEmailPreferences, comments: 'now', replies: 'now', testers: 'now' }),
-    ).toBe(
+    expect(inEnglish({ ...allInRecap, comments: 'now', replies: 'now', testers: 'now' })).toBe(
       en.t(($) => $.notifications.summary.nowAndRest, {
         types: 'Comments on your projects, replies and mentions, and the testers’ corner',
       }),

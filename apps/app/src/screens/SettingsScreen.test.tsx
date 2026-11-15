@@ -413,7 +413,8 @@ describe('the « Notifications » section', () => {
   const choice = (type: EmailType) =>
     fr.t(($) => $.notificationSettings.rowName, {
       label: fr.t(($) => $.notificationSettings.types[type]),
-      choice: fr.t(($) => $.notificationSettings.choices.digest),
+      // R10 : « Ruches » vaut « Tout de suite » par défaut, les autres « Dans le récap ».
+      choice: fr.t(($) => $.notificationSettings.choices[type === 'hives' ? 'now' : 'digest']),
     })
 
   it('shows the e-mail choice of each type, the recap switch and the security sentence', async () => {
@@ -424,7 +425,7 @@ describe('the « Notifications » section', () => {
     })
     expect(recap).toBeChecked()
     expect(screen.getByText(fr.t(($) => $.notificationSettings.recapHint))).toBeTruthy()
-    // Les réglages de Léa sont ceux par défaut : chaque type « Dans le récap ».
+    // Les réglages de Léa sont ceux par défaut : chaque type « Dans le récap », sauf « Ruches ».
     for (const type of EmailType.options) {
       expect(screen.getByRole('button', { name: choice(type) })).toBeTruthy()
     }

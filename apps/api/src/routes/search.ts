@@ -8,34 +8,14 @@ import type { Database } from '@ruche/db'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { describeError } from '../log'
-import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import type { RateLimiter } from '../rate-limit'
+import { hitSearchQuota, pgCodeOf, STATEMENT_TIMEOUT } from '../search/limits'
 import { search } from '../search/load'
 import { createSearchSlots } from '../search/slots'
 import { createRouter, errorResponse } from './router'
 
-// Anti-abus (plan de R3) : 600 recherches par heure et 2 000 par jour, comme les suggestions de
-// mentions (routes/members.ts). L'appli cherche pendant qu'on tape, après une courte pause : 600
-// dans l'heure, c'est beaucoup d'écriture ; le plafond du jour empêche de relever peu à peu tout
-// l'annuaire, jour et nuit (avec la règle des 3 caractères pour les membres, search/load.ts).
-const searchHourRule: RateRule = { windowMs: 60 * 60 * 1000, max: 600 }
-const searchDayRule: RateRule = { windowMs: 24 * 60 * 60 * 1000, max: 2000 }
-
-/** Le code d'erreur de PostgreSQL quand `statement_timeout` arrête une requête. */
-const STATEMENT_TIMEOUT = '57014'
-
-/**
- * Le code PostgreSQL d'une erreur, sur l'erreur elle-même ou sur sa cause (Drizzle enveloppe
- * l'erreur du pilote dans la sienne, qui la garde dans `cause`).
- */
-const pgCodeOf = (error: unknown): string | undefined => {
-  for (let current = error, depth = 0; current && depth < 3; depth++) {
-    if (typeof current !== 'object') return undefined
-    const code = Reflect.get(current, 'code')
-    if (typeof code === 'string') return code
-    current = Reflect.get(current, 'cause')
-  }
-  return undefined
-}
+// Anti-abus : 600 recherches par heure et 2 000 par jour (search/limits.ts), les mêmes compteurs
+// que la recherche de la feuille « Inviter » d'une ruche (R10).
 
 const searchRoute = createRoute({
   method: 'get',
@@ -78,16 +58,10 @@ export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   app.on('GET', '/v1/search', async (c, next) => {
     const user = c.get('user')
     if (!user) return c.json(errorBody(languageOf(c), 'unauthorized'), 401)
-    const keys = memberCounterKeys(user.id)
-    for (const [key, rule] of [
-      [keys.searchHour, searchHourRule],
-      [keys.searchDay, searchDayRule],
-    ] as const) {
-      const decision = await limiter.hit(key, rule)
-      if (!decision.allowed) {
-        c.header('Retry-After', String(decision.retryAfterSeconds))
-        return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
-      }
+    const decision = await hitSearchQuota(limiter, user.id)
+    if (!decision.allowed) {
+      c.header('Retry-After', String(decision.retryAfterSeconds))
+      return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
     }
     await next()
   })

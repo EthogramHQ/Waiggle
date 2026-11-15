@@ -1,8 +1,9 @@
 // « Proches à suivre » (tranche R4) : qui proposer à un membre, et ce qu'il a écarté. Des membres
 // qui ont publié récemment, chacun avec son dernier projet public ; jamais lui-même, ni quelqu'un
 // qu'il suit, qu'il a écarté (« × »), qu'il a bloqué ou qui l'a bloqué. L'ordre ne dépend que de la
-// date du dernier projet, jamais de la popularité (relecture juridique jur-J5). Les routes sont
-// dans routes/suggestions.ts.
+// date du dernier projet, jamais de la popularité (relecture juridique jur-J5). R10 : les membres
+// des ruches du lecteur passent d'abord, et jamais un membre qui a choisi de ne pas être proposé. Les
+// routes sont dans routes/suggestions.ts.
 import {
   type DismissedSuggestionExport,
   SUGGESTION_MAX,
@@ -69,11 +70,22 @@ const isStatementTimeout = (error: unknown): boolean => {
  * Un brouillon (projet privé) ou un projet devenu privé n'entre pas dans la fenêtre : il ne remonte
  * pas son auteur, qui est classé par son dernier projet encore public.
  */
-const suggestedProjectIds = async (db: Database, viewerId: string): Promise<string[]> => {
+const suggestedProjectIds = async (
+  db: Database,
+  viewerId: string,
+  hiveMembersOnly: boolean,
+  limit: number,
+): Promise<{ id: string; authorId: string }[]> => {
   const recent = db
     .select({ id: t.id, authorId: t.authorId, publishedAt: t.publishedAt })
     .from(t)
-    .where(and(listedVerifiedProjectFor(viewerId), isNotNull(t.publishedAt)))
+    .where(
+      and(
+        listedVerifiedProjectFor(viewerId),
+        isNotNull(t.publishedAt),
+        hiveMembersOnly ? authorInMyHives(viewerId) : undefined,
+      ),
+    )
     .orderBy(desc(t.publishedAt), desc(t.id))
     .limit(SUGGESTION_WINDOW)
     .as('recent')
@@ -95,19 +107,52 @@ const suggestedProjectIds = async (db: Database, viewerId: string): Promise<stri
   const rows = await db.transaction(async (tx) => {
     await tx.execute(sql`set local statement_timeout = '2s'`)
     return tx
-      .select({ id: latest.id })
+      .select({ id: latest.id, authorId: latest.authorId })
       .from(latest)
       .where(
         and(
           ne(latest.authorId, viewerId),
+          // R10 : jamais un membre qui a choisi « Ne pas me proposer aux autres », pas même aux
+          // membres de ses ruches. Clé primaire de profile (user_id), une lecture par auteur gardé ;
+          // un membre sans ligne de profil n'a rien choisi. Après la fenêtre, comme les autres
+          // exclusions : elle ne fait pas lire plus de lignes d'index.
+          sql`not exists (select 1 from ${schema.profile} where ${schema.profile.userId} = ${latest.authorId} and ${schema.profile.hideFromSuggestions})`,
           sql`not exists (select 1 from ${f} where ${f.followerId} = ${viewerId} and ${f.memberId} = ${latest.authorId})`,
           sql`not exists (select 1 from ${d} where ${d.memberId} = ${viewerId} and ${d.dismissedId} = ${latest.authorId})`,
         ),
       )
       .orderBy(desc(latest.publishedAt), desc(latest.id))
-      .limit(SUGGESTION_MAX)
+      .limit(limit)
   })
-  return rows.map((row) => row.id)
+  return rows
+}
+
+/**
+ * « L'auteur du projet est membre d'une de MES ruches » (R10) : les ruches du lecteur (index
+ * hive_member_user_idx), puis les membres de chacune (clé primaire de hive_member, lue par son
+ * début), puis leurs projets (index d'auteur de project). Le lecteur est dans la liste lui-même :
+ * la liste finale l'écarte (`ne(latest.authorId, viewerId)`). Le nom de la colonne est écrit en
+ * toutes lettres (sql.raw, du texte fixe) : sans lui, Drizzle l'écrirait sans sa table.
+ */
+const authorInMyHives = (viewerId: string) =>
+  sql`${sql.raw('"project"."author_id"')} in (select mates.user_id from ${schema.hiveMember} mates
+    where mates.hive_id in (select mine.hive_id from ${schema.hiveMember} mine where mine.user_id = ${viewerId}))`
+
+/**
+ * Les projets à montrer, dans l'ordre de la liste : d'abord les membres des ruches du lecteur (leur
+ * propre fenêtre de 200 projets : un proche dont le dernier projet est plus ancien que les 200 du
+ * site reste proposé), puis les autres auteurs récents, chacun une seule fois. Deux requêtes, quel
+ * que soit le nombre d'auteurs. La seconde en lit jusqu'à dix, pour que les membres de ruche déjà
+ * pris (au plus cinq) ne la privent pas de ses places. Un membre de ma ruche sans projet que je
+ * vois n'est pas proposé (la carte du dernier projet est obligatoire au contrat).
+ */
+const orderedSuggestionIds = async (db: Database, viewerId: string): Promise<string[]> => {
+  const mates = await suggestedProjectIds(db, viewerId, true, SUGGESTION_MAX)
+  const others = await suggestedProjectIds(db, viewerId, false, SUGGESTION_MAX * 2)
+  const seen = new Set(mates.map((row) => row.authorId))
+  return [...mates, ...others.filter((row) => !seen.has(row.authorId))]
+    .slice(0, SUGGESTION_MAX)
+    .map((row) => row.id)
 }
 
 /**
@@ -131,7 +176,7 @@ export const loadSuggestions = async (
 ): Promise<SuggestedMember[]> => {
   let ids: string[]
   try {
-    ids = await suggestedProjectIds(db, viewerId)
+    ids = await orderedSuggestionIds(db, viewerId)
   } catch (error) {
     if (!isStatementTimeout(error)) throw error
     console.error(

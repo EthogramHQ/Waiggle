@@ -117,6 +117,7 @@ import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
 import { AdminGesturesCatalogue } from './outils-gestes'
 import { ToolPageSheetsCatalogue } from './outils-page'
+import { HivePillsCatalogue } from './pastilles'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectCategoryCatalogue } from './projet-categorie'
@@ -143,6 +144,10 @@ import { SettingsCatalogue } from './reglages'
 import { NotificationSettingsCatalogue } from './reglages-notifications'
 import { RemovalR9Catalogue } from './removal-r9'
 import { ReportSamples } from './reports'
+import { HiveNewsCatalogue } from './ruches-actualite'
+import { HiveCellsCatalogue } from './ruches-alveoles'
+import { HiveRowsCatalogue } from './ruches-lignes'
+import { ProjectTilesCatalogue } from './ruches-tuiles'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
@@ -793,6 +798,8 @@ export function CatalogueScreen() {
       <NotificationsCatalogue />
       {/* Tranche R8, l'exemple et les lignes de choix des réglages (reglages-notifications.tsx). */}
       <NotificationSettingsCatalogue />
+      {/* Tranche R10, l'actualité et les membres d'une ruche, jour et nuit (ruches-actualite.tsx). */}
+      <HiveNewsCatalogue />
 
       {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions, le champ. */}
       <CommentCardCatalogue />
@@ -821,6 +828,12 @@ export function CatalogueScreen() {
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
       <RemovalR9Catalogue />
+      {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
+      <HiveCellsCatalogue />
+      {/* Tranche R10, la ligne d'une ruche et la carte d'une invitation (ruches-lignes.tsx). */}
+      <HiveRowsCatalogue />
+      {/* Tranche R10, la pastille et le menu « … » d'une tuile de projet (ruches-tuiles.tsx). */}
+      <ProjectTilesCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
@@ -845,6 +858,8 @@ export function CatalogueScreen() {
       <InvalidChoicesCatalogue />
       <ToolTagsCatalogue />
       <ToolFiltersCatalogue />
+      {/* Tranche R10 : le sélecteur de ruches du Fil (pastilles.tsx). */}
+      <HivePillsCatalogue />
       <ToolFieldCatalogue />
       <ToolHeaderCatalogue />
       <AdminCardsCatalogue />

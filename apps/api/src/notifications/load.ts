@@ -12,6 +12,7 @@
 // d'une mise à jour.
 import {
   EXCERPT_MAX,
+  HiveIcon,
   NOTIFICATION_DAYS,
   NOTIFICATION_PAGE_SIZE,
   type Notification,
@@ -24,10 +25,14 @@ import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { blockedWith, notBlockedWith } from '../blocks/visibility'
+import { invitationValidSince } from '../hives/load'
 import { avatarUrlOf, mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
 import { mediaOnCoversSql } from '../projects/media-visibility'
-import { listedProject, listedProjectFor } from '../projects/visibility'
+// R10 : `sharedProjectWith` remplace `listedProject` (sans lecteur, il écarte tout projet réservé à
+// une ruche) dans les sources qui nomment un projet : public, ou réservé à l'une des ruches de `me`.
+// `readsHiveSql` (R10, relecture de sécurité) : la règle de la ruche d'un commentaire.
+import { listedProjectFor, readsHiveSql, sharedProjectWith } from '../projects/visibility'
 import { afterReportSql, toRemoval } from '../removals/load'
 import { photoRankSql } from '../reports/part-rank'
 // suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
@@ -78,12 +83,19 @@ const parisDay = (column: string) =>
  *   « exists » par les index de member_block). Et pas sur le projet d'un membre bloqué avec lui
  *   (`listedProjectFor`) : la notification nommerait un projet qu'il ne peut plus ouvrir.
  *   Débloquer fait revenir ces notifications (règle 3) : rien n'est effacé, tout est recalculé.
+ * - (R10, relecture de sécurité, décision du 15/11/2026) écrit pendant que le projet était
+ *   réservé à une ruche (c.hive_id posé) : seulement pour l'auteur du projet et les membres
+ *   actuels de cette ruche (`readsHiveSql`, la règle `readsHiveOf` de `sees`), même si le projet
+ *   a été ouvert depuis. Sans cela, une réponse ou une mention écrite dans la ruche préviendrait,
+ *   avec son début, un membre qui n'en fait pas partie. Les e-mails (tout de suite, récap) lisent
+ *   ces mêmes sources.
  * Une mention ne notifie ainsi que qui peut lire (scénario de la tranche 6b).
  */
 const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is null
   and c.author_id <> ${me} and ${listedProjectFor(me)}
   and ${notBlockedWith(me, sql.raw('c.author_id'))}
-  and (c.hidden_at is null or project.author_id = ${me}))`
+  and (c.hidden_at is null or project.author_id = ${me})
+  and (project.author_id = ${me} or ${readsHiveSql(sql.raw('c.hive_id'), me)}))`
 
 /**
  * Toutes les notifications de `me` dont le geste est postérieur à `since`, une ligne par
@@ -208,7 +220,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       join project on project.id = c.project_id
       where c.author_id = ${me} and c.deleted_at is null and c.removed_at is not null
         and ${during('c.removed_at')}
-        and (${listedProject()} or project.author_id = ${me})
+        and (${sharedProjectWith(me)} or project.author_id = ${me})
       union all
       select 'call', project.id, null, null, tc.removal_id, tc.removed_at, tc.id
       from project
@@ -221,7 +233,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       join tester_message m on m.project_id = th.project_id and m.tester_id = th.tester_id
       join project on project.id = th.project_id
       where th.tester_id = ${me} and m.sender_id = ${me} and m.removed_at is not null
-        and ${during('m.removed_at')} and ${listedProject()}
+        and ${during('m.removed_at')} and ${sharedProjectWith(me)}
       union all
       select 'message', project.id, null, null, m.removal_id, m.removed_at, m.id
       from project
@@ -244,7 +256,36 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       join project on project.id = coalesce(cpr.project_id, pu.project_id, tc.project_id, m.project_id)
       where cpr.author_id = ${me} and cpr.object_kind <> 'member'
         and ${during('cpr.created_at')}
-        and (project.author_id = ${me} or ${listedProject()})
+        and (project.author_id = ${me} or ${sharedProjectWith(me)})
+      union all
+      -- R10 : le nom de sa ruche retiré par la modération (il anime la ruche). La marque
+      -- hive.name_removal_id vit tant que le retrait dure : rétabli, ou remplacé par un nom que
+      -- l'animateur choisit, elle s'efface, et la notification avec elle. Ses ruches par la clé
+      -- primaire de hive_member (index hive_member_user_idx pour user_id), puis les clés primaires
+      -- de hive et de la décision. Daté de la décision.
+      select 'hive', null, null, null, h.name_removal_id, d.created_at, h.id
+      from hive_member hm
+      join hive h on h.id = hm.hive_id and h.animator_id = ${me}
+      join moderation_decision d on d.id = h.name_removal_id
+      where hm.user_id = ${me} and ${during('d.created_at')}
+      union all
+      -- R10, relecture juridique (C2) : la décision vise celui qui a écrit le nom (name_set_by) ;
+      -- sa motivation lui est due (article 17 du DSA), même s'il n'anime pas ou plus, même parti
+      -- de la ruche. Ses décisions par moderation_decision_member_idx (target_member_id,
+      -- created_at), puis la ruche par sa clé primaire (« case » : l'identifiant n'est converti en
+      -- uuid que pour une cible « hive »). La ligne vit jusqu'à un rétablissement de ce nom
+      -- (moderation_decision_target_idx), même si l'animateur a renommé la ruche depuis. Quand il
+      -- anime la ruche et que ce retrait dure, la branche du dessus la donne déjà : une seule ligne.
+      select 'hive', null, null, null, d.id, d.created_at, h.id
+      from moderation_decision d
+      join hive h on h.id = case when d.target_kind = 'hive' then d.target_id::uuid end
+      where d.target_member_id = ${me} and d.target_kind = 'hive' and d.action = 'remove'
+        and ${during('d.created_at')}
+        and (h.animator_id = ${me} and h.name_removal_id = d.id) is not true
+        and not exists (
+          select 1 from moderation_decision rs
+          where rs.target_kind = 'hive' and rs.target_id = d.target_id
+            and rs.action = 'restore' and rs.created_at > d.created_at)
     ) x
     where x.removal_id is not null
 
@@ -309,6 +350,36 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       d.target_kind, null, d.id, null, null, null, null
     from moderation_decision d
     where d.target_member_id = ${me} and d.action = 'restore' and ${during('d.created_at')}
+      and d.target_kind <> 'hive'
+
+    union all
+
+    -- 7 quater (R10). Le nom d'une ruche rétabli par la modération, pour son animateur d'aujourd'hui
+    --    (la décision, elle, vise celui qui avait écrit le nom). Ses ruches par hive_member, puis la
+    --    décision par l'index moderation_decision_target_idx (target_kind, target_id, created_at) :
+    --    l'identifiant de la ruche est comparé en texte (« h.id::text »), sans convertir l'identifiant
+    --    d'une cible d'une autre sorte en uuid. Relecture juridique (C2) : celui qui a écrit le nom
+    --    l'apprend aussi (seconde branche, par moderation_decision_member_idx, la ruche par sa clé
+    --    primaire) ; quand c'est lui qui anime, seule cette seconde branche le donne (une ligne).
+    select 'restored', 'restored:' || d.id, d.created_at, null, null,
+      null, null, null, null, null, null, null, null, null,
+      'hive', null, d.id, null, null, null, h.id
+    from hive_member hm
+    join hive h on h.id = hm.hive_id and h.animator_id = ${me}
+    join moderation_decision d on d.target_kind = 'hive' and d.target_id = h.id::text
+      and d.action = 'restore'
+    where hm.user_id = ${me} and ${during('d.created_at')}
+      and d.target_member_id is distinct from ${me}
+
+    union all
+
+    select 'restored', 'restored:' || d.id, d.created_at, null, null,
+      null, null, null, null, null, null, null, null, null,
+      'hive', null, d.id, null, null, null, h.id
+    from moderation_decision d
+    join hive h on h.id = case when d.target_kind = 'hive' then d.target_id::uuid end
+    where d.target_member_id = ${me} and d.target_kind = 'hive' and d.action = 'restore'
+      and ${during('d.created_at')}
 
     union all
 
@@ -340,6 +411,10 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
           join project on project.id = c.project_id
           where c.id = r.target_id::uuid and c.deleted_at is null and c.removed_at is null
             and c.author_id is not null and (c.hidden_at is null or project.author_id = ${me})
+            -- R10 : un commentaire écrit pour une ruche dont il n'est plus membre ne mène plus
+            -- à rien (readsHiveSql, comme readable plus haut).
+            and (project.author_id = ${me} or c.author_id = ${me}
+              or ${readsHiveSql(sql.raw('c.hive_id'), me)})
             and ${visibleTo(me)})
       end,
       null, null, null, null, null, null, null, null, null, null,
@@ -380,9 +455,63 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     where s.user_id = ${me} and not ${activeSuspensionSql('s', now)}
       and ${during('coalesce(s.lifted_at, s.ends_at)')}
 
+    union all
+
+    ${hiveSources(me, during, now)}
+
     ${upTo ? sql`` : sql`union all ${catalogueSources(me, during)}`}
   `
 }
+
+/**
+ * Les sources 17 à 19 (R10) : les ruches, avec les vingt et une colonnes. Ce qu'elles nomment (la
+ * ruche, son nom, son icône, l'invitation) se lit ensuite par item_id (loadDetailedRows) :
+ *   17. une invitation reçue (`hive_invited`), à l'invité seulement : ni refusée (`refused_at`), ni
+ *       acceptée (accepter efface la ligne), ni vieille de 30 jours (invitationValidSince, la même
+ *       limite que l'onglet Ruches), ni d'un membre bloqué avec lui (bloquer efface déjà les
+ *       invitations : le filtre redit la règle). Index hive_invitation_invitee_idx (invitee_id,
+ *       created_at), qui donne ses invitations dans la fenêtre. author_id : l'inviteur ; item_id :
+ *       l'invitation ;
+ *   18. « Max a rejoint Famille » (`hive_joined`), à qui l'a invité seulement, depuis l'entrée du
+ *       membre. Cachée si l'inviteur n'est plus dans la ruche (un ancien membre ne lit jamais le nom
+ *       actuel d'une ruche) : « (select 1 … limit 1) is not null » lit la clé primaire (hive_id,
+ *       user_id) de hive_member, et ne devient jamais une lecture de toute la table (charte de
+ *       l'API, 7b) ; et entre deux membres bloqués, dans un sens ou dans l'autre. Index
+ *       hive_member_invited_by_idx (invited_by, joined_at). La clé du groupe ne peut pas contenir
+ *       l'identifiant du membre (le curseur n'admet que des chiffres hexadécimaux) : son empreinte
+ *       md5, 32 chiffres hexadécimaux, la rend unique et stable. item_id : la ruche ;
+ *   19. les trois traces gardées (`hive_notice` : retiré, animation confiée, ruche supprimée), écrites
+ *       par l'API au moment du geste avec la copie du nom. Index hive_notice_recipient_idx
+ *       (recipient_id, created_at desc). item_id : la trace.
+ * Une publication dans une ruche ne fait aucune ligne (scénario) : elle se lit dans la ruche.
+ */
+const hiveSources = (me: string, during: (column: string) => SQL, now: Date): SQL => sql`
+    select 'hive_invited', 'hive_invited:' || hi.id, hi.created_at,
+      null, null, null, hi.inviter_id, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, hi.id
+    from hive_invitation hi
+    where hi.invitee_id = ${me} and hi.refused_at is null
+      and hi.created_at > ${utc(invitationValidSince(now))} and ${during('hi.created_at')}
+      and ${notBlockedWith(me, sql.raw('hi.inviter_id'))}
+
+    union all
+
+    select 'hive_joined', 'hive_joined:' || hm.hive_id || ':' || md5(hm.user_id), hm.joined_at,
+      null, null, null, hm.user_id, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, hm.hive_id
+    from hive_member hm
+    where hm.invited_by = ${me} and hm.user_id <> ${me} and ${during('hm.joined_at')}
+      and (select 1 from hive_member mine
+        where mine.hive_id = hm.hive_id and mine.user_id = ${me} limit 1) is not null
+      and ${notBlockedWith(me, sql.raw('hm.user_id'))}
+
+    union all
+
+    select 'hive_' || hn.kind, 'hive_notice:' || hn.id, hn.created_at,
+      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, hn.id
+    from hive_notice hn
+    where hn.recipient_id = ${me} and ${during('hn.created_at')}`
 
 /**
  * Les sources 15 et 16 (R8) : les notifications du catalogue, les seules qui s'écrivent
@@ -407,7 +536,7 @@ const catalogueSources = (me: string, during: (column: string) => SQL): SQL => s
     from catalogue_notice cn
     join project on project.id = cn.project_id
     where cn.member_id = ${me} and cn.kind = 'project_category' and ${during('cn.created_at')}
-      and project.author_id = ${me} and ${listedProject()}
+      and project.author_id = ${me} and ${sharedProjectWith(me)}
 
     union all
 
@@ -605,7 +734,7 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
     from project
     join project_reaction r on r.project_id = project.id
     cross join lateral (select ${parisDay('r.created_at')} as day) d
-    where project.author_id = ${me} and ${listedProject()}
+    where project.author_id = ${me} and ${sharedProjectWith(me)}
       and r.member_id <> ${me} and ${during('r.created_at')}
       and ${notBlockedWith(me, sql.raw('r.member_id'))}
     group by r.project_id, d.day
@@ -619,7 +748,7 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
     from project
     join project_follow f on f.project_id = project.id
     cross join lateral (select ${parisDay('f.created_at')} as day) d
-    where project.author_id = ${me} and ${listedProject()}
+    where project.author_id = ${me} and ${sharedProjectWith(me)}
       and f.follower_id <> ${me} and ${during('f.created_at')}
       and ${notBlockedWith(me, sql.raw('f.follower_id'))}
     group by f.project_id, d.day
@@ -774,6 +903,12 @@ const ListRow = z.object({
     // R9 : une partie du profil retirée, et un contenu ou une partie rétablis.
     'profile_removed',
     'restored',
+    // R10 : les ruches (sources 17 à 19).
+    'hive_invited',
+    'hive_joined',
+    'hive_removed',
+    'hive_animator',
+    'hive_deleted',
   ]),
   key: z.string(),
   at: z.string(),
@@ -842,6 +977,15 @@ const ListRow = z.object({
   lift_cause: z.string().nullable(),
   report_part: z.boolean().nullable(),
   value_back: z.boolean().nullable(),
+  // R10 : la ruche nommée (null : supprimée depuis), le nom à montrer (la copie d'une trace, ou le
+  // nom actuel ; null : retiré par la modération), son icône ; l'invitation et la trace lues. Pour
+  // un nom de ruche retiré ou rétabli, la ruche visée par la décision.
+  hive_id: z.string().nullable(),
+  hive_name: z.string().nullable(),
+  hive_icon: HiveIcon.nullable(),
+  hive_renamable: z.boolean().nullable(),
+  invitation_id: z.string().nullable(),
+  hive_notice_id: z.string().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -854,7 +998,14 @@ const partOf = (row: ListRow) => {
 /** Les parties d'un profil qu'une notification `profile_removed` peut nommer (contrat). */
 const ProfilePartField = z.enum(['name', 'handle', 'bio', 'favoriteTools', 'avatar'])
 /** Les sortes de contenu d'une notification `restored` (contrat) ; une ancienne note n'en est pas. */
-const RestoredKind = z.enum(['project', 'update', 'comment', 'call', 'message', 'member'])
+const RestoredKind = z.enum(['project', 'update', 'comment', 'call', 'message', 'member', 'hive'])
+
+/** La ruche d'une ligne (nom retiré ou rétabli), telle que le contrat la nomme ; null si elle a disparu. */
+const hiveOf = (row: ListRow) => {
+  if (row.hive_id === null) return null
+  const icon = HiveIcon.safeParse(row.hive_icon)
+  return { id: row.hive_id, name: row.hive_name, icon: icon.success ? icon.data : null }
+}
 
 /**
  * L'extrait d'un commentaire : son texte actuel sur une ligne, 80 caractères au plus, suivi de
@@ -1054,6 +1205,26 @@ export const present = (
               afterReport: row.after_report ?? false,
             })
       const targetKind = row.target_kind
+      // R10 : le nom d'une ruche retiré, pour son animateur et pour qui l'avait écrit : pas de
+      // projet, la ruche à la place. Relecture juridique (C2) : son identifiant (la ligne mène à
+      // ses réglages pour la renommer) seulement pour l'animateur actuel, tant que le retrait dure.
+      if (targetKind === 'hive') {
+        const hive = hiveOf(row)
+        if (!removal || !hive) return null
+        return {
+          ...common,
+          kind: 'removed',
+          targetKind,
+          part: partOf(row),
+          project: null,
+          hive: { ...hive, id: row.hive_renamable ? hive.id : null },
+          excerpt: null,
+          ground: removal.ground,
+          explanation: removal.explanation,
+          afterReport: removal.afterReport,
+          projectHidden: false,
+        }
+      }
       if (
         !project ||
         !removal ||
@@ -1142,11 +1313,15 @@ export const present = (
       const targetKind = RestoredKind.safeParse(row.target_kind)
       if (!targetKind.success) return null
       const part = partOf(row)
+      // R10 : le nom d'une ruche rétabli : la ruche, pas de projet.
+      const hive = targetKind.data === 'hive' ? hiveOf(row) : null
+      if (targetKind.data === 'hive' && !hive) return null
       return {
         ...common,
         kind: 'restored',
         targetKind: targetKind.data,
         project,
+        ...(hive ? { hive } : {}),
         part,
         valueBack: row.value_back ?? true,
         handle: part?.field === 'handle' ? row.my_handle : null,
@@ -1196,6 +1371,36 @@ export const present = (
         link,
       }
     }
+    case 'hive_invited':
+      // L'invitation a disparu entre-temps (acceptée, ruche supprimée) : plus de ligne. L'inviteur
+      // peut avoir supprimé son compte : la ligne reste, sans lui (le contrat le dit nul).
+      if (row.invitation_id === null || row.hive_id === null) return null
+      return {
+        ...common,
+        kind: 'hive_invited',
+        invitation: { id: row.invitation_id },
+        hive: { id: row.hive_id, name: row.hive_name, icon: row.hive_icon },
+        inviter:
+          row.author_id !== null && row.author_name !== null ? authorOf(row, publicApiUrl) : null,
+      }
+    case 'hive_joined':
+      if (row.hive_id === null || row.author_id === null || row.author_name === null) return null
+      return {
+        ...common,
+        kind: 'hive_joined',
+        hive: { id: row.hive_id, name: row.hive_name, icon: row.hive_icon },
+        member: authorOf(row, publicApiUrl),
+      }
+    case 'hive_removed':
+    case 'hive_animator':
+    case 'hive_deleted':
+      // La trace, avec la copie du nom ; la ruche (son identifiant, son icône) si elle existe encore.
+      if (row.hive_notice_id === null) return null
+      return {
+        ...common,
+        kind: row.kind,
+        hive: { id: row.hive_id, name: row.hive_name, icon: row.hive_icon },
+      }
   }
 }
 
@@ -1264,14 +1469,44 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       ) end as report_part,
       case
         when n.kind <> 'restored' then null
+        -- R10 : le rétablissement d'un nom de ruche note dans sa décision le nom qu'il a rendu ;
+        -- vide, l'animateur avait choisi un autre nom depuis (decide.ts, moderation/parts.ts).
+        when md.target_kind = 'hive' then md.previous_value is not null
         when md.part_field = 'handle' then exists (
           select 1 from member_handle vh
           where vh.handle = prev.previous_value and vh.user_id = ${me}
             and vh.claimed_at = md.created_at)
         when md.part_field = 'name' then a_me.name = prev.previous_value
         else true
-      end as value_back
+      end as value_back,
+      -- R10 : la ruche d'une ligne de ruche (alias hive) ou d'un nom de ruche retiré ou rétabli
+      -- (alias hv, la ruche visée par la décision). Le nom d'une trace est sa copie, jamais le nom
+      -- actuel (un ancien membre ne le lit pas) ; celui d'une invitation, d'une entrée ou d'une
+      -- décision, le nom actuel, que l'invité et les membres lisent déjà dans l'onglet Ruches. Vide
+      -- (la modération a vidé la copie) ou retiré (name_removal_id) : null, « Ruche sans nom ».
+      -- Relecture juridique (C2) : le nom d'une ruche retiré va aussi à qui l'avait écrit, membre
+      -- ou non. Le nom actuel (renommée depuis) n'est lu que par un membre (clé primaire de
+      -- hive_member) ; un ancien membre n'a que l'icône. Un rétablissement rend à qui n'est plus
+      -- membre le nom qu'il avait lui-même écrit (previous_value de la décision), rien de plus.
+      coalesce(hive.id, hv.id) as hive_id,
+      case
+        when hn.id is not null then nullif(hn.hive_name, '')
+        when hive.id is not null and hive.name_removal_id is null then nullif(hive.name, '')
+        when hive.id is null and hv.name_removal_id is null
+          and (select 1 from hive_member hvm
+               where hvm.hive_id = hv.id and hvm.user_id = ${me} limit 1) is not null
+          then nullif(hv.name, '')
+        when hive.id is null and n.kind = 'restored' then nullif(md.previous_value, '')
+      end as hive_name,
+      -- La ligne d'un nom retiré mène à la ruche pour la renommer : seulement pour l'animateur
+      -- actuel, et tant que ce retrait dure (celui qui a écrit le nom sans animer n'y peut rien).
+      (n.kind = 'removed' and hv.animator_id = ${me} and hv.name_removal_id = n.decision_id)
+        is true as hive_renamable,
+      coalesce(hive.icon, hv.icon) as hive_icon,
+      hi.id as invitation_id,
+      hn.id as hive_notice_id
     from (${chosen}) n
+    left join hive hv on hv.id = n.item_id and n.target_kind = 'hive'
     left join project on project.id = n.project_id
     -- « lateral » : une sous-requête qui lit les colonnes des tables déjà jointes (ici, l'auteur du
     -- projet), calculée une fois par ligne et réutilisée par deux colonnes. Deux « exists » par les
@@ -1327,6 +1562,32 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join catalogue_notice cn on cn.id = n.item_id
       and n.kind in ('project_category', 'tool_added')
     left join tool notice_tool on notice_tool.id = cn.tool_id
+    -- R10 : l'invitation ou la trace de item_id, puis la ruche qu'elle nomme (pour « a rejoint »,
+    -- item_id est la ruche elle-même). Trois clés primaires, pour les seules lignes de ruche.
+    -- « lateral » impose une lecture par ligne gardée (21 au plus), par la clé primaire : EXPLAIN
+    -- ANALYZE a montré qu'une jointure simple pouvait lire toute la table pour la hacher, faute de
+    -- savoir que item_id ne vient que de quelques lignes (mesure de R10, 400 invitations). « limit
+    -- 1 » (la clé primaire n'en rend de toute façon qu'une) empêche PostgreSQL de « déplier » la
+    -- sous-requête en jointure simple, ce qu'il fait sinon, et le ramènerait au hachage.
+    left join lateral (
+      select hi.id, hi.hive_id from hive_invitation hi
+      where n.kind = 'hive_invited' and hi.id = n.item_id
+      limit 1
+    ) hi on true
+    left join lateral (
+      select hn.id, hn.hive_id, hn.hive_name from hive_notice hn
+      where n.kind in ('hive_removed', 'hive_animator', 'hive_deleted') and hn.id = n.item_id
+      limit 1
+    ) hn on true
+    left join lateral (
+      select hive.id, hive.name, hive.name_removal_id, hive.icon from hive
+      where hive.id = case
+        when n.kind = 'hive_joined' then n.item_id
+        when n.kind = 'hive_invited' then hi.hive_id
+        else hn.hive_id
+      end
+      limit 1
+    ) hive on true
     order by n.at desc, n.key desc
   `
   return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows

@@ -66,6 +66,32 @@ import {
 } from '../src/testing/email.ts'
 import { leaMe, suspendedMe } from '../src/testing/fixtures.ts'
 import {
+  amisId,
+  amisPage,
+  atelier,
+  createdHive,
+  familleId,
+  familleProjects,
+  activity as hiveActivity,
+  animatorPage as hiveAnimatorPage,
+  hiveFeed,
+  memberPage as hiveMemberPage,
+  members as hiveMembers,
+  hiveNotifications,
+  projectsPage as hiveProjectsPage,
+  invitableFor,
+  invitationId,
+  invitedOnly,
+  membersLeaAnimator,
+  myHives,
+  myHivesAnimator,
+  noHives,
+  odileMemberPage,
+  papiJean,
+  quizJeudi,
+  readyPage,
+} from '../src/testing/hives.ts'
+import {
   decisionHistory,
   decisionHistoryPageOf,
   meteoPreview,
@@ -949,11 +975,52 @@ const launchProject = {
   latestUpdate: recipesUpdates[2],
   updateCount: 1,
 }
+// R10 : le même projet d'Inès, réservé à Famille (page `projet-partager-ruche`) : sa feuille
+// « Partager » dit « Seuls les membres de Famille pourront l'ouvrir. ».
+const reservedLaunchProject = {
+  ...launchProject,
+  id: '00000000-0000-4000-8000-0000000000f7',
+  visibility: 'hive',
+  hive: { id: familleId, name: 'Famille' },
+}
 // Tranche R6a, la feuille de modification (planches `R6-Modifier`, `R6-Publier-Suite`) : un projet
 // de Léa à trois photos décrites, deux catégories, « Commencé en » et « Facile à refaire ? », et un
 // prompt de départ où traîne une clé d'API (l'encadré « Clé : … » et « Retirer la clé »). La clé
 // est écrite en morceaux : un faux, mais à la forme connue, que l'analyse des secrets de GitHub
 // prendrait pour un vrai si elle était d'un seul tenant.
+// R10 : le nom de la ruche « Famille » (4 membres, animée par Papi Jean), signalé deux fois ; la
+// modération n'en voit que le nom, l'alvéole, l'animateur et le nombre de membres.
+const hiveNameReport = {
+  target: { kind: 'hive', id: familleId },
+  part: { field: 'name', mediaId: null, position: null },
+  context: null,
+  hive: { icon: 'house-line', animatorName: papiJean.name, memberCount: 4 },
+  contentCreatedAt: '2026-10-01T08:00:00.000Z',
+  projectId: null,
+  snapshot: [{ field: 'name', value: 'Famille' }],
+  images: [],
+  snapshotsDiffer: false,
+  state: 'present',
+  concernsMe: false,
+  reasons: [{ reason: 'harassment', count: 2 }],
+  details: [],
+  count: 2,
+  firstReportedAt: '2026-10-20T08:00:00.000Z',
+  lastReportedAt: '2026-10-20T09:00:00.000Z',
+  authorRecord: {
+    memberId: papiJean.id,
+    name: papiJean.name,
+    handle: 'papi_jean',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    projectCount: 1,
+    commentCount: 2,
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
+}
+
 const fakeApiKey = ['sk', '-proj-', 'Qm7Lr2Xv9TkB4sWn8JcY', '3pHd6FaZ1uE5gNoa91f'].join('')
 const skyProject = {
   ...recipesProject,
@@ -1418,6 +1485,8 @@ const goneCommentId = '5e6f7081-92a3-4b4c-8d5e-0000000000ff'
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
+  // R10 : les cinq lignes des ruches (testing/hives.ts), page `activite-ruches`.
+  if (choice === 'hives') return [hiveNotifications]
   if (choice === 'moderation') {
     return [
       [
@@ -2087,6 +2156,7 @@ const newestFirst = (messages) => [...messages].reverse()
 // l'ouverture) ; 'part-removed', la 2e photo du projet aux photos de Léa est retirée seule (elle la
 // voit encore, avec « Retiré par la modération ») ; 'provisional', son pseudo a été retiré et
 // remplacé par un pseudo provisoire (la feuille « Choisir un pseudo », le bandeau de « Moi »).
+// R10 : `moderation: 'hive'` met en tête de la file le nom de « Famille », signalé deux fois.
 // `emailChoices` (R8) : les réglages d'e-mail de départ, 'default' (tout « Dans le récap »),
 // 'replies-now' (les réponses et mentions « Tout de suite ») ou 'recap-off' (récap coupé, les
 // commentaires « Tout de suite », les abonnés « Jamais »).
@@ -2100,6 +2170,10 @@ const fakeApi = (
   suspended = false,
   emailChoices = 'default',
   moderation = null,
+  // R10 : les ruches de Léa. 'some' : Famille et Amis du jeudi, une invitation dans Atelier IA ;
+  // 'animator' : les mêmes, Léa animatrice de Famille (ses réglages) ; 'none' : aucune ruche ni
+  // invitation ; 'invited' : le premier lancement, aucune ruche, une invitation qui attend.
+  hives = 'some',
 ) => {
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
@@ -2499,6 +2573,9 @@ const fakeApi = (
     if (pathname === `/v1/projects/${launchProject.id}`) {
       return json(200, withExtras(launchProject))
     }
+    if (pathname === `/v1/projects/${reservedLaunchProject.id}`) {
+      return json(200, withExtras(reservedLaunchProject))
+    }
     // R6a : la feuille de modification (trois photos décrites, une clé dans le prompt) et un projet
     // d'avant R6a, sans catégorie. Les pages de captures qui les ouvrent : la session.
     if (pathname === `/v1/projects/${skyProject.id}`) return json(200, withExtras(skyProject))
@@ -2530,6 +2607,79 @@ const fakeApi = (
       (method === 'POST' || method === 'DELETE')
     ) {
       return route.fulfill({ status: 204, body: '' })
+    }
+    // R10, les ruches (testing/hives.ts), avec les réponses des écritures du plan : POST /v1/hives
+    // → 201 HiveSummary ; PATCH /v1/hives/{id} → 200 HivePage ; DELETE d'une ruche, d'un membre,
+    // d'une invitation, POST …/animator → 204 ; POST …/invitations → 201 sans corps ; POST
+    // …/accept → 200 HiveSummary. Une ruche inconnue répond 404, comme une ruche qu'on ne voit pas.
+    if (pathname === '/v1/hives' && method === 'GET') {
+      return json(
+        200,
+        hives === 'none'
+          ? noHives
+          : hives === 'invited'
+            ? invitedOnly
+            : hives === 'animator'
+              ? myHivesAnimator
+              : myHives,
+      )
+    }
+    if (pathname === '/v1/hives' && method === 'POST') {
+      const { name, icon } = JSON.parse(route.request().postData() ?? '{}')
+      return json(201, createdHive(name ?? null, icon ?? 'house-line'))
+    }
+    if (pathname === `/v1/hive-invitations/${invitationId}/accept` && method === 'POST') {
+      return json(200, atelier)
+    }
+    if (pathname === `/v1/hive-invitations/${invitationId}` && method === 'DELETE') {
+      return route.fulfill({ status: 204, body: '' })
+    }
+    const hiveRoute = pathname.match(/^\/v1\/hives\/([^/]+)(?:\/([a-z]+))?(?:\/([^/]+))?$/)
+    if (hiveRoute && hives !== 'none') {
+      const [, id, part, rest] = hiveRoute
+      const animator = hives === 'animator'
+      const created = createdHive(null, 'house-line').id
+      const page =
+        id === familleId
+          ? animator
+            ? hiveAnimatorPage
+            : hiveMemberPage
+          : id === amisId
+            ? amisPage
+            : id === created
+              ? readyPage('Famille', 'house-line')
+              : null
+      if (!page) return json(404, { error: { code: 'not_found', message: '' } })
+      const done = () => route.fulfill({ status: 204, body: '' })
+      if (!part && method === 'GET') return json(200, page)
+      if (!part && method === 'PATCH') {
+        const changes = JSON.parse(route.request().postData() ?? '{}')
+        const { pinnedProjectId: _pin, invitePolicy, ...summary } = changes
+        return json(200, {
+          ...page,
+          summary: { ...page.summary, ...summary },
+          ...(invitePolicy ? { invitePolicy } : null),
+        })
+      }
+      if (!part && method === 'DELETE') return done()
+      if (part === 'activity') {
+        return json(200, id === familleId ? hiveActivity : { items: [], nextCursor: null })
+      }
+      if (part === 'projects') {
+        const items = id === familleId ? familleProjects : id === amisId ? [quizJeudi] : []
+        return json(200, id === familleId ? hiveProjectsPage : { items, nextCursor: null })
+      }
+      if (part === 'members' && !rest && method === 'GET') {
+        if (id !== familleId) return json(200, { members: hiveMembers.members.slice(0, 2) })
+        return json(200, animator ? membersLeaAnimator : hiveMembers)
+      }
+      if (part === 'members' && method === 'DELETE') return done()
+      if (part === 'invitable') {
+        return json(200, { members: invitableFor(url.searchParams.get('q') ?? '') })
+      }
+      if (part === 'invitations' && method === 'POST')
+        return route.fulfill({ status: 201, body: '' })
+      if (part === 'animator' && method === 'POST') return done()
     }
     // Bloquer (PUT) et débloquer (DELETE) un membre (tranche 7b) : 204, comme la vraie API ; la
     // liste et la page du membre suivent. Se bloquer soi-même : 422.
@@ -2566,6 +2716,8 @@ const fakeApi = (
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
     if (pathname === `/v1/members/${ines.id}`) return json(200, inesMember)
+    // R10 : Tante Odile, ses projets en tuiles (dont deux réservés à Famille).
+    if (pathname === `/v1/members/${odileMemberPage.id}`) return json(200, odileMemberPage)
     // Tranche 7c : Sam, auteur du commentaire signalé de la file, et Karim, déjà suspendu. Leur
     // page dit à un administrateur seul où en est la modération (`Member.moderation`) ; la page
     // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
@@ -2584,6 +2736,15 @@ const fakeApi = (
     if (pathname === '/v1/categories') {
       const english = (route.request().headers()['accept-language'] ?? '').startsWith('en')
       return json(200, categoryList(english ? 'en' : 'fr', categoryCounts))
+    }
+    // R10 : le Fil d'une ruche (`?hive=<id>`) : les projets de Famille ; une autre ruche, rien.
+    if (pathname === '/v1/feed/following' && url.searchParams.get('hive')) {
+      return json(
+        200,
+        url.searchParams.get('hive') === familleId
+          ? hiveFeed
+          : { items: [], nextCursor: null, followsAnyone: true, lastReadAt: null },
+      )
     }
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     // « Marquer le fil lu » (R4) : l'appli l'envoie quand la première page s'affiche. La page
@@ -2672,6 +2833,22 @@ const fakeApi = (
           remainingToday,
         })
       }
+      // R10 : la ruche « Famille » que Léa signale (page signaler-ruche) ; l'animateur y est montré
+      // comme auteur, sa seule partie est le nom.
+      if (kind === 'hive' && id === familleId) {
+        return json(200, {
+          target: { kind: 'hive', id: familleId },
+          text: 'Famille',
+          projectId: null,
+          author: { id: papiJean.id, name: papiJean.name, handle: 'papi_jean', isBlocked: false },
+          head: { title: null, authorName: papiJean.name, image: null },
+          parts: [
+            { field: 'name', mediaId: null, position: null, thumb: null, reportedByMe: false },
+          ],
+          reportedByMe: false,
+          remainingToday,
+        })
+      }
       const comment = notMineComments.find((c) => c.id === id)
       if (kind !== 'comment' || !comment) {
         return json(404, { error: { code: 'not_found', message: '' } })
@@ -2717,7 +2894,10 @@ const fakeApi = (
     }
     if (pathname === '/v1/moderation/reports') {
       // R9 : la 2e photo de « Météo » en tête (une partie), puis la file d'avant.
-      const page = moderationQueuePageOf(moderationQueueR9)
+      // R10 (`moderation: 'hive'`) : le nom d'une ruche signalé, en tête (page moderation-ruche).
+      const page = moderationQueuePageOf(
+        moderation === 'hive' ? [hiveNameReport, ...moderationQueueR9] : moderationQueueR9,
+      )
       return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
     }
     if (pathname === '/v1/moderation/removed') {
@@ -3754,6 +3934,25 @@ const pages = [
       await page.getByText(/^Tu as aussi bloqué/).waitFor()
     },
   },
+  // R10 : signaler le nom d'une ruche (`/report?kind=hive&id=…`, ouvert par le menu de sa page) :
+  // « Quelle partie ? » propose « Toute la ruche » et « Le nom ».
+  {
+    name: 'signaler-ruche',
+    path: `/report?kind=hive&id=${familleId}`,
+    signedIn: true,
+  },
+  // R10 : le détail du nom d'une ruche signalé, pour la modération : alvéole, membres, animateur.
+  {
+    name: 'moderation-ruche',
+    path: `/moderation?item=hive:${familleId}:name`,
+    signedIn: true,
+    admin: true,
+    moderation: 'hive',
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('img', { name: 'Ruche Famille' }).waitFor()
+    },
+  },
   {
     name: 'signaler-limite',
     path: `/report?kind=project&id=${meteoProjectId}`,
@@ -4078,7 +4277,118 @@ const pages = [
       await page.getByText('Aucun projet trouvé dans cette catégorie.').waitFor()
     },
   },
-  { name: 'ruches', path: '/hives', signedIn: true },
+  // R10 (planches R10-*) : l'onglet Ruches (deux ruches, une invitation), vide ; la page de
+  // Famille (Actualité, Projets en tuiles, Membres ; jour, nuit, ordinateur comme toutes les pages) ;
+  // les feuilles Créer et Inviter ; les réglages de l'animatrice ; la fenêtre « Quitter » ; le Fil
+  // d'une ruche ; l'invitation du premier lancement ; publier pour une ruche ; l'Activité ; la page
+  // d'un membre en tuiles.
+  { name: 'ruches', path: '/hives', signedIn: true, fullPage: true },
+  { name: 'ruches-vide', path: '/hives', signedIn: true, hives: 'none' },
+  { name: 'ruche', path: `/hives/${familleId}`, signedIn: true, fullPage: true },
+  {
+    name: 'ruche-membres',
+    path: `/hives/${familleId}?tab=members`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'ruche-projets',
+    path: `/hives/${familleId}?tab=projects`,
+    signedIn: true,
+    fullPage: true,
+  },
+  // Le nom tapé, comme sur la planche R10-Creer : le compteur « 7 / 40 » et l'aperçu « Ma ruche
+  // Famille ».
+  {
+    name: 'ruche-creer',
+    path: '/hives/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('textbox', { name: fr.hives.createSheet.name }).fill('Famille')
+      await page.getByText('Famille', { exact: true }).last().waitFor()
+    },
+  },
+  {
+    name: 'ruche-inviter',
+    path: `/hives/${familleId}/invite`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('textbox', { name: fr.hives.invite.search }).fill('ma')
+      await page.getByText('Max Durand').first().waitFor()
+    },
+  },
+  // Les réglages ne s'ouvrent qu'à l'animateur : Léa anime Famille (sinon retour à la ruche).
+  {
+    name: 'ruche-reglages',
+    path: `/hives/${familleId}/settings`,
+    signedIn: true,
+    hives: 'animator',
+  },
+  {
+    name: 'ruche-quitter',
+    path: `/hives/${familleId}?tab=members`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.hives.page.leave }).last().click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
+  { name: 'fil-ruche', path: `/?hive=${familleId}`, signedIn: true, fullPage: true },
+  {
+    name: 'fil-premier-invitation',
+    path: '/',
+    signedIn: true,
+    feed: 'nobody',
+    hives: 'invited',
+  },
+  // Le témoin : un membre sans ruche n'a que « Membres de Waiggle » et « Privé ».
+  { name: 'publier-sans-ruche', path: '/projects/new', signedIn: true, hives: 'none' },
+  {
+    name: 'publier-ruche',
+    path: '/projects/new',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: fr.project.form.hive }).click()
+      // Puis la ruche : la phrase du bas dit « Seuls les membres de Famille verront ce projet. »
+      await page.getByRole('radio', { name: 'Famille', exact: true }).click()
+    },
+  },
+  {
+    name: 'activite-ruches',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'hives',
+    fullPage: true,
+  },
+  { name: 'membre-tuiles', path: `/members/${odileMemberPage.id}`, signedIn: true, fullPage: true },
+  // R10 : l'onglet Projets vu par l'animatrice (Léa anime Famille), le « … » de la première tuile
+  // ouvert (« Retirer l'épingle » sur le projet épinglé, « Épingler » ailleurs) ; et la feuille
+  // « Partager » d'un projet réservé à Famille.
+  {
+    name: 'ruche-projets-animateur',
+    path: `/hives/${familleId}?tab=projects`,
+    signedIn: true,
+    hives: 'animator',
+    prepare: async (page) => {
+      // Le « … » de la tuile du Plan de table (celui de la ruche, en haut, a un autre nom).
+      await page
+        .getByRole('button', {
+          name: fr.hives.page.projectMenu.replace('{{title}}', 'Le plan de table'),
+        })
+        .click()
+      await page.getByRole('menuitem').first().waitFor()
+    },
+  },
+  {
+    name: 'projet-partager-ruche',
+    path: `/projects/${reservedLaunchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Partager', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Copier le lien' }).waitFor()
+    },
+  },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
 // habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se
@@ -4267,6 +4577,7 @@ if (script) {
       suspended,
       emailChoices,
       moderation,
+      hives,
       ...options
     } = {},
   ) => {
@@ -4290,6 +4601,7 @@ if (script) {
         suspended,
         emailChoices,
         moderation,
+        hives,
       ),
     )
     return context
@@ -4406,6 +4718,7 @@ async function layoutReport() {
             shot.suspended,
             shot.emailChoices,
             shot.moderation,
+            shot.hives,
           ),
         )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
@@ -4585,6 +4898,7 @@ const capture = async ({ shot, device, scheme }) => {
         shot.suspended,
         shot.emailChoices,
         shot.moderation,
+        shot.hives,
       ),
     )
     const page = await context.newPage()

@@ -326,7 +326,7 @@ describe('when the e-mail goes out', () => {
 })
 
 describe('when nothing goes out', () => {
-  it('is off by default: every type waits for the recap', async () => {
+  it('is off by default: every type waits for the recap, but hive invitations', async () => {
     await instantFor(ines, 'replies')
     await act.comment(velo.id, malik, '@ines_morel et @zoe, regardez.')
     later()
@@ -343,6 +343,9 @@ describe('when nothing goes out', () => {
       follows: 'digest',
       updates: 'digest',
       testers: 'digest',
+      // R10 : seules les invitations dans une ruche partent « tout de suite » par défaut ; Zoé n'en a
+      // aucune, elle ne reçoit rien (instant-emails.hives.test.ts).
+      hives: 'now',
     })
     expect(instantTo(zoeAccount.email)).toEqual([])
     // Témoin : Inès, qui l'a demandé pour les réponses et mentions, le reçoit.

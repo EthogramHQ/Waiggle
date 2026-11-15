@@ -10,7 +10,11 @@
 // « Réglages », en rubriques (/settings/<rubrique>) ; le second membre renvoie son lien de
 // vérification depuis « Vérifie ta boîte mail » ; le premier oublie son mot de passe, en choisit un
 // nouveau par le lien reçu, puis le change depuis la rubrique « Sécurité » : chaque fois, son autre
-// appareil est déconnecté. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque
+// appareil est déconnecté. Puis le projet devient privé, est supprimé. Tranche R10 (« Ruches ») :
+// Léa crée la ruche « Famille » et y invite Sam, qui la rejoint ; Léa publie un projet réservé à la
+// ruche, que Sam voit (Actualité, Projets, Fil) et que Malik, hors de la ruche, ne trouve nulle part ;
+// Sam quitte la ruche, puis Léa (la dernière) : le projet redevient privé. Enfin le compte de Léa est
+// supprimé. À chaque
 // étape, on vérifie ce que voit chacun (le membre, l'autre membre, une personne sans compte) et ce
 // qui reste sur le disque du serveur.
 //
@@ -979,8 +983,7 @@ try {
     await byRole(mainNav, 'link', tab).click()
     await malik.page.waitForURL((url) => url.pathname === path)
     await mainNav.locator(`[aria-current="page"]`).filter({ hasText: tab }).first().waitFor()
-    if (tab === 'Ruches')
-      await malik.page.getByText('Les ruches arrivent bientôt').first().waitFor()
+    if (tab === 'Ruches') await malik.page.getByText('Pas encore de ruche').first().waitFor()
   }
   console.log('  ok : chaque onglet ouvre sa page et devient l’onglet actif')
 
@@ -1488,6 +1491,204 @@ try {
   await lea.page.waitForURL((url) => url.pathname === '/me')
   expectEqual('photo, pour Léa', await statusFor(lea, photoUrl), 404)
   await expectMedia('après la suppression du projet', { avatars: 1, visuals: 0 })
+
+  // --- Tranche R10 : les ruches. Léa crée « Famille » et y invite Sam (l'invité) ; Malik, resté en
+  // dehors, est celui qui ne doit rien en voir. Le projet de la ruche n'a pas de photo : le disque
+  // n'a donc rien à compter ici. ---
+  const hiveProject = 'La marmite de Famille'
+  const hiveWord = 'marmite' // le mot que la recherche doit retrouver (ou pas)
+  const hiveRegexp = new RegExp(hiveProject)
+  const reserved = 'Réservé à Famille'
+  const unknownProject = '00000000-0000-4000-8000-000000000000'
+
+  step(
+    'Léa n’a pas de ruche : elle en crée une, « Famille », qui l’attend avec « Ta ruche est prête »',
+  )
+  await open(lea.page, `${appUrl}/hives`)
+  await lea.page.getByText('Pas encore de ruche').first().waitFor()
+  await byRole(lea.page, 'button', 'Créer une ruche').first().click()
+  await lea.page.waitForURL((url) => url.pathname === '/hives/new')
+  const createSheet = lea.page.getByRole('dialog', { name: 'Créer une ruche' })
+  await createSheet.waitFor()
+  await createSheet.getByLabel('Nom de la ruche', { exact: false }).fill('Famille')
+  await byRole(createSheet, 'button', 'Créer').click()
+  await lea.page.waitForURL(/\/hives\/[0-9a-f-]{36}$/)
+  const hiveId = new URL(lea.page.url()).pathname.split('/').at(-1)
+  await lea.page.getByText('Ta ruche est prête').first().waitFor()
+  const hiveOfLea = await waitFor('ruche de Léa, dans l’API', async () => {
+    const res = await lea.request.get(`${apiUrl}/v1/hives`)
+    const mine = res.ok() ? await res.json() : null
+    return mine?.hives.length === 1 ? mine.hives[0] : null
+  })
+  expectEqual('nom de la ruche', hiveOfLea.name, 'Famille')
+  expectEqual('rôle de Léa', hiveOfLea.role, 'animator')
+  console.log('  ok : Léa a créé la ruche « Famille » et en est l’animatrice')
+
+  step('Léa invite Sam depuis la feuille « Inviter dans Famille »')
+  await byRole(lea.page, 'button', 'Inviter des proches').click()
+  await lea.page.waitForURL((url) => url.pathname === `/hives/${hiveId}/invite`)
+  const inviteSheet = lea.page.getByRole('dialog', { name: 'Inviter dans Famille' })
+  await inviteSheet.waitFor()
+  await inviteSheet.getByLabel('Chercher un membre', { exact: true }).fill('Sam')
+  // La feuille de la garde de double tape ignore les clics de ses premières 600 ms (R9).
+  await lea.page.waitForTimeout(800)
+  await byRole(inviteSheet, 'button', 'Inviter Sam').click()
+  await byRole(inviteSheet, 'button', 'Invitation envoyée').waitFor()
+  console.log('  ok : le bouton de Sam devient « Invitation envoyée »')
+  // L'API : Sam voit l'invitation, Léa en a une de moins à envoyer (sa ruche en attend une).
+  const samInvitations = await waitFor('invitation de Sam, dans l’API', async () => {
+    const mine = await (await sam.request.get(`${apiUrl}/v1/hives`)).json()
+    return mine.invitations.length === 1 ? mine : null
+  })
+  expectEqual('ruches de Sam avant d’accepter', samInvitations.hives.length, 0)
+
+  step('Sam reçoit l’invitation dans son Activité et dans l’onglet Ruches, et rejoint la ruche')
+  await open(sam.page, `${appUrl}/notifications`)
+  // L'apostrophe de « t’invite » est typographique ; le nom de la ruche est en gras, d'où l'expression.
+  await sam.page
+    .getByText(/t’invite dans la ruche\s+Famille/)
+    .first()
+    .waitFor()
+  console.log('  ok : l’Activité de Sam dit « t’invite dans la ruche Famille »')
+  await open(sam.page, `${appUrl}/hives`)
+  await sam.page.getByText('Invitations', { exact: true }).first().waitFor()
+  await byRole(sam.page, 'button', 'Refuser l’invitation de Lea').first().waitFor()
+  await byRole(sam.page, 'button', 'Rejoindre la ruche Famille').click()
+  await sam.page.waitForURL((url) => url.pathname === `/hives/${hiveId}`)
+  const samHives = await waitFor('Sam membre, dans l’API', async () => {
+    const mine = await (await sam.request.get(`${apiUrl}/v1/hives`)).json()
+    return mine.hives.length === 1 && mine.invitations.length === 0 ? mine : null
+  })
+  expectEqual('ruche de Sam', samHives.hives[0].id, hiveId)
+  expectEqual('rôle de Sam', samHives.hives[0].role, 'member')
+  console.log('  ok : Sam a rejoint la ruche ; l’invitation a disparu')
+
+  step('Léa publie un projet réservé à Famille, par « Une ruche » dans « Qui peut le voir ? »')
+  await open(lea.page, `${appUrl}/projects/new`)
+  await lea.page.getByLabel('Titre').fill(hiveProject)
+  await lea.page.getByLabel('En une phrase').fill('Une recette qui ne sort pas de la famille.')
+  await chooseCategory(lea.page, 'Cuisine')
+  await byRole(lea.page, 'radio', 'Une ruche').click()
+  await byRole(lea.page, 'radio', 'Famille').click()
+  const hiveProjectId = await publishToFeed(lea.page)
+  const hiveProjectUrl = `${apiUrl}/v1/projects/${hiveProjectId}`
+  const reservedProject = await readProject(lea, hiveProjectId)
+  expectEqual('visibilité du projet', reservedProject.visibility, 'hive')
+  expectEqual('ruche du projet', reservedProject.hive?.name, 'Famille')
+  console.log('  ok : le projet est réservé à la ruche « Famille »')
+
+  step(
+    'Sam le voit dans la ruche (Actualité, Projets), sous la pastille « Famille » du Fil, et l’ouvre',
+  )
+  expectEqual('projet réservé, pour Sam', await statusFor(sam, hiveProjectUrl), 200)
+  await open(sam.page, `${appUrl}/hives/${hiveId}`)
+  // La ligne de l'Actualité se lit en entier : le projet, puis la pastille « Réservé à Famille ».
+  await byRole(sam.page, 'link', new RegExp(`${hiveProject}.*${reserved}`))
+    .first()
+    .waitFor()
+  console.log('  ok : l’Actualité de la ruche montre le projet à Sam, « Réservé à Famille »')
+  await byRole(sam.page, 'tab', /^Projets/)
+    .first()
+    .click()
+  await byRole(sam.page, 'link', new RegExp(`^${hiveProject}`))
+    .first()
+    .waitFor()
+  console.log('  ok : l’onglet Projets de la ruche le montre aussi')
+  await open(sam.page, `${appUrl}/`)
+  await byRole(sam.page, 'tab', 'Famille').click()
+  await sam.page.waitForURL((url) => url.searchParams.get('hive') === hiveId)
+  const cardInFeed = byRole(sam.page, 'link', hiveRegexp).first()
+  await cardInFeed.waitFor()
+  await cardInFeed.click()
+  await sam.page.waitForURL((url) => url.pathname === `/projects/${hiveProjectId}`)
+  await sam.page.getByText('Publié à l’instant').first().waitFor()
+  console.log('  ok : le Fil de « Famille » montre la carte, qui ouvre la page du projet')
+  // La recherche de Sam le trouve : le témoin de l'absence de Malik plus bas.
+  await open(sam.page, `${appUrl}/search?q=${hiveWord}`)
+  await byRole(sam.page, 'link', hiveRegexp).first().waitFor()
+  console.log('  ok : la recherche de Sam trouve le projet de la ruche')
+
+  step(
+    'Malik, hors de la ruche, ne le trouve ni dans Explorer, ni dans la recherche, ni par son adresse',
+  )
+  await open(malik.page, `${appUrl}/explore`)
+  // La liste est chargée quand le projet de Sam (visible des membres) y est : alors l'absence compte.
+  await byRole(malik.page, 'link', samProject).first().waitFor()
+  expectEqual(
+    'carte du projet réservé, dans Explorer pour Malik',
+    await byRole(malik.page, 'link', hiveRegexp).count(),
+    0,
+  )
+  await open(malik.page, `${appUrl}/search?q=${hiveWord}`)
+  await malik.page
+    .getByText(new RegExp(`^Aucun résultat pour .{1,3}${hiveWord}.{1,3}$`))
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  expectEqual(
+    'projet réservé, dans la recherche de Malik',
+    await byRole(malik.page, 'link', hiveRegexp).count(),
+    0,
+  )
+  // L'adresse répond comme pour un projet privé ou inconnu : 404, même corps (rien ne dit qu'il existe).
+  const forMalik = await malik.request.get(hiveProjectUrl)
+  const forUnknown = await malik.request.get(`${apiUrl}/v1/projects/${unknownProject}`)
+  expectEqual('projet réservé, pour Malik', forMalik.status(), 404)
+  expectEqual('projet inconnu, pour Malik', forUnknown.status(), 404)
+  expectEqual(
+    'corps de la réponse, réservé et inconnu',
+    await forMalik.text(),
+    await forUnknown.text(),
+  )
+  expectEqual('projet réservé, sans compte', await statusFor(visitor, hiveProjectUrl), 401)
+  await open(malik.page, `${appUrl}/projects/${hiveProjectId}`)
+  await malik.page.getByText('Ce projet est introuvable').waitFor()
+  await open(malik.page, `${appUrl}/members/${me.id}`)
+  await malik.page.getByText('Pas encore de projet visible des membres.').waitFor()
+  console.log('  ok : Malik ne voit le projet de la ruche nulle part')
+  // Le témoin de la page de Léa : Sam, membre de la ruche, y voit la tuile « Réservé à Famille ».
+  await open(sam.page, `${appUrl}/members/${me.id}`)
+  await byRole(sam.page, 'link', hiveRegexp).first().waitFor()
+  console.log('  ok : la page de Léa montre le projet à Sam, pas à Malik')
+
+  step('Sam quitte la ruche : le projet ne s’ouvre plus pour lui')
+  await open(sam.page, `${appUrl}/hives/${hiveId}`)
+  await byRole(sam.page, 'button', 'Plus d’options pour la ruche Famille').click()
+  await byRole(sam.page, 'menuitem', 'Quitter la ruche').click()
+  const quitSheet = sam.page.getByRole('dialog', { name: /^Quitter la ruche Famille/ })
+  await quitSheet.waitFor()
+  await byRole(quitSheet, 'button', 'Quitter').click()
+  await waitFor('Sam hors de la ruche, dans l’API', async () => {
+    const mine = await (await sam.request.get(`${apiUrl}/v1/hives`)).json()
+    return mine.hives.length === 0
+  })
+  expectEqual('projet réservé, pour Sam parti', await statusFor(sam, hiveProjectUrl), 404)
+  await open(sam.page, `${appUrl}/projects/${hiveProjectId}`)
+  await sam.page.getByText('Ce projet est introuvable').waitFor()
+  await open(sam.page, `${appUrl}/hives`)
+  await sam.page.getByText('Pas encore de ruche').first().waitFor()
+  console.log('  ok : Sam n’a plus de ruche et le projet est introuvable pour lui')
+
+  step('Léa, dernière de la ruche, la quitte : la ruche disparaît et son projet redevient privé')
+  await open(lea.page, `${appUrl}/hives/${hiveId}`)
+  await byRole(lea.page, 'button', 'Plus d’options pour la ruche Famille').click()
+  await byRole(lea.page, 'menuitem', 'Quitter la ruche').click()
+  const lastSheet = lea.page.getByRole('dialog', { name: /^Quitter la ruche Famille/ })
+  await lastSheet.waitFor()
+  await lastSheet.getByText(/dernier membre\s*:\s*la ruche sera supprimée/).waitFor()
+  await byRole(lastSheet, 'button', 'Quitter').click()
+  const kept = await waitFor('projet redevenu privé, dans l’API', async () => {
+    const project = await readProject(lea, hiveProjectId)
+    return project.visibility === 'private' ? project : null
+  })
+  expectEqual('ruche du projet, après le départ', kept.hive, null)
+  expectEqual(
+    'ruche supprimée, pour Léa',
+    await statusFor(lea, `${apiUrl}/v1/hives/${hiveId}`),
+    404,
+  )
+  expectEqual('projet redevenu privé, pour Sam', await statusFor(sam, hiveProjectUrl), 404)
+  console.log('  ok : le projet est privé, jamais « Membres »')
 
   step('Léa supprime son compte : son avatar disparaît du disque')
   // R2 : depuis la rubrique « Compte », une feuille posée sur les réglages

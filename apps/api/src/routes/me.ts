@@ -28,6 +28,7 @@ import { errorBody, languageOf } from '../errors'
 import { readFeedReadAt } from '../feed/state'
 import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
+import { hiveExportOf } from '../hives/export'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
 import { mentionsOfComments } from '../mentions/load'
@@ -40,7 +41,7 @@ import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
 import { provisionalOf } from '../profile/provisional'
 import { loadProjectsOf } from '../projects/load'
-import { listedProject, listedProjectFor } from '../projects/visibility'
+import { listedProjectFor, sharedProjectWith } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
 import { partOwnerKey, removedPartsOf } from '../removals/parts'
@@ -240,7 +241,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     // c.req.valid('json') : le corps de la requête, déjà vérifié par le schéma ProfileUpdate. Le
     // pseudo y est déjà nettoyé (« @Ines » → « ines ») et de bonne forme.
-    const { name, handle, language, bio, favoriteTools } = c.req.valid('json')
+    const { name, handle, language, bio, favoriteTools, hideFromSuggestions } = c.req.valid('json')
 
     // Un changement de pseudo a son propre quota (5 par jour), compté seulement s'il change :
     // renvoyer son pseudo actuel avec le reste du profil n'en est pas un. Un essai sur un pseudo
@@ -277,21 +278,28 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             })
             .where(eq(schema.user.id, user.id))
         }
-        // … la bio et les outils dans `profile`. « Upsert » : créer la ligne si elle n'existe pas
-        // encore, sinon la mettre à jour (insert … on conflict do update).
-        if (bio !== undefined || favoriteTools !== undefined) {
+        // … la bio, les outils et « Ne pas me proposer aux autres » (R10) dans `profile`.
+        // « Upsert » : créer la ligne si elle n'existe pas encore, sinon la mettre à jour
+        // (insert … on conflict do update).
+        if (bio !== undefined || favoriteTools !== undefined || hideFromSuggestions !== undefined) {
           // Les outils favoris (R6b) : reliés au catalogue, écrits dans profile_tool seulement
           // (l'ancienne colonne `favorite_tools` est effacée par la migration 0018).
           const resolved =
             favoriteTools === undefined ? undefined : await resolveTools(tx, favoriteTools)
-          // Sans bio envoyée, il ne reste rien à mettre à jour (Drizzle refuse un `set` vide) : la
-          // ligne n'est créée que si elle manque.
-          const profileInsert = tx
-            .insert(schema.profile)
-            .values({ userId: user.id, bio: bio ?? '' })
-          await (bio === undefined
+          // Seuls les champs envoyés sont mis à jour. Sans bio ni réglage envoyés, il ne reste rien
+          // à mettre à jour (Drizzle refuse un `set` vide) : la ligne n'est créée que si elle manque.
+          const profileSet = {
+            ...(bio !== undefined && { bio }),
+            ...(hideFromSuggestions !== undefined && { hideFromSuggestions }),
+          }
+          const profileInsert = tx.insert(schema.profile).values({
+            userId: user.id,
+            bio: bio ?? '',
+            hideFromSuggestions: hideFromSuggestions ?? false,
+          })
+          await (Object.keys(profileSet).length === 0
             ? profileInsert.onConflictDoNothing()
-            : profileInsert.onConflictDoUpdate({ target: schema.profile.userId, set: { bio } }))
+            : profileInsert.onConflictDoUpdate({ target: schema.profile.userId, set: profileSet }))
           if (resolved) {
             createdHere = resolved.created
             await replaceProfileTools(tx, user.id, resolved.tools)
@@ -490,6 +498,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // de ses données. Les deux requêtes partent de la clé primaire (follower_id, …).
     // Un projet suivi devenu privé n'y figure pas (l'abonnement est gardé, mais ne montre plus
     // rien) : sinon l'export dirait qu'il existe encore, alors qu'un projet supprimé disparaît.
+    // R10 : un projet réservé à une ruche y figure tant que le membre est de cette ruche ; sorti de
+    // la ruche, il ne le voit plus, comme un projet devenu privé (règle commune `sharedProjectWith`,
+    // sans les blocages, comme avant).
     const followedMembers = await db
       .select({ id: schema.memberFollow.memberId, followedAt: schema.memberFollow.createdAt })
       .from(schema.memberFollow)
@@ -499,8 +510,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       .select({ id: schema.projectFollow.projectId, followedAt: schema.projectFollow.createdAt })
       .from(schema.projectFollow)
       .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
-      // Un projet suivi retiré par la modération n'y figure pas non plus (listedProject).
-      .where(and(eq(schema.projectFollow.followerId, user.id), listedProject()))
+      // Un projet suivi retiré par la modération n'y figure pas non plus.
+      .where(and(eq(schema.projectFollow.followerId, user.id), sharedProjectWith(user.id)))
       .orderBy(asc(schema.projectFollow.createdAt))
     const withDate = (follows: { id: string; followedAt: Date }[]) =>
       follows.map(({ id, followedAt }) => ({ id, followedAt: followedAt.toISOString() }))
@@ -621,6 +632,11 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // R9 (RGPD art. 15 et 20) : les parties de son profil retirées (bio, outils favoris, photo, et nom
     // ou pseudo encore provisoires), avec leur valeur et leur décision, lues comme sur sa page :
     // leur texte n'est plus que dans la ligne de retrait. Une requête, plus celle du nom et du pseudo.
+    // R10 : ses ruches (nom, rôle, entrée, dernière visite) et ses invitations reçues, refusées
+    // comprises, et envoyées (l'invité par son pseudo) : trois requêtes, hives/export.ts. Le réglage
+    // « Ne pas me proposer aux autres » est déjà dans `me` (`hideFromSuggestions`).
+    const hives = await hiveExportOf(db, user.id)
+
     const profileRemovedParts =
       (
         await removedPartsOf(
@@ -666,6 +682,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         feed: { readAt: feedReadAt?.toISOString() ?? null },
         dismissedSuggestions,
         emailPreferences,
+        hives,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
           ...s,

@@ -11,7 +11,8 @@
 // - l'adresse vient de `shareUrl` (identifiant validé, sec-B6) et ne contient rien d'autre : ni
 //   paramètre, ni nom de qui partage ;
 // - jur-3 : pour un projet privé, le bandeau dit que le lien ne s'ouvrira que pour son auteur ;
-//   jur-5 : le toast de « Copier le lien » le redit ;
+//   jur-5 : le toast de « Copier le lien » le redit ; R10 : pour un projet réservé à une ruche,
+//   « Seuls les membres de Famille pourront l'ouvrir. », redit aussi par le toast ;
 // - ui-8 : « Copier le lien » ferme la feuille d'abord, puis montre le toast (un toast montré sous
 //   une fenêtre modale est caché sur téléphone, et hors de `aria-modal` sur le web) ; une copie
 //   refusée par l'appareil garde la feuille ouverte et le dit dans son pied (jamais un « Lien
@@ -47,9 +48,17 @@ type ContentProps = {
   target: ShareTarget
   /**
    * `public` (par défaut) : seuls les membres pourront l'ouvrir. `private` : un projet privé, que
-   * le lien n'ouvrira que pour son auteur (jur-3).
+   * le lien n'ouvrira que pour son auteur (jur-3). R10 : `hive`, un projet réservé à une ruche, que
+   * seuls ses membres pourront ouvrir (la ruche est dans `hive`).
    */
-  visibility?: 'public' | 'private'
+  visibility?: 'public' | 'hive' | 'private'
+  /**
+   * R10 : la ruche d'un projet réservé (`Project.hive`), pour la nommer : « Seuls les membres de
+   * Famille pourront l'ouvrir. ». Un nom `null` (retiré par la modération) se dit « Ruche sans nom ».
+   * Sans ruche, un projet `hive` se dit comme un projet privé : la feuille ne promet jamais plus que
+   * ce que le lien ouvrira.
+   */
+  hive?: { id: string; name: string | null } | null
   /**
    * La vignette : la première photo du projet, la photo du membre. Décorative (le titre dit de quoi
    * il s'agit). Un membre sans photo a ses initiales ; un projet sans photo, pas de vignette.
@@ -70,6 +79,7 @@ function useShareContent({
   title,
   target,
   visibility = 'public',
+  hive = null,
   image = null,
   onClose,
   copy = copyText,
@@ -103,7 +113,34 @@ function useShareContent({
 
   if (!url) return null
 
-  const isPrivate = target.kind === 'project' && visibility === 'private'
+  // Qui pourra ouvrir le lien : les membres (par défaut), ceux d'une ruche (R10), ou l'auteur seul.
+  // Un projet réservé dont la ruche manque se dit privé : le moins promis des deux.
+  const audience: 'members' | 'hive' | 'private' =
+    target.kind !== 'project'
+      ? 'members'
+      : visibility === 'hive'
+        ? hive
+          ? 'hive'
+          : 'private'
+        : visibility === 'private'
+          ? 'private'
+          : 'members'
+  // Le nom de la ruche, dans une phrase qui ne dit pas « la ruche … » : « Ruche sans nom » s'il a
+  // été retiré (plan R10, « Une ruche sans nom dans une phrase »).
+  const hiveName = hive?.name ?? t(($) => $.hives.unnamed)
+  const banner =
+    audience === 'hive'
+      ? t(($) => $.share.hiveOnly, { hive: hiveName })
+      : audience === 'private'
+        ? t(($) => $.share.privateOnly)
+        : t(($) => $.share.membersOnly)
+  // Le toast de « Copier le lien » redit la même chose (jur-5).
+  const copied =
+    audience === 'hive'
+      ? t(($) => $.share.copiedHive, { hive: hiveName })
+      : audience === 'private'
+        ? t(($) => $.share.copiedPrivate)
+        : t(($) => $.share.copiedMembers)
   // Le menu de l'appareil : seulement s'il existe, et (sur le web) une fois la page hydratée.
   const system = hydrated && (canShare ?? canShareNatively())
 
@@ -124,9 +161,7 @@ function useShareContent({
     // la page l'ignore le temps de la garde.
     holdPageTaps()
     onClose()
-    toast.show(isPrivate ? t(($) => $.share.copiedPrivate) : t(($) => $.share.copiedMembers), {
-      icon: 'check-circle',
-    })
+    toast.show(copied, { icon: 'check-circle' })
   }
 
   const onSystem = async () => {
@@ -181,11 +216,7 @@ function useShareContent({
         <Text variant="code" tone="secondary" selectable breakAnywhere>
           {url}
         </Text>
-        <Callout
-          tone="caution"
-          icon="lock-simple"
-          title={isPrivate ? t(($) => $.share.privateOnly) : t(($) => $.share.membersOnly)}
-        />
+        <Callout tone="caution" icon="lock-simple" title={banner} />
       </>
     ),
     footer: (

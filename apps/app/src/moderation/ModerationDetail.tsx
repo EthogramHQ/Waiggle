@@ -24,9 +24,10 @@ import { shortDate } from '../projects/format'
 import { AuthorRecord } from '../ui/AuthorRecord'
 import { excerpt } from '../ui/CommentAction'
 import type { Focusable } from '../ui/focus'
+import { HiveBadge } from '../ui/HiveBadge'
 import type { ImageSource } from '../ui/image'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
-import { Stack } from '../ui/Stack'
+import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { partText, reasonTextKey } from './present'
@@ -95,6 +96,9 @@ export const detailTitle = (
   t: T,
 ): string => {
   const kind = t(($) => $.moderation.kinds[item.target.kind])
+  // R10 : le nom d'une ruche. Pas « Le nom de Papi Jean » : la fiche de l'auteur est celle de
+  // l'animateur (ou de qui a écrit le nom), et le titre ferait croire à son profil.
+  if (item.target.kind === 'hive' && item.part) return t(($) => $.moderation.detail.hiveName)
   const where = item.context?.title ?? item.authorRecord?.name ?? null
   if (item.part) {
     const part = partText(item.part, t, item.target.kind)
@@ -107,6 +111,17 @@ export const detailTitle = (
   // sorte (« Commentaire ») ; jamais le nom de l'auteur, qui ferait croire à un profil.
   if (item.target.kind === 'member') return item.authorRecord?.name ?? kind
   return item.context?.title ?? kind
+}
+
+/**
+ * R10 : « 4 membres, animée par Papi Jean » ; sans animateur (son compte est parti), le nombre de
+ * membres seul.
+ */
+const hiveLine = (hive: NonNullable<ModerationQueueItem['hive']>, t: T): string => {
+  const members = t(($) => $.hives.members, { count: hive.memberCount })
+  return hive.animatorName === null
+    ? members
+    : t(($) => $.moderation.detail.hiveLine, { members, name: hive.animatorName })
 }
 
 /** Le résultat d'une décision, à la place des boutons : une confirmation, ou « déjà décidé ». */
@@ -155,7 +170,11 @@ export function ModerationDetail(props: Props) {
   const { item, actions, outcome, outcomeRef, error, onView, titleRef } = props
   const kind = t(($) => $.moderation.kinds[item.target.kind])
   const part = item.part ? partText(item.part, t, item.target.kind) : null
-  const viewLink = onView ? { viewLabel: t(($) => $.moderation.detail.seeInContext), onView } : null
+  // R10 : une ruche n'a pas de page à voir pour la modération, qui n'en est pas membre : pas de lien.
+  const viewLink =
+    onView && item.target.kind !== 'hive'
+      ? { viewLabel: t(($) => $.moderation.detail.seeInContext), onView }
+      : null
   // Ce que le lecteur d'écran lit après chaque bouton : de quel contenu il s'agit.
   const common = {
     kind,
@@ -206,6 +225,17 @@ export function ModerationDetail(props: Props) {
       <Text variant="title2" heading={2} focusRef={titleRef}>
         {detailTitle(queued, t)}
       </Text>
+      {/* R10 : ce que la modération voit d'une ruche en plus de son nom (dans la copie) : son
+          alvéole, ses membres et son animateur ; jamais son actualité ni ses projets. Rien pour une
+          ruche supprimée depuis (`hive` null). */}
+      {queued.hive ? (
+        <Row gap="md">
+          <HiveBadge icon={queued.hive.icon} name={firstText(queued.snapshot) || null} size={44} />
+          <Stack grow>
+            <Text>{hiveLine(queued.hive, t)}</Text>
+          </Stack>
+        </Row>
+      ) : null}
       <ReportCard
         {...common}
         description={t(($) => $.moderation.describe, {

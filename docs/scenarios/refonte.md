@@ -2768,3 +2768,409 @@ plan :
   l'auteur, la feuille « Retirer » ;
 - `R9-Activite-Moderation` : les lignes d'Activité d'une partie retirée, d'un rétablissement, d'une
   levée pour erreur et du pseudo provisoire (téléphone, jour).
+
+## R10 — Les Ruches
+
+Statut : **validé par Louis** le 14/11/2026 (conversation « plan » de R10), tel quel, avec les
+dix choix de la session et les quatre planches à dessiner.
+
+R10 crée les ruches, des groupes de proches comme « Ma ruche Famille », d'après les planches du
+28/10 (`R10-Ruches`, `R10-Ruche`, `R10-Ruche-Nuit`, `R10-Inviter`, `R10-Membres`,
+`R10-Ruche-Desktop` ; décisions F-Nav1, F-Fil9, F-Fil11, F-Fil13, F-Pub6, F-Et5 et `decisions.md`
+du 28/10). Elle livre aussi ce que les tranches d'avant lui ont renvoyé : le sélecteur du Fil,
+« Tes ruches » sur ordinateur, les invitations au premier lancement (R4), « Une ruche » dans « Qui
+peut le voir ? » (R6a), la mosaïque de tuiles (R6b), une mise à jour dans une ruche (R7a), la
+ligne « Ruches » des réglages et la partie « Dans tes ruches » du récap (R8). Dans le code, la
+fonction s'appelle `hive`.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : un projet privé,
+retiré, d'un membre bloqué dans un sens ou dans l'autre n'apparaît nulle part ; tout se calcule au
+moment de la lecture ; un membre suspendu lit et exporte, mais ne publie pas ; un e-mail ne
+contient aucun lien ni domaine venu d'un membre ; la modération ne montre jamais qui a signalé.
+
+Hors de R10, et où ça va :
+- l'âge minimum (choix de Louis du 14/11/2026 : **15 ans**) : la case « J'ai 15 ans ou plus » à
+  l'inscription et sa mention dans les règles viennent avec R11, la conformité ;
+- les défis d'une ruche : plus tard (la planche le dit : « Les défis viendront plus tard ») ;
+- un tchat ou une conversation de groupe dans une ruche : non (F-Nav1) ;
+- inviter dans une ruche quelqu'un qui n'a pas encore de compte : plus tard, avec l'ouverture des
+  inscriptions (R12 au plus tôt) ; en R10, on invite des membres de Waiggle ;
+- plusieurs animateurs, ou des rôles en plus : plus tard, si les ruches le demandent ;
+- un projet réservé à plusieurs ruches à la fois : non (F-Pub6 dit « une ruche ») ;
+- des ruches payantes : non décidé (`compliance-backlog`).
+
+### L'onglet Ruches (planche `R10-Ruches`)
+
+**Mes ruches**
+- Étant donné Inès, membre des ruches « Famille » et « Amis du jeudi »
+- Quand elle touche l'onglet Ruches
+- Alors la page « Mes ruches » remplace « Les ruches arrivent bientôt »
+- Et une phrase dit : « Une ruche, c'est un groupe de proches. On y entre par une invitation ; ses
+  membres se voient entre eux et partagent des projets réservés à la ruche. »
+- Et chaque ruche a sa ligne : son alvéole miel avec son icône, son nom, « 4 membres · animée par
+  Papi Jean », la pile des photos de quelques membres, et ses nouveautés (« 2 nouveautés », ou
+  « rien de neuf »)
+- Et les nouveautés comptent les projets publiés et les mises à jour dans la ruche depuis sa
+  dernière visite de la page de cette ruche
+- Et les ruches vont de la plus récemment active à la plus calme
+- Et le bouton « Créer une ruche » est en haut
+
+**Les invitations reçues**
+- Étant donné une invitation de Nora Benali dans la ruche « Atelier IA »
+- Alors une partie « Invitations » porte une pastille avec leur nombre, au-dessus de ses ruches
+- Et chaque invitation dit « Nora Benali t'invite dans la ruche Atelier IA », « 6 membres · il y a
+  3 h », avec « Rejoindre la ruche » et « Refuser »
+- Et sous les boutons : « Refuser ne prévient personne. »
+- Quand elle touche « Rejoindre la ruche »
+- Alors elle devient membre, la ruche prend sa place dans la liste, et sa page s'ouvre
+- Quand elle touche « Refuser »
+- Alors l'invitation disparaît de chez elle, et personne n'est prévenu : pour la ruche,
+  l'invitation reste « Invitation envoyée » et compte dans les 50 places jusqu'à ses 30 jours ; ni
+  nouvelle invitation ni nouvel e-mail avant (choix de Louis du 14/11/2026, relecture du plan)
+- Et deux tapes rapides n'acceptent ni ne refusent deux fois
+
+**Aucune ruche**
+- Étant donné un membre qui n'est dans aucune ruche et n'a aucune invitation
+- Alors la page montre la mascotte, la phrase qui explique les ruches et « Créer une ruche »
+
+### Créer une ruche (planche à dessiner `R10-Creer`)
+
+- Quand Inès touche « Créer une ruche »
+- Alors une feuille demande le nom de la ruche (« Famille », 40 caractères au plus) et une icône,
+  à choisir parmi douze, posée dans l'alvéole miel (décision du 28/10)
+- Et un aperçu montre l'alvéole et « Ma ruche Famille »
+- Quand elle touche « Créer »
+- Alors la ruche existe, Inès en est l'animatrice et son seul membre, et la page de la ruche
+  s'ouvre sur « Inviter des proches »
+- Et un membre crée 10 ruches au plus, et il est membre de 20 ruches au plus ; au-delà, le bouton
+  explique pourquoi
+- Et un nom vide, ou fait seulement d'espaces, est refusé avec un message sous le champ
+- Et un membre suspendu ne voit pas « Créer une ruche »
+
+### La page d'une ruche (planches `R10-Ruche`, `R10-Ruche-Nuit`, `R10-Ruche-Desktop`)
+
+**Le haut**
+- Étant donné Inès sur la page de « Famille »
+- Alors le haut dit « Ma ruche » puis « Famille », avec l'alvéole, la pile des photos, « 4 membres »
+  et le bouton « Inviter » (si elle a le droit d'inviter)
+- Et trois onglets : **Actualité · Projets · 5 · Membres** (le nombre compte les projets réservés
+  à la ruche)
+- Et aucun tchat (F-Nav1)
+
+**Le projet épinglé**
+- Étant donné un projet épinglé par l'animateur
+- Alors il vient en premier, en grande carte, avec « Épinglé par Papi Jean »
+- Et seul un projet que tous les membres de la ruche peuvent voir s'épingle : un projet réservé à
+  la ruche, ou un projet « Membres » d'un membre de la ruche
+- Et s'il devient privé, est retiré, ou si son auteur quitte la ruche, l'épingle disparaît d'elle-
+  même
+
+**Qui cherche des testeurs**
+- Alors sous l'épingle, « Papi Jean cherche des testeurs » montre les projets des membres de la
+  ruche qui appellent des testeurs (R7a), avec « Testable » et « Tester »
+
+**L'actualité**
+- Alors l'onglet Actualité liste, du plus récent au plus ancien, ce que font les membres : « Léa a
+  publié Le plan de table », « Tante Odile a mis à jour Biscotte au parc · v2 », « Papi Jean a
+  épinglé … », avec la date relative
+- Et un projet réservé à la ruche porte la pastille « Réservé à Famille »
+- Et l'actualité ne montre que des projets qu'Inès peut voir : ceux réservés à cette ruche et les
+  projets « Membres » de ses membres ; jamais un projet réservé à une autre ruche, privé, retiré,
+  ou d'un membre bloqué
+- Et elle remonte 30 jours, par pages de 20
+
+**Les projets**
+- Alors l'onglet Projets montre les projets réservés à la ruche en mosaïque de tuiles (F-Et5),
+  du plus récent au plus ancien
+
+**Les membres** (planche `R10-Membres`)
+- Alors l'onglet Membres liste les membres : photo, nom, pseudo, « Animateur » pour l'animateur,
+  « toi » pour Inès ; le nom ouvre la page du membre
+- Et en bas, « Inviter un proche » (si elle a le droit d'inviter)
+- Et la phrase : « L'animateur épingle un projet, choisit qui peut inviter et peut retirer un
+  membre. Les membres d'une ruche se voient entre eux, jamais les autres membres de Waiggle. »
+- Et sous « Mes suggestions », l'interrupteur « Ne pas me proposer aux autres » (voir plus bas)
+- Et tout en bas, « Quitter la ruche »
+
+**Sur ordinateur** (planche `R10-Ruche-Desktop`)
+- Alors l'actualité est au centre, la colonne de gauche porte les membres, et la colonne de droite
+  « Qui cherche des testeurs » avec « Tester »
+- Et une phrase dit : « Une partie de la ruche arrive dans ton récap du dimanche. Les défis
+  viendront plus tard. »
+
+**Qui peut ouvrir la page**
+- Seuls ses membres ; pour tout autre membre, l'adresse d'une ruche répond comme une page qui
+  n'existe pas, sans dire si la ruche existe
+- Un membre invité, qui n'a pas encore accepté, voit seulement son invitation (nom, icône,
+  animateur, nombre de membres), jamais l'actualité ni les membres
+
+### Inviter (planche `R10-Inviter`)
+
+**Envoyer une invitation**
+- Quand Inès touche « Inviter »
+- Alors une feuille « Inviter dans Famille » cherche parmi les membres de Waiggle, par nom ou
+  pseudo (la recherche d'aujourd'hui, qui ignore les accents)
+- Et chaque résultat a sa photo, son nom, son pseudo et « Inviter » ; un membre déjà dans la ruche
+  dit « Déjà membre », un membre déjà invité dit « Invitation envoyée »
+- Et une phrase dit : « Tu invites des membres de Waiggle. Ils deviennent membres seulement s'ils
+  acceptent ; un refus ne prévient personne. »
+- Et un aperçu « Ce que reçoit Max » montre l'invitation et ses trois promesses : « Les membres de
+  la ruche verront ton nom et ta photo dans la ruche. » ; « Tu verras les projets réservés à la
+  ruche. » ; « Tu pourras quitter la ruche quand tu veux. »
+- Quand elle touche « Inviter » sur la ligne de Max
+- Alors le bouton dit « Invitation envoyée », et Max la reçoit dans Ruches et dans son Activité
+- Et deux tapes rapides n'envoient qu'une invitation
+
+**Qui peut inviter**
+- Par défaut, tout membre de la ruche invite ; l'animateur peut réserver ce droit à lui seul
+  (`decisions.md`, 28/10)
+- Un membre suspendu n'invite pas
+
+**Les limites**
+- Une ruche a 50 membres au plus, invitations en attente comprises ; au-delà, « Inviter » le dit
+- Un membre envoie 20 invitations par jour au plus
+- Une invitation vaut 30 jours, puis disparaît d'elle-même
+- On ne peut pas inviter un membre qu'on a bloqué ou qui nous a bloqué : il n'apparaît pas dans la
+  recherche, et l'API répond comme pour un membre qui n'existe pas
+
+**Recevoir une invitation**
+- Étant donné Max, invité par Inès dans « Famille »
+- Alors son Activité dit « Inès Haddad t'invite dans la ruche Famille », et la ligne ouvre l'onglet
+  Ruches
+- Et s'il ne suit encore personne, l'invitation passe aussi en tête du Fil, au-dessus de « Proches
+  à suivre » (F-Fil9, planche `R4-Fil-Premier`)
+- Et un e-mail le prévient selon son réglage « Ruches » ; l'e-mail ne contient pas le nom de la
+  ruche, écrit par un membre : « Inès Haddad t'invite dans une ruche sur Waiggle. »
+- Quand il accepte
+- Alors Inès, qui l'a invité, voit dans son Activité « Max a rejoint Famille » ; s'il refuse,
+  personne n'en sait rien
+
+### L'animateur (planche à dessiner `R10-Reglages-Ruche`)
+
+- Étant donné Papi Jean, animateur de « Famille »
+- Alors un bouton « Réglages de la ruche » lui permet de : changer le nom et l'icône ; choisir qui
+  peut inviter (« Tous les membres » ou « Seulement moi ») ; confier l'animation à un autre membre ;
+  supprimer la ruche
+- Et sur chaque carte de projet que la ruche peut épingler, « Épingler » (un seul projet à la fois ;
+  en épingler un autre remplace le premier)
+- Et sur la ligne d'un membre, « Retirer de la ruche », avec une confirmation
+
+**Retirer un membre**
+- Quand il retire Tante Odile
+- Alors elle n'est plus membre, ses projets réservés à la ruche redeviennent privés, et son
+  Activité dit « Tu ne fais plus partie de la ruche Famille. », sans dire qui l'a retirée
+- Et elle peut être réinvitée plus tard
+
+**Confier l'animation**
+- Quand il confie l'animation à Léa
+- Alors Léa devient animatrice, Papi Jean redevient membre, et l'Activité de Léa dit « Tu animes
+  maintenant la ruche Famille. »
+
+**Supprimer la ruche**
+- Quand il touche « Supprimer la ruche »
+- Alors une fenêtre dit « Supprimer la ruche Famille ? Ses 5 projets réservés redeviennent privés,
+  pour leurs auteurs. Ça ne s'annule pas. »
+- Et après confirmation, la ruche disparaît, et chaque membre lit dans son Activité « La ruche
+  Famille a été supprimée. »
+- Et deux tapes rapides ne suppriment qu'une fois ; la fenêtre ne se ferme pas pendant la
+  suppression
+
+**Un animateur suspendu**
+- Il garde son rôle mais n'épingle, ne renomme, n'invite et ne retire plus personne tant que dure
+  la suspension ; la ruche continue
+
+### Quitter une ruche
+
+- Quand Léa touche « Quitter la ruche »
+- Alors une fenêtre dit « Quitter la ruche Famille ? Tes projets réservés à la ruche redeviennent
+  privés. »
+- Et la fenêtre dit aussi : « Tes commentaires sur ses projets restent lisibles par ses membres. »
+- Et après confirmation, elle n'est plus membre ; personne n'est prévenu
+- Et elle peut toujours effacer ses propres commentaires, réactions et messages sur les projets de
+  la ruche, sans plus les voir (choix de Louis du 14/11/2026, relecture du plan)
+- Et si l'animateur quitte la ruche, l'animation passe au membre le plus ancien, et la fenêtre le
+  dit avant (« Léa animera la ruche. ») ; celui-ci est prévenu
+- Et si le dernier membre part, la ruche est supprimée, et la fenêtre le dit avant
+
+### Un projet réservé à une ruche (F-Pub6, planche `R6-Publier-Suite`)
+
+**Le choisir**
+- Étant donné Inès, membre d'au moins une ruche, qui publie ou modifie un projet
+- Alors « Qui peut le voir ? » propose « Membres de Waiggle » (nouveau libellé de « Membres »,
+  choix de Louis du 14/11/2026), « Une ruche » et « Privé » (« Public, trouvable
+  sur Google » reste pour R12)
+- Quand elle choisit « Une ruche »
+- Alors elle choisit laquelle parmi ses ruches, et la phrase du bas dit « Seuls les membres de
+  Famille verront ce projet. »
+- Et un membre qui n'est dans aucune ruche ne voit pas ce choix
+- Et un membre suspendu ne publie toujours pas
+
+**Qui le voit**
+- Seuls les membres de la ruche, son auteur, et la modération quand il est signalé
+- Partout : le Fil, Explorer, « Ils cherchent des testeurs », la recherche, la page de l'auteur, sa
+  page, ses images, ses mises à jour, ses commentaires, le coin des testeurs, l'Activité et le
+  récap ; pour tout autre membre, son adresse répond comme un projet privé
+- Une mise à jour d'un projet réservé n'est vue que des membres de la ruche (renvoi de R7a)
+- Partager ce projet dit : « Seuls les membres de Famille pourront l'ouvrir. »
+- Un membre qui quitte la ruche perd l'accès tout de suite, même s'il suivait ou testait le projet
+- Si son auteur quitte la ruche, en est retiré, ou si la ruche est supprimée, le projet redevient
+  privé
+
+### Le Fil (F-Fil9, F-Fil11, F-Fil13 ; planches `R4-Fil`, `R4-Fil-Premier`, `R4-Fil-Desktop`)
+
+**Le sélecteur**
+- Étant donné Inès, membre d'au moins une ruche
+- Alors des pastilles de verre « Tout · Famille · Amis du jeudi » (une par ruche) restent collées en
+  haut du Fil pendant le défilement ; un membre sans ruche ne les voit pas
+- Et « Tout » est le Fil d'aujourd'hui : les projets et les mises à jour des membres qu'elle suit,
+  y compris leurs projets réservés à une ruche où elle est
+- Quand elle touche « Famille »
+- Alors le Fil montre les projets et les mises à jour de tous les membres de Famille, même ceux
+  qu'elle ne suit pas : les projets réservés à Famille et leurs projets « Membres »
+- Et la pastille active a sa goutte ; « Tu es à jour » et le bouton des nouveautés valent pour la
+  pastille choisie
+
+**Tes ruches, sur ordinateur**
+- Alors la colonne de droite du Fil commence par « Tes ruches » : chaque ruche avec son alvéole,
+  son nom et ses nouveautés, qui ouvre sa page ; puis « Proches à suivre » et « Ils cherchent des
+  testeurs »
+
+**Proches à suivre**
+- Alors les membres de ses ruches qu'elle ne suit pas viennent en premier, puis ceux qui ont publié
+  récemment ; la légende dit « Des membres de tes ruches et des membres qui ont publié
+  récemment »
+- Et jamais un membre qui a choisi « Ne pas me proposer aux autres »
+
+### « Ne pas me proposer aux autres » (planche `R10-Membres`)
+
+- Quand Léa active « Ne pas me proposer aux autres »
+- Alors elle n'apparaît plus dans « Proches à suivre », chez personne
+- Et la ligne le dit : « Tu n'apparais plus dans « Proches à suivre ». Tu restes dans la recherche
+  et dans les membres de tes ruches. »
+- Et le réglage vaut pour toutes ses ruches ; il est aussi dans ses réglages, avec les autres
+  choix sur ce que les autres voient
+
+### La mosaïque de tuiles (F-Et5, renvoi de R6b)
+
+- Alors la page d'un membre (« Ses projets ») montre les projets en tuiles, comme la page d'un
+  outil ; le Fil garde ses grandes cartes
+- Et « Récents » dans Explorer garde ses cartes, avec « Suivre » (F-Fil8) et « Tester » (choix de
+  Louis du 14/11/2026, relecture du plan : les tuiles les perdraient)
+
+### Les notifications et le récap (renvois de R8)
+
+**L'Activité**
+- Les lignes neuves : une invitation reçue ; « Max a rejoint Famille » (à qui l'a invité) ; « Tu ne
+  fais plus partie de la ruche Famille. » ; « Tu animes maintenant la ruche Famille. » ; « La ruche
+  Famille a été supprimée. »
+- Une nouvelle publication dans une ruche ne fait pas de ligne : elle se lit dans les nouveautés de
+  la ruche, le sélecteur du Fil et le récap
+
+**Le réglage « Ruches »**
+- Les réglages d'e-mail gagnent la ligne « Ruches » : « Tout de suite · Dans le récap · Jamais »,
+  « Tout de suite » par défaut (décisions de R8)
+- Elle règle l'e-mail d'une invitation ; la partie « Dans tes ruches » du récap est là sauf si
+  « Ruches » vaut « Jamais »
+
+**La partie « Dans tes ruches » du récap**
+- Alors le récap du dimanche dit, ruche par ruche, les projets publiés et les mises à jour de la
+  semaine (titre, auteur), et les invitations en attente si le réglage est « Dans le récap »
+- Et un projet réservé à une ruche n'a jamais de vignette (les vignettes restent aux projets
+  « Membres ») ; le nom d'une ruche n'est jamais un lien
+- Et rien s'il n'y a rien
+
+### Les blocages
+
+- Deux membres d'une même ruche qui se bloquent restent membres tous les deux ; chacun ne voit plus
+  rien de l'autre dans la ruche (actualité, projets, membres, épingle, testeurs)
+- « Animée par » ne nomme pas un animateur bloqué dans un sens ou dans l'autre
+- Sauf pour l'animateur : un membre qui l'a bloqué reste dans sa liste des membres, sous une forme
+  réduite (son nom seul, sans photo, pseudo ni lien), avec « Retirer de la ruche » ; un blocage ne
+  retire jamais à l'animateur le pouvoir de modérer sa ruche (choix de Louis du 14/11/2026,
+  relecture du plan)
+
+### La modération
+
+- Le nom et l'icône d'une ruche se signalent depuis sa page ou depuis l'invitation (« Signaler la
+  ruche »), avec les motifs d'aujourd'hui
+- La modération voit le nom, l'icône, l'animateur et le nombre de membres, jamais l'actualité ni
+  les projets réservés (sauf un projet signalé, comme aujourd'hui)
+- Elle peut retirer le nom : la ruche s'appelle alors « Ruche sans nom », l'animateur est prévenu
+  et choisit un autre nom (comme le pseudo provisoire de R9)
+- Un projet réservé à une ruche se signale comme les autres
+
+### Mes données et la suppression du compte
+
+- L'export ajoute ses ruches (nom, rôle, date d'entrée), les invitations envoyées et reçues, et le
+  réglage « Ne pas me proposer aux autres »
+- Supprimer son compte le retire de ses ruches ; s'il était animateur, l'animation passe au membre
+  le plus ancien ; s'il était le dernier, la ruche est supprimée
+
+### Accessibilité
+
+- Les pastilles du sélecteur sont des onglets (rôle, nom, état actif), au clavier par les flèches
+- L'alvéole d'une ruche a un nom lu (« Ruche Famille ») ; son icône est décorative
+- Les boutons « Rejoindre la ruche », « Refuser », « Inviter » disent qui ou quoi (« Inviter Max
+  Durand »)
+- Zones à toucher de 44 au moins ; textes à 200 % sans coupure au milieu d'un mot à 320
+
+### Ménage
+
+- La page « Les ruches arrivent bientôt » et ses textes disparaissent
+
+### Repris des listes « À reprendre » et « À surveiller »
+
+- `compliance-backlog` (R10) : « Ne pas me proposer aux autres » dit ce qu'il couvre (les
+  suggestions, pas la recherche) ;
+- `compliance-backlog` (R10) : la visibilité « ruche » passe par la même règle d'accès dans la
+  recherche, avec un test (un projet réservé n'est jamais trouvé par un non-membre).
+
+### Le parcours d'un membre (`journey`)
+
+- Inès crée la ruche « Famille », invite Léa ; Léa accepte depuis l'onglet Ruches ; Inès publie un
+  projet réservé à Famille ; Léa le voit dans l'actualité de la ruche, dans la pastille « Famille »
+  du Fil, et l'ouvre ; Max, qui n'est pas dans la ruche, ne le trouve ni dans Explorer, ni dans la
+  recherche, ni par son adresse ; Léa quitte la ruche et ne l'ouvre plus
+
+### Les choix de la session (14/11/2026), à valider avec ce scénario
+
+1. **Les limites** : 50 membres par ruche (invitations comprises), 10 ruches créées et 20 ruches
+   par membre, 20 invitations par jour, une invitation valable 30 jours, un nom de 40 caractères.
+2. **Le sélecteur du Fil** : « Tout » reste les abonnements (F-Nav6) ; la pastille d'une ruche
+   montre tous ses membres, suivis ou non.
+3. **L'actualité d'une ruche** montre les projets réservés et les projets « Membres » de ses
+   membres (la planche montre les deux), sur 30 jours.
+4. **Un projet sans ruche** (son auteur part, est retiré, la ruche est supprimée) **redevient
+   privé**, jamais « Membres » : l'auteur décide de l'ouvrir.
+5. **L'animation passe au membre le plus ancien** quand l'animateur part ou supprime son compte ;
+   l'animateur peut aussi la confier.
+6. **Une nouvelle publication dans une ruche ne fait pas de ligne d'Activité** : nouveautés, Fil
+   et récap suffisent ; les invitations et les départs en font une.
+7. **Le nom de la ruche n'est jamais dans l'e-mail d'invitation** ni dans la ligne d'une invitation
+   du récap (écrit par un membre qu'on ne connaît peut-être pas) ; la partie « Dans tes ruches » du
+   récap l'écrit en texte simple, jamais en lien (décision de Louis du 14/11/2026, planche
+   `R10-Recap`) ; jamais de vignette pour un projet réservé.
+8. **Le nom d'une ruche se signale et se retire**, comme un pseudo (R9) : une invitation est le
+   seul endroit où un inconnu peut écrire un texte à un membre.
+9. **« Ne pas me proposer aux autres » est un réglage unique** pour toutes les ruches, aussi dans
+   les réglages.
+10. **La mosaïque de tuiles** (F-Et5) vient avec R10, comme R6b l'a renvoyé, sur la page d'un
+    membre seulement (relecture du plan).
+
+Après la relecture du plan, Louis a retenu le 14/11/2026 les cinq propositions (« Oui, comme
+proposé ») : l'invitation refusée reste « envoyée » pour la ruche jusqu'à ses 30 jours ; un ancien
+membre efface toujours ses commentaires ; l'animateur voit et peut retirer un membre qui l'a
+bloqué ; « Membres de Waiggle » ; la mosaïque sur la page d'un membre seulement.
+
+### Les planches qui manquent (les visuels d'abord)
+
+Les six planches du 28/10 couvrent l'onglet, la page, l'invitation et les membres. À dessiner et
+faire valider avant la relecture du plan :
+- `R10-Creer` : la feuille « Créer une ruche » (nom, douze icônes, aperçu de l'alvéole), et la
+  ruche juste créée, seule, sur « Inviter des proches » (téléphone, jour) ;
+- `R10-Reglages-Ruche` : les réglages de l'animateur (nom, icône, qui peut inviter, confier
+  l'animation, supprimer), « Retirer de la ruche » et les fenêtres de confirmation (Quitter,
+  Retirer, Supprimer) (téléphone, jour) ;
+- `R10-Etats` : l'onglet sans ruche, une ruche pleine (50), une invitation qui ne vaut plus, le
+  choix de la ruche dans « Qui peut le voir ? » (téléphone, jour) ;
+- `R10-Activite` : les lignes d'Activité des ruches et la partie « Dans tes ruches » du récap.

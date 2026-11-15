@@ -72,6 +72,20 @@ export const ErrorCode = z.enum([
   // ouvert ne vise.
   'part_whole_only',
   'part_not_reported',
+  // Tranche R10 (les ruches) : la ruche est pleine (50 membres, invitations en attente comprises) ;
+  // 10 ruches créées, ou 20 ruches rejointes ; inviter un membre déjà dans la ruche, ou déjà invité
+  // (une invitation refusée compte jusqu'à ses 30 jours) ; une invitation qui ne vaut plus (expirée,
+  // ou sa ruche supprimée : 410) ; épingler un projet que toute la ruche ne peut pas voir (422).
+  'hive_full',
+  'hives_created_limit',
+  'hives_joined_limit',
+  'already_hive_member',
+  'already_invited',
+  'invitation_expired',
+  'pin_not_visible',
+  // Relecture du design de R10 : la 21e invitation du jour (429). Le quota court sur 24 h : l'appli
+  // dit « demain », pas « dans quelques minutes » comme pour `rate_limited`.
+  'hive_invitations_limited',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

@@ -88,5 +88,7 @@ export const loadMe = async (
     // R9 (7d) : le nom ou le pseudo mis d'office par la modération, tant qu'il n'en a pas choisi
     // d'autre (profile/provisional.ts) ; une requête de plus, par l'index des décisions d'une cible.
     provisional: await provisionalOf(db, user.id, { name: user.name, handle }),
+    // R10 : « Ne pas me proposer aux autres ».
+    hideFromSuggestions: profile?.hideFromSuggestions ?? false,
   }
 }

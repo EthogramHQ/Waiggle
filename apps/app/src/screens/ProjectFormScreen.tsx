@@ -37,7 +37,9 @@ import {
   isDirty,
   type ProjectForm,
   type ProjectFormErrors,
+  settleAudience,
   toProjectChanges,
+  visibilityOf,
 } from '../projects/form'
 import { useProject } from '../projects/hooks'
 import { usePhotoTiles } from '../projects/usePhotoTiles'
@@ -55,7 +57,7 @@ import { useCalmMotion } from '../ui/theme/motion'
 import { useToast } from '../ui/theme/toast'
 import { HomeScreen } from './HomeScreen'
 import { ProjectAbandonDialog } from './ProjectAbandonDialog'
-import { audienceSentence } from './ProjectAudienceChoice'
+import { useAudienceSentence } from './ProjectAudienceChoice'
 import { ProjectCategorySheet } from './ProjectCategorySheet'
 import {
   type CategoriesOpener,
@@ -330,7 +332,8 @@ function ProjectFormView({
 
   // --- Changer un champ ---
   const update = (patch: Partial<ProjectForm>) => {
-    const next = { ...form, ...patch }
+    // R10 : repasser en « Membres de Waiggle » ou « Privé » efface la ruche choisie.
+    const next = settleAudience({ ...form, ...patch })
     setForm(next)
     // Après un premier refus, les erreurs suivent la frappe : un champ corrigé n'est plus en rouge,
     // et le message général part quand il ne reste rien à corriger.
@@ -422,9 +425,15 @@ function ProjectFormView({
     : null
 
   const cover = photos.tiles[0]?.image ?? null
+  // Ce qui est enregistré (modification) : l'audience et sa ruche, pour le présent ou le futur.
+  const savedAudience = editing ? { audience: initial.audience, hiveId: initial.hiveId } : null
+  const audienceText = useAudienceSentence(
+    { audience: form.audience, hiveId: form.hiveId },
+    savedAudience,
+  )
   const sentence = (
     <Text variant="callout" tone="secondary">
-      {audienceSentence(t, form.audience, editing ? initial.audience : null)}
+      {audienceText}
     </Text>
   )
 
@@ -451,7 +460,15 @@ function ProjectFormView({
         onClose={requestClose}
         {...(beside
           ? {
-              aside: <ProjectFormPreview form={form} cover={cover} change={change} />,
+              aside: (
+                <ProjectFormPreview
+                  form={form}
+                  cover={cover}
+                  change={change}
+                  hiveError={errors.hiveId ? t(($) => $.project.form.hiveRequired) : undefined}
+                  hiveRef={fieldRefs.hive}
+                />
+              ),
               footerNote: sentence,
             }
           : null)}
@@ -483,7 +500,7 @@ function ProjectFormView({
           fieldRefs={fieldRefs}
           savedPrompts={project?.prompts}
           withAudience={!beside}
-          {...(editing ? { savedAudience: initial.audience } : null)}
+          {...(savedAudience ? { savedAudience } : null)}
         />
         {project ? (
           // La zone rouge, en dernier : supprimer, et qui le peut (jur-J7).
@@ -506,7 +523,7 @@ function ProjectFormView({
         primary={form.primaryCategory}
         secondary={form.secondaryCategory}
         tools={form.tools}
-        visibility={form.audience === 'private' ? 'private' : 'public'}
+        visibility={visibilityOf(form.audience)}
         onChange={({ primary, secondary, tools }) =>
           update({ primaryCategory: primary, secondaryCategory: secondary, tools })
         }

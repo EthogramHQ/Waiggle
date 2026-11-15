@@ -62,6 +62,16 @@ export type Presented = {
   target: Href | null
 }
 
+/** L'onglet des ruches : où l'on rejoint une ruche ou refuse une invitation. */
+const HIVES_TAB: Href = '/hives'
+
+/**
+ * Le nom d'une ruche dans une phrase. Retiré par la modération (`null`), il devient « sans nom »
+ * là où la phrase dit déjà « la ruche » (`inline`), « Ruche sans nom » ailleurs (`plain`).
+ */
+const hiveName = (name: string | null, place: 'inline' | 'plain', t: T): string =>
+  name ?? (place === 'inline' ? t(($) => $.hives.unnamedInline) : t(($) => $.hives.unnamed))
+
 /** Les réglages du profil, où l'on choisit un nouveau nom ou pseudo. */
 const PROFILE_SETTINGS: Href = '/settings/profile'
 
@@ -182,6 +192,78 @@ export const presentNotification = (
     thumb: null,
   } as const
   switch (notification.kind) {
+    case 'hive_invited': {
+      // R10 : une invitation dans une ruche. La phrase nomme qui invite (ou, si son compte est
+      // supprimé, seulement la ruche) ; au toucher, l'onglet Ruches, où l'on rejoint ou refuse.
+      const { inviter, hive } = notification
+      const name = hiveName(hive.name, 'inline', t)
+      const said = inviter
+        ? say({ name: inviter.name, hive: name }, (params) =>
+            t(($) => $.notifications.hiveInvited, params as { name: string; hive: string }),
+          )
+        : say({ hive: name }, (params) =>
+            t(($) => $.notifications.hiveInvitedNoInviter, params as { hive: string }),
+          )
+      return {
+        ...plain,
+        ...said,
+        icon: 'hexagon',
+        // L'icône de la ruche, dans le miel ; une ruche sans icône garde l'hexagone.
+        leading: iconLeading(hive.icon ?? 'hexagon', 'honey'),
+        target: HIVES_TAB,
+      }
+    }
+    case 'hive_joined': {
+      // R10 : quelqu'un que j'ai invité a rejoint. Sans nom de ruche (retiré par la modération), la
+      // phrase ne dit pas « la ruche » : « Ruche sans nom ». Au toucher, les membres de la ruche.
+      const { member, hive } = notification
+      const said = say({ name: member.name, hive: hiveName(hive.name, 'plain', t) }, (params) =>
+        t(($) => $.notifications.hiveJoined, params as { name: string; hive: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: 'user-plus',
+        leading: memberLeading(member),
+        target: hive.id
+          ? { pathname: '/hives/[id]', params: { id: hive.id, tab: 'members' } }
+          : null,
+      }
+    }
+    case 'hive_animator': {
+      // R10 : l'animation m'est confiée ; au toucher, la ruche.
+      const { hive } = notification
+      const said = say({ hive: hiveName(hive.name, 'inline', t) }, (params) =>
+        t(($) => $.notifications.hiveAnimator, params as { hive: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: 'crown',
+        leading: iconLeading('crown', 'honey'),
+        target: hive.id ? { pathname: '/hives/[id]', params: { id: hive.id } } : null,
+      }
+    }
+    case 'hive_removed':
+    case 'hive_deleted': {
+      // R10 : je ne suis plus dans la ruche (sans dire qui m'a retiré), ou elle est supprimée. Rien
+      // à ouvrir (je n'y ai plus accès) ; dessous, ce que devient mon travail (option 7).
+      const removed = notification.kind === 'hive_removed'
+      const hive = hiveName(notification.hive.name, 'inline', t)
+      const said = say({ hive }, (params) =>
+        removed
+          ? t(($) => $.notifications.hiveRemoved, params as { hive: string })
+          : t(($) => $.notifications.hiveDeleted, params as { hive: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: removed ? 'sign-out' : 'hexagon',
+        leading: iconLeading(removed ? 'sign-out' : 'hexagon'),
+        detail: t(($) => $.notifications.hivePrivateAgain),
+        target: null,
+      }
+    }
     case 'reactions': {
       const { counts, total, project } = notification
       const said = say({ title: project.title }, (params) =>
@@ -494,6 +576,47 @@ export const presentNotification = (
         afterReport,
         projectHidden,
       } = notification
+      // R10 : le nom d'une ruche retiré (seul cas sans projet) : la phrase, puis toute la
+      // motivation, comme pour un contenu (article 17 du DSA). Relecture juridique (C2) : la ligne
+      // va à l'animateur actuel et à qui avait écrit le nom. L'API ne donne l'identifiant de la
+      // ruche qu'à l'animateur, tant que le retrait dure : lui seul est invité à la renommer, et
+      // la ligne mène à ses réglages. La ruche se reconnaît à son icône ; renommée depuis, à son
+      // nom actuel (jamais celui qui a été retiré).
+      if (targetKind === 'hive' || project === null) {
+        const hive = notification.hive
+        const renamable = hive?.id ? hive.id : null
+        const currentName = hive?.name ?? null
+        const said =
+          currentName === null
+            ? say({}, () => t(($) => $.notifications.removed.hive))
+            : say({ hive: currentName }, (params) =>
+                t(($) => $.notifications.removed.hiveRenamed, params as { hive: string }),
+              )
+        const rest =
+          renamable !== null
+            ? t(($) => $.removal.part.rest.hive)
+            : currentName === null
+              ? t(($) => $.removal.part.restHiveWriter)
+              : null
+        return {
+          ...plain,
+          ...said,
+          icon: 'prohibit',
+          leading: iconLeading(hive?.icon ?? 'prohibit', 'danger'),
+          detail: [
+            t(($) => $.removal.part.onlyYou),
+            ...(rest ? [rest] : []),
+            afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
+            t(($) => $.removal.grounds[ground]),
+            t(($) => $.removal.explanation, { explanation }),
+            t(($) => $.removal.contest),
+          ].join('\n'),
+          target:
+            renamable !== null
+              ? { pathname: '/hives/[id]/settings', params: { id: renamable } }
+              : null,
+        }
+      }
       const elsewhere = targetKind === 'comment' && projectHidden
       // R9 : une partie retirée seule se nomme (« La 2e photo de Météo… ») ; une partie que
       // l'auteur ne voit pas comme telle retombe sur la phrase du contenu entier.
@@ -607,6 +730,21 @@ export const presentNotification = (
       // Une partie nommée par son rang (« La 2e photo de Météo ») ; le pseudo ou le nom revient ou
       // non : le membre a pu en choisir un autre entre-temps (`valueBack`).
       const { targetKind, project, part, handle, valueBack } = notification
+      // R10 : le nom d'une ruche est de nouveau visible (sans projet, sans lien).
+      if (targetKind === 'hive') {
+        const hiveLine = say(
+          { hive: hiveName(notification.hive?.name ?? null, 'plain', t) },
+          (params) => t(($) => $.notifications.restored.hive, params as { hive: string }),
+        )
+        return {
+          ...plain,
+          ...hiveLine,
+          icon: 'check-circle',
+          leading: iconLeading('check-circle', 'honey'),
+          detail: t(($) => $.notifications.team),
+          target: null,
+        }
+      }
       const field = part?.field
       const rank = rankOf(part?.position ?? null, t)
       const said =

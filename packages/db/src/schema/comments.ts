@@ -50,6 +50,18 @@ export const projectComment = pgTable(
     // La décision de retrait, pour retrouver son fondement et son explication. onDelete:
     // 'set null' : l'API ne purge pas une décision tant que son contenu reste retiré.
     removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'set null' }),
+    // R10 (relecture de sécurité, décision du 15/11/2026) : la ruche à laquelle le projet était
+    // réservé quand ce commentaire a été écrit ; null s'il a été écrit sur un projet public (ou
+    // privé, par son auteur). Un commentaire écrit pour les membres d'une ruche le reste : il n'est
+    // lu, et compté, que par son auteur, l'auteur du projet et les membres actuels de cette ruche,
+    // même si le projet est ensuite ouvert à tous ou à une autre ruche (règle `sees`,
+    // apps/api/src/comments/load.ts). Volontairement SANS clé étrangère vers hive : une clé
+    // « on delete set null » rouvrirait ces commentaires à tous quand la ruche est supprimée, et une
+    // clé « restrict » empêcherait de la supprimer. Ruche supprimée, l'identifiant reste, mais plus
+    // personne n'en est membre : seuls l'auteur du commentaire et l'auteur du projet le lisent.
+    // Pas d'index : aucune lecture ne cherche par cette colonne ; elle se lit sur des commentaires
+    // déjà trouvés par leur projet, leur fil ou leur auteur.
+    hiveId: uuid('hive_id'),
   },
   (t) => [
     // Les pages de commentaires : les racines d'un projet, de la plus récente à la plus ancienne,

@@ -11,7 +11,7 @@ import { and, count, eq, sql } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { blocksOf } from '../blocks/visibility'
 import { reachableBy } from '../blocks/write'
-import { viewerOf } from '../comments/load'
+import { viewerHivesOf, viewerOf } from '../comments/load'
 import { errorBody, languageOf } from '../errors'
 import { memberFollowState } from '../follows/load'
 import { ensureHandle } from '../handles/claim'
@@ -20,6 +20,7 @@ import { searchMentionable } from '../mentions/search'
 import { avatarUrlOf } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { loadSummaries, visibleTo } from '../projects/load'
+import { inViewerHiveColumn } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { isActiveAdmin } from '../reports/admin'
@@ -156,7 +157,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Ses blocages en même temps (blocksOf, par les deux index de member_block) : la recherche ne
     // lit que `seesSql`, qui les lit dans la base, mais le Viewer les porte toujours (viewerOf),
     // pour qu'une règle JavaScript ajoutée plus tard (`sees`) ne les ignore pas sans bruit.
-    const [[project], blocks] = await Promise.all([
+    // R10 : ses ruches aussi (viewerHivesOf, par hive_member_user_idx), que le Viewer porte
+    // toujours pour la même raison ; seesSql, lui, les relit dans la base.
+    const [[project], blocks, hives] = await Promise.all([
       db
         .select({
           id: schema.project.id,
@@ -164,16 +167,19 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           visibility: schema.project.visibility,
           // Un projet retiré compte comme privé pour la recherche (viewerOf, comments/load.ts).
           removedAt: schema.project.removedAt,
+          // R10 : sa ruche est-elle l'une de celles du membre ? (viewerOf, projects/visibility.ts)
+          inViewerHive: inViewerHiveColumn(user.id),
         })
         .from(schema.project)
         .where(and(eq(schema.project.id, projectId), visibleTo(user.id))),
       blocksOf(db, user.id),
+      viewerHivesOf(db, user.id),
     ])
     if (!project) return c.json(errorBody(languageOf(c), 'not_found'), 404)
     const members = await searchMentionable(
       db,
       q,
-      viewerOf(user.id, project, blocks),
+      viewerOf(user.id, project, blocks, hives),
       project,
       publicApiUrl,
     )

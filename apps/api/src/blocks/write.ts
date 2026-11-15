@@ -63,7 +63,8 @@ export const reachableBy = (viewerId: string, memberId: string) =>
  * 3. la ligne du blocage, « on conflict do nothing » : bloquer deux fois ne change rien ;
  * 4. les abonnements retirés dans les deux sens : Malik ne suit plus Inès ni ses projets, Inès ne
  *    suit plus Malik ni ses projets. Ils ne reviennent pas au déblocage (scénario) ;
- * 5. de même, les inscriptions de testeur de l'un sur les projets de l'autre (R7a).
+ * 5. de même, les inscriptions de testeur de l'un sur les projets de l'autre (R7a) ;
+ * 6. les invitations dans une ruche de l'un à l'autre, dans les deux sens (R10).
  *
  * La date vient de l'horloge de JavaScript (`now`) : elle range la liste « Membres bloqués », et
  * les tests la maîtrisent ainsi.
@@ -123,6 +124,22 @@ export const blockMember = (
         or(
           and(eq(pt.memberId, blockerId), inArray(pt.projectId, projectsOf(blockedId))),
           and(eq(pt.memberId, blockedId), inArray(pt.projectId, projectsOf(blockerId))),
+        ),
+      )
+    // Les invitations dans une ruche entre les deux, dans les deux sens, refusées comprises (R10,
+    // relecture du plan, point 8) : l'invité ne voit plus l'invitation, et la ruche retrouve la
+    // place qu'elle tenait. Celles d'autres membres ne changent pas, même vers une ruche que l'un
+    // des deux anime (elles sont entre d'autres personnes). Chaque branche passe par l'index
+    // hive_invitation_inviter_idx (inviter_id, created_at), lu par son début. Inviter prend le même
+    // verrou de la paire (lockPair) : une invitation envoyée au même moment est effacée ici, ou
+    // voit le blocage et répond 404.
+    const hi = schema.hiveInvitation
+    await tx
+      .delete(hi)
+      .where(
+        or(
+          and(eq(hi.inviterId, blockerId), eq(hi.inviteeId, blockedId)),
+          and(eq(hi.inviterId, blockedId), eq(hi.inviteeId, blockerId)),
         ),
       )
     return true

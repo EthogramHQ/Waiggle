@@ -37,7 +37,14 @@ import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
 import { avatarUrlOf } from '../profile/me'
-import { listedProject, projectVisibleTo } from '../projects/visibility'
+import {
+  inViewerHiveColumn,
+  listedProject,
+  projectVisibleTo,
+  readsHiveSql,
+  reservedProject,
+  sharedWith,
+} from '../projects/visibility'
 import { removalsOf } from '../removals/load'
 
 type Reader = Pick<Database, 'select'>
@@ -56,6 +63,7 @@ export type CommentRow = Pick<
   | 'deletedAt'
   | 'removedAt'
   | 'removalId'
+  | 'hiveId'
 >
 
 // Les colonnes de CommentRow, pour les « select » ci-dessous.
@@ -69,19 +77,37 @@ const rowColumns = {
   deletedAt: c.deletedAt,
   removedAt: c.removedAt,
   removalId: c.removalId,
+  hiveId: c.hiveId,
 }
 
 /**
  * Qui regarde la page, et d'où : le membre, s'il est l'auteur du projet (qui voit les commentaires
  * qu'il a masqués, pour pouvoir les démasquer), si le projet est privé (alors seul son auteur le
  * voit, et il n'y lit que ses propres commentaires), et ses blocages (tranche 7b, `blocksOf` de
- * blocks/visibility.ts : ceux qu'il a posés, ceux qui le visent).
+ * blocks/visibility.ts : ceux qu'il a posés, ceux qui le visent). `hives` (R10, relecture de
+ * sécurité, décision du 15/11/2026) : les ruches dont il est membre aujourd'hui (`viewerHivesOf`),
+ * pour savoir s'il lit un commentaire écrit pour l'une d'elles (`sees`).
  */
 export type Viewer = {
   id: string
   isProjectAuthor: boolean
   projectIsPrivate: boolean
   blocks: Blocks
+  hives: ReadonlySet<string>
+}
+
+/**
+ * Les ruches dont ce membre est membre aujourd'hui, pour le Viewer (R10). Une requête, par l'index
+ * hive_member_user_idx : select hive_id from hive_member where user_id = $membre. Vingt au plus
+ * (la limite des ruches rejointes). Un ancien membre n'a plus de ligne : il perd la lecture des
+ * commentaires de la ruche à l'instant de son départ, sauf les siens.
+ */
+export const viewerHivesOf = async (db: Reader, viewerId: string): Promise<Set<string>> => {
+  const rows = await db
+    .select({ hiveId: schema.hiveMember.hiveId })
+    .from(schema.hiveMember)
+    .where(eq(schema.hiveMember.userId, viewerId))
+  return new Set(rows.map((row) => row.hiveId))
 }
 
 /**
@@ -94,16 +120,30 @@ export type Viewer = {
  * sans bruit les commentaires d'un membre bloqué (relecture de sécurité A3). Une lecture qui n'a
  * vraiment pas à les cacher écrit donc `noBlocks` elle-même, en le disant. `seesSql`, elle, lit
  * les blocages dans la base et ne dépend pas de ce paramètre.
+ *
+ * R10 : un projet réservé à une ruche se lit comme un projet public par les membres actuels de sa
+ * ruche (ils lisent les commentaires de tous, ceux d'un ancien membre compris : « Tes commentaires
+ * restent lisibles par ses membres », scénario « Quitter une ruche »), et comme un projet privé par
+ * tout autre, son auteur hors de la ruche ou un ancien membre venu effacer le sien (décision Q2).
+ * `inViewerHive` le dit, lu en SQL avec le projet (`inViewerHiveColumn`, projects/visibility.ts) ;
+ * obligatoire pour la même raison que `blocks` : l'oublier montrerait ou cacherait sans bruit.
+ * La règle elle-même est `sharedWith`, écrite à côté de sa version SQL.
+ *
+ * `hives` (R10, relecture de sécurité, décision du 15/11/2026) : ses ruches d'aujourd'hui, lues par
+ * `viewerHivesOf`. Obligatoire, pour la même raison encore : sans elles, `sees` ne saurait pas
+ * qu'un commentaire écrit pour une ruche lui reste fermé.
  */
 export const viewerOf = (
   memberId: string,
-  project: { authorId: string; visibility: string; removedAt: Date | null },
+  project: { authorId: string; visibility: string; removedAt: Date | null; inViewerHive: boolean },
   blocks: Blocks,
+  hives: ReadonlySet<string>,
 ): Viewer => ({
   id: memberId,
   isProjectAuthor: project.authorId === memberId,
-  projectIsPrivate: project.visibility !== 'public' || project.removedAt !== null,
+  projectIsPrivate: !sharedWith(project),
   blocks,
+  hives,
 })
 
 /**
@@ -126,9 +166,31 @@ export const blockBetween = (authorId: string, viewer: Viewer) =>
  * 25/10/2026, voir mentions/write.ts) ; il ne sert qu'à la règle 2 des blocages, et une lecture
  * qui ne le connaît pas le laisse vide (faux).
  */
-export type SeenRow = Pick<CommentRow, 'authorId' | 'hiddenAt' | 'removedAt'> & {
+export type SeenRow = Pick<CommentRow, 'authorId' | 'hiddenAt' | 'removedAt' | 'hiveId'> & {
   mentionsViewer?: boolean
 }
+
+/**
+ * La règle de la ruche d'un commentaire (R10, relecture de sécurité, décision du 15/11/2026) : un
+ * commentaire écrit pendant que le projet était réservé à une ruche (`hiveId` posé à l'écriture,
+ * routes/comments.ts) reste lu par les seuls membres actuels de cette ruche et par l'auteur du
+ * projet, même si le projet a depuis été ouvert à tous ou à une autre ruche : ce qui a été dit
+ * entre proches n'est jamais montré, sous leur nom, à un public plus large que celui pour lequel
+ * il a été écrit. Ruche supprimée : plus personne n'en est membre (la colonne n'a pas de clé
+ * étrangère, rien ne la remet à null). Son auteur, lui, lit toujours le sien (`sees` le dit avant).
+ *
+ * Elle s'accorde avec la décision du scénario « Quitter une ruche » (« Tes commentaires restent
+ * lisibles par ses membres ») : celle-ci regarde QUI A ÉCRIT (un ancien membre : ses commentaires
+ * restent lus par la ruche), la règle d'ici regarde QUI LIT (un membre de la ruche du
+ * commentaire). Le commentaire de Léa, partie depuis, reste lu par les membres de Famille, et
+ * jamais par le reste du réseau ; et Léa ne lit plus que les siens.
+ */
+const readsHiveOf = (row: Pick<SeenRow, 'hiveId'>, viewer: Viewer) =>
+  row.hiveId === null || viewer.isProjectAuthor || viewer.hives.has(row.hiveId)
+
+// La même règle en SQL est `readsHiveSql` (projects/visibility.ts, à côté de `inViewerHives` :
+// les notifications la lisent aussi, sans dépendre de ce fichier). Elle dit « hive_id is null or
+// hive_id in (<ses ruches>) » ; l'auteur du projet n'y passe pas (seesSql le traite avant).
 
 /**
  * La règle de visibilité d'un commentaire non supprimé, en un seul endroit (décisions de Louis du
@@ -144,6 +206,9 @@ export type SeenRow = Pick<CommentRow, 'authorId' | 'hiddenAt' | 'removedAt'> & 
  *   écrit chez lui (il garde la modération de son espace : masquer, signaler). Règle 2 : un
  *   commentaire qui le mentionne reste lisible si c'est son auteur qui l'a bloqué (il peut le
  *   signaler), mais pas s'il a lui-même bloqué l'auteur ;
+ * - écrit pendant que le projet était réservé à une ruche (R10, relecture de sécurité, décision
+ *   du 15/11/2026, `readsHiveOf`) : seulement par l'auteur du projet et les membres actuels de
+ *   cette ruche, quelle que soit la visibilité du projet aujourd'hui ;
  * - sur un projet public : tout le monde, sauf s'il est masqué ; un commentaire masqué reste lu
  *   par son auteur et par l'auteur du projet.
  */
@@ -151,6 +216,7 @@ export const sees = (row: SeenRow, viewer: Viewer) => {
   if (row.authorId === null) return false
   if (row.authorId === viewer.id) return true
   if (row.removedAt !== null || viewer.projectIsPrivate) return false
+  if (!readsHiveOf(row, viewer)) return false
   const block = blockBetween(row.authorId, viewer)
   if (block !== null && !viewer.isProjectAuthor) {
     if (block === 'blocked' || row.mentionsViewer !== true) return false
@@ -185,7 +251,7 @@ const blockedByViewerSql = (authorId: Column, viewerId: string) =>
  * retirés (les conditions d'avant les écartent déjà).
  */
 export const seesSql = (
-  table: { id: Column; hiddenAt: Column; authorId: Column; removedAt: Column },
+  table: { id: Column; hiddenAt: Column; authorId: Column; removedAt: Column; hiveId: Column },
   viewer: Viewer,
 ): SQL | undefined => {
   // « author_id = $membre » écarte aussi les lignes sans auteur (null n'est égal à rien).
@@ -200,9 +266,19 @@ export const seesSql = (
     notBlockedWith(viewer.id, table.authorId),
     and(mentionsViewerSql(table.id, viewer.id), not(blockedByViewerSql(table.authorId, viewer.id))),
   )
+  // R10 : un commentaire écrit pour une ruche, seulement s'il en est membre aujourd'hui
+  // (readsHiveSql, la règle de readsHiveOf ; l'auteur du projet est traité plus haut).
   return and(
     isNotNull(table.authorId),
-    or(and(isNull(table.hiddenAt), isNull(table.removedAt), notBlocked), mine),
+    or(
+      and(
+        isNull(table.hiddenAt),
+        isNull(table.removedAt),
+        readsHiveSql(table.hiveId, viewer.id),
+        notBlocked,
+      ),
+      mine,
+    ),
   )
 }
 
@@ -476,6 +552,7 @@ export const loadCommentPage = async (
         deletedAt: reply.deletedAt,
         removedAt: reply.removedAt,
         removalId: reply.removalId,
+        hiveId: reply.hiveId,
       })
       .from(reply)
       .where(and(eq(reply.rootId, c.id), seesSql(reply, viewer)))
@@ -494,6 +571,7 @@ export const loadCommentPage = async (
         deletedAt: shown.deletedAt,
         removedAt: shown.removedAt,
         removalId: shown.removalId,
+        hiveId: shown.hiveId,
       })
       .from(c)
       .crossJoinLateral(shown)
@@ -534,6 +612,7 @@ export const loadCommentPage = async (
         deletedAt: reply.deletedAt,
         removedAt: reply.removedAt,
         removalId: reply.removalId,
+        hiveId: reply.hiveId,
       })
       .from(reply)
       .where(
@@ -654,11 +733,15 @@ export const loadCommentContext = async (
       authorId: schema.project.authorId,
       visibility: schema.project.visibility,
       removedAt: schema.project.removedAt,
+      // R10 : sa ruche est-elle l'une de celles du membre (viewerOf) ? Ses ruches par l'index
+      // hive_member_user_idx, une fois pour la requête.
+      inViewerHive: inViewerHiveColumn(viewerId),
     })
     .from(schema.project)
     .where(and(eq(schema.project.id, target.projectId), projectVisibleTo(viewerId)))
   if (!project) return null
-  const viewer = viewerOf(viewerId, project, await blocksOf(db, viewerId))
+  const [blocks, hives] = await Promise.all([blocksOf(db, viewerId), viewerHivesOf(db, viewerId)])
+  const viewer = viewerOf(viewerId, project, blocks, hives)
   const mentioning = await mentioningViewer(db, [target], viewer)
   if (!sees({ ...target, mentionsViewer: mentioning.has(target.id) }, viewer)) return null
   // Une réponse mène à sa racine ; une racine, à elle-même.
@@ -675,8 +758,14 @@ export const loadCommentContext = async (
  * Le nombre de commentaires que tout le monde voit, pour plusieurs projets, en une requête : les
  * racines et les réponses, sans les masqués, les supprimés, les retirés par la modération (règle 1
  * de la relecture du plan de 7a), ni ceux d'un compte disparu (sans auteur). Le même nombre pour
- * tous, les deux auteurs compris. Sur un projet privé ou retiré, que seul son auteur voit, il ne
+ * tous, les deux auteurs compris, sauf les commentaires écrits pour une ruche (R10, plus bas). Sur
+ * un projet privé ou retiré, que seul son auteur voit, il ne
  * compte que ses propres commentaires : ceux des autres sont cachés à tous (voir `sees`).
+ *
+ * R10 : un projet réservé à une ruche (`reservedProject`) compte comme un projet public. Ce nombre
+ * n'est montré qu'à qui voit déjà le projet (ses membres et son auteur : les listes et la page
+ * passent par `projectVisibleTo` avant de le demander), et tous ceux-là lisent les commentaires de
+ * tous, ceux d'un ancien membre compris (viewerOf) : le nombre est celui qu'ils lisent.
  *
  * En SQL :
  *   select project_comment.project_id, count(*)::int from project_comment
@@ -684,15 +773,26 @@ export const loadCommentContext = async (
  *   where project_comment.project_id in (…) and hidden_at is null and deleted_at is null
  *     and project_comment.removed_at is null and project_comment.author_id is not null
  *     and ((project.visibility = 'public' and project.removed_at is null)
+ *       or (project.visibility = 'hive' and project.removed_at is null)
  *       or project_comment.author_id = project.author_id)
  *   group by project_comment.project_id
  * La jointure (« inner join ») met à côté de chaque commentaire la ligne de son projet, trouvée
  * par la clé primaire de project, pour lire sa visibilité et son auteur. L'index
  * project_comment_project_idx donne les commentaires de chaque projet de la liste.
+ *
+ * R10, relecture de sécurité (décision du 15/11/2026) : un commentaire écrit pour une ruche ne
+ * compte que pour qui le lit (`readsHiveOf`) : l'auteur du projet, les membres actuels de cette
+ * ruche, et son propre auteur. Le nombre dépend donc maintenant du lecteur `viewerId`. En SQL, une
+ * condition de plus :
+ *   and (project_comment.hive_id is null or project.author_id = $moi
+ *        or project_comment.author_id = $moi or project_comment.hive_id in (<ses ruches>))
+ * Ses ruches : une sous-requête calculée une fois (index hive_member_user_idx). L'index lu reste
+ * project_comment_project_idx.
  */
 export const commentCountsOf = async (
   db: Reader,
   projectIds: string[],
+  viewerId: string,
 ): Promise<Map<string, number>> => {
   if (projectIds.length === 0) return new Map()
   const p = schema.project
@@ -707,7 +807,8 @@ export const commentCountsOf = async (
         isNull(c.deletedAt),
         isNull(c.removedAt),
         isNotNull(c.authorId),
-        or(listedProject(), eq(c.authorId, p.authorId)),
+        or(listedProject(), reservedProject(), eq(c.authorId, p.authorId)),
+        or(eq(p.authorId, viewerId), eq(c.authorId, viewerId), readsHiveSql(c.hiveId, viewerId)),
       ),
     )
     .groupBy(c.projectId)
