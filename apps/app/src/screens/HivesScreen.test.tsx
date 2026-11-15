@@ -62,14 +62,19 @@ beforeEach(() => {
 const ACCEPT = new RegExp(`^/v1/hive-invitations/${invitationId}/accept$`)
 const REFUSE = new RegExp(`^/v1/hive-invitations/${invitationId}$`)
 
-/** Ouvre l'onglet et attend la fin du chargement (la phrase des ruches). */
+/**
+ * Ouvre l'onglet et attend la fin du chargement : « Mes ruches », les invitations ou l'état vide.
+ * R11 (« Moins de mots ») : la phrase des ruches ne reste que sous l'état vide.
+ */
 const openTab = async () => {
   const view = await renderWithProviders(
     <ToastProvider>
       <HivesScreen />
     </ToastProvider>,
   )
-  await waitFor(() => expect(shown(T.intro)).toBe(true))
+  await waitFor(() =>
+    expect(shown(T.mine) || shown(T.invitationsTitle) || shown(T.emptyTitle)).toBe(true),
+  )
   return view
 }
 
@@ -86,11 +91,12 @@ const refuseButton = () => screen.getByRole('button', { name: refuseNamed(nora.n
 // --- Mes ruches ---
 
 describe('my hives', () => {
-  it('shows « Mes ruches » with the sentence that explains hives, never the coming-soon page', async () => {
+  it('shows « Mes ruches » with no sentence under the title, never the coming-soon page', async () => {
     await openTab()
 
     expect(shown(T.mine)).toBe(true)
-    expect(shown(T.intro)).toBe(true)
+    // R11 (« Moins de mots ») : plus de sous-titre sous « Ruches » quand le membre en a.
+    expect(shown(T.intro)).toBe(false)
     // « Les ruches arrivent bientôt » a disparu : aucun état « bientôt » ni mascotte qui fait coucou
     // quand on a des ruches.
     expect(

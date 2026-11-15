@@ -119,10 +119,16 @@ const openQuit = async () => {
 // --- Le haut ---
 
 describe('the top of a hive page', () => {
-  it('says « Ma ruche » then « Famille », « 4 membres » and offers « Inviter »', async () => {
+  it('reads « Ruche Famille » without « Ma ruche », « 4 membres » and offers « Inviter »', async () => {
     await openHive()
 
-    expect(shown(fr.t(($) => $.hives.myHive)) || shown(myHiveNamed('Famille'))).toBe(true)
+    // R11 (« Moins de mots », U4) : « Ma ruche » quitte l'écran ; le nom lu devient « Ruche Famille ».
+    // Le texte est écrit en clair : sa clé disparaîtra avec lui.
+    expect(screen.queryByText('Ma ruche')).toBeNull()
+    expect(shown(myHiveNamed('Famille'))).toBe(true)
+    expect(myHiveNamed('Famille')).toBe('Ruche Famille')
+    // Ni la phrase du récap du dimanche (colonne de droite d'ordinateur).
+    expect(shown(T.desktopNote)).toBe(false)
     expect(shown('Famille')).toBe(true)
     expect(shown(membersText(4))).toBe(true)
     expect(getControl(T.invite)).not.toBeDisabled()
@@ -304,12 +310,15 @@ describe('the members tab', () => {
     await waitFor(() => expect(shown(odile.name)).toBe(true))
   }
 
-  it('lists the members with « Animateur » and « toi », the phrase of the animator and « Inviter un proche »', async () => {
+  it('lists the members with « Animateur » and without « toi », the phrase of the animator and « Inviter un proche »', async () => {
     await openMembers()
 
     expect(shown(papiJean.name)).toBe(true)
     expect(shown(fr.t(($) => $.hives.page.animator))).toBe(true)
-    expect(shown(fr.t(($) => $.hives.page.you))).toBe(true)
+    // R11 (« Moins de mots ») : la ligne du membre se reconnaît à son nom et sa photo ; « toi » et
+    // « @pseudo · toi » quittent l'écran (textes en clair : leurs clés disparaîtront avec eux).
+    expect(screen.queryByText('toi')).toBeNull()
+    expect(screen.queryByText(/·\s*toi$/)).toBeNull()
     expect(shown(T.membersPhrase)).toBe(true)
     expect(getControl(T.inviteOne)).toBeTruthy()
   })

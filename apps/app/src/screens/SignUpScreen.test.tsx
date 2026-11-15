@@ -86,7 +86,9 @@ describe('SignUpScreen', () => {
     expect(screen.getByLabelText('Encore 2 caractères')).toBeTruthy()
 
     await fireEvent.changeText(screen.getByLabelText('Mot de passe'), 'abeilles-dor')
-    expect(screen.getByLabelText('C’est bon, ton mot de passe est assez long.')).toBeTruthy()
+    // R11 (U4) : la phrase quitte l'écran mais reste le nom lu de la jauge pleine.
+    expect(screen.getByLabelText('Mot de passe assez long')).toBeTruthy()
+    expect(screen.queryByText('C’est bon, ton mot de passe est assez long.')).toBeNull()
   })
 
   it('shows the password on request, then hides it again', async () => {
@@ -176,11 +178,12 @@ describe('SignUpScreen', () => {
 // --- Tranche R2 : les textes de la maquette, la langue, le code source, les champs incomplets ---
 
 describe('the sign-up page after the redesign (R2)', () => {
-  it('is titled « Créer ton compte », with its subtitle, and the button says « Créer mon compte »', async () => {
+  it('is titled « Créer ton compte », without a subtitle, and the button says « Créer mon compte »', async () => {
     await renderWithI18n(<SignUpScreen />)
 
     expect(screen.getByRole('header', { name: fr.t(($) => $.auth.signUp.title) })).toBeTruthy()
-    expect(screen.getByText(fr.t(($) => $.auth.signUp.subtitle))).toBeTruthy()
+    // R11 (« Moins de mots ») : écrit en clair, sa clé disparaîtra.
+    expect(screen.queryByText('Tes proches te reconnaîtront à ton nom affiché.')).toBeNull()
     expect(screen.getByRole('button', { name: submitLabel })).toBeTruthy()
   })
 
