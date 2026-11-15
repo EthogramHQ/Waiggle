@@ -2,7 +2,7 @@
 // (relecture juridique du plan, jur-11 : chaque entrée d'aujourd'hui se retrouve, avec son aide).
 // Le titre de la rubrique n'est pas ici : c'est celui de la page sur téléphone (« Langue »), celui
 // de la colonne de droite sur ordinateur (SettingsScreen).
-import { contactEmail, sourceUrl } from '@ruche/brand'
+import { contactEmail } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { supportedLanguages } from '@ruche/i18n'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -11,12 +11,12 @@ import { useTranslation } from 'react-i18next'
 import { Linking, Platform } from 'react-native'
 import { downloadMyData } from '../../accounts/api'
 import { useSetHideFromSuggestions } from '../../hives/api'
-import { useOpenOutside } from '../../navigation/links'
 import { firstParam } from '../../navigation/params'
 import { useMe } from '../../profile/hooks'
 import { useChooseLanguage } from '../../profile/useChooseLanguage'
 import { type Focusable, focusWithoutScroll } from '../../ui/focus'
 import type { IconName } from '../../ui/Icon'
+import { LegalLinks } from '../../ui/LegalLinks'
 import { ListGroup, ListRow, type PressEvent } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { Stack } from '../../ui/Stack'
@@ -125,6 +125,7 @@ function AppearanceSection() {
 
 function DataSection() {
   const { t } = useTranslation()
+  const go = useGo()
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [exporting, setExporting] = useState(false)
   const onExport = async () => {
@@ -139,8 +140,22 @@ function DataSection() {
   }
   return (
     <Stack gap="lg">
-      <HideFromSuggestions />
       <ListGroup>
+        {/* R11 : ce que le membre a écrit et pourrait vouloir relire ou retirer, puis l'export. */}
+        <ListRow
+          label={t(($) => $.account.data.comments)}
+          icon="chat-circle"
+          trailing="chevron"
+          href="/settings/data/comments"
+          onPress={go('/settings/data/comments')}
+        />
+        <ListRow
+          label={t(($) => $.account.data.feedback)}
+          icon="chat-circle-dots"
+          trailing="chevron"
+          href="/settings/data/feedback"
+          onPress={go('/settings/data/feedback')}
+        />
         <ListRow
           label={t(($) => $.account.export.button)}
           icon="download-simple"
@@ -150,11 +165,12 @@ function DataSection() {
         />
       </ListGroup>
       {message ? <Notice tone={message.ok ? 'success' : 'error'} message={message.text} /> : null}
+      <HideFromSuggestions />
     </Stack>
   )
 }
 
-// R10 : « Ne pas me proposer aux autres », rangé sous « Ce que les autres voient ». L'interrupteur
+// R10 : « Ne pas me proposer aux autres » (R11 : sans sous-titre au-dessus). L'interrupteur
 // se lit sur le profil (GET /v1/me) ; le toucher le change tout de suite, et `set` le remet à la
 // valeur du serveur si l'enregistrement échoue (un message le dit alors, sous le groupe).
 function HideFromSuggestions() {
@@ -164,7 +180,7 @@ function HideFromSuggestions() {
   const [failed, setFailed] = useState(false)
   return (
     <Stack gap="sm">
-      <ListGroup title={t(($) => $.account.data.othersSee)}>
+      <ListGroup>
         <Switch
           inGroup
           label={t(($) => $.hives.hideFromSuggestions)}
@@ -305,24 +321,10 @@ function AccountSection({ email }: { email: string }) {
   )
 }
 
-// Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs : un
-// logiciel libre doit pouvoir être consulté par ceux qui l'utilisent (AGPL, article 13). Le lien
-// passe par la page « Tu quittes… », et les lecteurs d'écran entendent qu'il ouvre un site externe.
+// Les quatre pages publiques (Règles, Confidentialité, Mentions légales, Accessibilité), puis le
+// code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs : un
+// logiciel libre doit pouvoir être consulté par ceux qui l'utilisent (AGPL, article 13). Tout est
+// dans `LegalLinks` ; le code source passe par la page « Tu quittes… ».
 function AboutSection() {
-  const { t } = useTranslation()
-  const openOutside = useOpenOutside()
-  return (
-    <ListGroup footer={t(($) => $.home.openSource)}>
-      <ListRow
-        label={t(($) => $.home.seeCode)}
-        hint={t(($) => $.common.externalSite)}
-        trailing="arrow-up-right"
-        href={`/out?url=${encodeURIComponent(sourceUrl)}`}
-        onPress={(event) => {
-          if (Platform.OS === 'web') event?.preventDefault?.()
-          openOutside(sourceUrl)
-        }}
-      />
-    </ListGroup>
-  )
+  return <LegalLinks variant="rows" />
 }

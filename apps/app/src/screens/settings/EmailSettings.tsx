@@ -29,8 +29,14 @@ import { StatusPill } from '../../ui/StatusPill'
 import { Switch } from '../../ui/Switch'
 import { Text } from '../../ui/Text'
 
-/** Les sept types, dans l'ordre de la planche (celui du contrat) ; « Ruches » (R10) en dernier. */
-const TYPES: readonly EmailType[] = [
+/**
+ * Une ligne de choix : l'un des sept types d'e-mail, ou « Découvertes » (R11), qui n'est pas un
+ * e-mail à part mais deux parties du récap (jamais « Tout de suite »).
+ */
+type Setting = EmailType | 'discoveries'
+
+/** Les lignes, dans l'ordre de la planche ; « Ruches » (R10), puis « Découvertes » (R11) en dernier. */
+const TYPES: readonly Setting[] = [
   'reactions',
   'comments',
   'replies',
@@ -38,10 +44,11 @@ const TYPES: readonly EmailType[] = [
   'updates',
   'testers',
   'hives',
+  'discoveries',
 ]
 
 /** Les types où « Tout de suite » se propose ; les autres n'ont que le récap ou rien. */
-const offersNow = (type: EmailType) => (INSTANT_EMAIL_TYPES as readonly EmailType[]).includes(type)
+const offersNow = (type: Setting) => (INSTANT_EMAIL_TYPES as readonly Setting[]).includes(type)
 
 export function EmailSettings() {
   const { t } = useTranslation()
@@ -52,7 +59,7 @@ export function EmailSettings() {
 
   // Le type dont les choix sont ouverts : un seul à la fois (null : aucun). Le choisir garde la
   // ligne ouverte, pour voir ce qu'on vient de cocher.
-  const [open, setOpen] = useState<EmailType | null>(null)
+  const [open, setOpen] = useState<Setting | null>(null)
 
   // « Réessayer » a marché : la ligne qui portait le bouton disparaît, et le focus du clavier, qui
   // était dessus, irait tout en haut de la page. On le pose sur la première ligne de choix, dès
@@ -127,7 +134,7 @@ export function EmailSettings() {
     <Notice message={t(($) => $.notificationSettings.saveError)} />
   ) : null
 
-  const choicesOf = (type: EmailType): ChoiceRowChoice<EmailChoice>[] => [
+  const choicesOf = (type: Setting): ChoiceRowChoice<EmailChoice>[] => [
     ...(offersNow(type)
       ? [{ value: 'now' as const, label: t(($) => $.notificationSettings.choices.now) }]
       : []),
@@ -200,7 +207,7 @@ export function EmailSettings() {
   // « Tout de suite » ne le proposent pas : `now` ne peut leur arriver que d'un bug, écarté ici
   // plutôt que refusé par l'API (400). Après ce garde, `{ [type]: choice }` est bien l'un des
   // corps permis ; TypeScript ne sait pas relier une clé calculée à son type, d'où la conversion.
-  const choose = (type: EmailType, choice: EmailChoice) => {
+  const choose = (type: Setting, choice: EmailChoice) => {
     if (!data || data[type] === choice) return
     if (choice === 'now' && !offersNow(type)) return
     save.update({ [type]: choice } as EmailPreferencesPatch)
