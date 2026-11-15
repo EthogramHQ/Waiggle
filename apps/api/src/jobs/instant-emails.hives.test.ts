@@ -184,6 +184,27 @@ describe('the invitation e-mail', () => {
     expect(hrefsOf(email.html)).toContain(`${TEST_APP_URL}/hives`)
   })
 
+  // R10, relecture juridique (C1) : l'e-mail disait que « ses membres » se lisent avant d'accepter.
+  // La carte de l'invitation (ui/HiveInvitation, contrat HiveInvitation) ne montre que le nom de la
+  // ruche, son icône, qui invite et le nombre de membres : jamais la liste des membres.
+  it('describes in the invitation e-mail only what the invitee can read before accepting', async () => {
+    await inviteMax()
+    later(16 * MINUTE)
+
+    await runInstant()
+
+    const email = onlyInstantTo(maxAccount.email)
+    const explainFr = fill(fr.instant.hiveInvitedExplain)
+    const explainEn = fill(en.instant.hiveInvitedExplain)
+    expect(email.text).toContain(explainFr)
+    expect(explainFr).toMatch(/son icône/)
+    expect(explainFr).toMatch(/nombre de membres/)
+    expect(explainFr).not.toMatch(/ses membres se lisent/)
+    expect(explainEn).toMatch(/its icon/)
+    expect(explainEn).toMatch(/how many members/)
+    expect(explainEn).not.toMatch(/members can be read/)
+  })
+
   it('never writes the hive name in the e-mail, nor a link to a member', async () => {
     // Un nom qui porte aussi une adresse : ni l'un ni l'autre ne sort.
     await inviteMax('Famille Zébulon sur zebre-pirate.example')

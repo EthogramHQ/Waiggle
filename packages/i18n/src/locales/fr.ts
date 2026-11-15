@@ -320,7 +320,7 @@ export const fr = {
       // R10 (relecture du plan, juridique C5) : les ruches, ce qui part et ce qui reste.
       hivesItem: 'Tes ruches',
       hivesDetail:
-        'Tu quittes chacune de tes ruches. Si tu animes une ruche, l’animation passe à son membre le plus ancien ; si tu en es le dernier membre, elle est supprimée. Tes invitations partent aussi.',
+        'Tu quittes chacune de tes ruches. Si tu animes une ruche, l’animation passe à son membre le plus ancien ; si tu en es le dernier membre, elle est supprimée. Les invitations que tu as reçues partent aussi.',
       remains: {
         title: 'Ce qui reste',
         hiveNames:
@@ -330,6 +330,8 @@ export const fr = {
         // Tranche 7b (relecture juridique, J11) : au conditionnel, l'écran s'affiche pour tous.
         reportCopies:
           'Si tes contenus ou ton profil ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
+        // R10, relecture juridique (C4) : une invitation envoyée garde sa ruche, sans inviteur.
+        hiveInvitations: 'Les invitations que tu as envoyées restent valables, sans ton nom',
       },
     },
   },
@@ -2757,7 +2759,7 @@ export const fr = {
       // R10 : jamais le nom de la ruche, écrit par un membre (choix 7 du scénario).
       hiveInvited: '{{name}} (@{{handle}}) t’invite dans une ruche sur {{appName}}.',
       hiveInvitedExplain:
-        'Une ruche, c’est un groupe de proches. Son nom et ses membres se lisent dans l’appli, avant que tu acceptes ou refuses.',
+        'Une ruche, c’est un groupe de proches. Avant d’accepter ou de refuser, tu vois dans l’appli son nom, son icône et son nombre de membres ; ses membres et ses projets, seulement si tu la rejoins.',
       openHives: 'Voir l’invitation',
       private: 'Le fil du coin des testeurs est privé : son texte reste dans l’appli.',
       callPrivate: 'L’appel reste dans le coin des testeurs : son texte ne sort pas de l’appli.',
@@ -3132,6 +3134,14 @@ export const fr = {
         'Aucun e‑mail pour tes notifications ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches.',
       nowFriends:
         '{{types}} tout de suite ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches.',
+      // R10, relecture juridique (C3) : « Dans tes ruches » part dans le récap dès que « Ruches »
+      // n'est pas à « Jamais », même à « Tout de suite », qui ne vaut que pour les invitations.
+      nowFriendsHives:
+        '{{types}} tout de suite ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches et les nouveautés de tes ruches.',
+      hivesNow:
+        'Pour les ruches, « Tout de suite » ne vaut que pour les invitations : leurs nouveautés vont dans le récap du dimanche.',
+      hivesNowRecapOff:
+        'Pour les ruches, « Tout de suite » ne vaut que pour les invitations : le récap coupé, leurs nouveautés ne partent pas par e‑mail.',
       types: {
         reactions: 'les réactions',
         comments: 'les commentaires sur tes projets',
