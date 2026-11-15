@@ -432,8 +432,7 @@ describe('EmailSettings, the recap', () => {
     await screen.findByRole('button', { name: rowName('comments', 'digest') })
     await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5))
     // Les cinq types « Dans le récap » (réactions, commentaires, abonnés, testeurs, et les ruches que
-    // Léa y a mises) gardent leur
-    // choix ; « Tout de suite » et « Jamais » n'ont pas la phrase.
+    // Léa y a mises) gardent leur choix ; « Tout de suite » et « Jamais » n'ont pas la phrase.
     expect(screen.getByRole('button', { name: rowName('reactions', 'digest') })).toBeTruthy()
     expect(screen.getByRole('button', { name: rowName('testers', 'digest') })).toBeTruthy()
     expect(row('replies').props.accessibilityHint ?? null).toBeNull()
