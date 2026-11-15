@@ -777,13 +777,22 @@ function FeedInvitations({ invitations }: { invitations: readonly Invitation[] }
     const key = errorKey(error)
     return INVITATION_ERRORS.has(key) ? t(($) => $.errors[key]) : fallback
   }
+  // Une seule action miel par écran (R10) : « Rejoindre » en miel sur la première carte qui a encore
+  // ses boutons, en blanc sur les autres.
+  const firstOpen = shown.findIndex((one) => !refused.has(one.id))
   return (
     <Stack gap="md" align="stretch">
-      {shown.map((invitation) => (
+      {shown.map((invitation, index) => (
         <Stack key={invitation.id} gap="sm" align="stretch">
           <HiveInvitation
             invitation={invitation}
             refused={refused.has(invitation.id)}
+            primary={index === firstOpen}
+            // Relecture de l'interface de R10 (point 1) : signaler la ruche depuis le Fil aussi,
+            // comme depuis l'onglet Ruches (la carte refusée n'a plus de « … »).
+            onReport={() =>
+              router.push({ pathname: '/report', params: { kind: 'hive', id: invitation.hive.id } })
+            }
             onAccept={async () => {
               setFailure(null)
               try {

@@ -358,6 +358,9 @@ function HivesView({ mine }: { mine: MyHives }) {
                     })
                   }
                   refused={Boolean(refused[invitation.id])}
+                  // Une seule action miel par écran (R10) : « Rejoindre » en miel sur la première
+                  // carte qui a encore ses boutons, en blanc sur les autres.
+                  primary={index === invitations.findIndex((one) => !refused[one.id])}
                 />
                 {failure?.id === invitation.id ? (
                   // La ref sur un cadre, pas sur `Notice` : une `Notice` à ref attend le focus et

@@ -4,21 +4,30 @@
 //   attend ses ruches (son squelette), puis se montre avec ses pastilles ; une lecture ratée ne le
 //   retient pas ;
 // - sur ordinateur, la colonne de droite attend aussi : « Tes ruches » ne pousse plus les proches
-//   à suivre vers le bas en arrivant.
+//   à suivre vers le bas en arrivant ;
+// - au premier lancement, une invitation du Fil se signale comme depuis l'onglet Ruches, et une
+//   seule carte a « Rejoindre » en miel (une seule action miel par écran).
 //
 // Le faux serveur est celui de Hives.testkit.tsx, branché sur `fetch` : les vrais hooks de
 // `feed/api.ts` et de `hives/api.ts` tournent, comme dans HomeScreen.hives.test.tsx.
+import { palettes } from '@ruche/brand'
 import type { FeedItem, FollowingFeedPage, ProjectSummary } from '@ruche/contracts'
-import { act, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import { ToastProvider } from '../ui/theme/toast'
 import {
+  acceptNamed,
+  atelierId,
   biscotte,
   heldReply,
   hiveId,
   hiveServer,
   hoursAgo,
+  invitation,
+  invitationMore,
+  invitationReport,
   lea,
   memo,
   myHives,
@@ -141,6 +150,10 @@ const TEXT = {
   suggestionsSide: fr.t(($) => $.feed.side.suggestions),
 }
 
+/** La règle « une seule action miel », pas la couleur d'une variante. */
+const honey = (element: ReturnType<typeof screen.getByRole>) =>
+  StyleSheet.flatten(element.props.style)?.backgroundColor === palettes.day.honey
+
 const renderHome = () =>
   renderWithProviders(
     <ToastProvider>
@@ -155,6 +168,47 @@ const feedRead = () =>
       hiveServer.received('GET', FOLLOWING).filter((one) => !one.query.get('hive')).length,
     ).toBeGreaterThan(0),
   )
+
+describe('the invitations of the first run (R10, review)', () => {
+  it('reports the hive from the invitation of the feed, as from the Hives tab', async () => {
+    all = { ...all, items: [], followsAnyone: false }
+    await renderHome()
+
+    await fireEvent.press(await screen.findByRole('button', { name: invitationMore('Atelier IA') }))
+    await fireEvent.press(
+      await screen.findByRole('menuitem', { name: invitationReport('Atelier IA') }),
+    )
+
+    const report = mockRoute.calls.find(
+      ({ href }) => (href as { pathname?: string }).pathname === '/report',
+    )
+    expect(report?.href).toEqual({
+      pathname: '/report',
+      params: { kind: 'hive', id: atelierId },
+    })
+  })
+
+  it('has one « Rejoindre » in honey when two invitations are shown', async () => {
+    all = { ...all, items: [], followsAnyone: false }
+    hiveServer.mine = {
+      ...myHives,
+      invitations: [
+        invitation,
+        {
+          ...invitation,
+          id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c99',
+          hive: { ...invitation.hive, id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c98', name: 'Voisins' },
+        },
+      ],
+    }
+    await renderHome()
+
+    const first = await screen.findByRole('button', { name: acceptNamed('Atelier IA') })
+    const second = screen.getByRole('button', { name: acceptNamed('Voisins') })
+    expect(honey(first)).toBe(true)
+    expect(honey(second)).toBe(false)
+  })
+})
 
 describe('the hives read after the feed (R10, review)', () => {
   it('shows the skeleton of the feed until the hives are read, then the cards under the pills', async () => {

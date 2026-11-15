@@ -14,7 +14,10 @@
 //   promesses et ses boutons dessinés mais inertes (ni rôle, ni geste, ni focus : `Button drawing`),
 //   sans « … », avec « Refuser ne prévient personne. » dessous, comme sur la carte reçue.
 // - Refusée (`refused`) : elle reste à sa place, « Invitation refusée. » au lieu des boutons,
-//   jusqu'au prochain passage sur la page ; le focus, qui était sur « Refuser », va au message.
+//   jusqu'au prochain passage sur la page ; le focus, qui était sur « Refuser », va au message. Elle
+//   n'a plus de « … » : on ne signale plus une ruche dont on a refusé l'invitation (l'API non plus).
+// - Une seule action miel par écran : `primary={false}` met « Rejoindre » en blanc (toutes les
+//   invitations après la première).
 //
 // Une seule écriture à la fois : deux tapes rapides (ou « Rejoindre » puis « Refuser ») ne lancent
 // qu'une promesse. La garde est un `ref`, lu et posé au toucher : un état React ne serait à jour
@@ -47,8 +50,14 @@ type Props = {
   onReport?: () => void
   /** received (par défaut) : l'invitation reçue ; preview : l'aperçu, inerte. */
   mode?: 'received' | 'preview'
-  /** Refusée : « Invitation refusée. » à la place des boutons. */
+  /** Refusée : « Invitation refusée. » à la place des boutons, et plus de « … ». */
   refused?: boolean
+  /**
+   * « Rejoindre la ruche » en miel (vrai par défaut). Une seule action miel par écran (règle du
+   * design, notée au plan de R10) : quand l'écran montre plusieurs invitations, seule la première
+   * l'a ; les autres ont « Rejoindre » en blanc, comme « Refuser ».
+   */
+  primary?: boolean
 }
 
 /** Cache une vue et ce qu'elle contient aux lecteurs d'écran : web, iOS et Android. */
@@ -86,6 +95,7 @@ export function HiveInvitation({
   onReport,
   mode = 'received',
   refused = false,
+  primary = true,
 }: Props) {
   const { t } = useTranslation()
   // « de Nora Benali », « d’Inès » : le nom relié au texte selon la langue (`{{nameOf}}`).
@@ -154,7 +164,10 @@ export function HiveInvitation({
               {when}
             </Text>
           </View>
-          {!preview && onReport ? (
+          {/* Pas sur une carte refusée (relecture de l'interface de R10, point 1) : l'API répond à
+              l'invité qui a refusé comme pour une ruche inconnue, et « Signaler » menait à une
+              feuille « introuvable », un cul-de-sac. */}
+          {!preview && !refused && onReport ? (
             // Le menu dépasse un peu dans la marge de la carte : son icône s'aligne sur le texte,
             // sa zone garde ses 44 points.
             <View style={{ flexShrink: 0, marginTop: -space.sm, marginRight: -space.sm }}>
@@ -199,6 +212,7 @@ export function HiveInvitation({
               <Button
                 label={t(($) => $.hives.invitations.accept)}
                 spokenLabel={t(($) => $.hives.invitations.acceptNamed, { hive: hiveInline })}
+                variant={primary ? 'primary' : 'secondary'}
                 onPress={preview ? inert : () => run('accept', onAccept)}
                 loading={running === 'accept'}
                 drawing={preview}
