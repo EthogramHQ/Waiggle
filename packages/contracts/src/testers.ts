@@ -359,7 +359,9 @@ export const MyTesterMessage = z
     outcome: FeedbackOutcome.nullable(),
     device: FeedbackDevice.nullable(),
     createdAt: z.iso.datetime(),
-    media: z.object({ url: z.url() }).nullable(),
+    // La même forme que dans le coin des testeurs (largeur, hauteur, aperçu flou) : l'écran
+    // « Mes retours envoyés » la dessine sans attendre l'image. null : pas de capture, ou retirée.
+    media: TesterMedia.nullable(),
     removed: z.boolean(),
   })
   .meta({ id: 'MyTesterMessage' })
