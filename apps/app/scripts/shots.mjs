@@ -4284,9 +4284,11 @@ const pages = [
     signedIn: true,
     hives: 'animator',
     prepare: async (page) => {
+      // Le « … » de la tuile du Plan de table (celui de la ruche, en haut, a un autre nom).
       await page
-        .getByRole('button', { name: /^Plus d’options pour / })
-        .first()
+        .getByRole('button', {
+          name: fr.hives.page.projectMenu.replace('{{title}}', 'Le plan de table'),
+        })
         .click()
       await page.getByRole('menuitem').first().waitFor()
     },
