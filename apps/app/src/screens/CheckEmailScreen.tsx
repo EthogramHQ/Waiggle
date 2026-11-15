@@ -198,7 +198,6 @@ export function CheckEmailScreen() {
                 : t(($) => $.auth.checkEmail.body, { email })
               : t(($) => $.auth.checkEmail.bodyNoEmail)}
           </Text>
-          <Notice tone="info" message={t(($) => $.auth.checkEmail.locked)} />
           {/* La purge de nuit efface une inscription jamais vérifiée (tranche 6c) : on le dit. */}
           <Text variant="callout" tone="muted">
             {t(($) => $.auth.checkEmail.expires, { days: UNVERIFIED_ACCOUNT_DAYS })}

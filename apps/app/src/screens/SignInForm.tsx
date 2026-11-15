@@ -106,12 +106,9 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
 
   return (
     <>
-      <Stack gap="sm">
-        <Text variant="title2" heading={1}>
-          {t(($) => $.auth.signIn.title)}
-        </Text>
-        <Text tone="secondary">{t(($) => $.auth.signIn.subtitle)}</Text>
-      </Stack>
+      <Text variant="title2" heading={1}>
+        {t(($) => $.auth.signIn.title)}
+      </Text>
       {passwordChanged && !error ? (
         // Une confirmation, lue sans couper le lecteur d'écran (role « status »).
         <Notice tone="success" polite message={t(($) => $.auth.signIn.passwordChanged)} />
