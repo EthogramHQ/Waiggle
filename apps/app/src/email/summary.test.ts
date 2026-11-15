@@ -30,6 +30,8 @@ const allTypes = (choice: 'digest' | 'never', weeklyRecap = true): EmailPreferen
   updates: choice,
   testers: choice,
   hives: choice,
+  // R11 : « Découvertes », le réglage par défaut (le contrat l'exige ; ces tests n'en parlent pas).
+  discoveries: 'digest',
 })
 
 /** Les réglages de R8 : tous les types dans le récap (R10 : « Ruches » vaut « tout de suite » par

@@ -2190,7 +2190,9 @@ const fakeApi = (
   const reactions = structuredClone(reactionsOf)
   const added = {}
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
-  // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
+  // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API. R11 : `leaMe` porte
+  // l'accord des règles en vigueur (`rulesAccepted: true`, `rulesChanges: []`), et ses réglages
+  // d'e-mail (testing/email.ts) « Découvertes » dans le récap : chaque capture part de là.
   let me = structuredClone({
     ...leaMe,
     isAdmin: admin,

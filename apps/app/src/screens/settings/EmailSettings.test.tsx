@@ -84,6 +84,8 @@ const leaChoices: EmailPreferences = {
   testers: 'digest',
   // R10 : « Ruches » (Tout de suite par défaut) mis au récap, pour garder ce que ces tests vérifient.
   hives: 'digest',
+  // R11 : « Découvertes », le réglage par défaut (le contrat l'exige ; ces tests n'en parlent pas).
+  discoveries: 'digest',
 }
 
 const emailPath = '/v1/me/email-preferences'

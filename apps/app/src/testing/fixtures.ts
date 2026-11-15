@@ -19,6 +19,10 @@ export const leaMe: Me = {
   suspension: null,
   // Provisoire (R9) : la tranche « retrait d’une partie » remplira ce champ, avec ses tests.
   provisional: { name: false, handle: false },
+  // R11 : Léa a accepté la version des règles en vigueur ; rien n'a changé depuis (« Ce qui
+  // change » vide). Un membre dont l'accord manque se fabrique en écrasant `rulesAccepted`.
+  rulesAccepted: true,
+  rulesChanges: [],
 }
 
 /** Louis, administrateur (tranche 7a) : il voit « Modération » dans Mon compte. */
