@@ -2,15 +2,25 @@
 // et le hook qui le fait. L'API répond par le profil à jour (`rulesAccepted: true`) : on le pose
 // dans le cache du profil, et tout ce qui lit `useMe()` (la garde des règles, la feuille du pseudo)
 // se redessine sans nouvelle lecture.
-import { Me } from '@ruche/contracts'
+import { type AcceptRules, Me, RULES_VERSION } from '@ruche/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 import { request } from '../api/client'
 import { ApiError } from '../api/errors'
 
-/** Enregistre l'accord (POST /v1/me/rules, sans corps). Lève une `ApiError` en cas de refus. */
+/**
+ * Enregistre l'accord (POST /v1/me/rules). Le corps redit ce que le membre a coché : la version
+ * des règles qu'il a lue et ses deux accords (règles, âge) ; l'API refuse une autre version, ce qui
+ * protège d'un onglet resté ouvert sur d'anciennes règles. L'écran n'appelle ce geste qu'une fois
+ * les deux cases cochées. Lève une `ApiError` en cas de refus.
+ */
 export const acceptRules = async (): Promise<Me> => {
-  const result = await request('/v1/me/rules', { method: 'POST' }, Me)
+  const body: AcceptRules = { version: RULES_VERSION, acceptRules: true, ageDeclared: true }
+  const result = await request(
+    '/v1/me/rules',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    Me,
+  )
   if (!result.ok) throw new ApiError(result.error)
   return result.data
 }
