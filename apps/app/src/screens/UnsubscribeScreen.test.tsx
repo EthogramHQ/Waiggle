@@ -587,14 +587,16 @@ describe('UnsubscribeScreen, from an e-mail sent at once (R8)', () => {
     expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
   })
 
-  it('offers no choice on the recap and mention links, as before R8', async () => {
-    await open({ token: recapToken })
-    expect(screen.getByText('Ne plus recevoir le récap de la semaine ?')).toBeTruthy() // témoin
+  // R11 : le lien du récap propose désormais « Couper les découvertes »
+  // (UnsubscribeScreen.discoveries.test.tsx) ; celui des mentions reste sans choix.
+  it('offers no choice on the mention links, as before R8', async () => {
+    await open({ token: mentionsToken })
+    expect(screen.getByText(fr.t(($) => $.unsubscribe.askMentions))).toBeTruthy() // témoin
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
 
     await confirm()
 
-    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([recapToken, undefined])
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([mentionsToken, undefined])
   })
 })
 
