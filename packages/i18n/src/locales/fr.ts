@@ -1863,14 +1863,10 @@ export const fr = {
     // R6b : les liens vers les pages du catalogue, sous les onglets de la Modération.
     catalogueLinksLabel: 'Le catalogue',
     toolsLink: 'Outils',
-    toolsLinkHint: 'Les autres outils à vérifier, et le catalogue',
     categoriesLink: 'Catégories',
-    categoriesLinkHint: 'Les projets à ranger, et les catégories',
     // R6b : la page « Outils » de la Modération (/moderation/tools).
     catalogue: {
       title: 'Outils',
-      subtitle:
-        'Les autres outils tapés par les membres, et le catalogue. Chaque changement entre dans « Changements récents ».',
       tabPending: 'À vérifier',
       tabCatalogue: 'Catalogue',
       emptyPending: 'Aucun autre outil à vérifier.',
@@ -1946,8 +1942,6 @@ export const fr = {
     // R6b : la page « Catégories » de la Modération (/moderation/categories).
     categories: {
       title: 'Catégories',
-      subtitle:
-        'Les projets classés « Autre », et les catégories. Chaque changement entre dans « Changements récents ».',
       tabUncategorized: 'À ranger',
       tabCategories: 'Catégories',
       /** Le nom du groupe d'onglets (ui-S3) : il dit le choix, pas le titre de la page. */
@@ -2018,7 +2012,6 @@ export const fr = {
       otherDetail: 'Toujours en dernier · {{projects}}',
     },
     // R9 : l'écran en trois colonnes (ordinateur), ou la file puis le détail (téléphone).
-    subtitle: 'Les signalements des membres arrivent ici. Chaque décision entre dans l’historique.',
     adminOnly: 'Réservé aux administrateurs',
     pendingCount: 'À traiter ({{count}})',
     reportedTimes_one: 'Signalé {{count}} fois',
@@ -2095,7 +2088,6 @@ export const fr = {
     recent: {
       title: 'Historique',
       phoneTitle: 'Décisions récentes',
-      order: 'Du plus récent au plus ancien',
       all: 'Voir tout l’historique',
       what: {
         project: 'un projet',
