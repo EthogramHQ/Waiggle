@@ -131,7 +131,6 @@ export function NotificationSettingsCatalogue() {
             <EmailSummary
               title={t(($) => $.notifications.emailColumn.title)}
               summary={l.sentence}
-              note={t(($) => $.notifications.emailColumn.counts)}
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={() => {}}
             />
@@ -140,7 +139,6 @@ export function NotificationSettingsCatalogue() {
               title={t(($) => $.notifications.emailColumn.title)}
               summary={t(($) => $.notifications.summary.nowAndRest, { types: 'Les ruches' })}
               detail={t(($) => $.notifications.summary.hivesNow)}
-              note={t(($) => $.notifications.emailColumn.counts)}
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={() => {}}
             />
@@ -148,7 +146,6 @@ export function NotificationSettingsCatalogue() {
             <EmailSummary
               title={t(($) => $.notifications.emailColumn.title)}
               summary={null}
-              note={t(($) => $.notifications.emailColumn.counts)}
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={() => {}}
             />

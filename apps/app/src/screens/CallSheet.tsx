@@ -105,7 +105,7 @@ function CallSheetStates({ id }: { id: string }) {
     stateSheet({
       kind: 'signedOut',
       title: t(($) => $.states.signedOutTitle),
-      message: expired ? t(($) => $.states.expired) : t(($) => $.home.membersOnly),
+      message: expired ? t(($) => $.states.expired) : t(($) => $.project.testers.calls.signedOut),
       actions: [
         {
           label: t(($) => $.home.signIn),
