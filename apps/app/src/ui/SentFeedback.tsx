@@ -21,6 +21,7 @@ import type { FeedbackOutcome } from '@ruche/contracts'
 import type { ReactNode, Ref } from 'react'
 import { View } from 'react-native'
 import { Button } from './Button'
+import { CommentActionButton } from './CommentAction'
 import type { Focusable } from './focus'
 import { Icon, SMALL_ICON } from './Icon'
 import type { ImageSource } from './image'
@@ -254,14 +255,17 @@ export function SentFeedbackMessage({
           <RelativeTime date={at} {...(now ? { now } : null)} />
         </View>
         <View style={{ marginLeft: 'auto', flexShrink: 0, maxWidth: '100%' }}>
-          <Button
+          {/* Un texte rouge sans fond, comme « Supprimer » de « Mes commentaires » : six pastilles
+              rondes écraseraient « Ouvrir le coin ». Le nom lu dit quel message. */}
+          <CommentActionButton
             ref={deleteRef}
-            label={deleteLabel}
-            spokenLabel={deleteSpokenLabel}
-            icon="trash"
-            variant="danger"
-            size="small"
-            onPress={onDelete}
+            action={{
+              label: deleteSpokenLabel,
+              text: deleteLabel,
+              icon: 'trash',
+              tone: 'danger',
+              onPress: onDelete,
+            }}
           />
         </View>
       </View>
