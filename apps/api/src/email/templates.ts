@@ -729,8 +729,47 @@ export type RecapData = {
   testers: { title: string; count: number; url: string }[]
   /** Combien d'autres projets du coin ne sont pas montrés (« Et 2 autres projets »). */
   testersMore: number
+  /**
+   * R10, « Dans tes ruches » : ruche par ruche, la plus récemment active en tête. Absent ou vide :
+   * pas de partie (rien de nouveau dans ses ruches, ou « Ruches » réglé sur « Jamais »).
+   */
+  hives?: RecapHive[]
+  /**
+   * R10 : les invitations en attente, seulement quand « Ruches » vaut « Dans le récap » ; 5 au plus,
+   * puis `hiveInvitationsMore`. Jamais le nom de la ruche (écrit par un membre, choix 7 du scénario).
+   */
+  hiveInvitations?: RecapHiveInvitation[]
+  hiveInvitationsMore?: number
+  /** R10 : « Voir mes ruches », l'onglet Ruches de l'appli (fabriqué par la tâche). */
+  hivesUrl?: string
   links: NotificationLinks
 }
+
+/**
+ * R10 : une nouveauté d'une ruche, un projet publié ou mis à jour cette semaine. Son titre et le
+ * nom de son auteur seulement ; le lien mène à la page du projet (ou à ses mises à jour), jamais à
+ * la ruche.
+ */
+export type RecapHiveItem = {
+  kind: 'published' | 'updated'
+  author: string
+  title: string
+  url: string
+}
+
+/**
+ * R10 : une ruche dans « Dans tes ruches ». `name` : son nom tel que l'animateur l'a écrit, montré
+ * en texte simple, jamais en lien (décision de Louis du 14/11/2026) ; null quand la modération l'a
+ * retiré (« Ruche sans nom »). `more` : les nouveautés de plus, non montrées.
+ */
+export type RecapHive = {
+  name: string | null
+  items: RecapHiveItem[]
+  more: number
+}
+
+/** R10 : une invitation en attente ; `inviter` null si son compte a été supprimé. */
+export type RecapHiveInvitation = { inviter: string | null }
 
 /**
  * La feuille de style du récap habillé : comme `narrowScreenStyle`, elle resserre les marges sur un
@@ -820,6 +859,36 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
       more: more > 0 ? counted(moreOne, moreOther, more) : null,
     }))
   const wanted = data.testersWanted
+  // R10, « Dans tes ruches » (planche R10-Recap) : après les parties de R8, ruche par ruche. Le nom
+  // de la ruche, écrit par un membre, est désarmé (une adresse devient « [lien] ») et ne sera
+  // qu'échappé dans le HTML, jamais posé dans un lien. Aucune vignette : un projet réservé n'en a
+  // jamais (plan R10, point 1), et les autres en ont déjà dans les parties de R8.
+  const hives = (data.hives ?? [])
+    .filter((hive) => hive.items.length > 0)
+    .map((hive) => ({
+      heading:
+        hive.name === null ? fill(r.hiveUnnamed) : fill(r.hiveName, { hive: clean(hive.name) }),
+      items: hive.items.map((item) => ({
+        line: fill(item.kind === 'published' ? r.hivePublished : r.hiveUpdated, {
+          name: clean(item.author),
+          title: clean(item.title),
+        }),
+        url: item.url,
+      })),
+      more: hive.more > 0 ? counted(r.hiveMore_one, r.hiveMore_other, hive.more) : null,
+    }))
+  // Les invitations : qui invite, jamais dans quelle ruche (le nom se lit dans l'appli).
+  const invitations = (data.hiveInvitations ?? []).map((invitation) =>
+    invitation.inviter === null
+      ? fill(r.hiveInvitationNoInviter)
+      : fill(r.hiveInvitation, { name: clean(invitation.inviter) }),
+  )
+  const invitationsMore =
+    (data.hiveInvitationsMore ?? 0) > 0
+      ? counted(r.hiveMore_one, r.hiveMore_other, data.hiveInvitationsMore ?? 0)
+      : null
+  const hivesUrl = data.hivesUrl
+  const hasHivesPart = hives.length > 0 || invitations.length > 0
   // Les images, dans l'ordre où l'e-mail les montre ; chacune une seule fois.
   const attachments = [
     ...data.projects.map((project) => project.image),
@@ -887,6 +956,28 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
       '',
       ...(part.more === null ? [] : [part.more, '']),
     ]),
+    ...(hives.length > 0
+      ? [
+          r.hivesTitle,
+          '',
+          ...hives.flatMap((hive) => [
+            hive.heading,
+            ...hive.items.flatMap((item) => [`• ${item.line}`, `  ${item.url}`]),
+            ...(hive.more === null ? [] : [hive.more]),
+            '',
+          ]),
+        ]
+      : []),
+    ...(invitations.length > 0
+      ? [
+          r.hiveInvitationsTitle,
+          '',
+          ...invitations.map((line) => `• ${line}`),
+          ...(invitationsMore === null ? [] : [invitationsMore]),
+          '',
+        ]
+      : []),
+    ...(hasHivesPart && hivesUrl !== undefined ? [r.viewHives, hivesUrl, ''] : []),
     '—',
     fill(r.reason),
     '',
@@ -1018,6 +1109,31 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
         ].join(''),
       ),
     ),
+    // R10 : une seule partie pour les ruches. Le nom de chaque ruche en gras, en texte simple (un
+    // <p>, jamais un <a>) ; les invitations dans un encadré gris, comme sur la planche ; puis le lien
+    // vers l'onglet Ruches.
+    ...(hasHivesPart
+      ? [
+          part(
+            [
+              ...(hives.length > 0 ? [h2(r.hivesTitle)] : []),
+              ...hives.map((hive) =>
+                [
+                  `<p style="margin:0 0 8px;font-size:17px;line-height:1.3;font-weight:bold;color:${c.text};${wrap}">${escapeHtml(hive.heading)}</p>`,
+                  list(hive.items),
+                  hive.more === null ? '' : paragraph(hive.more),
+                ].join(''),
+              ),
+              invitations.length > 0
+                ? `<div style="margin:8px 0 16px;padding:16px;border-radius:${radii.small}px;background:${c.surfaceGrouped}"><p style="margin:0 0 8px;font-size:17px;line-height:1.3;font-weight:bold;color:${c.text}">${escapeHtml(r.hiveInvitationsTitle)}</p>${list(invitations.map((line) => ({ line })))}${invitationsMore === null ? '' : paragraph(invitationsMore)}</div>`
+                : '',
+              hivesUrl === undefined
+                ? ''
+                : `<p style="margin:0;font-size:15px">${textLink(r.viewHives, hivesUrl)}</p>`,
+            ].join(''),
+          ),
+        ]
+      : []),
   ]
   // Le pied : pourquoi on le reçoit, puis les deux liens l'un sous l'autre (relecture de design de
   // 6c : chacun se touche du doigt sans toucher l'autre), puis le contact, en texte.

@@ -238,6 +238,57 @@ const variants: [string, (language: Language) => EmailContent][] = [
           updatesMore: 2,
           testers: testedProjects,
           testersMore: 3,
+          // R10, « Dans tes ruches » (planche R10-Recap) : deux ruches, la seconde au nom de 40
+          // caractères d'un seul mot (HIVE_NAME_MAX), une auteure au nom de 88 caractères et le
+          // titre le plus long, puis « Ruche sans nom » (nom retiré par la modération) ; deux
+          // invitations, dont l'une d'un compte supprimé, et « Et 1 autre nouveauté ».
+          hives: [
+            {
+              name: 'Famille',
+              items: [
+                {
+                  kind: 'published',
+                  author: 'Léa Moreau',
+                  title: 'Le plan de table',
+                  url: projectUrl('1f2e3d4c-5b6a-4798-8a7b-6c5d4e3f2a1b'),
+                },
+                {
+                  kind: 'updated',
+                  author: LONG_NAME,
+                  title: LONG_TITLE,
+                  url: updatesOf('2f2e3d4c-5b6a-4798-8a7b-6c5d4e3f2a1b'),
+                },
+              ],
+              more: 1,
+            },
+            {
+              name: `Amisdujeudi${'i'.repeat(29)}`,
+              items: [
+                {
+                  kind: 'updated',
+                  author: 'Nora Benali',
+                  title: 'Arrosage malin',
+                  url: updatesOf('3f2e3d4c-5b6a-4798-8a7b-6c5d4e3f2a1b'),
+                },
+              ],
+              more: 0,
+            },
+            {
+              name: null,
+              items: [
+                {
+                  kind: 'published',
+                  author: 'Tante Odile',
+                  title: 'Biscotte au parc',
+                  url: projectUrl('4f2e3d4c-5b6a-4798-8a7b-6c5d4e3f2a1b'),
+                },
+              ],
+              more: 0,
+            },
+          ],
+          hiveInvitations: [{ inviter: 'Nora Benali' }, { inviter: null }],
+          hiveInvitationsMore: 1,
+          hivesUrl: `${APP_URL}/hives`,
         }),
       ),
   ],
