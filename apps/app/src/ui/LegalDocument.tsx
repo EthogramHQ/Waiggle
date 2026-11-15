@@ -218,6 +218,17 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
   )
 }
 
+/**
+ * R11 : la même pastille de version, seule, pour l'écran « Accepter », qui reprend l'« En bref »
+ * des Règles sans leur texte complet. Elle reçoit la date telle que le contrat l'écrit.
+ */
+export function LegalVersionBadge({ version }: { version: string }) {
+  const { t, i18n } = useTranslation()
+  return (
+    <VersionBadge label={t(($) => $.legal.version, { date: parisDay(version, i18n.language) })} />
+  )
+}
+
 /** La date de la version, dans une pastille discrète sous le titre de la page. */
 function VersionBadge({ label }: { label: string }) {
   const { colors } = useTheme()

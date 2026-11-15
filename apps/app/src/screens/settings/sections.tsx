@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking, Platform } from 'react-native'
-import { downloadMyData, signOut } from '../../accounts/api'
+import { downloadMyData } from '../../accounts/api'
 import { useSetHideFromSuggestions } from '../../hives/api'
 import { useOpenOutside } from '../../navigation/links'
 import { firstParam } from '../../navigation/params'
@@ -26,6 +26,7 @@ import type { Appearance } from '../../ui/theme/appearance'
 import { useHydrated } from '../../ui/theme/hydration'
 import { useTheme } from '../../ui/theme/ThemeProvider'
 import { EmailSettings } from './EmailSettings'
+import { useSignOut } from './useSignOut'
 
 /** Les rubriques qui ont un contenu ici (Mon profil et Modération ont leur propre page). */
 export type ContentSection =
@@ -251,29 +252,10 @@ function SecurityRows({ go }: { go: ReturnType<typeof useGo> }) {
 
 function AccountSection({ email }: { email: string }) {
   const { t } = useTranslation()
-  const router = useRouter()
   const go = useGo()
-  // La déconnexion refusée (serveur, réseau) : on le dit et on reste ici, sinon le membre partirait
-  // en se croyant déconnecté (relecture de sécurité de la PR #64). Une seule demande à la fois.
-  const [signOutFailed, setSignOutFailed] = useState(false)
-  const signingOut = useRef(false)
-  const onSignOut = async () => {
-    if (signingOut.current) return
-    signingOut.current = true
-    setSignOutFailed(false)
-    try {
-      const result = await signOut()
-      if (result.ok) {
-        router.replace('/')
-        return
-      }
-    } catch {
-      // Pas de réponse du serveur : même message qu'un refus.
-    } finally {
-      signingOut.current = false
-    }
-    setSignOutFailed(true)
-  }
+  // La déconnexion refusée (serveur, réseau) : on le dit et on reste ici (useSignOut.ts, commun
+  // avec l'écran « Accepter » des règles).
+  const { signOut: onSignOut, failed: signOutFailed } = useSignOut()
   // Notre adresse de contact (écrite dans @ruche/brand seulement), en clair pour qui veut la
   // recopier, et un lien qui ouvre la messagerie : c'est notre adresse, pas un site tiers, donc
   // sans la page « Tu quittes… ». Sur le web, le vrai lien `mailto:` suffit ; sur téléphone,
