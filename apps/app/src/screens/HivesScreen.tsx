@@ -35,10 +35,10 @@ import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import {
   type Focusable,
+  focusAndReveal,
   focusWithoutScroll,
   holdsFocus,
   moveReaderTo,
-  revealWithoutJump,
 } from '../ui/focus'
 import { HiveInvitation } from '../ui/HiveInvitation'
 import { HiveRow } from '../ui/HiveRow'
@@ -156,12 +156,15 @@ function HivesView({ mine }: { mine: MyHives }) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const closeRef = useRef<Focusable>(null)
   const [failure, setFailure] = useState<Failure | null>(null)
-  // L'échec s'écrit sous la carte touchée, qui peut être au bas de l'écran (sous la barre d'onglets
-  // du téléphone) : il vient dans l'écran à son apparition, sans saut (`revealWithoutJump`).
+  // L'échec s'écrit sous la carte touchée, qui peut être au bas de l'écran : il vient au milieu de
+  // la zone qui défile à son apparition. Au milieu, et non « juste assez » (`revealWithoutJump`) :
+  // la barre d'onglets du téléphone flotte sur le bas de la page sans que le défilement le sache
+  // (`Screen` ne réserve sa place qu'à `floating`), et « juste assez » laissait le message dessous.
+  // `focusAndReveal` ne pose aucun focus ici : le cadre n'en prend pas (ni bouton ni tabIndex).
   const failureNotice = useRef<Focusable>(null)
   const calm = useCalmMotion()
   useEffect(() => {
-    if (failure) revealWithoutJump(failureNotice.current, calm)
+    if (failure) focusAndReveal(failureNotice.current, calm)
   }, [failure, calm])
 
   // Le titre « Invitations » et celui de « Mes ruches » : où va le focus quand la carte de la
@@ -357,7 +360,11 @@ function HivesView({ mine }: { mine: MyHives }) {
                   refused={Boolean(refused[invitation.id])}
                 />
                 {failure?.id === invitation.id ? (
-                  <Notice ref={failureNotice} message={failure.text} />
+                  // La ref sur un cadre, pas sur `Notice` : une `Notice` à ref attend le focus et
+                  // cesse d'être annoncée ; celle-ci garde son annonce, le focus reste au bouton.
+                  <Stack ref={failureNotice} align="stretch">
+                    <Notice message={failure.text} />
+                  </Stack>
                 ) : null}
               </Stack>
             ))}
