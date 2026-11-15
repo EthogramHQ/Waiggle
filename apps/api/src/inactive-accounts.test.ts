@@ -354,7 +354,9 @@ describe('warning an inactive account', () => {
 
 describe('the date of deletion', () => {
   it('is 3 years after the last visit when the warning left on time', () => {
-    expect(inactiveDeletionDate(LAST_VISIT, plus(WARNING_DUE, 2 * DAY))).toEqual(THREE_YEARS)
+    // À l'heure : le jour même où il est dû, 30 jours avant les 3 ans (un e-mail parti deux jours
+    // plus tard repousse la date de deux jours, test suivant).
+    expect(inactiveDeletionDate(LAST_VISIT, WARNING_DUE)).toEqual(THREE_YEARS)
   })
 
   it('is 30 days after the warning when the warning left late', () => {

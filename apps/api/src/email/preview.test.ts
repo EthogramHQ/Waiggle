@@ -31,6 +31,8 @@ const SERVICE = [
   'change-email',
   'email-changed',
   'existing-account',
+  // R11 : l'avertissement d'un compte inactif depuis près de 3 ans, un e-mail de service.
+  'inactive-account',
   'moderation-alert',
   'new-email',
   // R6b : le récap hebdomadaire des « Autre » aux administrateurs.

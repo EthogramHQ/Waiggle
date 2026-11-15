@@ -47,12 +47,12 @@ afterEach(() => {
 
 describe('starting the job scheduler', () => {
   // Tranche 7a : une quatrième tâche, l'alerte de modération ; R6b : une cinquième, le récap des
-  // « Autre » aux administrateurs.
-  it('plans the five tasks and stops pg-boss gracefully when asked', async () => {
+  // « Autre » aux administrateurs ; R11 : une sixième, les comptes inactifs.
+  it('plans the six tasks and stops pg-boss gracefully when asked', async () => {
     const scheduler = await start()
 
     expect(boss.start).toHaveBeenCalledOnce()
-    expect(boss.schedule).toHaveBeenCalledTimes(5)
+    expect(boss.schedule).toHaveBeenCalledTimes(6)
     expect(boss.stop).not.toHaveBeenCalled()
     await scheduler.stop()
     expect(boss.stop).toHaveBeenCalledWith({ graceful: true, timeout: 30_000 })
