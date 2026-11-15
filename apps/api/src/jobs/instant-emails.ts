@@ -2,7 +2,9 @@
 // l'e-mail de mentions de 6c (mention-emails.ts). Scénario : docs/scenarios/refonte.md, « Les
 // e-mails tout de suite ». Rien ne part sans l'avoir demandé : chaque type est « Dans le récap » par
 // défaut ; seuls les commentaires sur ses projets, les réponses et mentions, et le coin des
-// testeurs peuvent être réglés sur « Tout de suite ».
+// testeurs peuvent être réglés sur « Tout de suite ». R10 : les invitations dans une ruche
+// (« Ruches »), seul type « Tout de suite » par défaut, entrent dans le même e-mail (ligne
+// `hive_invited`, sans le nom de la ruche).
 //
 // Pour chacun (compte vérifié, au moins un type sur « Tout de suite », le précédent e-mail il y a
 // plus d'une heure) :
@@ -28,21 +30,35 @@ import { type InstantLine, instantEmail } from '../email/instant'
 import { languageOfMember } from '../email/language'
 import { defangLinks, linkPlaceholder } from '../email/links'
 import { excerptOf, loadNotificationsSince, utc } from '../notifications/load'
-import { BATCH_SIZE, isoDate, type JobDeps, latest, linksFor, logMemberFailure } from './shared'
+import {
+  BATCH_SIZE,
+  isDeletedMember,
+  isoDate,
+  type JobDeps,
+  latest,
+  linksFor,
+  logMemberFailure,
+} from './shared'
 
 const MINUTE = 60 * 1000
 /** Jamais une nouveauté vieille de plus de 24 heures dans un e-mail. */
 const WINDOW_MS = 24 * 60 * MINUTE
 const ISO = 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
 
-/** Les trois types « Tout de suite » possibles, dans l'ordre de l'écran des réglages. */
-const TYPES = ['comments', 'replies', 'testers'] as const satisfies readonly InstantEmailType[]
+/** Les quatre types « Tout de suite » possibles (R10 : « Ruches »), dans l'ordre de l'écran des réglages. */
+const TYPES = [
+  'comments',
+  'replies',
+  'testers',
+  'hives',
+] as const satisfies readonly InstantEmailType[]
 
-/** Les colonnes des trois choix, lues avec le membre : quels types partent tout de suite. */
+/** Les colonnes des quatre choix, lues avec le membre : quels types partent tout de suite. */
 const Choices = z.object({
   email_comments: z.string(),
   email_replies: z.string(),
   email_testers: z.string(),
+  email_hives: z.string(),
 })
 const instantTypes = (row: z.infer<typeof Choices>) =>
   new Set<InstantEmailType>(TYPES.filter((type) => row[`email_${type}`] === 'now'))
@@ -64,33 +80,86 @@ const intervalCutoff = (now: Date) =>
  * partiel email_preference_instant_idx : PostgreSQL ne se sert d'un index partiel que s'il peut
  * prouver que la condition de la requête l'implique, et la même expression le prouve à coup sûr.
  */
-const anyInstant = sql`(ep.email_comments = 'now' or ep.email_replies = 'now' or ep.email_testers = 'now')`
+const anyInstant = sql`(ep.email_comments = 'now' or ep.email_replies = 'now' or ep.email_testers = 'now' or ep.email_hives = 'now')`
+
+/** Les trois types d'avant R10, ceux qui suffisent seuls à faire entrer un membre dans le lot. */
+const anyOtherInstant = sql`(ep.email_comments = 'now' or ep.email_replies = 'now' or ep.email_testers = 'now')`
 
 /**
- * Un lot de membres qui peuvent recevoir l'e-mail maintenant, après `after` :
+ * « Il a une invitation récente » (R10, plan « Ce qui change au plan », point 6) : ni refusée, et
+ * datée des 24 dernières heures (aucune nouveauté plus ancienne ne part dans cet e-mail), jusqu'à
+ * `now`. `invitee` : la colonne du membre, écrite ici (sql.raw, jamais une entrée du client).
+ */
+const recentInvitationOf = (invitee: string, now: Date) => sql`(select 1 from hive_invitation hi
+    where hi.invitee_id = ${sql.raw(invitee)} and hi.refused_at is null
+      and hi.created_at > ${utc(new Date(now.getTime() - WINDOW_MS))}
+      and hi.created_at <= ${utc(now)}
+    limit 1) is not null`
+
+/**
+ * Un lot de membres qui peuvent recevoir l'e-mail maintenant, après `after`. Deux sortes de membres
+ * (R10), réunies par « union all » (les deux branches ne se recoupent pas : la seconde n'a que des
+ * membres sans ligne de réglages) :
  *
- *   select ep.user_id, ep.instant_sent_at, ep.recap_sent_at, ns.seen_at, les trois choix
- *   from email_preference ep join "user" u … left join notification_state ns …
- *   where (au moins un type à 'now') and u.email_verified and ep.user_id > $after
- *     and (ep.instant_sent_at is null or ep.instant_sent_at <= $il_y_a_une_heure)
- *   order by ep.user_id limit 100
+ *   select … from (
+ *     (select ep.user_id … from email_preference ep join "user" u …
+ *      where (au moins un type à 'now') and u.email_verified and ep.user_id > $after
+ *        and (ep.instant_sent_at is null or ep.instant_sent_at <= $il_y_a_une_heure)
+ *        and (un type d'avant R10 à 'now' or une invitation récente)
+ *      order by ep.user_id limit 100)
+ *     union all
+ *     (select distinct hi.invitee_id … from hive_invitation hi join "user" u …
+ *      where (invitation récente) and u.email_verified and hi.invitee_id > $after
+ *        and aucune ligne email_preference
+ *      order by hi.invitee_id limit 100)
+ *   ) c left join notification_state ns …
+ *   order by c.id limit 100
  *
- * La tâche passe toutes les 5 minutes : l'index partiel email_preference_instant_idx (les seules
- * lignes qui ont un type à « now », rangées par user_id) donne ces membres dans l'ordre, sans lire
- * les autres, qui sont la majorité ; "user" et notification_state par leur clé primaire.
+ * 1. Ceux qui ont une ligne de réglages : la tâche passe toutes les 5 minutes, l'index partiel
+ *    email_preference_instant_idx (les seules lignes qui ont un type à « now », rangées par user_id)
+ *    les donne dans l'ordre, sans lire les autres. Mais « Ruches » vaut « Tout de suite » par
+ *    défaut : la plupart des lignes y entrent. Un membre dont le seul type « Tout de suite » est
+ *    « Ruches » n'est donc pris que s'il a une invitation récente (index hive_invitation_invitee_idx,
+ *    invitee_id puis created_at) : sinon il n'aurait rien à recevoir, et on ne lit rien pour lui.
+ * 2. Ceux qui n'ont jamais touché à leurs réglages (pas de ligne : « Ruches » à « Tout de suite »)
+ *    et qui ont une invitation récente. Sans index par date sur hive_invitation, la lecture parcourt
+ *    la table, petite (20 invitations par jour et par membre au plus, effacées à 30 jours) : à
+ *    surveiller, un index (created_at) le jour où elle grandit.
+ * Chaque branche est triée et bornée à 100 elle-même, ses filtres compris : les 100 premiers des deux
+ * listes réunies sont bien les 100 premiers de l'ensemble, et un lot de moins de 100 dit vraiment
+ * qu'il n'y a plus personne après. "user" et notification_state par leur clé primaire.
  */
 const candidates = async (db: Database, now: Date, after: string): Promise<Candidate[]> => {
   const query = sql`
-    select ep.user_id as id, ep.email_comments, ep.email_replies, ep.email_testers,
-      to_char(ep.instant_sent_at, ${ISO}) as instant_sent_at,
-      to_char(ep.recap_sent_at, ${ISO}) as recap_sent_at,
+    select c.id, c.email_comments, c.email_replies, c.email_testers, c.email_hives,
+      to_char(c.instant_sent_at, ${ISO}) as instant_sent_at,
+      to_char(c.recap_sent_at, ${ISO}) as recap_sent_at,
       to_char(ns.seen_at, ${ISO}) as seen_at
-    from email_preference ep
-    join "user" u on u.id = ep.user_id
-    left join notification_state ns on ns.user_id = ep.user_id
-    where ${anyInstant} and u.email_verified and ep.user_id > ${after}
-      and (ep.instant_sent_at is null or ep.instant_sent_at <= ${intervalCutoff(now)})
-    order by ep.user_id
+    from (
+      (select ep.user_id as id, ep.email_comments, ep.email_replies, ep.email_testers,
+        ep.email_hives, ep.instant_sent_at, ep.recap_sent_at
+      from email_preference ep
+      join "user" u on u.id = ep.user_id
+      where ${anyInstant} and u.email_verified and ep.user_id > ${after}
+        and (ep.instant_sent_at is null or ep.instant_sent_at <= ${intervalCutoff(now)})
+        and (${anyOtherInstant} or ${recentInvitationOf('ep.user_id', now)})
+      order by ep.user_id
+      limit ${BATCH_SIZE})
+      union all
+      (select distinct hi.invitee_id, 'digest', 'digest', 'digest', 'now',
+        null::timestamp, null::timestamp
+      from hive_invitation hi
+      join "user" u on u.id = hi.invitee_id
+      where hi.refused_at is null
+        and hi.created_at > ${utc(new Date(now.getTime() - WINDOW_MS))}
+        and hi.created_at <= ${utc(now)}
+        and u.email_verified and hi.invitee_id > ${after}
+        and not exists (select 1 from email_preference ep where ep.user_id = hi.invitee_id)
+      order by hi.invitee_id
+      limit ${BATCH_SIZE})
+    ) c
+    left join notification_state ns on ns.user_id = c.id
+    order by c.id
     limit ${BATCH_SIZE}
   `
   return z.object({ rows: z.array(Candidate) }).parse(await db.execute(query)).rows
@@ -114,13 +183,28 @@ const Taken = Choices.extend({
  * version d'avant R8, l'ancienne tâche ne renvoie pas ce qui vient de partir.
  */
 const take = async (db: Database, userId: string, now: Date) => {
+  // R10 : un membre sans ligne de réglages (« Ruches » à « Tout de suite » par défaut) reçoit
+  // l'e-mail d'une invitation ; la prise crée alors sa ligne, avec les valeurs par défaut (comme le
+  // récap, weekly-recap.ts), et `updated_at` reste nul : ce n'est pas lui qui a choisi. D'où
+  // « insert … select from "user" … on conflict do update … where » : la ligne naît seulement si le
+  // compte existe et est vérifié ; si elle existe, la mise à jour ne se fait que si les conditions
+  // tiennent encore (« as ep » nomme la ligne existante dans le `where`). Le `with` rend la ligne
+  // prise, puis la requête principale lit l'adresse du compte.
   const query = sql`
-    update email_preference ep set instant_sent_at = ${utc(now)}, mention_sent_at = ${utc(now)}
-    from "user" u
-    where ep.user_id = ${userId} and u.id = ep.user_id and u.email_verified and ${anyInstant}
-      and (ep.instant_sent_at is null or ep.instant_sent_at <= ${intervalCutoff(now)})
-    returning u.email, u.name, u.language, ep.email_comments, ep.email_replies, ep.email_testers,
-      to_char(ep.recap_sent_at, ${ISO}) as recap_sent_at
+    with taken as (
+      insert into email_preference as ep (user_id, instant_sent_at, mention_sent_at)
+      select u.id, ${utc(now)}, ${utc(now)} from "user" u
+      where u.id = ${userId} and u.email_verified
+      on conflict (user_id) do update set
+        instant_sent_at = excluded.instant_sent_at, mention_sent_at = excluded.mention_sent_at
+      where ${anyInstant}
+        and (ep.instant_sent_at is null or ep.instant_sent_at <= ${intervalCutoff(now)})
+      returning ep.user_id, ep.email_comments, ep.email_replies, ep.email_testers, ep.email_hives,
+        ep.recap_sent_at
+    )
+    select u.email, u.name, u.language, taken.email_comments, taken.email_replies,
+      taken.email_testers, taken.email_hives, to_char(taken.recap_sent_at, ${ISO}) as recap_sent_at
+    from taken join "user" u on u.id = taken.user_id
   `
   const [row] = z.object({ rows: z.array(Taken) }).parse(await db.execute(query)).rows
   return row ?? null
@@ -202,6 +286,28 @@ const pendingOf = (appUrl: string, { row, notification: n }: Loaded): Pending | 
         }),
       }
     }
+    case 'hive_invited': {
+      // R10 : une invitation dans une ruche. Le nom et le pseudo de l'inviteur (le pseudo de la même
+      // ligne que l'écran Activité) ; jamais le nom de la ruche, écrit par un membre (choix 7 du
+      // scénario), ni un lien vers l'inviteur ou la ruche : seulement l'onglet Ruches, où l'invité
+      // lit le nom avant d'accepter. Sans inviteur (compte supprimé) ou sans pseudo : pas de ligne.
+      const handle = row.author_handle
+      if (n.inviter === null || handle === null) return null
+      const who = n.inviter.name
+      return {
+        type: 'hives',
+        at,
+        line: () => ({
+          kind: 'hive_invited',
+          who,
+          handle,
+          title: '',
+          excerpt: null,
+          at: new Date(at),
+          url: page('/hives'),
+        }),
+      }
+    }
     default:
       return null
   }
@@ -209,24 +315,34 @@ const pendingOf = (appUrl: string, { row, notification: n }: Loaded): Pending | 
 
 /** L'e-mail « tout de suite » d'un membre : true s'il est parti. */
 const instantOne = async (deps: JobDeps, member: Candidate, now: Date) => {
-  const since = latest(
-    member.seen_at,
-    member.instant_sent_at,
-    member.recap_sent_at,
-    new Date(now.getTime() - WINDOW_MS),
-  )
+  // R10 : le dernier récap ne borne pas la lecture elle-même, mais seulement les types qu'il
+  // contenait : une invitation n'y entre que si « Ruches » vaut « Dans le récap » ; à « Tout de
+  // suite », celle arrivée juste avant le récap partirait sinon nulle part.
+  const recapSentAt = member.recap_sent_at?.getTime() ?? Number.NEGATIVE_INFINITY
+  const since = latest(member.seen_at, member.instant_sent_at, new Date(now.getTime() - WINDOW_MS))
   const wanted = instantTypes(member)
   // Rien d'après `now`, la date qui sera notée comme celle de l'envoi : ce qui arrive pendant le
   // passage partira au suivant, une seule fois.
   const pending = (await loadNotificationsSince(deps.db, member.id, since, now, deps.apiUrl))
     .map((item) => pendingOf(deps.appUrl, item))
-    .filter((item): item is Pending => item !== null && wanted.has(item.type))
+    .filter(
+      (item): item is Pending =>
+        item !== null && wanted.has(item.type) && (item.type === 'hives' || item.at > recapSentAt),
+    )
   // Rien n'attend depuis 15 minutes : on laisse le temps aux suivantes d'arriver.
   const oldest = Math.min(...pending.map((item) => item.at))
   if (pending.length === 0 || oldest > now.getTime() - INSTANT_EMAIL_DELAY_MINUTES * MINUTE) {
     return false
   }
-  const taken = await take(deps.db, member.id, now)
+  let taken: z.infer<typeof Taken> | null
+  try {
+    taken = await take(deps.db, member.id, now)
+  } catch (error) {
+    // R10 : la prise peut créer la ligne ; un compte supprimé au même instant la refuse (clé
+    // étrangère) : rien à envoyer, comme le récap.
+    if (isDeletedMember(error)) return false
+    throw error
+  }
   if (!taken) return false
   // Les choix relus à la prise : un type passé « Dans le récap » depuis la lecture du lot ne part
   // pas. Et le récap peut tourner en même temps (relecture de sécurité A7 de 6c) : s'il est parti
@@ -234,7 +350,9 @@ const instantOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   // prise le montre, et on les retire. Le récap fait de même avec la date de cet e-mail.
   const stillWanted = instantTypes(taken)
   const recapAt = taken.recap_sent_at?.getTime() ?? Number.NEGATIVE_INFINITY
-  const fresh = pending.filter((item) => stillWanted.has(item.type) && item.at > recapAt)
+  const fresh = pending.filter(
+    (item) => stillWanted.has(item.type) && (item.type === 'hives' || item.at > recapAt),
+  )
   // Plus rien à envoyer : rien ne part (la date reste notée, cas rare d'une course).
   if (fresh.length === 0) return false
   const language = languageOfMember(taken)
