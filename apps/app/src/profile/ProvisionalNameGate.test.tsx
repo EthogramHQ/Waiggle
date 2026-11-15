@@ -8,6 +8,7 @@ import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { openModalLayer } from '../ui/modalLayers'
 import { getMe } from './api'
+import { meQueryKey } from './hooks'
 import { ProvisionalNameGate } from './ProvisionalNameGate'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -66,6 +67,20 @@ describe('ProvisionalNameGate (R9)', () => {
     expect(titleShown()).toBe(false)
 
     await act(async () => closeOther())
+
+    expect(await screen.findByRole('header', { name: title })).toBeTruthy()
+  })
+
+  it('opens nothing while the rules are not accepted, then opens once they are', async () => {
+    jest.mocked(getMe).mockResolvedValue({ ...handleRemoved, rulesAccepted: false })
+    const { queryClient } = await renderWithProviders(<ProvisionalNameGate />)
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    expect(titleShown()).toBe(false)
+
+    // L'accord posé dans le cache du profil (ce que fait `useAcceptRules`) ouvre la feuille.
+    await act(async () => {
+      queryClient.setQueryData(meQueryKey, handleRemoved)
+    })
 
     expect(await screen.findByRole('header', { name: title })).toBeTruthy()
   })
