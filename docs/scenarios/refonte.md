@@ -3174,3 +3174,357 @@ faire valider avant la relecture du plan :
 - `R10-Etats` : l'onglet sans ruche, une ruche pleine (50), une invitation qui ne vaut plus, le
   choix de la ruche dans « Qui peut le voir ? » (téléphone, jour) ;
 - `R10-Activite` : les lignes d'Activité des ruches et la partie « Dans tes ruches » du récap.
+
+## R11 — La conformité
+
+Statut : **validé par Louis** le 15/11/2026 (conversation « plan » de R11), tel quel, avec les
+treize choix de la session et les planches à dessiner.
+
+R11 est la tranche prévue avant toute ouverture au-delà du cercle actuel (décision du 19/10/2026,
+liste de conformité n° 1 à 28). Elle écrit les quatre pages qui disent les règles du jeu (Règles,
+Confidentialité, Mentions légales, Accessibilité), fait accepter les règles et déclarer l'âge à
+l'inscription comme aux membres déjà inscrits, donne les droits qui manquaient (« Mes
+commentaires », « Mes retours envoyés », couper la partie « découvertes » du récap), écrit les
+procédures de l'éditeur et le registre des traitements. Elle retire enfin de toute l'appli les
+sous-titres et les phrases qui décrivent un élément déjà clair (décision de Louis du 15/11/2026).
+
+Décisions de Louis (15/11/2026) : l'éditeur est **Louis, en micro-entreprise** ; les membres déjà
+inscrits passent par un **écran obligatoire** ; une **relecture juridique complète** du projet sert
+de base à la page Confidentialité et au registre ; les droits manquants viennent **dans R11**.
+Âge minimum : **15 ans** (Louis, 14/11/2026). Les règles ne sont pas validées par un professionnel
+pour l'instant, en connaissance de cause (Louis, 28/10/2026) ; les autres textes non plus, et le
+bilan le redit.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : rien d'un membre ne
+se voit sans compte ; un membre suspendu lit, exporte et retire, mais ne publie pas ; un e-mail ne
+contient aucun lien ni domaine venu d'un membre ; la modération ne montre jamais qui a signalé.
+
+Hors de R11, et où ça va :
+- la validation des textes par un professionnel (juriste ou avocat) : avant l'ouverture au public,
+  par Louis ;
+- le dépôt de la marque (INPI), les recherches d'antériorité du nom, du logo et de « Waggle ! » :
+  Louis, avant l'ouverture commerciale ;
+- les contrats de sous-traitance (Hostinger, Scaleway) : Louis vérifie qu'ils sont acceptés ; le
+  registre dit où ils sont ;
+- le consentement aux e-mails marketing (n° 8) : quand ils arriveront (Brevo) ;
+- une vérification de l'âge (pièce d'identité, date de naissance) : non, une déclaration suffit à
+  ce stade (à faire valider par un professionnel) ;
+- les projets publics sur le web et la phrase « Rien n'est public sans ton accord. » : R12.
+
+### Les quatre pages (planche `R2-Regles` ; planches à dessiner `R11-Pages`, `R11-Pages-Desktop`)
+
+**Lire les règles sans compte**
+- Étant donné un visiteur sans compte, sur l'accueil
+- Quand il touche « Règles » au pied de la page
+- Alors la page « Les règles de {{appName}} » s'ouvre à `/rules`, sans demander de compte
+- Et elle montre sa version (« Version du 18 nov. 2026 »), « En bref » en mots simples, puis « Le
+  texte complet », qui fait foi
+- Et les quatre pages sont faites de même : `/rules`, `/privacy` (« Confidentialité »), `/legal`
+  (« Mentions légales »), `/accessibility` (« Accessibilité »)
+- Et chacune a, en bas, les liens vers les trois autres et l'adresse de contact
+- Et sur ordinateur, le texte tient dans une colonne de lecture, avec à côté le sommaire des
+  parties ; toucher une partie y mène
+- Et la page suit la langue de l'appli (français ou anglais) ; elle est lisible à 200 % de texte
+
+**Le contenu des Règles** (texte complet, par parties)
+- À quoi sert {{appName}} ; les démos vivent sur d'autres sites, que {{appName}} ne vérifie pas
+- Ton compte : par invitation, à partir de 15 ans, un compte par personne, personnel ; un parent
+  n'ouvre pas de compte pour un enfant de moins de 15 ans
+- Ce que tu publies : il reste à toi ; tu autorises {{appName}} à l'afficher aux personnes que tu
+  choisis ; un prompt publié peut être copié et réutilisé par les membres qui le voient ; une photo
+  ou une information sur quelqu'un, seulement avec son accord ; des captures sans données de tiers
+- Ce qui est interdit : harcèlement, y compris par mentions ou invitations répétées ; haine ;
+  contenu sexuel ou violent ; contenu illégal ; arnaque, virus ou hameçonnage derrière un lien ; se
+  faire passer pour quelqu'un par son nom ou son pseudo ; nommer un tiers qui n'est pas membre sans
+  son accord ; un nom de ruche insultant ou qui révèle une catégorie sensible
+- Les ruches : l'animateur épingle, invite, choisit qui invite, retire un membre
+- Les testeurs : le coin des testeurs est privé entre l'auteur et chaque testeur ; on ne cite pas un
+  retour et on ne nomme pas un testeur sans son accord
+- Comment se font le fil, Explorer, les suggestions et la recherche (les critères et l'ordre, ce
+  qu'un membre peut régler, comme « Ne pas me proposer aux autres ») : les phrases retirées des
+  écrans (voir « Moins de mots ») sont dites ici
+- La modération : signaler ; qui lit un signalement ; ce que la modération peut faire, du plus
+  léger au plus lourd (retirer une partie, retirer un contenu, suspendre pour un temps ou sans fin) ;
+  la motivation envoyée ; contester par e-mail ; saisir la justice
+- Ce que peut l'auteur d'un projet : masquer un commentaire, sans recours pour l'instant ; le sort
+  des commentaires quand le projet devient privé ou est supprimé
+- Quitter {{appName}} : télécharger ses données, supprimer son compte ; ce qui reste chez les autres
+- Les changements des règles : une nouvelle version se lit et s'accepte à la visite suivante
+- Responsabilité, droit applicable (français), contact
+
+**Le contenu de la Confidentialité**
+- Qui est responsable (l'éditeur des Mentions légales) et comment le joindre
+- Pour chaque fonction (compte, profil, projets, réactions, commentaires, mentions, abonnements, fil
+  et suggestions, recherche, testeurs, ruches, notifications et e-mails, signalements et modération,
+  blocage, sécurité du compte) : les données gardées, pourquoi, sur quelle base, qui les voit, combien
+  de temps — selon l'inventaire de la relecture juridique complète, durées **telles que le code les
+  applique**
+- Ce qui est rangé sur l'appareil (thème, langue, aides vues, adresse en attente de vérification)
+  et ce qui n'est jamais gardé (la position de la souris et l'inclinaison de l'appareil pour la
+  lumière) ; aucun cookie de mesure ni de publicité
+- Les sauvegardes (14 jours, puis la copie hebdomadaire de l'hébergeur) et les journaux du serveur
+- Les sous-traitants, ce que chacun reçoit et où : Hostinger (le serveur, à Paris), Scaleway (les
+  e-mails, à Paris), GitHub (le code et les images du logiciel, aucune donnée de membre) ; puis, à
+  part, un destinataire qui n'est pas un sous-traitant : Anthropic (Claude, l'assistant de code qui
+  aide à construire et exploiter {{appName}}), dit **tel qu'il est aujourd'hui** (décision de Louis
+  du 15/11/2026) : il peut lire des extraits des journaux et de la base pour corriger une panne ou
+  traiter un signalement ; l'offre utilisée est une offre pour les particuliers, sous laquelle
+  Anthropic décide lui-même de l'usage de ces données (il en est responsable, selon sa propre
+  politique de confidentialité, avec un lien vers elle) ; elles peuvent partir hors de l'Union
+  européenne ; elles ne servent pas à entraîner ses modèles (réglage coupé le 15/11/2026) et sont
+  gardées 30 jours chez lui. Le passage à une offre professionnelle, où Anthropic devient
+  sous-traitant, viendra au plus tard à l'ouverture au public ; la page changera alors
+- Tes droits (accès et export, rectification, effacement, opposition, limitation, portabilité), comment
+  les exercer depuis l'appli ou par e-mail, le délai de réponse, et la CNIL
+
+**Le contenu des Mentions légales**
+- L'éditeur : Louis, entrepreneur individuel (nom, adresse professionnelle, SIREN, e-mail), directeur
+  de la publication ; l'hébergeur : Hostinger (nom, adresse, téléphone) ; le code source et sa
+  licence (AGPL-3.0) ; la marque et le logo
+
+**Le contenu d'Accessibilité**
+- L'engagement, l'état : « partiellement conforme » aux WCAG 2.2 niveau AA, sans audit extérieur
+- Ce qui est fait (taille du texte de l'appareil, lecteurs d'écran, clavier, zones de 44, contrastes
+  vérifiés, « Réduire les animations »)
+- Les limites connues, dites vraies : la lumière d'ambiance et le portail de sortie bougent sans
+  bouton pour les arrêter, sauf avec « Réduire les animations » ; de jour, sous la lumière tirée d'une
+  photo, quelques textes gris passent sous le contraste visé ; sur iOS et Android, le focus ne va pas
+  toujours à la carte arrivée
+- Signaler un défaut (contact) ; le Défenseur des droits si la réponse ne vient pas
+
+### Les liens vers les pages
+
+- L'accueil des visiteurs et l'écran de connexion ont un pied : Règles · Confidentialité · Mentions
+  légales · Accessibilité · Le code source
+- Réglages, « À propos » : les quatre pages et le code source, en lignes
+- L'inscription : « les règles de {{appName}} » est un lien dans la case ; il ouvre la page sans
+  perdre ce qui est déjà tapé
+- Le pied des e-mails ajoute l'adresse de la page Confidentialité, en texte (`waiggle.com/privacy`)
+
+### L'inscription (planche `R2-Inscription` ; à dessiner `R11-Inscription`)
+
+**Deux cases**
+- Étant donné Max, qui crée son compte avec un code d'invitation
+- Alors, sous le mot de passe, deux cases non cochées : « J'accepte les règles de {{appName}} » et
+  « J'ai 15 ans ou plus »
+- Quand il touche « Créer mon compte » sans les cocher
+- Alors le bouton, resté actif (F-C8), dit ce qui manque, comme pour les autres champs (« Il manque
+  deux choses : ton accord aux règles et ton âge. ») ; chaque case non cochée dit « Coche la case pour
+  créer ton compte. »
+- Et l'API refuse aussi une inscription sans les deux accords, avec son propre code d'erreur
+- Quand il coche les deux et crée son compte
+- Alors son compte garde la version des règles acceptée, la date, et la déclaration d'âge ; l'export
+  de ses données les contient
+
+### Les membres déjà inscrits, et chaque nouvelle version (à dessiner `R11-Accepter`)
+
+**Accepter à la visite suivante**
+- Étant donné Inès, inscrite avant R11, qui ouvre l'appli
+- Alors, avant toute autre page, « Les règles de {{appName}} » : « En bref », un lien vers le texte
+  complet, les deux mêmes cases, et « Continuer »
+- Et tant qu'elle n'a pas coché les deux, « Continuer » dit ce qui manque
+- Et l'écran garde trois sorties : « Télécharger mes données », « Supprimer mon compte », « Me
+  déconnecter » ; aucune autre page ne s'ouvre (un lien reçu revient sur cet écran, puis sur la page
+  demandée une fois accepté)
+- Et l'API refuse toute écriture de ce compte tant que les règles ne sont pas acceptées, sauf
+  accepter, exporter, supprimer le compte, se déconnecter et régler ses e-mails (code d'erreur
+  propre, comme la suspension)
+- Et un membre suspendu passe par le même écran
+
+**Une nouvelle version**
+- Étant donné une nouvelle version des règles (sa date change)
+- Alors chaque membre retrouve l'écran à sa visite suivante, avec, au-dessus, « Ce qui change »
+- Et une correction de forme (faute, lien) ne change pas la version
+
+### Mes commentaires (à dessiner `R11-Mes-Commentaires`)
+
+- Étant donné Léa, dans Réglages, « Mes données »
+- Quand elle touche « Mes commentaires »
+- Alors tous ses commentaires et réponses, du plus récent au plus ancien, avec le titre du projet
+  (ou « Projet qui n'est plus visible » si elle ne le voit plus), la date et le début du texte
+- Et toucher un commentaire d'un projet visible l'ouvre à sa place dans le fil du projet
+- Et chacun a « Supprimer », avec la confirmation d'aujourd'hui ; la suppression suit les règles
+  d'aujourd'hui (une racine avec des réponses devient « Commentaire supprimé »)
+- Et elle peut supprimer un commentaire sur un projet devenu privé, retiré par la modération, d'un
+  membre qu'elle a bloqué ou qui l'a bloquée, ou d'une ruche qu'elle a quittée : aujourd'hui, l'API
+  le refuse quand le projet ne lui est plus visible
+- Et la liste se charge par pages ; vide, elle le dit
+
+### Mes retours envoyés (à dessiner `R11-Mes-Retours`)
+
+- Étant donné Max, testeur de trois projets, dans « Mes données »
+- Quand il touche « Mes retours envoyés »
+- Alors ses retours et messages du coin des testeurs, groupés par projet (ou « Projet qui n'est plus
+  visible »), du plus récent au plus ancien, avec leur capture
+- Et un coin fermé (projet retiré, devenu privé, testeur parti, retiré ou bloqué) se relit ici en
+  lecture seule, ses seuls messages à lui : jamais ceux de l'auteur d'un coin fermé
+- Et chaque message a « Supprimer » (sa capture part avec lui), comme aujourd'hui dans le coin
+
+### Le récap : couper les découvertes (planche `R8-Reglages`)
+
+- Étant donné Inès, dans Réglages, « Notifications »
+- Alors une ligne « Découvertes » (les nouveaux projets de ses proches, « Ils cherchent des
+  testeurs ») : « Dans le récap » ou « Jamais », « Dans le récap » par défaut, aussi pour les inscrits
+  d'avant (rien ne change pour eux sans leur choix)
+- Quand elle choisit « Jamais »
+- Alors le récap du dimanche garde ses autres parties, sans ces deux-là
+- Et la page de désinscription du récap propose aussi « Couper les découvertes »
+
+### Un compte suspendu (vérifié, rien à changer)
+
+- Un compte suspendu peut déjà retirer sa bio, ses outils favoris et sa photo, et le bandeau le dit
+  (`suspension/guard.ts`, `DELETE /v1/me/avatar`) : R11 n'y touche pas, sauf si la relecture
+  juridique trouve un manque
+
+### Moins de mots (décision de Louis du 15/11/2026)
+
+**La règle**
+- Un titre, une rubrique, un bouton, un réglage se suffisent : aucun sous-titre, sur-titre,
+  étiquette « toi » ni phrase d'aide qui les décrit ou les redit
+- Reste seulement une phrase qui apprend ce que l'écran ne montre pas : une suite irréversible, qui
+  voit quoi, une limite ; un état vide garde sa phrase (« Aucun commentaire pour l'instant. »)
+- Les aides des lecteurs d'écran, invisibles, ne changent pas
+- La règle entre dans `CONTRIBUTING.md` (« Interface ») pour les tranches suivantes
+
+**La liste, phrase par phrase, à valider par Louis** (✂ retirer, ✎ raccourcir ; inventaire du
+15/11/2026)
+
+| Écran | Texte d'aujourd'hui | Choix |
+| --- | --- | --- |
+| Page d'une ruche, et aperçu à la création | « Ma ruche » au-dessus du nom | ✂ (le nom lu devient « Ruche Famille ») |
+| Page d'une ruche, sur ordinateur | « Une partie de la ruche arrive dans ton récap du dimanche. Les défis viendront plus tard. » | ✂ |
+| Page d'une ruche, Membres | « Mes suggestions » | ✂ |
+| Réglages, Mes données | « Ce que les autres voient » | ✂ |
+| Membres d'une ruche | « toi » et « @ines_h · toi » | ✂ |
+| Mes ruches, sous le titre | « Une ruche, c'est un groupe de proches… » | ✂ ; l'état vide garde « On y entre par une invitation. » |
+| Ruche juste créée | « Invite des proches : ils deviennent membres s'ils acceptent. » | ✎ « Ils deviennent membres s'ils acceptent. » |
+| Confier l'animation | « Choisis le membre qui animera la ruche. Tu en resteras membre. » | ✎ « Tu en resteras membre. » |
+| Réglages de la ruche | « Tu redeviens membre. » sous « Confier l'animation » | ✂ (dit dans la feuille) |
+| Fil, pastille d'une ruche | « Les nouveaux projets et les mises à jour des membres de la ruche… » | ✂ (dit dans les Règles) |
+| Fil, « Suivis » | « Les nouveaux projets des personnes que tu suis, et les mises à jour… » | ✂ (dit dans les Règles) |
+| Fil, « Découvrir » | « Les derniers projets publiés par les membres. » | ✂ (dit dans les Règles ; gardé en R5a, T12) |
+| Proches à suivre | « Des membres de tes ruches et des membres qui ont publié récemment » | ✂ (dit dans les Règles) |
+| Fil, premier lancement | « Ton fil t'attend » | ✂ (« Bonjour Inès ! » suffit) |
+| Fil, encart « Publier » | « Une idée, un essai, ça compte. » | ✂ |
+| Explorer, sur ordinateur | « Les projets de tous les membres : à tester, à suivre, pour t'inspirer. » | ✂ |
+| Outils | « Le catalogue des outils d'IA, de développement… » | ✂ (jur-T12 : dit dans les Règles) |
+| Inscription | « Tes proches te reconnaîtront à ton nom affiché. » | ✂ |
+| Connexion | « Connecte-toi pour retrouver les projets de tes proches. » | ✂ |
+| Mot de passe oublié | « Indique ton adresse : nous t'envoyons un lien… » | ✎ « Nous t'envoyons un lien. » |
+| Mot de passe, la jauge | « C'est bon, ton mot de passe est assez long. » | ✂ à l'écran (la jauge pleine le montre) ; le lecteur d'écran l'entend toujours |
+| Vérifie ta boîte mail | « Tant que tu n'as pas ouvert ce lien, tu ne peux pas te connecter. » | ✂ |
+| Corriger l'adresse avant vérification | « Une faute de frappe ? Indique la bonne adresse… » | ✎ « L'ancien lien ne marchera plus. » |
+| Réglages, la liste (téléphone) | les 11 lignes sous les rubriques (« Photo, nom, pseudo et présentation »…) | ✂ toutes |
+| Réglages, Apparence | « Sur cet appareil seulement. « Automatique » suit… » | ✎ « Sur cet appareil seulement. » |
+| Réglages, Nous écrire | « En français ou en anglais. Pour une question… » | ✎ « En français ou en anglais. » |
+| Accueil, connexion, À propos | « {{appName}} est un logiciel libre. » | ✂ (le lien « Le code source » reste, AGPL art. 13) |
+| Connexion et inscription, sous le cadenas | « Rien n'est visible sans compte, ni trouvé par un moteur de recherche. » (faux : l'accueil est trouvé) | ✎ « Les projets et les profils ne se voient qu'avec un compte. » (planche `R11-Pied`, validée) |
+| Feuille de suspension, feuille d'un appel | la même phrase, employée comme erreur | remplacée par le vrai message d'erreur |
+| Nouveau projet | « Montre à tes proches ce que tu construis. Tu pourras tout modifier ensuite. » | ✎ « Tu pourras tout modifier ensuite. » |
+| Aperçu dans le fil | « Il suit ce que tu écris. » | ✂ (décidé en R5a, T9, resté à l'écran) |
+| Aperçu dans le fil | « La lumière autour de la carte vient de ta première photo. Change-la, elle change aussi. » | ✎ « La lumière vient de ta première photo. » |
+| Qui peut le voir ? | « Toute personne qui a un compte. » sous « Membres de {{appName}} » | ✂ |
+| Mises à jour, vide (auteur) | « Pas encore de mise à jour. Raconte ce qui change : tes abonnés et tes testeurs seront prévenus. » | ✎ « Tes abonnés et tes testeurs seront prévenus. » |
+| Nouvelle mise à jour | « Une ligne par changement, 5 au plus. Pas besoin de tout dire. » | ✎ « 5 lignes au plus. » |
+| Coin des testeurs, vide (auteur) | « Aucun retour pour l'instant. Tes testeurs peuvent t'en envoyer depuis ce coin. » | ✎ « Aucun retour pour l'instant. » |
+| Activité, sur ordinateur | « On ne voit nulle part qui a réagi ou qui te suit : seulement des nombres. » | ✂ (dit dans les réglages et sur ses projets) |
+| Modération | « Les signalements des membres arrivent ici. Chaque décision entre dans l'historique. » | ✂ |
+| Modération, Historique | « Du plus récent au plus ancien » | ✂ |
+| Modération, liens Outils et Catégories | « Les autres outils à vérifier, et le catalogue », « Les projets à ranger, et les catégories » | ✂ |
+| Modération, Outils et Catégories | leurs sous-titres (« … Chaque changement entre dans « Changements récents ». ») | ✂ |
+
+Restent, parce qu'ils disent qui voit quoi, une limite ou une suite, ou qu'une relecture juridique
+les a demandés : les états vides, les promesses de l'invitation à une ruche, « Refuser ne prévient
+personne. », l'aide du nom affiché et du pseudo (on te trouve par ce nom), le nettoyage de la photo,
+les conséquences d'un mot de passe changé, du changement d'adresse et de la suppression du compte,
+« Réactions et abonnés : combien, jamais qui », les aides de « Qui peut le voir ? » pour « Une
+ruche » et « Privé », les phrases du coin des testeurs (« reste entre Léa et toi »), le signalement,
+la suspension, « Ne pas me proposer aux autres ».
+
+### Les moteurs de recherche
+
+- Le site a un fichier `robots.txt` : l'accueil et les quatre pages peuvent être trouvés ; les
+  autres adresses (projets, membres, réglages) ne sont pas proposées aux moteurs (rien ne s'y lit
+  sans compte, de toute façon)
+
+### Les durées, les purges et l'éditeur (`docs/ops`, registre)
+
+- Chaque donnée a une durée, et la page Confidentialité dit la durée réelle ; une donnée sans durée
+  trouvée par la relecture juridique en reçoit une, avec sa purge de la nuit et son test
+- Les sauvegardes : aujourd'hui, seules les quotidiennes partent à 14 jours ; celles d'une autre
+  étiquette (`avant-deploi`, `manuel`…) gardent leurs 5 dernières sans limite d'âge, donc parfois des
+  comptes supprimés depuis des mois. Chaque étiquette reçoit une borne d'âge, écrite dans
+  `infra/backup.sh` ; trier celles déjà sur le serveur attend l'accord de Louis
+- Les journaux : ceux de la base n'écrivent plus la valeur d'une erreur (une adresse peut y figurer) ;
+  ceux du système (journald) ont une durée ; les compteurs par adresse IP sont annoncés à leur durée
+  réelle (49 h, pas 25 h)
+- Un compte inactif depuis longtemps est supprimé, après un e-mail un mois avant avec le lien de
+  l'export ; la suppression suit le chemin complet d'aujourd'hui ; la durée : **3 ans** sans
+  connexion (décision de Louis du 15/11/2026, à faire valider par un professionnel)
+- `docs/ops/donnees.md` : que faire en cas de fuite (qui prévient qui, la CNIL sous 72 h, les
+  membres touchés) ; une demande reçue à `contact@` (accusé de réception, réponse sous un mois,
+  vérifier que c'est bien la personne) ; qui a perdu l'accès à son ancienne adresse ; retirer un
+  contenu à la main (renvoi à `moderation.md`)
+- `docs/legal/registre.md` : le registre des traitements (finalité, données, personnes, durée,
+  destinataires, sous-traitants et leurs contrats, sécurité), tiré du même inventaire
+- Une donnée de membre ne s'écrit jamais dans ces documents (le dépôt est public)
+
+### Mes données
+
+- L'export ajoute la version des règles acceptée, sa date et la déclaration d'âge, et le réglage
+  « Découvertes »
+
+### Accessibilité
+
+- Les deux cases ont leur nom lu (« J'accepte les règles de {{appName}} », « J'ai 15 ans ou plus »)
+  et leur état ; le lien des règles est un lien distinct de la case
+- Les pages se lisent par titres (un titre par partie), au clavier, et le sommaire d'ordinateur est
+  une navigation (« Sommaire »)
+- L'écran « Accepter » met le focus sur son titre ; « Continuer » refusé dit ce qui manque à la
+  région d'état
+- Zones à toucher de 44 au moins ; textes à 200 % sans coupure au milieu d'un mot à 320
+
+### Le parcours d'un membre (`journey`)
+
+- Max lit les règles depuis l'accueil, revient, crée son compte : refusé sans les deux cases, accepté
+  avec ; Inès, inscrite avant, voit l'écran « Accepter », coche, retrouve son Fil ; Léa supprime un
+  commentaire depuis « Mes commentaires » sur un projet devenu privé
+
+### Les choix de la session (15/11/2026), à valider avec ce scénario
+
+1. **Les adresses** `/rules`, `/privacy`, `/legal`, `/accessibility` (anglais, comme `/sign-up`),
+   visibles sans compte.
+2. **Tes coordonnées d'éditeur** s'écrivent à un seul endroit du dépôt (`packages/brand`), comme le
+   nom de l'appli : elles sont de toute façon publiques sur la page. Une adresse de domiciliation
+   peut remplacer ton adresse personnelle. C'est toi qui les tapes.
+3. **La version des règles est une date**, écrite dans le code ; la changer fait revenir l'écran
+   « Accepter ».
+4. **L'API garde l'accord**, comme la suspension : sans lui, aucune écriture, sauf les sorties.
+5. **Deux cases séparées** (règles, âge) : chaque accord a sa preuve.
+6. **Pas d'e-mail** aux membres déjà inscrits pour les règles : l'écran suffit dans le cercle
+   d'aujourd'hui.
+7. **« Mes commentaires » et « Mes retours envoyés » vivent dans « Mes données »**, l'un sous
+   l'autre.
+8. **« Découvertes » par défaut « Dans le récap »**, pour tous : rien ne change sans le choix du
+   membre.
+9. **Les critères du fil, d'Explorer et des suggestions** passent des écrans aux Règles (DSA art.
+   27 : les paramètres principaux dans les conditions ; à faire valider par un professionnel).
+10. **Sans accord, les e-mails continuent** (récap, ruches) : ils existaient avant R11, et l'accord
+    se donne à la visite suivante ; seules les écritures attendent.
+11. **Si « J'ai 15 ans ou plus » n'est pas coché**, une phrase neutre dit la suite (« {{appName}} est
+    ouvert à partir de 15 ans. »), sans pousser à cocher.
+12. **L'aide sous « Ruches » des réglages e-mail** demandée par la relecture de R10 (« Tout de suite
+    ne vaut que pour les invitations ») n'est pas écrite, selon la règle « Moins de mots » : le
+    choix se lit seul.
+
+### Les planches qui manquent (les visuels d'abord)
+
+À dessiner et faire valider avant la relecture du plan :
+- `R11-Pages` : une page (Confidentialité) sur téléphone, de jour et de nuit, avec « En bref », les
+  titres des parties, le pied de liens ; `R11-Pages-Desktop` : la même sur ordinateur avec le sommaire ;
+- `R11-Inscription` : l'inscription avec les deux cases, et l'état « ce qui manque » (téléphone) ;
+- `R11-Accepter` : l'écran des membres déjà inscrits, première fois et « Ce qui change » (téléphone,
+  ordinateur) ;
+- `R11-Mes-Commentaires` et `R11-Mes-Retours` : les deux listes, avec un projet qui n'est plus
+  visible (téléphone) ;
+- `R11-Pied` : le pied de l'accueil des visiteurs, et « À propos » des réglages (téléphone).
