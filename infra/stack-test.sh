@@ -110,6 +110,14 @@ step "L'API répond derrière Caddy, avec la version déployée"
 for _ in $(seq 1 30); do web -f -o /dev/null "https://$API_HOST/health" 2>/dev/null && break; sleep 1; done
 expect "version de l'API" "$(web -f "https://$API_HOST/health" | node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).version))')" stack-test
 
+step "Les journaux de la base n'écrivent ni la valeur d'une erreur, ni la requête refusée"
+# R11 (relecture de sécurité S-C4) : une erreur de PostgreSQL peut citer une valeur (une adresse
+# e-mail en double, par exemple) ; « terse » n'en garde que le message court. Et la requête qui a
+# échoué n'est jamais recopiée dans le journal (« panic » : seulement pour une panne du serveur).
+expect "log_error_verbosity" "$(echo 'show log_error_verbosity;' | db_query)" terse
+expect "log_min_error_statement" "$(echo 'show log_min_error_statement;' | db_query)" panic
+echo "ok"
+
 step "Chaque adresse mène à sa page"
 # Le contenu attendu est lu directement dans l'image web, là où Caddy le prend.
 page_in_image() {
@@ -131,7 +139,12 @@ done <<'EOF'
 /projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6/edit projects/[id]/edit.html
 /members/AbC123_xyz-9 members/[id].html
 /tags/claude-code tags/[slug].html
+/rules rules.html
+/privacy privacy.html
+/legal legal.html
+/accessibility accessibility.html
 /licences-tierces.txt licences-tierces.txt
+/robots.txt robots.txt
 EOF
 
 step "Une adresse inconnue mène à « introuvable », avec le code 404"
@@ -180,6 +193,32 @@ if web "https://$APP_HOST$script" | grep -q 'localhost:8081'; then
   die "$script : contient localhost:8081 (EXPO_PUBLIC_APP_URL absente à la construction ?)"
 fi
 echo "ok : $script sans adresse de développement"
+
+step "Les moteurs de recherche : seuls l'accueil, la connexion, l'inscription et les quatre pages"
+# R11 (scénario, « Les moteurs de recherche ») : robots.txt (apps/app/public/robots.txt, servi tel
+# quel plus haut) propose ces adresses et écarte le reste ; l'en-tête X-Robots-Tag de Caddy dit
+# « noindex » partout ailleurs, pour un moteur qui ne lirait pas robots.txt.
+grep -qi '^content-type: text/plain' <<<"$(headers_of "https://$APP_HOST/robots.txt")" ||
+  die "robots.txt : pas servi en text/plain"
+robots=$(web -f "https://$APP_HOST/robots.txt" | tr -d '\r')
+grep -qx 'User-agent: \*' <<<"$robots" || die "robots.txt : pas de « User-agent: * »"
+grep -qx 'Disallow: /' <<<"$robots" || die "robots.txt : le reste du site n'est pas écarté (« Disallow: / »)"
+# L'accueil seul (« /$ » : l'adresse exacte, pas tout ce qui commence par « / »).
+grep -qx 'Allow: /\$' <<<"$robots" || die "robots.txt : l'accueil n'est pas proposé (« Allow: /\$ »)"
+for path in /sign-in /sign-up /rules /privacy /legal /accessibility; do
+  # « [$]? » : un « $ » final permis (l'adresse exacte), jamais demandé.
+  grep -Eqx "Allow: ${path}[\$]?" <<<"$robots" || die "robots.txt : $path n'est pas proposé"
+done
+for path in / /sign-in /sign-up /rules /privacy /legal /accessibility; do
+  if grep -q '^x-robots-tag:.*noindex' <<<"$(headers_of "https://$APP_HOST$path")"; then
+    die "$path : écarté des moteurs (X-Robots-Tag), alors qu'il doit pouvoir être trouvé"
+  fi
+done
+for path in /projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6 /members/AbC123_xyz-9 /account /tags/claude-code /nope; do
+  grep -q '^x-robots-tag:.*noindex' <<<"$(headers_of "https://$APP_HOST$path")" ||
+    die "$path : pas d'en-tête « X-Robots-Tag: noindex »"
+done
+echo "ok"
 
 step "La politique MTA-STS des e-mails, et rien d'autre à son adresse"
 # Le fichier exact du dépôt, en texte brut ; toute autre adresse de ce nom : 404.
@@ -281,6 +320,36 @@ compose exec -T api sh -c 'test -f /app/media/avant.txt' || die "avatar sauvegar
 if compose exec -T api sh -c 'test -f /app/media/apres.txt'; then die "fichier postérieur toujours là"; fi
 [ -n "$(find "$RUCHE_BACKUPS" -name '*-avant-restauration.db.dump')" ] || die "pas de sauvegarde avant restauration"
 expect "version après restauration" "$(web -f "https://$API_HOST/health" | node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).version))')" stack-test
+echo "ok"
+
+step "Rotation : chaque étiquette a sa borne d'âge, les fichiers refus-*.txt aussi"
+# R11 (relecture de sécurité S-C5) : à chaque passage, la sauvegarde quotidienne comprise, une
+# sauvegarde d'une autre étiquette (ici « manuel ») de plus de 30 jours part, avec les fichiers
+# refus-*.txt d'une restauration (des identifiants de membres) ; plus récents, ils restent. Les
+# dates des noms et celles des fichiers (touch -d) disent la même chose.
+old=$(date -u -d '31 days ago' +%Y-%m-%d_%H%M%S)
+recent=$(date -u -d '20 days ago' +%Y-%m-%d_%H%M%S)
+aged() { # aged <il y a combien> <fichier>… : crée des fichiers vides, datés dans le passé
+  local ago=$1
+  shift
+  for file in "$@"; do
+    : >"$RUCHE_BACKUPS/$file"
+    touch -d "$ago" "$RUCHE_BACKUPS/$file"
+  done
+}
+old_files=("$old-manuel.db.dump" "$old-manuel.media.tar.gz" "refus-$old.txt")
+recent_files=("$recent-manuel.db.dump" "$recent-manuel.media.tar.gz" "refus-$recent.txt")
+aged '31 days ago' "${old_files[@]}"
+aged '20 days ago' "${recent_files[@]}"
+infra/backup.sh
+for file in "${old_files[@]}"; do
+  [ ! -e "$RUCHE_BACKUPS/$file" ] || die "$file : plus de 30 jours, toujours là après une sauvegarde quotidienne"
+done
+for file in "${recent_files[@]}"; do
+  [ -e "$RUCHE_BACKUPS/$file" ] || die "$file : 20 jours seulement, effacé trop tôt"
+done
+[ -n "$(find "$RUCHE_BACKUPS" -name '*-essai.db.dump')" ] || die "la sauvegarde « essai » du jour a disparu"
+rm -f -- "${recent_files[@]/#/$RUCHE_BACKUPS/}"
 echo "ok"
 
 step "Le rôle d'administrateur de la modération (infra/grant-admin.sh)"
