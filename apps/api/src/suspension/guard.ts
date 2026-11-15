@@ -3,7 +3,8 @@
 // - tout GET (et HEAD) : lire ce qu'il lisait avant, exporter ses données ;
 // - tout DELETE : supprimer ses contenus, retirer ses réactions, ne plus suivre, débloquer ;
 // - une courte liste de gestes permis (ALLOWED_WRITES) : signaler, bloquer, masquer un commentaire
-//   sur son projet, marquer ses notifications vues, régler ses e-mails, sa langue (PATCH /v1/me,
+//   sur son projet, marquer ses notifications vues, accepter les règles (R11), régler ses
+//   e-mails, sa langue (PATCH /v1/me,
 //   que la route restreint elle-même : S9 ; depuis R9, aussi vider sa bio ou ses outils, et choisir
 //   un nom ou un pseudo provisoire), passer son projet en privé (PATCH /v1/projects/:id, restreint
 //   par la route au seul `{ visibility: 'private' }`, R9), se désinscrire par le lien d'un e-mail, et
@@ -61,6 +62,10 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   // supprimer la ruche, deux DELETE « en partie » permis, se refusent dans leur route
   // (routes/hives.ts) à un animateur suspendu.
   'POST /v1/hive-invitations/:id/accept',
+  // R11 (relecture de sécurité du plan, S-B1) : accepter les règles en vigueur reste permis. Sans
+  // cela, un membre suspendu qui n'a pas accepté la nouvelle version ne pourrait jamais passer
+  // l'écran « Accepter ». Accepter ne lui rend pas l'écriture : cette garde refuse toujours le reste.
+  'POST /v1/me/rules',
 ])
 
 /** Un objet JSON (pas un tableau, ni null) : le seul corps dont on puisse juger les clés. */
@@ -113,9 +118,10 @@ export const suspendedProjectChange = (body: unknown) =>
  * Les routes que Hono a trouvées pour cette requête, sans les middlewares (méthode « ALL », comme
  * celui-ci ou la limite de taille). `matchedRoutes` (hono/route) les donne toutes, dans l'ordre
  * d'enregistrement : une route de @hono/zod-openapi y figure plusieurs fois (son validateur, son
- * garde de quota, puis elle-même), toujours sous la même méthode et le même modèle.
+ * garde de quota, puis elle-même), toujours sous la même méthode et le même modèle. Exportée
+ * pour la garde de l'accord aux règles (rules/guard.ts, R11), qui compare de la même façon.
  */
-const routesOf = (c: Parameters<MiddlewareHandler<AppEnv>>[0]) =>
+export const routesOf = (c: Parameters<MiddlewareHandler<AppEnv>>[0]) =>
   matchedRoutes(c)
     .filter((route) => route.method !== 'ALL')
     .map((route) => `${route.method} ${route.path}`)

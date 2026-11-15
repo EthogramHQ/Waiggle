@@ -11,9 +11,10 @@ import {
   normalizeInviteCode,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  type SignUpRefusalCode,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
+import { fill, parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
@@ -32,6 +33,7 @@ import { suspensionEmailKey } from '../moderation/suspend'
 import { mediaKeysOf } from '../projects/load'
 import { createRateLimiter, deleteAddressCounters, deleteMemberCounters } from '../rate-limit'
 import { voidReportsOfDepartedAuthors } from '../reports/queue'
+import { acceptCurrentRules } from '../rules/accept'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { dropOrphanOthers } from '../tools/write'
 import { createEmailChange } from './change-email'
@@ -84,6 +86,17 @@ const inviteDigest = (code: string) =>
  */
 const isRightInviteCode = (sent: unknown, expected: string) =>
   typeof sent === 'string' && timingSafeEqual(inviteDigest(sent), inviteDigest(expected))
+
+/**
+ * R11 : le refus de l'inscription quand une des deux cases manque, ou null si les deux valent le
+ * booléen `true` (`SignUpRequest` du contrat : `z.literal(true)` pour chacune). Les règles d'abord,
+ * puis l'âge : l'ordre des cases à l'écran.
+ */
+const signUpRulesRefusal = (body: object): SignUpRefusalCode | null => {
+  if (!('acceptRules' in body) || body.acceptRules !== true) return 'RULES_NOT_ACCEPTED'
+  if (!('ageDeclared' in body) || body.ageDeclared !== true) return 'AGE_NOT_DECLARED'
+  return null
+}
 
 // Les quotas de Better Auth (fenêtres en secondes, comme il les attend). Règle générale : 100
 // requêtes par minute et par adresse IP. Règles plus strictes sur les routes sensibles : 5 essais
@@ -535,18 +548,40 @@ export const createAuth = ({
           return
         }
         if (ctx.path !== '/sign-up/email') return
+        // La langue du visiteur, pour les messages des refus ; le code, pour l'appli
+        // (accounts/errors.ts).
+        const visitorLanguage = () =>
+          resolveLanguage(
+            parseAcceptLanguage(
+              ctx.headers?.get('accept-language') ?? ctx.request?.headers.get('accept-language'),
+            ),
+          )
         if (inviteCode !== null) {
           const sent = 'inviteCode' in body ? body.inviteCode : undefined
           if (!isRightInviteCode(sent, inviteCode)) {
-            // Le message, dans la langue du visiteur ; le code, pour l'appli (accounts/errors.ts).
-            const header =
-              ctx.headers?.get('accept-language') ?? ctx.request?.headers.get('accept-language')
-            const language = resolveLanguage(parseAcceptLanguage(header))
             throw new APIError('FORBIDDEN', {
               code: 'INVITE_CODE_INVALID',
-              message: resources[language].translation.auth.errors.inviteInvalid,
+              message: resources[visitorLanguage()].translation.auth.errors.inviteInvalid,
             })
           }
+        }
+        // R11 : les deux cases, deux accords séparés (« J'accepte les règles », « J'ai 15 ans ou
+        // plus »). Lues ici, dans le hook `before`, avant que Better Auth ne cherche si l'adresse a
+        // déjà un compte (relecture de sécurité du plan) : l'adresse d'un inscrit reçoit le même
+        // refus qu'une adresse inconnue, et la réponse ne dit pas qui est inscrit. Seul le booléen
+        // `true` compte (`=== true`) : ni `"true"`, ni `1`, ni une case absente. S'il manque les
+        // deux, la case des règles d'abord, l'ordre de l'écran. La version acceptée n'est pas lue :
+        // le serveur écrit la sienne (rules/accept.ts, dans `create.after` plus bas).
+        const refusal = signUpRulesRefusal(body)
+        if (refusal !== null) {
+          const errors = resources[visitorLanguage()].translation.errors
+          throw new APIError('BAD_REQUEST', {
+            code: refusal,
+            // `fill` remplit `{{appName}}` (le nom de l'appli, @ruche/brand).
+            message: fill(
+              refusal === 'RULES_NOT_ACCEPTED' ? errors.rulesNotAccepted : errors.ageNotDeclared,
+            ),
+          })
         }
         const name = 'name' in body ? body.name : ''
         if (!DisplayName.safeParse(name).success) {
@@ -600,6 +635,16 @@ export const createAuth = ({
                 image: null,
               },
             }
+          },
+          // R11 : une fois le compte créé, l'accord donné par les deux cases (vérifiées par le hook
+          // `before` plus haut) : la version des règles du serveur, l'heure de l'API, l'âge
+          // déclaré. Better Auth lance ce rappel après sa transaction (queueAfterTransactionHook) :
+          // l'écriture passe par `db` sans attendre une transaction encore ouverte. Seule
+          // l'inscription par e-mail porte les cases : un compte créé par un autre chemin (aucun
+          // n'est ouvert aujourd'hui) n'a pas d'accord, et l'écran « Accepter » le lui demandera.
+          after: async (user, context) => {
+            if (context?.path !== '/sign-up/email') return
+            await acceptCurrentRules(db, user.id, new Date())
           },
         },
       },

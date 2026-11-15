@@ -35,6 +35,7 @@ import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
+import { rulesRoutes } from './routes/rules'
 import { searchRoutes } from './routes/search'
 import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
@@ -46,6 +47,7 @@ import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
 import { updateRoutes } from './routes/updates'
 import { visualRoutes } from './routes/visuals'
+import { rulesGuard } from './rules/guard'
 import { sameOriginWrites } from './security/same-origin'
 import { suspensionGuard } from './suspension/guard'
 import type { AppEnv } from './types'
@@ -338,6 +340,11 @@ export const createApp = ({
   // toutes les routes, donc avant leur validateur et leur quota (suspension/guard.ts). Après
   // « no-store » (S14) : son refus n'est gardé par aucun cache non plus.
   app.use('/v1/*', suspensionGuard(db))
+  // R11 : un membre qui n'a pas accepté les règles en vigueur lit tout, mais n'écrit que ce que la
+  // garde de l'accord permet (rules/guard.ts). Après celle de la suspension : un compte suspendu
+  // reçoit d'abord `suspended`, le refus qui dit ce qui l'attend vraiment (accepter ne lui rendrait
+  // pas l'écriture).
+  app.use('/v1/*', rulesGuard(db))
 
   // La route de santé : `as const` garantit que status vaut exactement 'ok', comme l'exige le schéma.
   app.openapi(healthRoute, (c) => c.json({ status: 'ok' as const, version }, 200))
@@ -345,6 +352,8 @@ export const createApp = ({
   // Les routes du membre connecté et le service des images, rangés dans leurs propres fichiers.
   const limiter = createRateLimiter(db)
   app.route('/', meRoutes({ db, storage, limiter, publicApiUrl }))
+  // L'écran « Accepter » des règles (R11).
+  app.route('/', rulesRoutes({ db, limiter, publicApiUrl }))
   app.route('/', projectRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', visualRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', memberRoutes({ db, limiter, publicApiUrl }))
