@@ -10,7 +10,7 @@
 import type { EmailPreferences } from '@ruche/contracts'
 import { createI18n } from '../i18n'
 import { leaEmailPreferences } from '../testing/email'
-import { emailSummary } from './summary'
+import { emailSummary, hivesNowNote } from './summary'
 
 const fr = createI18n('fr')
 const en = createI18n('en')
@@ -125,6 +125,34 @@ describe('emailSummary', () => {
   // l'Activité » avec le récap activé, alors que le récap part encore le dimanche.
   it('never says nothing leaves while the recap is on, since it still brings the new projects of the people I follow', () => {
     expect(inFrench(allTypes('never'))).toBe(fr.t(($) => $.notifications.summary.nothingFriends))
+  })
+
+  // R10, relecture juridique (C3) : le récap porte « Dans tes ruches » dès que « Ruches » n'est pas
+  // à « Jamais » (jobs/weekly-recap.ts) ; « Tout de suite » n'y change rien, il ne vaut que pour les
+  // invitations. La phrase ne dit donc pas « seulement les nouveaux projets de tes proches ».
+  it('says the recap also brings the hives news when only the hives go at once', () => {
+    expect(inFrench({ ...allTypes('never'), hives: 'now' })).toBe(
+      fr.t(($) => $.notifications.summary.nowFriendsHives, { types: 'Les ruches' }),
+    )
+    expect(inEnglish({ ...allTypes('never'), hives: 'now', replies: 'now' })).toBe(
+      en.t(($) => $.notifications.summary.nowFriendsHives, {
+        types: 'Replies and mentions and hives',
+      }),
+    )
+  })
+
+  // Même relecture : rien ne disait que « Tout de suite », pour les ruches, ne vaut que pour les
+  // invitations. La colonne de l'Activité ajoute, sous la phrase, celle qui le dit (`hivesNowNote`),
+  // et où vont leurs nouveautés, récap activé ou non.
+  it('says « Tout de suite » means only the invitations for the hives, and where their news go', () => {
+    const note = (preferences: EmailPreferences) => hivesNowNote(preferences, fr.t as unknown as T)
+    expect(note(leaEmailPreferences)).toBe(fr.t(($) => $.notifications.summary.hivesNow))
+    expect(note({ ...leaEmailPreferences, weeklyRecap: false })).toBe(
+      fr.t(($) => $.notifications.summary.hivesNowRecapOff),
+    )
+    // Les ruches dans le récap, ou à « Jamais » : rien à préciser.
+    expect(note(allInRecap)).toBeNull()
+    expect(note({ ...leaEmailPreferences, hives: 'never' })).toBeNull()
   })
 
   it('writes the list the English way, with a capital first letter', () => {

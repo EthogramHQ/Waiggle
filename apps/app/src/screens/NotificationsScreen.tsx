@@ -25,7 +25,7 @@ import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useCategories } from '../categories/api'
 import { useEmailPreferences } from '../email/api'
-import { emailSummary } from '../email/summary'
+import { emailSummary, hivesNowNote } from '../email/summary'
 import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -299,6 +299,7 @@ function MemberNotifications() {
             <EmailSummary
               title={t(($) => $.notifications.emailColumn.title)}
               summary={preferences ? emailSummary(preferences, t, i18n.language) : null}
+              detail={preferences ? hivesNowNote(preferences, t) : null}
               note={t(($) => $.notifications.emailColumn.counts)}
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={openSettings}

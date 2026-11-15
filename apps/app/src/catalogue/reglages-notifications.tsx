@@ -135,6 +135,15 @@ export function NotificationSettingsCatalogue() {
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={() => {}}
             />
+            {/* R10 : « Ruches » à « Tout de suite », la phrase qui dit ce que ce choix veut dire. */}
+            <EmailSummary
+              title={t(($) => $.notifications.emailColumn.title)}
+              summary={t(($) => $.notifications.summary.nowAndRest, { types: 'Les ruches' })}
+              detail={t(($) => $.notifications.summary.hivesNow)}
+              note={t(($) => $.notifications.emailColumn.counts)}
+              actionLabel={t(($) => $.notifications.emailColumn.settings)}
+              onAction={() => {}}
+            />
             <Text tone="secondary">{l.summaryEmpty}</Text>
             <EmailSummary
               title={t(($) => $.notifications.emailColumn.title)}
