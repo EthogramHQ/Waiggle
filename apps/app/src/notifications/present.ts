@@ -577,22 +577,46 @@ export const presentNotification = (
         projectHidden,
       } = notification
       // R10 : le nom d'une ruche retiré (seul cas sans projet) : la phrase, puis toute la
-      // motivation, comme pour un contenu (article 17 du DSA). Elle ne mène nulle part.
-      if (targetKind === 'hive' || project === null)
+      // motivation, comme pour un contenu (article 17 du DSA). Relecture juridique (C2) : la ligne
+      // va à l'animateur actuel et à qui avait écrit le nom. L'API ne donne l'identifiant de la
+      // ruche qu'à l'animateur, tant que le retrait dure : lui seul est invité à la renommer, et
+      // la ligne mène à ses réglages. La ruche se reconnaît à son icône ; renommée depuis, à son
+      // nom actuel (jamais celui qui a été retiré).
+      if (targetKind === 'hive' || project === null) {
+        const hive = notification.hive
+        const renamable = hive?.id ? hive.id : null
+        const currentName = hive?.name ?? null
+        const said =
+          currentName === null
+            ? say({}, () => t(($) => $.notifications.removed.hive))
+            : say({ hive: currentName }, (params) =>
+                t(($) => $.notifications.removed.hiveRenamed, params as { hive: string }),
+              )
+        const rest =
+          renamable !== null
+            ? t(($) => $.removal.part.rest.hive)
+            : currentName === null
+              ? t(($) => $.removal.part.restHiveWriter)
+              : null
         return {
           ...plain,
-          ...say({}, () => t(($) => $.notifications.removed.hive)),
+          ...said,
           icon: 'prohibit',
-          leading: iconLeading('prohibit', 'danger'),
+          leading: iconLeading(hive?.icon ?? 'prohibit', 'danger'),
           detail: [
             t(($) => $.removal.part.onlyYou),
+            ...(rest ? [rest] : []),
             afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
             t(($) => $.removal.grounds[ground]),
             t(($) => $.removal.explanation, { explanation }),
             t(($) => $.removal.contest),
           ].join('\n'),
-          target: null,
+          target:
+            renamable !== null
+              ? { pathname: '/hives/[id]/settings', params: { id: renamable } }
+              : null,
         }
+      }
       const elsewhere = targetKind === 'comment' && projectHidden
       // R9 : une partie retirée seule se nomme (« La 2e photo de Météo… ») ; une partie que
       // l'auteur ne voit pas comme telle retombe sur la phrase du contenu entier.

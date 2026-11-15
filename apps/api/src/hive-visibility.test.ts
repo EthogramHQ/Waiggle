@@ -12,6 +12,7 @@
 // ailleurs. Quatre membres : Inès (l'autrice, dans « Famille » et « Amis »), Max (dans « Famille »),
 // Zoé (dans « Amis » seulement : être dans une autre ruche d'Inès ne suffit pas) et Sami (dans
 // aucune ruche). Le témoin de chaque lecture est Max : ce qui est caché aux autres lui est montré.
+import { randomUUID } from 'node:crypto'
 import { Comment, FeedPage, Member, Project, TesterMedia, ToolPage } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
@@ -347,6 +348,27 @@ describe('a member who left the hive', () => {
         .from(schema.projectReaction)
         .where(eq(schema.projectReaction.memberId, maxId)),
     ).toEqual([])
+  })
+
+  // R10, relecture de sécurité (A3) : défaire sa réaction ne doit pas dire qu'un projet réservé
+  // existe à qui n'en est ni membre, ni l'un de ceux qui y ont réagi.
+  it('answers a stranger removing a reaction on a hive-reserved project as on an unknown project', async () => {
+    const album = await reservedProject()
+    const unknown = await act.send('DELETE', `/v1/projects/${randomUUID()}/reactions/bravo`, sami)
+
+    for (const [name, cookie] of strangers()) {
+      const res = await act.send('DELETE', `/v1/projects/${album.id}/reactions/bravo`, cookie)
+      expect(res.status, name).toBe(404)
+      expect(await res.json(), name).toEqual(await unknown.clone().json())
+    }
+    // Témoins : Max, membre de Famille, la retire (même jamais posée) ; Max, parti après avoir
+    // réagi, la retire encore.
+    expect(await status('DELETE', `/v1/projects/${album.id}/reactions/bravo`, max)).toBe(204)
+    await act.react(album.id, 'bravo', max)
+    later()
+    await hives.removeMember(famille, maxId)
+    expect(await status('DELETE', `/v1/projects/${album.id}/reactions/funny`, max)).toBe(204)
+    expect(await status('DELETE', `/v1/projects/${album.id}/reactions/bravo`, max)).toBe(204)
   })
 })
 

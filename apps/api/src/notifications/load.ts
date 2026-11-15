@@ -260,6 +260,24 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       join hive h on h.id = hm.hive_id and h.animator_id = ${me}
       join moderation_decision d on d.id = h.name_removal_id
       where hm.user_id = ${me} and ${during('d.created_at')}
+      union all
+      -- R10, relecture juridique (C2) : la décision vise celui qui a écrit le nom (name_set_by) ;
+      -- sa motivation lui est due (article 17 du DSA), même s'il n'anime pas ou plus, même parti
+      -- de la ruche. Ses décisions par moderation_decision_member_idx (target_member_id,
+      -- created_at), puis la ruche par sa clé primaire (« case » : l'identifiant n'est converti en
+      -- uuid que pour une cible « hive »). La ligne vit jusqu'à un rétablissement de ce nom
+      -- (moderation_decision_target_idx), même si l'animateur a renommé la ruche depuis. Quand il
+      -- anime la ruche et que ce retrait dure, la branche du dessus la donne déjà : une seule ligne.
+      select 'hive', null, null, null, d.id, d.created_at, h.id
+      from moderation_decision d
+      join hive h on h.id = case when d.target_kind = 'hive' then d.target_id::uuid end
+      where d.target_member_id = ${me} and d.target_kind = 'hive' and d.action = 'remove'
+        and ${during('d.created_at')}
+        and (h.animator_id = ${me} and h.name_removal_id = d.id) is not true
+        and not exists (
+          select 1 from moderation_decision rs
+          where rs.target_kind = 'hive' and rs.target_id = d.target_id
+            and rs.action = 'restore' and rs.created_at > d.created_at)
     ) x
     where x.removal_id is not null
 
@@ -324,6 +342,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       d.target_kind, null, d.id, null, null, null, null
     from moderation_decision d
     where d.target_member_id = ${me} and d.action = 'restore' and ${during('d.created_at')}
+      and d.target_kind <> 'hive'
 
     union all
 
@@ -331,7 +350,9 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     --    (la décision, elle, vise celui qui avait écrit le nom). Ses ruches par hive_member, puis la
     --    décision par l'index moderation_decision_target_idx (target_kind, target_id, created_at) :
     --    l'identifiant de la ruche est comparé en texte (« h.id::text »), sans convertir l'identifiant
-    --    d'une cible d'une autre sorte en uuid.
+    --    d'une cible d'une autre sorte en uuid. Relecture juridique (C2) : celui qui a écrit le nom
+    --    l'apprend aussi (seconde branche, par moderation_decision_member_idx, la ruche par sa clé
+    --    primaire) ; quand c'est lui qui anime, seule cette seconde branche le donne (une ligne).
     select 'restored', 'restored:' || d.id, d.created_at, null, null,
       null, null, null, null, null, null, null, null, null,
       'hive', null, d.id, null, null, null, h.id
@@ -340,6 +361,17 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     join moderation_decision d on d.target_kind = 'hive' and d.target_id = h.id::text
       and d.action = 'restore'
     where hm.user_id = ${me} and ${during('d.created_at')}
+      and d.target_member_id is distinct from ${me}
+
+    union all
+
+    select 'restored', 'restored:' || d.id, d.created_at, null, null,
+      null, null, null, null, null, null, null, null, null,
+      'hive', null, d.id, null, null, null, h.id
+    from moderation_decision d
+    join hive h on h.id = case when d.target_kind = 'hive' then d.target_id::uuid end
+    where d.target_member_id = ${me} and d.target_kind = 'hive' and d.action = 'restore'
+      and ${during('d.created_at')}
 
     union all
 
@@ -939,6 +971,7 @@ const ListRow = z.object({
   hive_id: z.string().nullable(),
   hive_name: z.string().nullable(),
   hive_icon: HiveIcon.nullable(),
+  hive_renamable: z.boolean().nullable(),
   invitation_id: z.string().nullable(),
   hive_notice_id: z.string().nullable(),
 })
@@ -1160,7 +1193,9 @@ export const present = (
               afterReport: row.after_report ?? false,
             })
       const targetKind = row.target_kind
-      // R10 : le nom d'une ruche retiré, pour son animateur : pas de projet, la ruche à la place.
+      // R10 : le nom d'une ruche retiré, pour son animateur et pour qui l'avait écrit : pas de
+      // projet, la ruche à la place. Relecture juridique (C2) : son identifiant (la ligne mène à
+      // ses réglages pour la renommer) seulement pour l'animateur actuel, tant que le retrait dure.
       if (targetKind === 'hive') {
         const hive = hiveOf(row)
         if (!removal || !hive) return null
@@ -1170,7 +1205,7 @@ export const present = (
           targetKind,
           part: partOf(row),
           project: null,
-          hive,
+          hive: { ...hive, id: row.hive_renamable ? hive.id : null },
           excerpt: null,
           ground: removal.ground,
           explanation: removal.explanation,
@@ -1437,12 +1472,24 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       -- actuel (un ancien membre ne le lit pas) ; celui d'une invitation, d'une entrée ou d'une
       -- décision, le nom actuel, que l'invité et les membres lisent déjà dans l'onglet Ruches. Vide
       -- (la modération a vidé la copie) ou retiré (name_removal_id) : null, « Ruche sans nom ».
+      -- Relecture juridique (C2) : le nom d'une ruche retiré va aussi à qui l'avait écrit, membre
+      -- ou non. Le nom actuel (renommée depuis) n'est lu que par un membre (clé primaire de
+      -- hive_member) ; un ancien membre n'a que l'icône. Un rétablissement rend à qui n'est plus
+      -- membre le nom qu'il avait lui-même écrit (previous_value de la décision), rien de plus.
       coalesce(hive.id, hv.id) as hive_id,
       case
         when hn.id is not null then nullif(hn.hive_name, '')
         when hive.id is not null and hive.name_removal_id is null then nullif(hive.name, '')
-        when hive.id is null and hv.name_removal_id is null then nullif(hv.name, '')
+        when hive.id is null and hv.name_removal_id is null
+          and (select 1 from hive_member hvm
+               where hvm.hive_id = hv.id and hvm.user_id = ${me} limit 1) is not null
+          then nullif(hv.name, '')
+        when hive.id is null and n.kind = 'restored' then nullif(md.previous_value, '')
       end as hive_name,
+      -- La ligne d'un nom retiré mène à la ruche pour la renommer : seulement pour l'animateur
+      -- actuel, et tant que ce retrait dure (celui qui a écrit le nom sans animer n'y peut rien).
+      (n.kind = 'removed' and hv.animator_id = ${me} and hv.name_removal_id = n.decision_id)
+        is true as hive_renamable,
       coalesce(hive.icon, hv.icon) as hive_icon,
       hi.id as invitation_id,
       hn.id as hive_notice_id

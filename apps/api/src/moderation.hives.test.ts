@@ -19,6 +19,7 @@ import {
   ModerationQueuePage,
   MyHives,
   NotificationPage,
+  RemovedPage,
   type ReportTarget,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -320,5 +321,243 @@ describe('restoring the name of a hive', () => {
         valueBack: true,
       }),
     ])
+  })
+})
+
+// R10, relecture juridique (C2) : la décision vise celui qui a écrit le nom (`name_set_by`) ; sa
+// motivation lui est due (article 17 du DSA), comme à l'animateur actuel, seul à pouvoir renommer.
+// La ligne de l'animateur garde l'identifiant de la ruche (elle mène à ses réglages) ; celle de qui
+// a écrit le nom sans animer n'en a pas (rien à y faire). Le nom retiré n'y revient jamais ; le nom
+// actuel, seulement à un membre et une fois la ruche renommée.
+describe('who learns that a hive name was removed', () => {
+  const removedLines = async (cookie: string) => {
+    const { items, raw } = await notificationsOf(cookie)
+    return { lines: items.filter((item) => item.kind === 'removed'), raw }
+  }
+
+  it('tells the member who wrote a removed hive name why it was removed', async () => {
+    await removeName()
+
+    const zoeLines = await removedLines(zoe)
+    expect(zoeLines.lines).toEqual([
+      expect.objectContaining({
+        targetKind: 'hive',
+        project: null,
+        hive: { id: null, name: null, icon: 'leaf' },
+        part: { field: 'name', position: null },
+        ground: 'rules',
+        explanation: EXPLANATION,
+        afterReport: true,
+      }),
+    ])
+    expect(zoeLines.raw).not.toContain('Pivert')
+
+    // Inès renomme la ruche : Zoé, membre, lit le nom actuel ; jamais celui qui a été retiré.
+    later()
+    const renamed = await act.send('PATCH', `/v1/hives/${hiveId}`, ines, { name: 'Les Mésanges' })
+    expect(renamed.status).toBe(200)
+    const afterRename = await removedLines(zoe)
+    expect(afterRename.lines).toEqual([
+      expect.objectContaining({ hive: { id: null, name: 'Les Mésanges', icon: 'leaf' } }),
+    ])
+    expect(afterRename.raw).not.toContain('Pivert')
+
+    // Partie de la ruche, elle garde la motivation, sans le nom actuel.
+    await ctx.db.delete(schema.hiveMember).where(eq(schema.hiveMember.userId, zoeId))
+    const gone = await removedLines(zoe)
+    expect(gone.lines).toEqual([
+      expect.objectContaining({ hive: { id: null, name: null, icon: 'leaf' } }),
+    ])
+    expect(gone.raw).not.toContain('Mésanges')
+    // Témoin : Max, invité, n'a rien écrit et ne reçoit rien.
+    expect((await removedLines(max)).lines).toEqual([])
+  })
+
+  it('tells the current animator too, with a way to rename the hive', async () => {
+    await removeName()
+    // L'animation passe à Malik après la décision : c'est lui qui peut renommer.
+    await hives.join(hiveId, { id: malikId })
+    await ctx.db.update(schema.hive).set({ animatorId: malikId }).where(eq(schema.hive.id, hiveId))
+
+    const expected = {
+      targetKind: 'hive',
+      hive: { id: hiveId, name: null, icon: 'leaf' },
+      ground: 'rules',
+      explanation: EXPLANATION,
+    }
+    expect((await removedLines(malik)).lines).toEqual([expect.objectContaining(expected)])
+    // Inès n'anime plus ; Zoé garde sa ligne à elle, une seule.
+    expect((await removedLines(ines)).lines).toEqual([])
+    expect((await removedLines(zoe)).lines).toEqual([
+      expect.objectContaining({ hive: { id: null, name: null, icon: 'leaf' } }),
+    ])
+
+    // Zoé anime à son tour : une seule ligne, celle qui permet de renommer.
+    await ctx.db.update(schema.hive).set({ animatorId: zoeId }).where(eq(schema.hive.id, hiveId))
+    expect((await removedLines(zoe)).lines).toEqual([expect.objectContaining(expected)])
+  })
+
+  it('tells the member who wrote the name that it is restored, and the animator, once each', async () => {
+    await removeName()
+    later()
+    await act.decide(louis, { action: 'restore', target: target(), part: { field: 'name' } })
+
+    for (const cookie of [zoe, ines]) {
+      const { items } = await notificationsOf(cookie)
+      expect(items.filter((item) => item.kind === 'removed')).toEqual([])
+      expect(items.filter((item) => item.kind === 'restored')).toEqual([
+        expect.objectContaining({
+          targetKind: 'hive',
+          hive: expect.objectContaining({ name: NAME, icon: 'leaf' }),
+          valueBack: true,
+        }),
+      ])
+    }
+    // Témoin : Max, invité, ne reçoit rien.
+    const maxItems = (await notificationsOf(max)).items
+    expect(maxItems.filter((item) => item.kind === 'restored')).toEqual([])
+  })
+})
+
+// R10, relecture de sécurité (A2) : une copie du nom gardée dans l'Activité (`hive_notice`) ne doit
+// pas échapper à la modération. Qui la reçoit peut signaler le nom de la ruche, même s'il n'en est
+// plus membre ; et supprimer une ruche dont le nom est signalé vide ses copies.
+describe('the copies of a hive name kept in the Activity', () => {
+  it('lets a member removed from a hive report its name', async () => {
+    const removed = await act.send('DELETE', `/v1/hives/${hiveId}/members/${zoeId}`, ines)
+    expect(removed.status).toBe(204)
+    later()
+
+    expect((await reportBy(zoe, { part: { field: 'name' } })).status).toBe(201)
+
+    // Témoins : Malik, sans trace de cette ruche, reçoit le 404 d'une ruche inconnue ; une trace
+    // d'une autre ruche n'ouvre rien.
+    const unknown = await act.send('POST', '/v1/reports', malik, {
+      target: { kind: 'hive', id: randomUUID() },
+      reason: 'other',
+    })
+    const otherHive = await hives.create({ name: 'Atelier', animatorId: inesId, members: [] })
+    await hives.notice({ recipientId: malikId, kind: 'removed', hiveId: otherHive, hiveName: 'A' })
+    const stranger = await reportBy(malik)
+    expect(stranger.status).toBe(404)
+    expect(await stranger.text()).toBe(await unknown.text())
+    // Une trace d'au-delà de 90 jours (pas encore purgée) n'ouvre rien non plus.
+    await hives.notice({
+      recipientId: malikId,
+      kind: 'removed',
+      hiveId,
+      hiveName: NAME,
+      createdAt: new Date(Date.now() - 91 * 24 * 3600 * SECOND),
+    })
+    expect((await reportBy(malik)).status).toBe(404)
+  })
+
+  it('blanks the hive name in the deletion notices of a hive deleted with an open report on its name', async () => {
+    // Malik avait été retiré avant : sa trace garde la copie du nom.
+    const before = await hives.notice({
+      recipientId: malikId,
+      kind: 'removed',
+      hiveId,
+      hiveName: NAME,
+    })
+    // Témoin : une autre ruche, supprimée sans signalement, garde son nom dans ses traces.
+    const atelier = await hives.create({
+      name: 'Atelier',
+      animatorId: inesId,
+      members: [{ id: maxId }],
+    })
+    later()
+    expect((await reportBy(zoe, { part: { field: 'name' } })).status).toBe(201)
+    later()
+
+    expect((await act.send('DELETE', `/v1/hives/${hiveId}`, ines)).status).toBe(204)
+    expect((await act.send('DELETE', `/v1/hives/${atelier}`, ines)).status).toBe(204)
+
+    const notices = await ctx.db.select().from(schema.hiveNotice)
+    expect(notices.find((n) => n.id === before)?.hiveName).toBe('')
+    expect(notices.filter((n) => n.recipientId === zoeId)).toEqual([
+      expect.objectContaining({ kind: 'deleted', hiveName: '' }),
+    ])
+    expect(notices.filter((n) => n.recipientId === maxId)).toEqual([
+      expect.objectContaining({ kind: 'deleted', hiveName: 'Atelier' }),
+    ])
+    const zoeLines = await notificationsOf(zoe)
+    expect(zoeLines.items.filter((i) => i.kind === 'hive_deleted')).toEqual([
+      expect.objectContaining({ hive: expect.objectContaining({ name: null }) }),
+    ])
+    expect(zoeLines.raw).not.toContain('Pivert')
+  })
+
+  it('blanks them too when the last member leaves a hive whose name is reported', async () => {
+    const before = await hives.notice({
+      recipientId: malikId,
+      kind: 'removed',
+      hiveId,
+      hiveName: NAME,
+    })
+    expect((await reportBy(zoe, { part: { field: 'name' } })).status).toBe(201)
+    later()
+
+    expect((await act.send('DELETE', `/v1/hives/${hiveId}/members/${zoeId}`, zoe)).status).toBe(204)
+    expect((await act.send('DELETE', `/v1/hives/${hiveId}/members/${inesId}`, ines)).status).toBe(
+      204,
+    )
+    expect(await hives.row(hiveId)).toBeNull()
+
+    const [notice] = await ctx.db
+      .select()
+      .from(schema.hiveNotice)
+      .where(eq(schema.hiveNotice.id, before))
+    expect(notice?.hiveName).toBe('')
+  })
+})
+
+// R10 (décision du 15/11/2026) : un nom de ruche retiré entre dans l'onglet « Retirés » de la
+// modération, comme les autres contenus, d'où on le rétablit. Renommée depuis, la ruche garde son
+// nouveau nom au rétablissement (valueBack: false), et la ligne reste jusque-là.
+describe('the removed hive names in the moderation', () => {
+  const removedPage = async () => {
+    const res = await act.send('GET', '/v1/moderation/removed', louis)
+    expect(res.status).toBe(200)
+    return RemovedPage.parse(await res.json()).items
+  }
+
+  it('lists a removed hive name with the other removed contents and restores it', async () => {
+    await removeName()
+
+    expect(await removedPage()).toEqual([
+      expect.objectContaining({
+        target: { kind: 'hive', id: hiveId },
+        part: expect.objectContaining({ field: 'name' }),
+        projectId: null,
+        text: NAME,
+        ground: 'rules',
+        explanation: EXPLANATION,
+        concernsMe: false,
+      }),
+    ])
+
+    later()
+    await act.decide(louis, { action: 'restore', target: target(), part: { field: 'name' } })
+    expect((await hives.row(hiveId))?.name).toBe(NAME)
+    expect(await removedPage()).toEqual([])
+  })
+
+  it('keeps it listed after a rename, and the restoration keeps the new name', async () => {
+    await removeName()
+    later()
+    expect(
+      (await act.send('PATCH', `/v1/hives/${hiveId}`, ines, { name: 'Les Mésanges' })).status,
+    ).toBe(200)
+
+    expect(await removedPage()).toEqual([
+      expect.objectContaining({ target: { kind: 'hive', id: hiveId }, text: NAME }),
+    ])
+    later()
+    await act.decide(louis, { action: 'restore', target: target(), part: { field: 'name' } })
+    expect((await hives.row(hiveId))?.name).toBe('Les Mésanges')
+    expect(await removedPage()).toEqual([])
+    const restored = (await notificationsOf(ines)).items.filter((i) => i.kind === 'restored')
+    expect(restored).toEqual([expect.objectContaining({ valueBack: false })])
   })
 })

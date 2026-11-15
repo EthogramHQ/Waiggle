@@ -1722,6 +1722,8 @@ export const en: Translation = {
         message: 'The rest of the message stays visible.',
         hive: 'Your hive keeps its icon and members: choose it another name in its settings.',
       },
+      restHiveWriter: 'The hive keeps its icon and members; its host can choose it another name.',
+
       date: 'Removed on {{date}}',
       contestLead: 'To appeal:',
       court: 'You can also go to court.',
@@ -2658,6 +2660,7 @@ export const en: Translation = {
       call: 'Your call for testing on <b>{{title}}</b> was removed by the moderation',
       message: 'Your message on <b>{{title}}</b> was removed by the moderation',
       hive: 'The name of your hive was removed by moderation',
+      hiveRenamed: 'The former name of your hive <b>{{hive}}</b> was removed by moderation',
     },
     reportHandled: {
       project: {

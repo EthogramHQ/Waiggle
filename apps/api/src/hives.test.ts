@@ -755,3 +755,31 @@ describe('the members of a hive', () => {
     expect(await showing()).toEqual([])
   })
 })
+
+// R10, relecture de sécurité (A4) : le marque-page d'une ruche suit la règle de `cursor.ts`. Une
+// date hors des bornes de PostgreSQL (an 0, an négatif, an 275760) ferait échouer la requête (500) ;
+// elle est refusée comme toute donnée invalide.
+describe('the page mark of the lists of a hive', () => {
+  const mark = (at: string) =>
+    Buffer.from(`${at}~0~00000000-0000-4000-8000-000000000000`).toString('base64url')
+
+  it('answers 400 to a cursor dated year 0 or beyond 9999 on the activity and the projects of a hive', async () => {
+    const famille = await family()
+    for (const list of ['activity', 'projects']) {
+      const path = (at: string) =>
+        `/v1/hives/${famille.id}/${list}?${new URLSearchParams({ cursor: mark(at) })}`
+      for (const at of [
+        '0000-01-01T00:00:00.000Z',
+        '+275760-09-13T00:00:00.000Z',
+        '-000001-01-01T00:00:00.000Z',
+        '1999-12-31T23:59:59.000Z',
+      ]) {
+        await expectError(await act.send('GET', path(at), ines.cookie), 400, 'validation')
+      }
+      // Témoin : une date ordinaire passe.
+      expect((await act.send('GET', path('2026-11-14T08:00:00.000Z'), ines.cookie)).status).toBe(
+        200,
+      )
+    }
+  })
+})

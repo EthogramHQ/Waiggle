@@ -2019,6 +2019,9 @@ export const fr = {
         message: 'Le reste du message reste affiché.',
         hive: 'Ta ruche garde son icône et ses membres : choisis-lui un autre nom dans ses réglages.',
       },
+      // R10, relecture juridique (C2) : pour qui a écrit le nom retiré sans animer la ruche.
+      restHiveWriter:
+        'La ruche garde son icône et ses membres ; son animateur peut lui choisir un autre nom.',
       date: 'Retiré le {{date}}',
       contestLead: 'Pour contester :',
       court: 'Tu peux aussi saisir la justice.',
@@ -3181,6 +3184,8 @@ export const fr = {
       call: 'Ton appel à tester <b>{{title}}</b> a été retiré par la modération',
       message: 'Ton message sur <b>{{title}}</b> a été retiré par la modération',
       hive: 'Le nom de ta ruche a été retiré par la modération',
+      // R10, relecture juridique (C2) : la ruche renommée depuis se nomme par son nom actuel.
+      hiveRenamed: 'L’ancien nom de ta ruche <b>{{hive}}</b> a été retiré par la modération',
     },
     reportHandled: {
       // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).
