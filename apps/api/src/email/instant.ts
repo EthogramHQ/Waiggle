@@ -35,10 +35,15 @@ export type InstantLine = {
     | 'tester_reply_to_tester'
     | 'tester_reply_to_author'
     | 'feedback_settled'
-  /** Le nom de qui a écrit, tel qu'il l'a saisi (désarmé ici). */
+    // R10 : une invitation dans une ruche, sans le nom de la ruche (choix 7 du scénario).
+    | 'hive_invited'
+  /** Le nom de qui a écrit (ou invité), tel qu'il l'a saisi (désarmé ici). */
   who: string
   handle: string
-  /** Le titre du projet, tel qu'écrit par son auteur (désarmé ici). */
+  /**
+   * Le titre du projet, tel qu'écrit par son auteur (désarmé ici). Vide pour une invitation : le nom
+   * d'une ruche, écrit par un membre, ne sort jamais dans un e-mail (l'invité le lit dans l'appli).
+   */
   title: string
   /** Le début d'un commentaire (80 caractères, déjà désarmé par la tâche) ; null pour le coin. */
   excerpt: string | null
@@ -70,9 +75,10 @@ const sentenceKey = {
   tester_reply_to_tester: 'testerReplyToTester',
   tester_reply_to_author: 'testerReplyToAuthor',
   feedback_settled: 'feedbackSettled',
+  hive_invited: 'hiveInvited',
 } as const satisfies Record<InstantLine['kind'], keyof Texts>
 
-/** Le bouton de chaque ligne : le commentaire en contexte, ou le bon endroit du coin. */
+/** Le bouton de chaque ligne : le commentaire en contexte, le bon endroit du coin, l'onglet Ruches. */
 const buttonKey = {
   comment: 'seeInContext',
   reply: 'seeInContext',
@@ -82,6 +88,7 @@ const buttonKey = {
   tester_reply_to_tester: 'readReply',
   tester_reply_to_author: 'readReply',
   feedback_settled: 'openCorner',
+  hive_invited: 'openHives',
 } as const satisfies Record<InstantLine['kind'], keyof Texts>
 
 /** L'étiquette au-dessus de la ligne (« Commentaire · 18:02 ») : le coin a une seule étiquette. */
@@ -94,22 +101,29 @@ const labelKey = {
   tester_reply_to_tester: 'testers',
   tester_reply_to_author: 'testers',
   feedback_settled: 'testers',
+  hive_invited: 'hives',
 } as const satisfies Record<InstantLine['kind'], keyof Texts['labels']>
 
 /**
  * L'objet d'une première ligne, s'il peut la nommer. Un message du coin (retour, réponse,
- * « Réglé ») n'en a pas : l'objet s'affiche sur un écran verrouillé, et le fil est privé.
+ * « Réglé ») n'en a pas : l'objet s'affiche sur un écran verrouillé, et le fil est privé. Une
+ * invitation nomme l'inviteur, jamais la ruche (« Inès Haddad t'invite dans une ruche »).
  */
 const subjectKey: Partial<
   Record<
     InstantLine['kind'],
-    'subjectComment' | 'subjectReply' | 'subjectMention' | 'subjectTesterCall'
+    | 'subjectComment'
+    | 'subjectReply'
+    | 'subjectMention'
+    | 'subjectTesterCall'
+    | 'subjectHiveInvited'
   >
 > = {
   comment: 'subjectComment',
   reply: 'subjectReply',
   mention: 'subjectMention',
   tester_call: 'subjectTesterCall',
+  hive_invited: 'subjectHiveInvited',
 }
 
 /**
@@ -169,8 +183,16 @@ const writeLine = (language: Language, t: Texts, line: InstantLine): Written => 
     handle: line.handle,
     title: defangLinks(line.title, link),
   }
-  // Le coin des testeurs : jamais d'extrait, même si la tâche en donnait un par erreur.
-  const corner = !(line.kind === 'comment' || line.kind === 'reply' || line.kind === 'mention')
+  // Le coin des testeurs et les invitations : jamais d'extrait, même si la tâche en donnait un par
+  // erreur. La note d'une invitation dit pourquoi la ruche n'est pas nommée.
+  const invitation = line.kind === 'hive_invited'
+  const corner =
+    !invitation && !(line.kind === 'comment' || line.kind === 'reply' || line.kind === 'mention')
+  const note = invitation
+    ? fill(t.hiveInvitedExplain)
+    : corner
+      ? fill(line.kind === 'tester_call' ? t.callPrivate : t.private)
+      : null
   return {
     when: fill(t.when, {
       label: t.labels[labelKey[line.kind]],
@@ -179,8 +201,8 @@ const writeLine = (language: Language, t: Texts, line: InstantLine): Written => 
     sentence: fill(t[sentenceKey[line.kind]], params),
     // L'extrait a été désarmé avant d'être coupé (une adresse coupée en deux ne serait plus
     // reconnue) ; on repasse quand même le filtre, qui ne trouve plus rien à changer.
-    excerpt: corner || line.excerpt === null ? null : defangLinks(line.excerpt, link),
-    note: corner ? fill(line.kind === 'tester_call' ? t.callPrivate : t.private) : null,
+    excerpt: corner || invitation || line.excerpt === null ? null : defangLinks(line.excerpt, link),
+    note,
     button: fill(t[buttonKey[line.kind]]),
     url: line.url,
   }
@@ -407,8 +429,17 @@ export const instantPreviewData = (): InstantData => {
         at: at(10),
         url: `${project}/testers?tab=feedback`,
       },
+      // R10 : une invitation, sans titre (le nom de la ruche ne sort jamais), vers l'onglet Ruches.
+      {
+        kind: 'hive_invited',
+        ...malik,
+        title: '',
+        excerpt: null,
+        at: at(11),
+        url: `${PREVIEW_APP_URL}/hives`,
+      },
     ],
-    types: ['comments', 'replies', 'testers'],
+    types: ['comments', 'replies', 'testers', 'hives'],
     links: {
       button: `${PREVIEW_APP_URL}/notifications`,
       unsubscribe: `${PREVIEW_APP_URL}/unsubscribe?${query}`,
