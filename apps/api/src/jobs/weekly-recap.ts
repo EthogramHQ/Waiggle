@@ -91,6 +91,9 @@ const Choices = z.object({
   email_updates: z.string(),
   email_testers: z.string(),
   email_hives: z.string(),
+  // R11 : « Découvertes » (`digest` ou `never`), qui retire du récap « Nouveaux projets de tes
+  // proches » et « Ils cherchent des testeurs ». Pas un type d'e-mail : jamais lue par `choiceOf`.
+  discoveries: z.string(),
 })
 type Choices = z.infer<typeof Choices>
 const choiceOf = (choices: Choices, type: EmailType) => choices[`email_${type}`] as EmailChoice
@@ -103,7 +106,8 @@ const choiceColumns = sql`
   coalesce(ep.email_follows, 'digest') as email_follows,
   coalesce(ep.email_updates, 'digest') as email_updates,
   coalesce(ep.email_testers, 'digest') as email_testers,
-  coalesce(ep.email_hives, 'now') as email_hives`
+  coalesce(ep.email_hives, 'now') as email_hives,
+  coalesce(ep.discoveries, 'digest') as discoveries`
 
 const Candidate = Choices.extend({
   id: z.string(),
@@ -442,12 +446,12 @@ const take = async (db: Database, userId: string, now: Date) => {
         and (email_preference.recap_unvisited < ${RECAP_UNVISITED_MAX}
           or ${visitedSince('email_preference')})
       returning user_id, recap_unvisited, instant_sent_at, email_reactions, email_comments,
-        email_replies, email_follows, email_updates, email_testers, email_hives
+        email_replies, email_follows, email_updates, email_testers, email_hives, discoveries
     )
     select u.email, u.name, u.language, taken.recap_unvisited,
       to_char(taken.instant_sent_at, ${ISO}) as instant_sent_at,
       taken.email_reactions, taken.email_comments, taken.email_replies, taken.email_follows,
-      taken.email_updates, taken.email_testers, taken.email_hives
+      taken.email_updates, taken.email_testers, taken.email_hives, taken.discoveries
     from taken join "user" u on u.id = taken.user_id
   `
   const [row] = z.object({ rows: z.array(Taken) }).parse(await db.execute(query)).rows
@@ -515,8 +519,11 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   // R8 : les projets des proches ne sont pas des notifications de l'Activité : leur fenêtre part du
   // dernier récap (ou d'il y a 7 jours), pas de la dernière visite d'Activité.
   const friendsSince = latest(member.recap_sent_at, new Date(now.getTime() - RECAP_WINDOW_MS))
-  const friends = await friendProjects(deps.db, member.id, friendsSince, now, false)
-  const [wanted] = await friendProjects(deps.db, member.id, friendsSince, now, true)
+  // R11 : « Découvertes » sur « Jamais » retire ces deux parties (« Nouveaux projets de tes
+  // proches », « Ils cherchent des testeurs ») : on ne les lit même pas. Relu à la prise, plus bas.
+  const discover = member.discoveries !== 'never'
+  const friends = discover ? await friendProjects(deps.db, member.id, friendsSince, now, false) : []
+  const [wanted] = discover ? await friendProjects(deps.db, member.id, friendsSince, now, true) : []
   // R10, « Dans tes ruches » : même fenêtre que les proches. Rien si « Ruches » vaut « Jamais » ;
   // les invitations en attente seulement s'il vaut « Dans le récap » (« Tout de suite » : elles sont
   // parties par l'e-mail « tout de suite »). Lues avec le choix du début du lot, refiltrées après
@@ -536,12 +543,19 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     deps.appUrl,
     entries.filter((entry) => kept(entry, member, member.instant_sent_at)),
   )
-  const nothingElse = (hiveParts: { hives: unknown[]; invitations: unknown[] }) =>
-    friends.length === 0 &&
-    wanted === undefined &&
+  const nothingElse = (hiveParts: {
+    friends: unknown[]
+    wanted: unknown
+    hives: unknown[]
+    invitations: unknown[]
+  }) =>
+    hiveParts.friends.length === 0 &&
+    hiveParts.wanted === undefined &&
     hiveParts.hives.length === 0 &&
     hiveParts.invitations.length === 0
-  if (isEmpty(early) && nothingElse({ hives, invitations: invitations.shown })) return false
+  if (isEmpty(early) && nothingElse({ friends, wanted, hives, invitations: invitations.shown })) {
+    return false
+  }
   let taken: z.infer<typeof Taken> | null
   try {
     taken = await take(deps.db, member.id, now)
@@ -567,7 +581,18 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   const invitationsKept = takenHivesChoice === 'digest' ? invitations : { shown: [], more: 0 }
   // Tout était déjà parti : rien n'est envoyé. La date du récap reste notée (cas rare, une course
   // entre les deux tâches) ; le récap suivant repart de là, sans rien perdre de nouveau.
-  if (isEmpty(content) && nothingElse({ hives: hivesKept, invitations: invitationsKept.shown })) {
+  // R11 : « Découvertes » relu à la prise (passé à « Jamais » entre-temps : les deux parties sortent).
+  const friendsKept = taken.discoveries === 'never' ? [] : friends
+  const wantedKept = taken.discoveries === 'never' ? undefined : wanted
+  if (
+    isEmpty(content) &&
+    nothingElse({
+      friends: friendsKept,
+      wanted: wantedKept,
+      hives: hivesKept,
+      invitations: invitationsKept.shown,
+    })
+  ) {
     return false
   }
 
@@ -575,8 +600,8 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   const urlOf = (projectId: string) => new URL(`/projects/${projectId}`, deps.appUrl).toString()
   const withImage = [
     ...projects.slice(0, OWN_IMAGES).map(({ id }) => ({ id, own: true })),
-    ...friends.slice(0, 1).map(({ id }) => ({ id, own: false })),
-    ...(wanted ? [{ id: wanted.id, own: false }] : []),
+    ...friendsKept.slice(0, 1).map(({ id }) => ({ id, own: false })),
+    ...(wantedKept ? [{ id: wantedKept.id, own: false }] : []),
   ]
   const images = await imagesFor(deps, withImage)
   const imageAt = (index: number) => images[index] ?? null
@@ -606,11 +631,11 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     // La note unique : il recevait le récap avant R8, et n'a pas encore reçu le récap habillé.
     news: member.recap_sent_at !== null && member.recap_v2_at === null,
     last: taken.recap_unvisited >= RECAP_UNVISITED_MAX,
-    friends: friends.map((row, index) =>
+    friends: friendsKept.map((row, index) =>
       friendOf(row, index === 0 ? imageAt(friendImageAt) : null),
     ),
-    testersWanted: wanted
-      ? friendOf(wanted, imageAt(friendImageAt + (friends.length > 0 ? 1 : 0)))
+    testersWanted: wantedKept
+      ? friendOf(wantedKept, imageAt(friendImageAt + (friendsKept.length > 0 ? 1 : 0)))
       : null,
     // 5 projets au plus, comme les lignes (RECAP_MAX_LINES), puis « Et N autres projets ».
     updates: content.updates.slice(0, RECAP_MAX_LINES),

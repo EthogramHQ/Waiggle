@@ -52,7 +52,11 @@ const RANK: Record<EmailChoice, number> = { never: 0, digest: 1, now: 2 }
  * coupé, un type passé à un choix plus bas, ou, pour un lien « tout de suite », tous les types qui
  * étaient « Tout de suite » d'un coup (`instant`).
  */
-export type Lowered = { what: 'recap' } | { what: EmailType | 'instant'; to: DigestOnlyChoice }
+export type Lowered =
+  | { what: 'recap' }
+  // R11 : `discoveries` (« Découvertes ») ne baisse que vers `never` ; la ligne de journal est
+  // `Unsubscribe <id> discoveries never`, que la procédure de restauration relit (serveur.md).
+  | { what: EmailType | 'instant' | 'discoveries'; to: DigestOnlyChoice }
 
 /** Les colonnes à écrire pour des réglages donnés (seulement ceux qui sont présents). */
 const columnValues = (values: Partial<EmailPreferences>) => ({
@@ -144,6 +148,10 @@ const loweredBetween = (before: EmailPreferences, after: EmailPreferences): Lowe
       // Une baisse ne mène jamais à « now » : `to` est forcément `digest` ou `never`.
       return RANK[to] < RANK[before[type]] && to !== 'now' ? [{ what: type, to }] : []
     }),
+    // R11 : « Découvertes » baisse de « Dans le récap » à « Jamais » (rien d'autre n'est possible).
+    ...(before.discoveries === 'digest' && after.discoveries === 'never'
+      ? [{ what: 'discoveries' as const, to: 'never' as const }]
+      : []),
   ]
 }
 
@@ -153,6 +161,11 @@ export type UnsubscribeRequest = {
   all: boolean
   /** Pour les types « Tout de suite » : `digest` sans choix (le « un clic » d'une messagerie). */
   choice: DigestOnlyChoice
+  /**
+   * R11 : `scope=discoveries` (« Couper les découvertes », lien du récap) : seules les découvertes
+   * passent à `never`, le récap et les autres types ne bougent pas. Faux par défaut.
+   */
+  discoveries?: boolean
 }
 
 /**
@@ -177,7 +190,7 @@ export type UnsubscribeRequest = {
 export const unsubscribeMember = async (
   db: Database,
   userId: string,
-  { kind, all, choice }: UnsubscribeRequest,
+  { kind, all, choice, discoveries = false }: UnsubscribeRequest,
   now: Date,
 ): Promise<Lowered[] | null> =>
   db.transaction(async (tx) => {
@@ -191,17 +204,26 @@ export const unsubscribeMember = async (
 
     const change: Partial<EmailPreferences> = {}
     const lowered: Lowered[] = []
-    if ((all || kind === 'recap') && before.weeklyRecap) {
-      change.weeklyRecap = false
-      lowered.push({ what: 'recap' })
-    }
-    if (all || kind === 'instant') {
-      const instant = INSTANT_EMAIL_TYPES.filter((type) => before[type] === 'now')
-      for (const type of instant) change[type] = choice
-      if (instant.length > 0) lowered.push({ what: 'instant', to: choice })
-    } else if (kind === 'mentions' && before.replies === 'now') {
-      change.replies = 'digest'
-      lowered.push({ what: 'replies', to: 'digest' })
+    if (discoveries) {
+      // Seules les découvertes : le récap reste (la route a déjà refusé un jeton qui n'est pas
+      // celui du récap). Déjà sur « Jamais » : rien à baisser, rien n'est écrit.
+      if (before.discoveries === 'digest') {
+        change.discoveries = 'never'
+        lowered.push({ what: 'discoveries', to: 'never' })
+      }
+    } else {
+      if ((all || kind === 'recap') && before.weeklyRecap) {
+        change.weeklyRecap = false
+        lowered.push({ what: 'recap' })
+      }
+      if (all || kind === 'instant') {
+        const instant = INSTANT_EMAIL_TYPES.filter((type) => before[type] === 'now')
+        for (const type of instant) change[type] = choice
+        if (instant.length > 0) lowered.push({ what: 'instant', to: choice })
+      } else if (kind === 'mentions' && before.replies === 'now') {
+        change.replies = 'digest'
+        lowered.push({ what: 'replies', to: 'digest' })
+      }
     }
     if (lowered.length === 0) return lowered
 
