@@ -87,7 +87,11 @@ export const moderationAlert = async (deps: JobDeps, now: Date) => {
     try {
       await deps.mailer.send({
         to: admin.email,
-        ...moderationAlertEmail(languageOfMember(admin), { name: admin.name, count, url }),
+        ...moderationAlertEmail(
+          languageOfMember(admin),
+          { name: admin.name, count, url },
+          deps.appUrl,
+        ),
       })
       sent++
     } catch (error) {

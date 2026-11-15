@@ -150,10 +150,14 @@ export const unverifiedEmailRoutes = ({ db, limiter, auth, mailer, appUrl, secre
     if (!owner) return
     sendInBackground({
       to: owner.email,
-      ...existingAccountEmail(languageOfMember(owner), {
-        name: owner.name,
-        signInUrl: `${appUrl}/sign-in`,
-      }),
+      ...existingAccountEmail(
+        languageOfMember(owner),
+        {
+          name: owner.name,
+          signInUrl: `${appUrl}/sign-in`,
+        },
+        appUrl,
+      ),
     })
   }
 
@@ -276,7 +280,11 @@ export const unverifiedEmailRoutes = ({ db, limiter, auth, mailer, appUrl, secre
     url.searchParams.set('callbackURL', `${appUrl}/verified`)
     sendInBackground({
       to: newEmail,
-      ...verificationEmail(languageOfMember(account), { name: account.name, url: url.toString() }),
+      ...verificationEmail(
+        languageOfMember(account),
+        { name: account.name, url: url.toString() },
+        appUrl,
+      ),
     })
     return answer()
   })

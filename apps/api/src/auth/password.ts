@@ -187,10 +187,14 @@ export const createPasswordFlows = ({
     sendInBackground(
       {
         to: user.email,
-        ...passwordChangedEmail(languageOfMember(user), {
-          name: user.name,
-          settingsUrl: `${appUrl}/settings/security`,
-        }),
+        ...passwordChangedEmail(
+          languageOfMember(user),
+          {
+            name: user.name,
+            settingsUrl: `${appUrl}/settings/security`,
+          },
+          appUrl,
+        ),
       },
       where,
     )
@@ -281,10 +285,14 @@ export const createPasswordFlows = ({
       sendInBackground(
         {
           to: user.email,
-          ...resetPasswordEmail(languageOfMember(user), {
-            url: link.toString(),
-            hours: RESET_LINK_LIFETIME_SECONDS / 3600,
-          }),
+          ...resetPasswordEmail(
+            languageOfMember(user),
+            {
+              url: link.toString(),
+              hours: RESET_LINK_LIFETIME_SECONDS / 3600,
+            },
+            appUrl,
+          ),
         },
         REQUEST,
       )

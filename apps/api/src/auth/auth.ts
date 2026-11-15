@@ -197,10 +197,14 @@ export const createAuth = ({
       onExistingUserSignUp: async ({ user }) => {
         await mailer.send({
           to: user.email,
-          ...existingAccountEmail(languageOf(user), {
-            name: user.name,
-            signInUrl: `${appUrl}/sign-in`,
-          }),
+          ...existingAccountEmail(
+            languageOf(user),
+            {
+              name: user.name,
+              signInUrl: `${appUrl}/sign-in`,
+            },
+            appUrl,
+          ),
         })
       },
       // Mot de passe oublié (tranche R2, A1) : le lien vaut une heure et ne sert qu'une fois ; une
