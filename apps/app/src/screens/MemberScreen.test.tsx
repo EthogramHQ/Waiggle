@@ -114,10 +114,8 @@ describe('MemberScreen', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await fireEvent.press(await screen.findByRole('link', { name: 'Mon agent de recettes' }))
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/projects/[id]',
-      params: { id: projectWithPhotos.id },
-    })
+    // R10 : la tuile ouvre le projet par son adresse écrite en entier, comme la page d'un outil.
+    expect(mockPush).toHaveBeenCalledWith(`/projects/${projectWithPhotos.id}`)
 
     await fireEvent.press(screen.getByRole('link', { name: 'Python' }))
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/tags/[slug]', params: { slug: 'python' } })
