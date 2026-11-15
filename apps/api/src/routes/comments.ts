@@ -19,11 +19,11 @@ import {
   ProjectId,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, exists, isNotNull, isNull, not, sql } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { blockedWith, blocksOf } from '../blocks/visibility'
+import { commentChangeRule, deleteComment } from '../comments/delete'
 import {
   authorsOf,
   type CommentRow,
@@ -47,10 +47,11 @@ import { createRouter, errorResponse } from './router'
 // Règles anti-abus (docs/scenarios/phase-1.md, tranche 5) : 60 commentaires par heure et par
 // membre, publier et modifier ensemble, tous les projets ensemble. Supprimer, masquer et démasquer
 // comptent comme des modifications du projet (60 par heure, le même compteur que dans
-// routes/projects.ts et routes/notes.ts).
+// routes/projects.ts et routes/notes.ts) ; la règle est dans comments/delete.ts, car « Mes
+// commentaires » la partage.
 const HOUR = 60 * 60 * 1000
 const commentRule: RateRule = { windowMs: HOUR, max: 60 }
-const changeRule: RateRule = { windowMs: HOUR, max: 60 }
+const changeRule = commentChangeRule
 
 const projectParams = z.object({ id: z.string() })
 const commentParams = z.object({ id: z.string(), commentId: z.string() })
@@ -600,41 +601,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Seul son auteur supprime un commentaire ; l'auteur du projet, lui, peut le masquer.
     if (comment.authorId !== user.id) return forbidden(ctx)
 
-    const reply = alias(c, 'reply')
-    const hasReplies = (rootId: string) =>
-      exists(db.select({ id: reply.id }).from(reply).where(eq(reply.rootId, rootId)))
-    await db.transaction(async (tx) => {
-      // On verrouille d'abord la racine du fil (« for update ») : une réponse publiée ou supprimée
-      // en même temps attend la fin de cette transaction, et chacune voit l'état laissé par l'autre.
-      const rootId = comment.rootId ?? commentId
-      await tx.select({ id: c.id }).from(c).where(eq(c.id, rootId)).for('update')
-
-      if (comment.rootId === null) {
-        // Une racine avec des réponses devient « Commentaire supprimé » : texte, auteur et dates de
-        // modification et de masquage effacés pour de bon ; les réponses gardent leur fil. Sans
-        // réponse, elle est effacée (« not exists » : aucune ligne ne pointe vers elle).
-        const [kept] = await tx
-          .update(c)
-          .set({ body: '', authorId: null, editedAt: null, hiddenAt: null, deletedAt: new Date() })
-          .where(and(eq(c.id, commentId), hasReplies(commentId)))
-          .returning({ id: c.id })
-        if (!kept) await tx.delete(c).where(eq(c.id, commentId))
-        // Gardée comme emplacement, elle perd aussi ses mentions : elles partent avec le texte.
-        else
-          await tx
-            .delete(schema.commentMention)
-            .where(eq(schema.commentMention.commentId, commentId))
-        return
-      }
-      // Une réponse est effacée. Si c'était la dernière d'un « Commentaire supprimé », celui-ci ne
-      // montre plus rien : il est effacé à son tour.
-      await tx.delete(c).where(eq(c.id, commentId))
-      await tx
-        .delete(c)
-        .where(
-          and(eq(c.id, comment.rootId), isNotNull(c.deletedAt), not(hasReplies(comment.rootId))),
-        )
-    })
+    // La liste d'étapes est commune avec « Mes commentaires » (comments/delete.ts).
+    await deleteComment(db, commentId, comment.rootId)
     return ctx.body(null, 204)
   })
 
