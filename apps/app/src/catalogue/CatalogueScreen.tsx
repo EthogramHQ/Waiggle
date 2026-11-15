@@ -117,6 +117,7 @@ import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
 import { AdminGesturesCatalogue } from './outils-gestes'
 import { ToolPageSheetsCatalogue } from './outils-page'
+import { LegalPagesCatalogue } from './pages-legales'
 import { HivePillsCatalogue } from './pastilles'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
@@ -827,6 +828,8 @@ export function CatalogueScreen() {
       <ModerationSheetsCatalogue />
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
+      {/* Tranche R11 : le corps d'une page légale et les liens vers les quatre pages (pages-legales.tsx). */}
+      <LegalPagesCatalogue />
       <RemovalR9Catalogue />
       {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
       <HiveCellsCatalogue />
