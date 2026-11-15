@@ -90,7 +90,9 @@ export function HiveActivityRow({ item, hiveName, onPress, toSource, now }: Prop
     : null
 
   return (
-    <Pressed label={label} onPress={guard(onPress)} role="link">
+    // `inset` : rangée dans un `ListGroup` qui rogne, la ligne dessine son anneau de focus à
+    // l'intérieur (relecture du design de R10 : la première ligne n'en montrait que le bas).
+    <Pressed label={label} onPress={guard(onPress)} role="link" inset>
       <View
         style={{
           flexDirection: 'row',

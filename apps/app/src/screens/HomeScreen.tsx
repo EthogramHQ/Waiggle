@@ -20,6 +20,7 @@ import {
   type HiveInvitation as Invitation,
   ProjectId,
 } from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   type ReactNode,
@@ -42,7 +43,13 @@ import { FeedSide } from '../feed/FeedSide'
 import { FirstRun } from '../feed/FirstRun'
 import { firstOfOthers } from '../feed/items'
 import { useReadBefore } from '../feed/readBefore'
-import { useAcceptInvitation, useHiveFeed, useMyHives, useRefuseInvitation } from '../hives/api'
+import {
+  hiveFeedQueryKey,
+  useAcceptInvitation,
+  useHiveFeed,
+  useMyHives,
+  useRefuseInvitation,
+} from '../hives/api'
 import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
@@ -182,9 +189,13 @@ function MemberHome({ session }: { session: SessionData }) {
   const { chosen } = hiveChoice
   // R6a : ses propres projets sont dans son fil, mais jamais une nouveauté pour lui.
   const followingNews = useFeedNews('following', items[0], false, viewerId)
-  // R10 : sous la pastille d'une ruche, pas de bouton des nouveautés, seulement la phrase (voir
-  // NO_NEWS) ; « Tout » garde le sien.
-  const news = chosen ? NO_NEWS : followingNews
+  // R10 (relecture) : sous la pastille d'une ruche, le bouton des nouveautés de cette ruche, lu dans
+  // « mes ruches » (voir hiveNewsOf). L'état du Fil de la ruche se lit dans le cache, sans hook : cet
+  // écran se redessine quand « mes ruches » sont relues, juste après chaque page de ce Fil.
+  const queryClient = useQueryClient()
+  const hiveFeedKey = chosen ? hiveFeedQueryKey(chosen.id) : undefined
+  const hiveFeedState = hiveFeedKey ? queryClient.getQueryState(hiveFeedKey) : undefined
+  const news = chosen ? hiveNewsOf(chosen, hiveChoice.read, hiveFeedState) : followingNews
   // Le fil est marqué lu jusqu'au premier élément de la première page, dès qu'il s'affiche (R4) ;
   // R6a : le premier élément d'un autre, jamais un des siens (voir feed/api.ts). R10 : seulement
   // quand il s'affiche, sous « Tout » : le Fil d'une ruche a sa propre date, que sa lecture avance.
@@ -201,7 +212,9 @@ function MemberHome({ session }: { session: SessionData }) {
   // projet » (masqué pour un compte suspendu), la cloche et la photo.
   const topNav = <TopNav openSuspension />
   const onExplore = () => router.push('/explore')
-  const showNews = () => feed.refetch()
+  // Afficher les nouveautés : relire le fil montré (« Tout », ou celui de la ruche choisie).
+  const showNews = () =>
+    hiveFeedKey ? queryClient.refetchQueries({ queryKey: hiveFeedKey }) : feed.refetch()
   // Le bouton des nouveautés, avec la phrase qui dit ce que montre le fil quand rien n'est neuf.
   // Sur ordinateur, à côté du titre (la phrase passe en sous-titre) ; sur téléphone, en tête du fil.
   // R10 : sous une ruche, la phrase de la ruche (« … des membres de la ruche Famille. »).
@@ -251,8 +264,11 @@ function MemberHome({ session }: { session: SessionData }) {
           hideMascot={published.noticeUp}
         />
       ) : hiveChoice.waiting ? (
-        // Une ruche demandée par l'adresse, ses ruches pas encore lues : on ne montre pas « Tout »
-        // pour le remplacer aussitôt, sous les yeux.
+        // Ses ruches pas encore lues : le squelette du Fil. Une ruche demandée par l'adresse : on ne
+        // montre pas « Tout » pour le remplacer aussitôt, sous les yeux. Relecture du design de R10 :
+        // sans ruche demandée non plus, les pastilles arrivées après le Fil s'inséraient au-dessus
+        // des cartes et les faisaient descendre sous le doigt. Une lecture ratée ne retient pas le
+        // Fil : il se montre, sans pastilles.
         <SkeletonList count={3} shape="feed" />
       ) : (
         <FollowingFeed
@@ -317,14 +333,17 @@ function MemberHome({ session }: { session: SessionData }) {
         subtitle={compact || (firstRun && !chosen) ? undefined : caption}
         pageTitle={t(($) => $.nav.feed)}
         // R10 : les pastilles des ruches, sous l'en-tête. Sur téléphone, Screen les garde collées en
-        // haut pendant le défilement ; sur ordinateur, elles restent en tête du contenu.
+        // haut pendant le défilement ; sur tablette et ordinateur, à droite du titre « Fil ».
+        // Relecture du design de R10 : `null` (et non `undefined`) tant qu'elles ne sont pas là. La
+        // place existe déjà, vide : quand les ruches arrivent après le Fil, Screen garde le même
+        // arbre, et le Fil n'est pas remonté (le focus du clavier restait sur toute la page).
         sticky={
           pills ? (
             <>
               {hiddenTitle}
               {pills}
             </>
-          ) : undefined
+          ) : null
         }
       >
         {pills ? null : hiddenTitle}
@@ -643,12 +662,31 @@ function FollowingFeed({
   )
 }
 
-/**
- * R10 : sous la pastille d'une ruche, aucun bouton des nouveautés, la seule phrase de la ruche. La
- * relecture de la tête du fil, chaque minute, avancerait la date de sa dernière visite (la première
- * page d'un Fil de ruche la pose, voir hives/api.ts) : la ruche se croirait vue sans l'être.
- */
+/** Rien de neuf : toujours le même objet, d'un rendu à l'autre. */
 const NO_NEWS: News = { count: null, more: false, authors: [], kinds: [] }
+
+/** « Mes ruches » relues chaque minute sous la pastille d'une ruche, comme la tête de « Tout ». */
+const HIVE_NEWS_INTERVAL_MS = 60_000
+
+/**
+ * R10 (relecture, scénario « le bouton des nouveautés vaut pour la pastille choisie ») : les
+ * nouveautés de la ruche choisie, lues dans « mes ruches » (`news`, compté depuis sa dernière
+ * visite). Relire la tête du Fil de la ruche, comme « Tout » le fait, avancerait la date de visite
+ * (la première page la pose, voir hives/api.ts) : la ruche se croirait vue sans l'être.
+ *
+ * Le compte n'est cru que si « mes ruches » ont été lues après la dernière page du Fil de la ruche
+ * (`dataUpdatedAt`), et ne sont pas en train de l'être : avant, il compte encore les cartes qu'on a
+ * sous les yeux (« 2 nouveautés » au-dessus des deux mêmes projets). Ni visages ni sortes : le
+ * compte seul, « 2 nouveautés », comme la ligne de « Tes ruches ».
+ */
+const hiveNewsOf = (
+  hive: HiveSummary,
+  read: { at: number; fetching: boolean },
+  feed: { data?: unknown; dataUpdatedAt: number } | undefined,
+): News =>
+  hive.news > 0 && feed?.data !== undefined && !read.fetching && read.at > feed.dataUpdatedAt
+    ? { count: hive.news, more: false, authors: [], kinds: [] }
+    : NO_NEWS
 
 /**
  * Hook (R10) : la pastille du Fil. Elle vit dans l'adresse (`/?hive=<id>`), lue après l'hydratation
@@ -658,16 +696,18 @@ const NO_NEWS: News = { count: null, more: false, authors: [], kinds: [] }
  *
  * - `hives` : ses ruches, dans l'ordre de l'API (les pastilles, « Tes ruches ») ;
  * - `chosen` : la ruche choisie, ou `undefined` pour « Tout » ;
- * - `waiting` : une ruche est demandée par l'adresse, mais ses ruches ne sont pas encore lues ;
- * - `invitations` : ses invitations valables (le premier lancement les montre).
+ * - `waiting` : ses ruches ne sont pas encore lues (le Fil attend, voir plus haut) ;
+ * - `invitations` : ses invitations valables (le premier lancement les montre) ;
+ * - `read` : quand ses ruches ont été lues, et si elles le sont en ce moment.
  */
 const useHiveChoice = () => {
   const router = useRouter()
   const hydrated = useHydrated()
   const asked = useHiveParam()
-  const mine = useMyHives()
-  const hives: HiveSummary[] = mine.data?.hives ?? []
   const wanted = hydrated ? asked : undefined
+  // Sous la pastille d'une ruche, relues chaque minute : ses nouveautés (voir hiveNewsOf).
+  const mine = useMyHives(wanted ? { refetchInterval: HIVE_NEWS_INTERVAL_MS } : {})
+  const hives: HiveSummary[] = mine.data?.hives ?? []
   const chosen = wanted ? hives.find((hive) => hive.id === wanted) : undefined
   const choose = useCallback(
     (value: string) => {
@@ -680,9 +720,11 @@ const useHiveChoice = () => {
   return {
     hives,
     chosen,
-    waiting: wanted !== undefined && mine.isPending,
+    waiting: mine.isPending,
     invitations: mine.data?.invitations ?? [],
     choose,
+    // Quand « mes ruches » ont été lues, et si elles le sont en ce moment (voir hiveNewsOf).
+    read: { at: mine.dataUpdatedAt, fetching: mine.isFetching },
   }
 }
 
@@ -771,13 +813,22 @@ function FeedInvitations({ invitations }: { invitations: readonly Invitation[] }
     const key = errorKey(error)
     return INVITATION_ERRORS.has(key) ? t(($) => $.errors[key]) : fallback
   }
+  // Une seule action miel par écran (R10) : « Rejoindre » en miel sur la première carte qui a encore
+  // ses boutons, en blanc sur les autres.
+  const firstOpen = shown.findIndex((one) => !refused.has(one.id))
   return (
     <Stack gap="md" align="stretch">
-      {shown.map((invitation) => (
+      {shown.map((invitation, index) => (
         <Stack key={invitation.id} gap="sm" align="stretch">
           <HiveInvitation
             invitation={invitation}
             refused={refused.has(invitation.id)}
+            primary={index === firstOpen}
+            // Relecture de l'interface de R10 (point 1) : signaler la ruche depuis le Fil aussi,
+            // comme depuis l'onglet Ruches (la carte refusée n'a plus de « … »).
+            onReport={() =>
+              router.push({ pathname: '/report', params: { kind: 'hive', id: invitation.hive.id } })
+            }
             onAccept={async () => {
               setFailure(null)
               try {

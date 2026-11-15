@@ -34,7 +34,8 @@ const fr = {
   received: 'Invitation reçue, avec son « … » (« Signaler la ruche Atelier IA »)',
   noInviter: 'L’inviteur a supprimé son compte ; pas de « … »',
   unnamed: 'Ruche dont le nom a été retiré par la modération',
-  refused: 'Invitation refusée : elle reste à sa place',
+  refused: 'Invitation refusée : elle reste à sa place, sans « … »',
+  secondary: 'Deuxième invitation de l’écran : « Rejoindre » en blanc (une seule action miel)',
   preview: 'Aperçu (« Ce que reçoit Max ») : boutons dessinés, inertes, sans « … »',
   narrowInvitation: 'Invitation à 320 points',
   reported: 'Signalement demandé (l’écran ouvrirait la feuille « Signaler »).',
@@ -53,7 +54,8 @@ const en: typeof fr = {
   received: 'Received invitation, with its “…” (“Report the hive Atelier IA”)',
   noInviter: 'The inviter deleted their account; no “…”',
   unnamed: 'Hive whose name was removed by moderation',
-  refused: 'Declined invitation: it stays in place',
+  refused: 'Declined invitation: it stays in place, no “…”',
+  secondary: 'Second invitation of the screen: “Join” in white (one honey action only)',
   preview: 'Preview (“What Max receives”): buttons drawn, inert, no “…”',
   narrowInvitation: 'Invitation at 320 points',
   reported: 'Report requested (the screen would open the “Report” sheet).',
@@ -139,10 +141,12 @@ function LiveInvitation({
   value,
   onReport,
   mode,
+  primary = true,
 }: {
   value: Invitation
   onReport?: () => void
   mode?: 'received' | 'preview'
+  primary?: boolean
 }) {
   const [refused, setRefused] = useState(false)
   return (
@@ -151,6 +155,7 @@ function LiveInvitation({
       onAccept={slowly}
       onRefuse={() => slowly().then(() => setRefused(true))}
       refused={refused}
+      primary={primary}
       {...(onReport ? { onReport } : null)}
       {...(mode ? { mode } : null)}
     />
@@ -245,6 +250,9 @@ export function HiveRowsCatalogue() {
                 onReport={report}
                 refused
               />
+            </Example>
+            <Example caption={`${l.secondary} — ${l[scheme]}`}>
+              <LiveInvitation value={invitation} onReport={report} primary={false} />
             </Example>
             <Example caption={`${l.preview} — ${l[scheme]}`}>
               <LiveInvitation

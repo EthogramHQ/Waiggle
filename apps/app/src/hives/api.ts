@@ -86,9 +86,19 @@ export const getMyHives = async (): Promise<MyHives> => {
  * Hook : mes ruches (de la plus récemment active à la plus calme) et mes invitations valables.
  * `staleTime: 0` : les nouveautés de chaque ruche changent à chaque visite de sa page ; on relit à
  * chaque retour sur l'onglet plutôt que de montrer le compte d'avant.
+ *
+ * `refetchInterval` (R10, relecture) : relire toutes les N millisecondes, tant que l'écran est
+ * affiché. Le Fil sous la pastille d'une ruche y lit le bouton de ses nouveautés, comme « Tout »
+ * relit la tête de son fil chaque minute (`useFeedNews`) ; relire la tête du Fil de la ruche, lui,
+ * avancerait la date de visite sans que le membre ait rien vu.
  */
-export const useMyHives = () =>
-  useQuery({ queryKey: myHivesQueryKey, queryFn: getMyHives, staleTime: 0 })
+export const useMyHives = ({ refetchInterval }: { refetchInterval?: number } = {}) =>
+  useQuery({
+    queryKey: myHivesQueryKey,
+    queryFn: getMyHives,
+    staleTime: 0,
+    ...(refetchInterval ? { refetchInterval } : null),
+  })
 
 /** GET /v1/hives/{id} : la page d'une ruche (404, le même, si on n'y a pas droit). */
 export const getHive = async (id: string): Promise<HivePage> => {
@@ -206,18 +216,38 @@ export const getHiveFeedPage = async (
 }
 
 /**
+ * La clé de cache du Fil d'une ruche. Calculée à l'appel : les tests du Fil remplacent feed/api par
+ * un faux module sans `feedQueryKey`, et l'accueil charge ce fichier.
+ */
+export const hiveFeedQueryKey = (id: string) => [...feedQueryKey, 'hive', id] as const
+
+/**
  * Hook : le Fil d'une ruche (la pastille du Fil). Sa clé commence par « feed » : toute écriture
  * qui relit les fils le relit aussi. `enabled: false` tant que l'écran ne sait pas quelle pastille
  * est choisie (la page web pas encore hydratée ne connaît pas son adresse).
+ *
+ * R10 (relecture) : chaque page lue fait relire « mes ruches ». La première pose la date de visite
+ * côté serveur : sans cette relecture, « Tes ruches » et le bouton des nouveautés de la pastille
+ * annonçaient encore « 2 nouveautés » pour la ruche qu'on lisait. Relire aussi après une suite
+ * garde une règle simple pour le Fil : des ruches lues après la dernière page font foi
+ * (`dataUpdatedAt`).
  */
-export const useHiveFeed = (id: string, enabled = true) =>
-  useInfiniteQuery({
-    queryKey: [...feedQueryKey, 'hive', id],
-    queryFn: ({ pageParam }) => getHiveFeedPage(id, pageParam),
+export const useHiveFeed = (id: string, enabled = true) => {
+  const queryClient = useQueryClient()
+  return useInfiniteQuery({
+    queryKey: hiveFeedQueryKey(id),
+    queryFn: async ({ pageParam }) => {
+      const page = await getHiveFeedPage(id, pageParam)
+      // Sans attendre : la page s'affiche tout de suite, les ruches se relisent à côté. Une relecture
+      // déjà en route (partie avant la date de visite) est annulée et relancée.
+      void queryClient.invalidateQueries({ queryKey: myHivesQueryKey, exact: true })
+      return page
+    },
     enabled,
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
+}
 
 // --- Écritures ---
 
