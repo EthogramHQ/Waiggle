@@ -377,10 +377,11 @@ describe('on a wide window, three columns', () => {
     restoreWindow = setDesktopWindow()
   })
 
-  it('gives the subtitle, the « Réservé aux administrateurs » pill and « À traiter (4) »', async () => {
+  it('gives no subtitle, the « Réservé aux administrateurs » pill and « À traiter (4) »', async () => {
     await openModeration()
 
-    expect(screen.getByText(containing(fr.t(($) => $.moderation.subtitle)))).toBeTruthy()
+    // R11 (« Moins de mots ») : écrit en clair, sa clé disparaîtra.
+    expect(screen.queryByText(/Les signalements des membres arrivent ici/)).toBeNull()
     expect(screen.getByText(containing(fr.t(($) => $.moderation.adminOnly)))).toBeTruthy()
     const pending = fr.t(($) => $.moderation.pendingCount, { count: 4 })
     expect(screen.getByRole('radio', { name: containing(pending), checked: true })).toBeTruthy()

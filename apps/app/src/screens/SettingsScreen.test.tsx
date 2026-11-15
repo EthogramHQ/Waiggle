@@ -81,15 +81,17 @@ const sections = {
   about: fr.t(($) => $.settings.sections.about),
   moderation: fr.t(($) => $.settings.sections.moderation),
 }
+// R11 (« Moins de mots ») : les lignes d'aide sous les rubriques quittent la liste. Écrites en clair
+// (‑ : le trait d'union insécable de « e‑mail ») : leurs clés disparaîtront avec elles.
 const hints = {
-  profile: fr.t(($) => $.settings.hints.profile),
-  notifications: fr.t(($) => $.settings.hints.notifications),
-  language: fr.t(($) => $.settings.hints.language),
-  appearance: fr.t(($) => $.settings.hints.appearance),
-  data: fr.t(($) => $.settings.hints.data),
-  security: fr.t(($) => $.settings.hints.security),
-  account: fr.t(($) => $.settings.hints.account),
-  about: fr.t(($) => $.settings.hints.about),
+  profile: 'Photo, nom, pseudo et présentation',
+  notifications: 'Les e‑mails que tu reçois',
+  language: 'Celle de l’appli et de tes e‑mails',
+  appearance: 'Jour, nuit ou automatique',
+  data: 'Télécharger tes données',
+  security: 'Mot de passe, membres bloqués',
+  account: 'Adresse e‑mail, déconnexion, suppression',
+  about: 'Le code source et sa licence',
 }
 
 /** Le rôle d'un élément, qu'il soit écrit `role` (web) ou `accessibilityRole`. */
@@ -140,7 +142,7 @@ describe('SettingsScreen, the page', () => {
     expect(paths()).toContain('/settings/profile')
   })
 
-  it('lists every section, each with what it contains, as a link to its page (phone)', async () => {
+  it('lists every section by its name alone, as a link to its page (phone)', async () => {
     await renderWithI18n(<SettingsScreen />)
 
     for (const key of [
@@ -155,8 +157,8 @@ describe('SettingsScreen, the page', () => {
     ] as const) {
       const row = entry(containing(sections[key]))
       expect(row).toBeTruthy()
-      // L'aide sous le nom : ce que contient la rubrique (« Photo, nom, pseudo et présentation »).
-      expect(screen.getAllByText(containing(hints[key])).length).toBeGreaterThan(0)
+      // R11 : plus d'aide sous le nom (« Photo, nom, pseudo et présentation »).
+      expect(screen.queryAllByText(containing(hints[key]))).toHaveLength(0)
       mockPush.mockClear()
       mockReplace.mockClear()
       await fireEvent.press(row)
@@ -387,12 +389,15 @@ describe('the « Compte » section', () => {
 })
 
 describe('the « À propos » section', () => {
-  it('says the app is free software (AGPL, art. 13) and links to the code as an external site', async () => {
+  it('links to the code as an external site (AGPL, art. 13), without the free-software sentence', async () => {
     await renderWithI18n(<SettingsScreen section="about" />)
 
-    expect(screen.getAllByText(containing(fr.t(($) => $.home.openSource))).length).toBe(1)
-    expect(screen.getAllByText(/logiciel libre/).length).toBeGreaterThan(0)
-    const link = screen.getByRole('link', { name: containing(fr.t(($) => $.home.seeCode)) })
+    // R11 (« Moins de mots », planche R11-Pied) : le lien « Le code source » suffit ; la phrase
+    // « … est un logiciel libre. » quitte l'écran (écrite en clair : sa clé disparaîtra).
+    expect(screen.queryAllByText(/logiciel libre/)).toHaveLength(0)
+    const link = screen.getByRole('link', {
+      name: containing(fr.t(($) => $.legal.links.sourceCode)),
+    })
     const external = fr.t(($) => $.common.externalSite)
     const props = link.props as Record<string, unknown>
     expect(

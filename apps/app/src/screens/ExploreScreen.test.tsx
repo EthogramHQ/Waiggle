@@ -383,11 +383,17 @@ describe('ExploreScreen, the page', () => {
     expect(screen.getByRole('header', { name: fr.t(($) => $.explore.title) })).toBeTruthy()
   })
 
-  it('shows the subtitle on a computer only', async () => {
+  // R11 (« Moins de mots ») : plus de sous-titre, même sur ordinateur (les critères d'Explorer sont
+  // dits dans les Règles). Écrit en clair : sa clé disparaîtra.
+  const subtitle = 'Les projets de tous les membres'
+
+  it('has no subtitle on a computer', async () => {
     await onDesktop(async () => {
       await renderExplore()
 
-      expect(screen.getByText(containing(fr.t(($) => $.explore.subtitle)))).toBeTruthy()
+      // Témoin : la page est bien là.
+      expect(screen.getByRole('header', { name: fr.t(($) => $.explore.title) })).toBeTruthy()
+      expect(screen.queryByText(containing(subtitle))).toBeNull()
     })
   })
 
@@ -396,7 +402,7 @@ describe('ExploreScreen, the page', () => {
 
     // Témoin : la page est bien là.
     expect(screen.getByRole('header', { name: fr.t(($) => $.explore.title) })).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t(($) => $.explore.subtitle)))).toBeNull()
+    expect(screen.queryByText(containing(subtitle))).toBeNull()
   })
 
   it('offers on a phone a search field that is a link to the search page', async () => {

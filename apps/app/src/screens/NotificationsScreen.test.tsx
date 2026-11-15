@@ -1109,7 +1109,9 @@ describe('the settings of the notifications (R8)', () => {
           }),
         ),
       ).toBeTruthy()
-      expect(screen.getByText(t(($) => $.notifications.emailColumn.counts))).toBeTruthy()
+      // R11 (« Moins de mots ») : la promesse « seulement des nombres » est dite dans les réglages
+      // et sur ses projets ; elle quitte cette colonne (écrite en clair : sa clé disparaîtra).
+      expect(screen.queryByText(/On ne voit nulle part qui a réagi/)).toBeNull()
     } finally {
       restoreWindow()
     }

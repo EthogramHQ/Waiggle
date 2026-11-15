@@ -42,9 +42,196 @@ export const en: Translation = {
     signIn: 'Sign in',
     haveAccount: 'I already have an account',
     publish: 'Publish a project',
-    membersOnly: 'Nothing is visible without an account, or found by a search engine.',
+    membersOnly: 'Projects and profiles are only visible with an account.',
     openSource: '{{appName}} is free software.',
     seeCode: 'See the code',
+  },
+  legal: {
+    version: 'Version of {{date}}',
+    summaryTitle: 'In short',
+    fullTextTitle: 'The full text, which prevails',
+    contents: 'Contents',
+    links: {
+      label: '{{appName}} pages',
+      rules: 'Rules',
+      privacy: 'Privacy',
+      legal: 'Legal notice',
+      accessibility: 'Accessibility',
+      sourceCode: 'The source code',
+      contact: 'Contact us: {{contactEmail}}',
+    },
+    pages: {
+      rules: {
+        title: 'The rules of {{appName}}',
+        summary: {
+          respect:
+            'Respect the other members: no harassment, no hate, no sexual or violent content.',
+          account: 'From age 15, one account per person. Don’t pretend to be anyone else.',
+          consent: 'Only post a photo of someone, or information about them, with their consent.',
+          links:
+            'Your demos live on other sites: no scam, no virus, no phishing behind your links.',
+          report:
+            'Something bothers you? Report it. Moderation reads it, and can remove it or suspend an account.',
+          inactive:
+            'An account with no visit for 3 years is deleted, after an email sent one month before.',
+          yours: 'What you post remains yours. You can download everything or delete everything.',
+        },
+        sections: {
+          purpose: {
+            title: 'What {{appName}} is for',
+            body: '{{appName}} lets people close to each other show the projects they build with AI, try them and encourage each other.\n\n{{appName}} hosts no program: each project links to a demo on another site, whose content and owner {{appName}} does not check.',
+          },
+          account: {
+            title: 'Your account',
+            body: 'You join {{appName}} by invitation, from age 15. A parent does not open an account for a child under 15.\n\nEveryone has a single, personal account: keep your password to yourself, and don’t pretend to be anyone else, by your name or your handle.\n\nSigned-in members find you by your display name and your handle. No member sees your email address.\n\nAn account with no visit for 3 years is deleted. An email warns you one month before: signing in is enough to keep it.',
+          },
+          content: {
+            title: 'What you post',
+            body: 'What you post remains yours. You allow {{appName}} to show it to the people you choose: all signed-in members, the members of a hive, or only you when the project is private.\n\nA published prompt can be copied and reused by the members who see it.\n\nA photo of someone, or information about them, only with their consent. Your screenshots don’t show other people’s data.\n\nReactions and followers are counted: nobody sees who reacted or who follows whom.',
+          },
+          forbidden: {
+            title: 'What is forbidden',
+            body: '- Harassment, including through repeated mentions or invitations.\n- Hate, against a person or a group.\n- Sexual or violent content.\n- Illegal content.\n- A scam, a virus or phishing behind a link.\n- Pretending to be someone, by their name or their handle.\n- Naming a person who is not a member without their consent.\n- A hive name that is insulting, or that reveals someone’s health, opinions, religion, origin or sex life.',
+          },
+          hives: {
+            title: 'Hives',
+            body: 'A hive is a group of people close to each other, of 50 members at most, invitations included. You join one only by invitation; declining notifies no one, and you can leave whenever you want.\n\nIts members see each other and see the projects kept for the hive. The other members of {{appName}} see neither its members nor these projects.\n\nThe host pins a project, chooses who can invite and can remove a member.\n\nNews from your hives also comes in your Sunday recap.',
+          },
+          testers: {
+            title: 'Testers',
+            body: 'The author of a project can welcome testers. The testers’ corner is private: each thread stays between the author and one tester. A call from the author is read by all their testers, even those who arrive later.\n\nDon’t quote feedback or name a tester without their consent.',
+          },
+          feed: {
+            title: 'The feed, Explore, suggestions and search',
+            body: 'No ranking depends on a member’s popularity or on advertising.\n\n- **The feed, “Following”**: new projects from the people you follow, and updates to their projects and to the projects you follow. Each project appears only once, at its latest event, newest first.\n- **The feed, a hive**: new projects and updates from the members of that hive, in the same order.\n- **Explore**: the projects of all members. “Recent” shows the latest published projects, newest first, and can be filtered by category; “Looking for testers”, the projects open to testers; “Popular tools”, the tools cited by the most projects.\n- **Tools**: the catalogue of AI, development and digital project tools, described by {{appName}} with no link to their makers, and the members’ projects that use them.\n- **People to follow**: the members of your hives first, then members who published recently, by the date of their latest project. Never someone you follow, dismissed or blocked, nor a member who chose “Don’t suggest me to others”.\n- **Search**: the projects, members and tools that contain every word typed, ignoring accents. Projects whose title contains the word come first. Under 3 letters, only the members you follow are found. What you search for is not kept.\n\nYou can adjust what you see: follow or unfollow, dismiss a suggestion, block a member. And what others see of you: “Don’t suggest me to others”, in your settings.',
+          },
+          moderation: {
+            title: 'Moderation',
+            body: 'Any member can report content or a profile. Only the people in moderation, administrators of {{appName}}, read reports, and they never say who reported.\n\nFrom lightest to heaviest, moderation can:\n\n- remove part of a content (a photo, a title…);\n- remove the whole content;\n- suspend an account for a time, or indefinitely.\n\nEach decision is explained: the person concerned receives the facts and the rule or law applied. A suspension is also announced by email. While suspended, you can read everything, remove your content, export your data or delete your account, but no longer post.\n\nDisagree with a decision? Write to {{contactEmail}}: a person will review it and reply. You can also go to court.',
+          },
+          authors: {
+            title: 'What a project’s author can do',
+            body: 'The author of a project can hide a comment on their project: it stays visible only to them and to the person who wrote it. There is no appeal against this yet.\n\nIf the project becomes private or is removed by moderation, its comments are kept without being read by other members. If it is deleted, they go with it. You can always delete your comments from “My comments”, in your settings.',
+          },
+          leaving: {
+            title: 'Leaving {{appName}}',
+            body: 'At any time you can download your data, then delete your account, from your settings. Deletion is immediate and final.\n\nWhat stays with others:\n\n- the replies to your comments, under “Comment deleted”, without your text or your name;\n- the name of the hives you created, as long as they have members, and the invitations you sent, without your name;\n- your reports, without your name, until one year after they were handled;\n- what members already copied, such as a prompt, and the emails they already received.',
+          },
+          changes: {
+            title: 'Changes to the rules',
+            body: 'A new version of the rules has a new date. You read and accept it on your next visit, with what changes at the top. Until then, you can read everything, download your data or delete your account, but not post.\n\nA correction of form, such as a typo or a link, does not change the version.',
+          },
+          liability: {
+            title: 'Liability, law and contact',
+            body: '{{appName}} is provided as is, with no guarantee that it is always available. Each member answers for what they post; {{appName}} does not answer for the demo sites. Illegal content that is reported is removed as soon as moderation sees it.\n\nThese rules are governed by French law. A disagreement? Write to us first at {{contactEmail}}; you can also go to court.\n\nFor any question: {{contactEmail}}, in English or French.',
+          },
+        },
+      },
+      privacy: {
+        title: 'Privacy',
+        summary: {
+          noAds: 'No advertising, no tracking cookie.',
+          email: 'No member sees your email address.',
+          where:
+            'The server and the emails are in Paris. Only the coding assistant may read extracts outside the European Union.',
+          control: 'You can download everything or delete everything.',
+        },
+        sections: {
+          controller: {
+            title: 'Who is responsible',
+            body: 'The publisher, presented in the Legal notice, is responsible for your data. To write to them: {{contactEmail}}, in English or French.',
+          },
+          data: {
+            title: 'What is kept, and why',
+            body: 'Unless stated otherwise, the basis is the contract: the rules you accept to use {{appName}}.\n\n- **Your account**: your display name, your email address, your language, your password (only its fingerprint, never the password itself). To sign you in and write to you. Signed-in members see your name; nobody sees your address.\n- **Your profile**: your handle, your bio, your photo and your favourite tools. Seen by signed-in members. The photo is cropped and cleaned of its hidden information.\n- **Your projects and their updates**: texts, prompts, photos, demo links, categories. Seen by the people you choose: all signed-in members, a hive, or only you.\n- **Reactions and follows**: who reacts to or follows what. Others only see numbers.\n- **Comments and mentions**: the text, the date, who is mentioned. Seen by those who see the project; the mention, by the person mentioned.\n- **The feed and suggestions**: the date you last read the feed, the suggestions you dismissed, your “Don’t suggest me to others” choice. Seen only by you.\n- **Search**: nothing you search for is kept.\n- **Testers**: your sign-up as a tester, your feedback, your messages and their screenshots. Seen by the project’s author and you.\n- **Hives**: the hives you belong to, who invited you, the invitations. Seen by the members of each hive.\n- **Notifications and emails**: what happened to you, your email choices, the sending dates. Seen only by you.\n- **Reports and moderation**: who reports, the reason, a copy of the reported texts, the decisions and suspensions. Seen by administrators; the person concerned receives the decision, never the name of who reported. Basis: the legitimate interest of protecting members, and the law for illegal content.\n- **Blocking**: the members you blocked. The blocked person is not notified.\n- **Account security**: your sign-in sessions (with the IP address and browser of their creation), the links sent by email, counters against abuse. Seen by no one. Basis: the legitimate interest of protecting accounts.\n- **The accepted rules**: the version, the date, and your statement that you are 15 or older, never your date of birth. To prove your agreement.\n- **The date of your last visit**: to delete an account inactive for 3 years.',
+          },
+          retention: {
+            title: 'How long',
+            body: '- **Your account and what you post**: as long as your account exists, or until you delete them.\n- **An account with no visit**: deleted after 3 years, with an email one month before.\n- **A sign-up whose address is never verified**: 30 days.\n- **A sign-in session**: 7 days after its last use, erased within 8 days. A session used every day keeps the IP address of its creation.\n- **Links sent by email** (verification, password, address): valid 1 hour, erased within 25 hours.\n- **Counters against abuse**: less than 49 hours. Some keep an IP address.\n- **Your former handle**: reserved for 30 days.\n- **A photo added but never published**: 24 hours, erased within 48 hours.\n- **An invitation to a hive**: 30 days, declined or not.\n- **The app’s notices about your tools and your hives**: 90 days.\n- **A dismissed “Other” tool, and the catalogue log**: 1 year.\n- **A report**: until the decision; 30 days if it has no object; 1 year after the decision if it was handled.\n- **A moderation decision**: 1 year after the last decision on the same content, and as long as the content stays removed.\n- **A suspension**: 1 year after it ends; if indefinite, as long as the account exists.\n- **Server backups**: 14 days; 30 days at most for a backup made before an operation.\n- **The host’s weekly copy**: [duration of the host’s copy].\n- **The app and database logs**: 50 MB at most, the oldest erased first; the app’s also go with each update. They keep no address or name.\n- **The server’s system log** (administrators’ sign-ins): 6 months.\n- **An email sent to {{contactEmail}}**: 1 year after the reply.\n- **Extracts read by the coding assistant**: 30 days at Anthropic, except for the exceptions in its policy.',
+          },
+          device: {
+            title: 'On your device',
+            body: '{{appName}} uses no audience-measurement or advertising cookie, and loads no tool from another site.\n\nStored on your device:\n\n- your sign-in session (a cookie on the web), 7 days after your last visit;\n- the chosen theme;\n- the help already seen;\n- the dates of the last suspension seen, if there was one;\n- the address waiting for verification, erased when you sign in or close the tab.\n\nThe ambient light follows the mouse and the tilt of the device, but neither is ever kept.',
+          },
+          servers: {
+            title: 'Backups and logs',
+            body: 'The server backs up the database and the files every day, kept 14 days. Before a delicate operation, one more backup is made, kept 30 days at most. The host also makes a weekly copy of the whole server.\n\nA deleted account therefore disappears from backups at the latest when they expire.\n\nThe server logs are used to fix outages and spot attacks. They keep no email address or name.',
+          },
+          recipients: {
+            title: 'Who else receives data',
+            body: 'The processors of {{appName}}, who act only on its behalf:\n\n- **Hostinger**: the server, in Paris (the database, the files, the logs, the backups), and the {{contactEmail}} mailbox.\n- **Scaleway**: sending emails, in Paris. It receives your address, your name, your language and the content of the emails.\n- **GitHub**: the code and the software images. No member data.\n\nEmails you receive then stay in your mailbox, with your provider.\n\n{{appName}} sells or rents no data.',
+          },
+          assistant: {
+            title: 'The coding assistant',
+            body: '{{appName}} is built and run with the help of Claude, Anthropic’s coding assistant. It is not a processor: it is a separate recipient.\n\nTo fix an outage or handle a report, it may read extracts of the logs and the database, for example the text of reported content.\n\n- The plan used today is a plan for individuals. Under it, Anthropic decides for itself how these extracts are used, and is responsible for them under [its privacy policy](https://www.anthropic.com/legal/privacy).\n- These extracts may leave the European Union.\n- They are not used to train its models: this setting has been off since 15 November 2026.\n- They are kept 30 days at Anthropic, except for the exceptions in its policy.\n\nAt the latest when {{appName}} opens to the public, {{appName}} will move to a business plan, under which Anthropic becomes its processor. This page will change then.',
+          },
+          rights: {
+            title: 'Your rights',
+            body: 'You have the right to access your data, correct it, erase it, object to a processing, ask for it to be restricted, and take it with you.\n\nFrom the app:\n\n- **download your data**: Settings, “My data”;\n- **correct it**: “My profile”, and your address in Settings, “Account”;\n- **erase it**: each content from its page, your comments from “My comments”, your tester feedback from “My sent feedback”, or your whole account;\n- **object**: “Don’t suggest me to others”, and your email choices in Settings, “Notifications”.\n\nBy email, at {{contactEmail}}: write from your account’s address, so we know it is really you. We reply within one month; if the request is complex, this can go up to three months, and we tell you.\n\nYou can also complain to the CNIL, the French data protection authority: [cnil.fr](https://www.cnil.fr/fr/plaintes).',
+          },
+        },
+      },
+      legal: {
+        title: 'Legal notice',
+        summary: {
+          publisher: 'A publisher, as a sole trader.',
+          host: 'The server is at {{host}}.',
+          code: 'Free code, under the AGPL-3.0 licence.',
+        },
+        sections: {
+          publisher: {
+            title: 'The publisher',
+            body: '{{publisher}}, sole trader (entrepreneur individuel).\n\n- **Address**: {{publisherAddress}}\n- **SIREN**: {{siren}}\n- **Email**: {{publisherEmail}}\n\nPublication director: {{publicationDirector}}.',
+          },
+          host: {
+            title: 'The host',
+            body: '{{host}}, {{hostAddress}}, {{hostPhone}}.\n\nThe {{appName}} server is in Paris.',
+          },
+          code: {
+            title: 'The source code and its licence',
+            body: '{{appName}} is free software, under the AGPL-3.0 licence. [The source code]({{sourceUrl}}) is public: anyone can read, copy and modify it, under the terms of the licence.',
+          },
+          brand: {
+            title: 'The brand and the logo',
+            body: 'The name {{appName}}, its logo and its mascot designate this service. The code licence gives no right to use them: don’t use them to present another service without the publisher’s consent.',
+          },
+        },
+      },
+      accessibility: {
+        title: 'Accessibility',
+        summary: {
+          status: '{{appName}} partially conforms to WCAG 2.2, level AA.',
+          done: 'Text follows the size chosen on your device, and everything works with a screen reader or a keyboard.',
+          contact: 'Found a problem? Write to {{contactEmail}}.',
+        },
+        sections: {
+          commitment: {
+            title: 'Our commitment',
+            body: '{{appName}} aims to be usable by everyone: at any text size, with a screen reader, with a keyboard. This statement covers the app, on the web, on iOS and on Android.',
+          },
+          status: {
+            title: 'Conformance status',
+            body: '{{appName}} **partially conforms** to the WCAG 2.2 guidelines, level AA. No external audit has been done yet: this status comes from our own checks.',
+          },
+          done: {
+            title: 'What is done',
+            body: '- Text follows the size chosen on your device, and still reads at 200%.\n- Every screen reads with a screen reader: headings, named buttons, announced states.\n- Everything works with a keyboard, with a visible focus.\n- Touch targets are at least 44 points.\n- Text contrasts are checked, by day and by night.\n- With “Reduce motion” on your device, large movements become fades and the ambient light stops.',
+          },
+          limits: {
+            title: 'Known limits',
+            body: '- The ambient light and the exit portal move with no button to stop them, except with “Reduce motion”.\n- By day, under the light taken from a photo, a few grey texts fall below the target contrast.\n- On iOS and Android, the focus does not always go to the card that just arrived.',
+          },
+          contact: {
+            title: 'Report a problem',
+            body: 'A screen you can’t use, content you can’t read? Write to {{contactEmail}}, in English or French. We will reply, and help you get what you are looking for in another form.',
+          },
+          recourse: {
+            title: 'If no answer comes',
+            body: 'With no answer, or an answer that does not suit you, you can contact the [Défenseur des droits](https://www.defenseurdesdroits.fr), the French rights ombudsman.',
+          },
+        },
+      },
+    },
   },
   auth: {
     contact:
@@ -62,7 +249,7 @@ export const en: Translation = {
     passwordMeter: {
       remaining_one: '{{count}} more character',
       remaining_other: '{{count}} more characters',
-      done: 'Good, your password is long enough.',
+      done: 'Password long enough',
     },
     tabs: {
       label: 'Sign in or sign up',
@@ -88,7 +275,7 @@ export const en: Translation = {
     chooseNewPassword: 'Choose a new password',
     forgotPassword: {
       title: 'Forgot your password?',
-      intro: 'Enter your email address: we will send you a link to choose a new password.',
+      intro: 'We will send you a link.',
       submit: 'Send the link',
       sentTitle: 'Sent',
       sent: 'If an account exists for this address, an email has just been sent.',
@@ -124,8 +311,7 @@ export const en: Translation = {
       noneReceived: 'Nothing yet? Check your spam folder, or send the email again.',
       change: {
         title: 'Change address',
-        intro:
-          'A typo? Enter the right address and your password: a new link will be sent there, and the old one will stop working.',
+        intro: 'The old link will stop working.',
         newEmail: 'New email address',
         password: 'Your password',
         submit: 'Send the link',
@@ -156,7 +342,26 @@ export const en: Translation = {
       wrongPassword: 'Incorrect password.',
       sessionExpired: 'Your session has expired. Sign in again, then start over.',
       generic: 'Something went wrong. Please try again in a moment.',
+      rulesUnchecked: 'Tick the box to create your account.',
+      ageUnchecked: '{{appName}} is open from age 15.',
     },
+  },
+  rules: {
+    accept: 'I accept the rules of {{appName}}',
+    age: 'I am 15 or older',
+    read: 'Read the rules',
+    readFull: 'Read the full text',
+    continue: 'Continue',
+    missing: {
+      rules: 'One thing is missing: your agreement to the rules.',
+      age: 'One thing is missing: your age.',
+      both: 'Two things are missing: your agreement to the rules and your age.',
+    },
+    changesTitle: 'What changes',
+    changes: {},
+    suspended:
+      'Accepting the rules does not lift your suspension: you can read everything, but not post, until it ends.',
+    error: 'Your agreement could not be saved. Try again.',
   },
   account: {
     about: { title: 'About' },
@@ -173,10 +378,15 @@ export const en: Translation = {
       auto: 'Automatic',
       day: 'Day',
       night: 'Night',
-      hint: 'On this device only. “Automatic” follows your device setting.',
+      hint: 'On this device only.',
     },
     emails: { title: 'Emails', row: 'Choose which emails you get' },
-    data: { title: 'My data', othersSee: 'What others see' },
+    data: {
+      title: 'My data',
+      othersSee: 'What others see',
+      comments: 'My comments',
+      feedback: 'My sent feedback',
+    },
     safety: { title: 'Safety' },
     export: {
       button: 'Download my data',
@@ -186,7 +396,7 @@ export const en: Translation = {
     contact: {
       label: 'Contact us',
       spoken: 'Contact us: {{contactEmail}}',
-      hint: 'In English or French. For a question, something to report, or your data.',
+      hint: 'In English or French.',
     },
     moderation: 'Moderation',
     blocks: 'Blocked members',
@@ -372,7 +582,7 @@ export const en: Translation = {
   project: {
     form: {
       newTitle: 'New project',
-      newIntro: 'Show your people what you are building. You can change everything later.',
+      newIntro: 'You can change everything later.',
       editTitle: 'Edit the project',
       publish: 'Publish',
       save: 'Save',
@@ -504,8 +714,7 @@ export const en: Translation = {
         'Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but no member, you included, can see them while it stays private. They come back if it becomes visible to members again.',
       preview: 'Preview in the feed',
       previewHint: 'It follows what you write.',
-      previewLight:
-        'The light around the card comes from your first photo. Change it, and the light changes too.',
+      previewLight: 'The light comes from your first photo.',
       previewUntitled: 'Your project',
       previewNoPitch: 'Your sentence will show here.',
       deleteZone: 'Delete this project',
@@ -579,7 +788,7 @@ export const en: Translation = {
       add: 'Post an update',
       seeAll_one: 'See the update',
       seeAll_other: 'See the {{count}} updates',
-      empty: 'No update yet. Tell what changes: your followers and your testers will be notified.',
+      empty: 'Your followers and your testers will be notified.',
       emptyPrivate:
         'No update yet. This project is private: no other member will see what you post, and nobody is notified.',
       sheetTitle: 'New update',
@@ -598,7 +807,7 @@ export const en: Translation = {
       removeLineLabel: 'Remove line {{number}}',
       lineLabel: 'Change {{number}} of {{total}}, {{family}}',
       familyButton: 'Kind: {{family}}',
-      linesHint: 'One line per change, 5 at most. No need to say everything.',
+      linesHint: '5 lines at most.',
       versionField: 'Version number, optional',
       versionPlaceholder: 'v1.3',
       photos: 'Photos',
@@ -725,6 +934,7 @@ export const en: Translation = {
         invalidPhoto: 'The photo is no longer available. Add it again.',
         limited: 'You have started {{max}} calls today on this project. Try again tomorrow.',
         error: 'The call could not be sent. Try again.',
+        signedOut: 'Sign in to send a call to your testers.',
         empty: 'No call yet.',
         emptyAuthor: 'No call yet. Start the first one: your testers will be notified in Activity.',
         more: 'Show earlier calls',
@@ -818,7 +1028,7 @@ export const en: Translation = {
         filterSpoken_other: '{{label}}, {{count}} threads',
         emptyOpen: 'No feedback to handle.',
         emptySettled: 'No fixed feedback yet.',
-        emptyAuthor: 'No feedback yet. Your testers can send you some from this corner.',
+        emptyAuthor: 'No feedback yet.',
         emptyTester: 'No feedback yet. Tell {{name}} what works and what gets stuck.',
         more: 'Show more',
         moreError: 'The rest could not load.',
@@ -1349,6 +1559,7 @@ export const en: Translation = {
       notAllowedSelf: 'You can’t suspend your own account.',
       notAllowedAdmin: 'This account belongs to an admin: it can’t be suspended.',
       errorTitle: 'This page couldn’t load',
+      signedOut: 'Sign in to suspend an account or lift its suspension.',
     },
     lift: {
       title: 'Lift {{nameOf}} suspension',
@@ -1922,8 +2133,7 @@ export const en: Translation = {
   hives: {
     title: 'Hives',
     mine: 'My hives',
-    intro:
-      'A hive is a group of people close to you. You join one by invitation; its members see each other and share projects kept for the hive.',
+    intro: 'You join one by invitation.',
     emptyTitle: 'No hive yet',
     create: 'Create a hive',
     createdLimit: 'You have created 10 hives, the most possible. Delete one to create another.',
@@ -1933,7 +2143,7 @@ export const en: Translation = {
     unnamedInline: 'unnamed',
     badge: '{{hive}} hive',
     myHive: 'My hive',
-    myHiveNamed: 'My {{hive}} hive',
+    myHiveNamed: '{{hive}} hive',
     members_one: '{{count}} member',
     members_other: '{{count}} members',
     animatedBy: 'run by {{name}}',
@@ -1995,7 +2205,7 @@ export const en: Translation = {
     },
     ready: {
       title: 'Your hive is ready',
-      body: 'Invite people close to you: they become members if they accept.',
+      body: 'They become members if they accept.',
       action: 'Invite people',
     },
     page: {
@@ -2094,7 +2304,7 @@ export const en: Translation = {
       policyAnimator: 'Only me',
       policyError: 'This choice could not be saved. Try again.',
       handOver: 'Hand over hosting',
-      handOverHint: 'Choose the member who will host the hive. You will stay a member.',
+      handOverHint: 'You will stay a member.',
       delete: 'Delete the hive',
       handOverDetail: 'You become a member again.',
       handOverNone: 'Nobody else is a member of the hive yet.',
@@ -2138,6 +2348,34 @@ export const en: Translation = {
     editProfile: 'Edit my profile',
     myProjects: 'My projects',
   },
+  myComments: {
+    title: 'My comments',
+    empty: 'You haven’t written any comment yet.',
+    projectGone: 'Project no longer visible',
+    reply: 'Reply',
+    open: 'Your comment on {{title}}: {{excerpt}}',
+    openReply: 'Your reply on {{title}}: {{excerpt}}',
+    delete: 'Delete',
+    deleteNamed: 'Delete the comment: {{excerpt}}',
+    more: 'Show more',
+    moreError: 'More of your comments could not load.',
+    loadError: 'Your comments could not load.',
+  },
+  myFeedback: {
+    title: 'My sent feedback',
+    empty: 'You haven’t sent any feedback yet.',
+    projectGone: 'Project no longer visible',
+    openCorner: 'Open the corner',
+    openCornerNamed: 'Open the testers’ corner of {{title}}',
+    closed: 'Corner closed',
+    closedNote: 'Only your messages remain here.',
+    delete: 'Delete',
+    deleteNamed: 'Delete the message: {{excerpt}}',
+    deleteBody: 'It will disappear, with its screenshot.',
+    more: 'Show more',
+    moreError: 'More of your feedback could not load.',
+    loadError: 'Your feedback could not load.',
+  },
   states: {
     errorTitle: 'This page could not load',
     signedOutTitle: 'Members only',
@@ -2173,6 +2411,12 @@ export const en: Translation = {
     allDone: 'You will no longer receive any notification email.',
     accountEmails: 'Emails about your account, such as verifying your address, continue.',
     manage: 'Manage my emails',
+    recapAll: 'Turn off the whole recap',
+    recapDiscoveries: 'Turn off discoveries',
+    discoveriesHint:
+      'The recap keeps the rest, without the new projects of your people or “Looking for testers”.',
+    doneDiscoveries:
+      'Done: your recap keeps the rest, without the new projects of your people or “Looking for testers”.',
     invalidTitle: 'Invalid link',
     invalid: 'This link cannot unsubscribe you. Sign in to manage your emails in My profile.',
   },
@@ -2458,6 +2702,23 @@ export const en: Translation = {
         'Disagree? Write to us at {{contactEmail}}: a person will review the decision and reply. You can also go to court.',
       greeting: 'Hello,',
     },
+    inactive: {
+      subject: 'Your {{appName}} account will be deleted on {{date}}',
+      heading: 'Your account will soon be deleted',
+      body: 'Nobody has signed in to your {{appName}} account for almost 3 years. So that no data is kept without reason, an account with no visit for 3 years is deleted.',
+      date: 'Without a sign-in by then, your account will be deleted on {{date}}.',
+      keep: 'To keep it, just sign in: nothing else to do.',
+      export:
+        'To keep a copy of your data, sign in, then open Settings, “My data”, “Download my data”.',
+      goes: 'The deletion is the same as if you deleted your account yourself: your profile, your projects, your comments and your tester feedback disappear.',
+      remains:
+        'What stays with others: the replies to your comments, without your name; the name of the hives you created, as long as they have members; your reports, without your name, until one year after they were handled.',
+      button: 'Sign in',
+      textLink: 'Sign in:',
+      reason:
+        'You are receiving this email because your {{appName}} account has not been used for almost 3 years. It is a service email: it is sent even if you turned off the others, only once before the deletion.',
+    },
+    privacy: 'Privacy: {{url}}',
   },
   notificationSettings: {
     title: 'Notifications',
@@ -2476,6 +2737,7 @@ export const en: Translation = {
       updates: 'Updates you follow',
       testers: 'Testers’ corner',
       hives: 'Hives',
+      discoveries: 'Discoveries',
     },
     choices: { now: 'Right away', digest: 'In the recap', never: 'Never' },
     rowName: '{{label}}, {{choice}}',
@@ -2828,5 +3090,9 @@ export const en: Translation = {
     hiveInvitationsLimited:
       'You have sent all your invitations for today: the next ones can go tomorrow.',
     pinNotVisible: 'This project can’t be pinned: not the whole hive can see it.',
+    rulesRequired:
+      'Accept the rules of {{appName}} first: this action is waiting for your agreement.',
+    rulesNotAccepted: 'Accept the rules of {{appName}} to create your account.',
+    ageNotDeclared: '{{appName}} is open from age 15.',
   },
 }

@@ -634,7 +634,9 @@ export const T = {
   leave: h.t(($) => $.hives.page.leave),
   inviteOne: h.t(($) => $.hives.page.inviteOne),
   membersPhrase: h.t(($) => $.hives.page.membersPhrase),
-  desktopNote: h.t(($) => $.hives.page.desktopNote),
+  // R11 (« Moins de mots ») : la phrase du récap quitte la colonne de droite. Écrite en clair, pour
+  // dire son absence quand sa clé aura disparu.
+  desktopNote: 'Une partie de la ruche arrive dans ton récap du dimanche.',
   hideFromSuggestions: h.t(($) => $.hives.hideFromSuggestions),
   inviteSearch: h.t(($) => $.hives.invite.search),
   inviteHint: h.t(($) => $.hives.invite.searchHint),
