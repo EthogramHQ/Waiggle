@@ -35,6 +35,7 @@ import { sees, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { invitationValidSince, isHiveMember, shownName } from '../hives/load'
+import { notificationCutoff } from '../notifications/load'
 import { mediaUrl } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
@@ -636,7 +637,24 @@ const loadVisible = async (
               gt(hinv.createdAt, invitationValidSince(now)),
             ),
           )
-        if (!invitation) return null
+        // R10, relecture de sécurité (A2) : qui garde une trace de cette ruche dans son Activité
+        // (retiré, animation reçue ; 90 jours, la durée d'une ligne) en lit le nom : il doit pouvoir
+        // le signaler, même s'il n'en est plus membre (le pouvoir de signaler reste à la personne
+        // visée, tranche 7b). Index hive_notice_hive_idx (hive_id), puis le destinataire.
+        const [notice] = invitation
+          ? [invitation]
+          : await db
+              .select({ id: schema.hiveNotice.id })
+              .from(schema.hiveNotice)
+              .where(
+                and(
+                  eq(schema.hiveNotice.hiveId, target.id),
+                  eq(schema.hiveNotice.recipientId, viewerId),
+                  gt(schema.hiveNotice.createdAt, notificationCutoff(now)),
+                ),
+              )
+              .limit(1)
+        if (!notice) return null
       }
       const [row] = await db
         .select({

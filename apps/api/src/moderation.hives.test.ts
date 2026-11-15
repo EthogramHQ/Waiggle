@@ -417,3 +417,96 @@ describe('who learns that a hive name was removed', () => {
     expect(maxItems.filter((item) => item.kind === 'restored')).toEqual([])
   })
 })
+
+// R10, relecture de sécurité (A2) : une copie du nom gardée dans l'Activité (`hive_notice`) ne doit
+// pas échapper à la modération. Qui la reçoit peut signaler le nom de la ruche, même s'il n'en est
+// plus membre ; et supprimer une ruche dont le nom est signalé vide ses copies.
+describe('the copies of a hive name kept in the Activity', () => {
+  it('lets a member removed from a hive report its name', async () => {
+    const removed = await act.send('DELETE', `/v1/hives/${hiveId}/members/${zoeId}`, ines)
+    expect(removed.status).toBe(204)
+    later()
+
+    expect((await reportBy(zoe, { part: { field: 'name' } })).status).toBe(201)
+
+    // Témoins : Malik, sans trace de cette ruche, reçoit le 404 d'une ruche inconnue ; une trace
+    // d'une autre ruche n'ouvre rien.
+    const unknown = await act.send('POST', '/v1/reports', malik, {
+      target: { kind: 'hive', id: randomUUID() },
+      reason: 'other',
+    })
+    const otherHive = await hives.create({ name: 'Atelier', animatorId: inesId, members: [] })
+    await hives.notice({ recipientId: malikId, kind: 'removed', hiveId: otherHive, hiveName: 'A' })
+    const stranger = await reportBy(malik)
+    expect(stranger.status).toBe(404)
+    expect(await stranger.text()).toBe(await unknown.text())
+    // Une trace d'au-delà de 90 jours (pas encore purgée) n'ouvre rien non plus.
+    await hives.notice({
+      recipientId: malikId,
+      kind: 'removed',
+      hiveId,
+      hiveName: NAME,
+      createdAt: new Date(Date.now() - 91 * 24 * 3600 * SECOND),
+    })
+    expect((await reportBy(malik)).status).toBe(404)
+  })
+
+  it('blanks the hive name in the deletion notices of a hive deleted with an open report on its name', async () => {
+    // Malik avait été retiré avant : sa trace garde la copie du nom.
+    const before = await hives.notice({
+      recipientId: malikId,
+      kind: 'removed',
+      hiveId,
+      hiveName: NAME,
+    })
+    // Témoin : une autre ruche, supprimée sans signalement, garde son nom dans ses traces.
+    const atelier = await hives.create({
+      name: 'Atelier',
+      animatorId: inesId,
+      members: [{ id: maxId }],
+    })
+    later()
+    expect((await reportBy(zoe, { part: { field: 'name' } })).status).toBe(201)
+    later()
+
+    expect((await act.send('DELETE', `/v1/hives/${hiveId}`, ines)).status).toBe(204)
+    expect((await act.send('DELETE', `/v1/hives/${atelier}`, ines)).status).toBe(204)
+
+    const notices = await ctx.db.select().from(schema.hiveNotice)
+    expect(notices.find((n) => n.id === before)?.hiveName).toBe('')
+    expect(notices.filter((n) => n.recipientId === zoeId)).toEqual([
+      expect.objectContaining({ kind: 'deleted', hiveName: '' }),
+    ])
+    expect(notices.filter((n) => n.recipientId === maxId)).toEqual([
+      expect.objectContaining({ kind: 'deleted', hiveName: 'Atelier' }),
+    ])
+    const zoeLines = await notificationsOf(zoe)
+    expect(zoeLines.items.filter((i) => i.kind === 'hive_deleted')).toEqual([
+      expect.objectContaining({ hive: expect.objectContaining({ name: null }) }),
+    ])
+    expect(zoeLines.raw).not.toContain('Pivert')
+  })
+
+  it('blanks them too when the last member leaves a hive whose name is reported', async () => {
+    const before = await hives.notice({
+      recipientId: malikId,
+      kind: 'removed',
+      hiveId,
+      hiveName: NAME,
+    })
+    expect((await reportBy(zoe, { part: { field: 'name' } })).status).toBe(201)
+    later()
+
+    expect((await act.send('DELETE', `/v1/hives/${hiveId}/members/${zoeId}`, zoe)).status).toBe(204)
+    expect((await act.send('DELETE', `/v1/hives/${hiveId}/members/${inesId}`, ines)).status).toBe(
+      204,
+    )
+    expect(await hives.row(hiveId)).toBeNull()
+
+    const [notice] = await ctx.db
+      .select()
+      .from(schema.hiveNotice)
+      .where(eq(schema.hiveNotice.id, before))
+    expect(notice?.hiveName).toBe('')
+  })
+})

@@ -98,6 +98,29 @@ const privatizeReserved = (tx: Tx, hiveId: string, authorId?: string) =>
       ),
     )
 
+/**
+ * R10, relecture de sécurité (A2) : avant de supprimer une ruche, ses copies du nom gardées pour
+ * l'Activité (`hive_notice.hive_name`) sont vidées si un signalement ouvert vise la ruche, entière
+ * ou son nom. Sans cela, la suppression ferait échapper la copie à la modération : `hive_id` des
+ * traces passe à null (plus moyen de les retrouver), et le signalement devient « sans objet ».
+ * Rend vrai si le nom est signalé (les traces « supprimée » écrites ensuite le prennent vide).
+ * Index content_report_target_idx (target_kind, target_id), puis hive_notice_hive_idx (hive_id).
+ */
+const blankReportedCopies = async (tx: Tx, hiveId: string) => {
+  const r = schema.contentReport
+  const [open] = await tx
+    .select({ id: r.id })
+    .from(r)
+    .where(and(eq(r.targetKind, 'hive'), eq(r.targetId, hiveId), eq(r.status, 'open')))
+    .limit(1)
+  if (!open) return false
+  await tx
+    .update(schema.hiveNotice)
+    .set({ hiveName: '' })
+    .where(eq(schema.hiveNotice.hiveId, hiveId))
+  return true
+}
+
 /** Une ligne d'Activité gardée (`hive_notice`), avec la copie du nom de la ruche. */
 const notice = (
   recipientId: string,
@@ -208,13 +231,14 @@ export const deleteHive = (db: Database, hiveId: string, animatorId: string, now
       .where(eq(hm.hiveId, hiveId))
       .for('update')
     await privatizeReserved(tx, hiveId)
+    const reported = await blankReportedCopies(tx, hiveId)
     const others = members.filter((member) => member.userId !== animatorId)
     if (others.length > 0) {
       await tx
         .insert(schema.hiveNotice)
         .values(
           others.map((member) =>
-            notice(member.userId, 'deleted', { id: null, name: hive.name }, now),
+            notice(member.userId, 'deleted', { id: null, name: reported ? '' : hive.name }, now),
           ),
         )
     }
@@ -266,6 +290,7 @@ export const removeFromHive = (
       // Le dernier membre est parti : la ruche n'a plus personne. Ses projets réservés (il ne
       // devrait plus y en avoir) redeviennent privés d'abord, sinon leur clé étrangère l'empêcherait.
       await privatizeReserved(tx, hiveId)
+      await blankReportedCopies(tx, hiveId)
       await tx.delete(h).where(eq(h.id, hiveId))
       return 'done'
     }
