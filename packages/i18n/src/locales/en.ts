@@ -2001,7 +2001,6 @@ export const en: Translation = {
   },
   explore: {
     title: 'Explore',
-    subtitle: 'Projects from every member: to test, to follow, to inspire you.',
     testers: 'They are looking for testers',
     test: 'Test',
     testProject: 'Test {{title}}',
@@ -2062,8 +2061,6 @@ export const en: Translation = {
   },
   tools: {
     title: 'Tools',
-    subtitle:
-      'The catalogue of AI, development and digital-project tools, and the members’ projects that use them.',
     projects_one: '{{count}} project',
     projects_other: '{{count}} projects',
     noProjects: 'No project yet',
@@ -2792,7 +2789,6 @@ export const en: Translation = {
   },
   publishPrompt: {
     title: 'Or publish your first project.',
-    body: 'An idea, a try: it all counts.',
     action: 'Publish',
   },
   dates: {
