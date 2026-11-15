@@ -3,7 +3,8 @@
 // récap du dimanche, et ce qui reste seulement dans l'Activité. Une fonction pure, à part des hooks
 // (`email/api.ts`) : les tests de l'écran remplacent ces hooks sans perdre la phrase.
 //
-// Six phrases possibles (`notifications.summary`) :
+// Les phrases « proches » (`nothingFriends`, `nowFriends`, `nowFriendsHives`) ne valent que si les
+// découvertes sont gardées (R11). Six phrases de base possibles (`notifications.summary`) :
 // - des types « Tout de suite » et le reste dans le récap : `nowAndRest` ;
 // - pareil, mais une partie du reste est à « Jamais » : `nowAndSome` ;
 // - des types « Tout de suite » et rien d'autre ne part (récap coupé, ou tout le reste à « Jamais ») :
@@ -44,7 +45,11 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
 
   // Le récap activé part même sans aucun type « dans le récap » : il apporte les nouveaux projets
   // des proches (choix 7 du scénario). La phrase ne dit donc jamais « rien ne part » dans ce cas.
-  const friendsOnly = preferences.weeklyRecap && inRecap.length === 0
+  // R11 (relecture juridique, J4) : « Découvertes » à « Jamais » retire du récap les nouveaux
+  // projets des proches : il n'y a plus rien d'eux à promettre, et la phrase retombe sur celles de
+  // R8 (`nothing`, `nowOnly`). Les nouveautés des ruches restent dites par `hivesNowNote`.
+  const friendsOnly =
+    preferences.weeklyRecap && preferences.discoveries !== 'never' && inRecap.length === 0
   // R10, relecture juridique (C3) : « Ruches » à « Tout de suite » n'envoie tout de suite que les
   // invitations ; les nouveautés des ruches partent quand même dans le récap (« Dans tes ruches »,
   // jobs/weekly-recap.ts). « Seulement les nouveaux projets de tes proches » serait faux.
