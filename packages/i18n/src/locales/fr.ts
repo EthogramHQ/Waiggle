@@ -821,7 +821,6 @@ export const fr = {
       // Qui peut le voir.
       audience: 'Qui peut le voir ?',
       members: 'Membres de {{appName}}',
-      membersHint: 'Toute personne qui a un compte.',
       // R10 (F-Pub6) : « Une ruche », seulement pour un membre d'au moins une ruche.
       hive: 'Une ruche',
       hiveHint: 'Seulement les membres d’une de tes ruches.',
@@ -845,7 +844,6 @@ export const fr = {
         'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient visible des membres.',
       // L'aperçu de la carte (ordinateur).
       preview: 'Aperçu dans le fil',
-      previewHint: 'Il suit ce que tu écris.',
       previewLight: 'La lumière vient de ta première photo.',
       previewUntitled: 'Ton projet',
       previewNoPitch: 'Ta phrase apparaîtra ici.',
@@ -3420,7 +3418,6 @@ export const fr = {
     emailColumn: {
       title: 'Ce que tu reçois par e‑mail',
       settings: 'Régler les notifications',
-      counts: 'On ne voit nulle part qui a réagi ou qui te suit : seulement des nombres.',
     },
     // La phrase de la colonne (email/summary.ts) : {{types}} est une liste comme « les réponses et
     // les mentions », dont l'appli met la première lettre en capitale.

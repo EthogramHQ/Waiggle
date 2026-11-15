@@ -679,7 +679,6 @@ export const en: Translation = {
       removePrompt: 'Remove prompt {{number}}',
       audience: 'Who can see it?',
       members: '{{appName}} members',
-      membersHint: 'Anyone who has an account.',
       hive: 'A hive',
       hiveHint: 'Only the members of one of your hives.',
       hiveChoice: 'Which hive?',
@@ -697,7 +696,6 @@ export const en: Translation = {
       audiencePrivate:
         'Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but no member, you included, can see them while it stays private. They come back if it becomes visible to members again.',
       preview: 'Preview in the feed',
-      previewHint: 'It follows what you write.',
       previewLight: 'The light comes from your first photo.',
       previewUntitled: 'Your project',
       previewNoPitch: 'Your sentence will show here.',
@@ -2835,7 +2833,6 @@ export const en: Translation = {
     emailColumn: {
       title: 'What you get by email',
       settings: 'Notification settings',
-      counts: 'Nobody can see who reacted or who follows you: only numbers.',
     },
     summary: {
       nowAndRest: '{{types}} right away; the rest in the Sunday recap, at 10 am.',

@@ -43,14 +43,9 @@ export function ProjectFormPreview({ form, cover, change, hiveError, hiveRef }: 
   return (
     <Stack gap="xl">
       <Stack gap="lg">
-        <Stack gap="xs">
-          <Text variant="headline" heading={2}>
-            {t(($) => $.project.form.preview)}
-          </Text>
-          <Text variant="callout" tone="secondary">
-            {t(($) => $.project.form.previewHint)}
-          </Text>
-        </Stack>
+        <Text variant="headline" heading={2}>
+          {t(($) => $.project.form.preview)}
+        </Text>
         <CardPreview image={cover}>
           <ProjectCard
             title={form.title.trim() || t(($) => $.project.form.previewUntitled)}

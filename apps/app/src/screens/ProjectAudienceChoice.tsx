@@ -97,7 +97,6 @@ export function ProjectAudienceChoice({ audience, hiveId, change, hiveError, hiv
   const hives = useHiveOptions()
   const choose = change('audience')
   const chooseHive = change('hiveId')
-  const membersHint = t(($) => $.project.form.membersHint)
   const hiveHint = t(($) => $.project.form.hiveHint)
   const privateHint = t(($) => $.project.form.privateHint)
   // « Une ruche » seulement à un membre d'au moins une ruche ; un projet déjà réservé le garde,
@@ -109,8 +108,6 @@ export function ProjectAudienceChoice({ audience, hiveId, change, hiveError, hiv
       <ListGroup title={t(($) => $.project.form.audience)} radio>
         <ListRow
           label={t(($) => $.project.form.members)}
-          detail={membersHint}
-          hint={membersHint}
           selected={audience === 'members'}
           onPress={() => choose('members')}
         />

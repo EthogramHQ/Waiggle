@@ -2,7 +2,7 @@
 // la page Activité sur ordinateur. Une carte dit en une phrase ce qui part par e-mail (« Les réponses
 // et les mentions tout de suite ; le reste dans le récap du dimanche, à 10 h. », écrite par
 // `email/summary.ts`) et mène aux réglages des notifications ; dessous, hors de la carte, une note
-// rappelle qu'on ne voit nulle part qui a réagi ou qui suit, seulement des nombres.
+// facultative (l'Activité n'en met plus depuis R11).
 //
 // Le titre est de niveau 2 : celui de la page (« Activité ») reste le seul de niveau 1. Tant que les
 // réglages ne sont pas lus (`summary: null`), la carte ne promet rien, mais le chemin vers eux reste :
@@ -23,8 +23,11 @@ type Props = {
    * ruches, « Tout de suite » ne vaut que pour les invitations… ») ; absente ou null : rien.
    */
   detail?: string | null
-  /** La note sous la carte (« On ne voit nulle part qui a réagi… »). */
-  note: string
+  /**
+   * Une note sous la carte, facultative (R11 : l'Activité n'en met plus, la promesse « seulement des
+   * nombres » est dite dans les réglages). Absente : ni texte, ni place.
+   */
+  note?: string
   /** Le nom du bouton qui mène aux réglages (« Régler les notifications »). */
   actionLabel: string
   onAction: () => void
@@ -61,11 +64,13 @@ export function EmailSummary({ title, summary, detail, note, actionLabel, onActi
         </View>
       </Surface>
       {/* La note, alignée sur le texte de la carte plutôt que sur son bord (planche). */}
-      <View style={{ paddingHorizontal: space.xs }}>
-        <Text variant="caption" tone="muted">
-          {note}
-        </Text>
-      </View>
+      {note ? (
+        <View style={{ paddingHorizontal: space.xs }}>
+          <Text variant="caption" tone="muted">
+            {note}
+          </Text>
+        </View>
+      ) : null}
     </View>
   )
 }
