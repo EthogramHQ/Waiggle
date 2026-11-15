@@ -622,15 +622,27 @@ export function Screen({
                     // (`scroll-padding-bottom`), ni sous la barre fixe et ce qui se pose dessous
                     // (`scroll-padding-top`, jur-RF3). Les types de React Native ignorent ces deux
                     // propriétés ; react-native-web les transmet.
-                    // R10 : sous la place collée aussi (`sticky`), sa hauteur et un peu d'air.
+                    // R10 : sous la place collée aussi (`sticky`), sa hauteur et un peu d'air. Et
+                    // au-dessus de la barre d'onglets du téléphone, même sans place flottante :
+                    // elle flotte sur le contenu, un champ ou un bouton du bas de la page finissait
+                    // dessous (noté au plan de R10, WCAG 2.4.11).
                     style={scrollPadding(
-                      floatingTop,
+                      floatingTop > 0 ? floatingTop : tabBar.height,
                       barPinned
                         ? barSpace.scrollPaddingTop
                         : stick && stickyHeight > 0
                           ? stickyHeight + space.sm
                           : 0,
                     )}
+                    // L'équivalent sur téléphone (R10) : le contenu dépasse déjà de la barre
+                    // d'onglets (`paddingBottom`, plus bas) ; la barre de défilement de iOS, elle,
+                    // s'arrête au-dessus de la barre d'onglets et de la place flottante au lieu de
+                    // passer dessous. Le web l'ignore, Android aussi.
+                    scrollIndicatorInsets={
+                      floatingTop > 0 || tabBar.height > 0
+                        ? { bottom: floatingTop > 0 ? floatingTop : tabBar.height }
+                        : undefined
+                    }
                     stickyHeaderIndices={stickyIndices}
                     contentContainerStyle={{
                       flexGrow: 1,
