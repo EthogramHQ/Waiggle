@@ -9,6 +9,7 @@
 // demande seulement. Ce qu'on crée (un appel, un message) attend la réponse : l'API peut refuser, et
 // c'est elle qui donne l'identifiant et la date.
 import {
+  MyTesterMessagesPage,
   type NewTesterCall,
   type NewTesterMessage,
   OpenFeedbackList,
@@ -174,6 +175,44 @@ export const useOpenFeedback = (projectId: string) =>
     queryKey: openFeedbackKey(projectId),
     queryFn: () => read(`${cornerPath(projectId)}/feedback/open`, OpenFeedbackList),
   })
+
+/**
+ * La clé de « Mes retours envoyés » (R11) : sous `['me']`, comme toutes les données du membre, pour
+ * qu'une relecture de `['me', …]` la reprenne.
+ */
+export const myTesterMessagesKey = ['me', 'tester-messages'] as const
+
+/**
+ * Hook : « Mes retours envoyés » (R11, Réglages → Mes données) : les messages que le membre a
+ * écrits comme testeur, dans le coin de n'importe quel projet, coins fermés compris, les plus
+ * récents d'abord, page après page. L'API les rend à plat ; l'écran les regroupe par projet.
+ */
+export const useMyTesterMessages = () =>
+  useInfiniteQuery({
+    queryKey: myTesterMessagesKey,
+    queryFn: ({ pageParam }) =>
+      read(withQuery('/v1/me/tester-messages', { cursor: pageParam }), MyTesterMessagesPage),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: nextCursor,
+  })
+
+/**
+ * Hook : retirer un message de « Mes retours envoyés » une fois supprimé. La suppression passe par
+ * la route du coin (`useDeleteMessage`), qui ne change que les caches du coin ; l'écran appelle
+ * cette fonction quand sa fenêtre est partie, pour que la liste en cache ne le ramène pas à la
+ * prochaine visite.
+ */
+export const useForgetMyTesterMessage = () => {
+  const queryClient = useQueryClient()
+  return useCallback(
+    (messageId: string) =>
+      mapPages<MyTesterMessagesPage>(queryClient, myTesterMessagesKey, (page) => ({
+        ...page,
+        items: page.items.filter((one) => one.id !== messageId),
+      })),
+    [queryClient],
+  )
+}
 
 // --- Le geste commun aux écritures ---
 

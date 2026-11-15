@@ -102,6 +102,7 @@ import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { MyCommentsCatalogue } from './mes-commentaires'
+import { MyFeedbackCatalogue } from './mes-retours'
 import { UpdateFamiliesCatalogue } from './mises-a-jour'
 import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
@@ -833,6 +834,8 @@ export function CatalogueScreen() {
       <LegalPagesCatalogue />
       {/* Tranche R11 : la ligne de « Mes commentaires » (mes-commentaires.tsx). */}
       <MyCommentsCatalogue />
+      {/* Tranche R11 : « Mes retours envoyés », la carte d'un projet et ses messages (mes-retours.tsx). */}
+      <MyFeedbackCatalogue />
       <RemovalR9Catalogue />
       {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
       <HiveCellsCatalogue />
