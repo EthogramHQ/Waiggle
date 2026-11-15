@@ -910,6 +910,11 @@ export const loadRemovedPage = async (
   // qu'elle a retirée (le contenu lui-même reste affiché).
   const wholeOrCurrentPart = (removalId: SQLWrapper) =>
     sql`((${d.partField} is null and ${removalId} = ${d.id}) or (${d.partField} is not null and ${partStillRemoved}))`
+  // R10 (décision du 15/11/2026) : un nom de ruche retiré, retrouvé par la clé primaire de hive,
+  // tant qu'aucun rétablissement ne l'a suivi (« not exists », par moderation_decision_target_idx)
+  // et qu'aucun retrait plus récent ne l'a remplacé (name_removal_id : le sien, ou vide si
+  // l'animateur a renommé la ruche depuis ; le rétablir garde alors le nouveau nom, valueBack).
+  const hv = schema.hive
   const conditions: (SQL | undefined)[] = [
     eq(d.action, 'remove'),
     or(
@@ -919,6 +924,7 @@ export const loadRemovedPage = async (
       isNotNull(tc.id),
       isNotNull(tm.id),
       isNotNull(mu.id),
+      isNotNull(hv.id),
     ),
   ]
   // « Après le curseur », dans l'ordre décroissant de la page (cursor.ts).
@@ -959,6 +965,10 @@ export const loadRemovedPage = async (
       memberId: mu.id,
       memberName: mu.name,
       memberHandle: mh.handle,
+      // R10 : la ruche d'un nom retiré, et ce nom (gardé par la décision, jamais par la ruche).
+      hiveId: hv.id,
+      hiveRemovedName: d.previousValue,
+      hiveWriterId: d.targetMemberId,
     })
     .from(d)
     // R9 : la ligne du retrait en cours d'une partie (index content_part_removal_removal_idx).
@@ -998,6 +1008,18 @@ export const loadRemovedPage = async (
       ),
     )
     .leftJoin(mh, and(eq(mh.userId, mu.id), isNull(mh.releasedAt)))
+    .leftJoin(
+      hv,
+      and(
+        eq(d.targetKind, 'hive'),
+        sql`${hv.id} = ${id}`,
+        or(isNull(hv.nameRemovalId), eq(hv.nameRemovalId, d.id)),
+        sql`not exists (
+          select 1 from moderation_decision rs
+          where rs.target_kind = 'hive' and rs.target_id = ${d.targetId}
+            and rs.action = 'restore' and rs.created_at > ${d.createdAt})`,
+      ),
+    )
     .where(and(...conditions))
     .orderBy(desc(d.createdAt), desc(d.id))
     .limit(MODERATION_PAGE_SIZE + 1)
@@ -1019,6 +1041,7 @@ export const loadRemovedPage = async (
       row.callAuthorId,
       row.messageSenderId,
       row.memberId,
+      row.hiveId === null ? null : row.hiveWriterId,
     ].filter((id): id is string => id !== null),
   )
   const blocked = await blockedByAdmin(db, adminId, [...new Set(authors)])
@@ -1048,6 +1071,19 @@ export const loadRemovedPage = async (
             row.memberHandle === null ? row.memberName : `${row.memberName} (@${row.memberHandle})`,
           removedAt: row.decidedAt.toISOString(),
           concernsMe: concerns(row.memberId),
+        },
+      ]
+    }
+    // R10 : le nom d'une ruche (seule partie qu'on en retire) : le texte est le nom retiré, pour que
+    // la modération sache ce qu'elle rétablirait ; « te concerne » si c'est lui qui l'avait écrit.
+    if (part !== null && row.hiveId !== null) {
+      return [
+        {
+          ...base,
+          projectId: null,
+          text: row.hiveRemovedName ?? '',
+          removedAt: row.decidedAt.toISOString(),
+          concernsMe: concerns(row.hiveWriterId),
         },
       ]
     }

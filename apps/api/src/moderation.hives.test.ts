@@ -19,6 +19,7 @@ import {
   ModerationQueuePage,
   MyHives,
   NotificationPage,
+  RemovedPage,
   type ReportTarget,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -508,5 +509,55 @@ describe('the copies of a hive name kept in the Activity', () => {
       .from(schema.hiveNotice)
       .where(eq(schema.hiveNotice.id, before))
     expect(notice?.hiveName).toBe('')
+  })
+})
+
+// R10 (décision du 15/11/2026) : un nom de ruche retiré entre dans l'onglet « Retirés » de la
+// modération, comme les autres contenus, d'où on le rétablit. Renommée depuis, la ruche garde son
+// nouveau nom au rétablissement (valueBack: false), et la ligne reste jusque-là.
+describe('the removed hive names in the moderation', () => {
+  const removedPage = async () => {
+    const res = await act.send('GET', '/v1/moderation/removed', louis)
+    expect(res.status).toBe(200)
+    return RemovedPage.parse(await res.json()).items
+  }
+
+  it('lists a removed hive name with the other removed contents and restores it', async () => {
+    await removeName()
+
+    expect(await removedPage()).toEqual([
+      expect.objectContaining({
+        target: { kind: 'hive', id: hiveId },
+        part: expect.objectContaining({ field: 'name' }),
+        projectId: null,
+        text: NAME,
+        ground: 'rules',
+        explanation: EXPLANATION,
+        concernsMe: false,
+      }),
+    ])
+
+    later()
+    await act.decide(louis, { action: 'restore', target: target(), part: { field: 'name' } })
+    expect((await hives.row(hiveId))?.name).toBe(NAME)
+    expect(await removedPage()).toEqual([])
+  })
+
+  it('keeps it listed after a rename, and the restoration keeps the new name', async () => {
+    await removeName()
+    later()
+    expect(
+      (await act.send('PATCH', `/v1/hives/${hiveId}`, ines, { name: 'Les Mésanges' })).status,
+    ).toBe(200)
+
+    expect(await removedPage()).toEqual([
+      expect.objectContaining({ target: { kind: 'hive', id: hiveId }, text: NAME }),
+    ])
+    later()
+    await act.decide(louis, { action: 'restore', target: target(), part: { field: 'name' } })
+    expect((await hives.row(hiveId))?.name).toBe('Les Mésanges')
+    expect(await removedPage()).toEqual([])
+    const restored = (await notificationsOf(ines)).items.filter((i) => i.kind === 'restored')
+    expect(restored).toEqual([expect.objectContaining({ valueBack: false })])
   })
 })
