@@ -101,6 +101,7 @@ import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
+import { MyFeedbackCatalogue } from './mes-retours'
 import { UpdateFamiliesCatalogue } from './mises-a-jour'
 import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
@@ -830,6 +831,8 @@ export function CatalogueScreen() {
       <SuspensionCatalogue />
       {/* Tranche R11 : le corps d'une page légale et les liens vers les quatre pages (pages-legales.tsx). */}
       <LegalPagesCatalogue />
+      {/* Tranche R11 : « Mes retours envoyés », la carte d'un projet et ses messages (mes-retours.tsx). */}
+      <MyFeedbackCatalogue />
       <RemovalR9Catalogue />
       {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
       <HiveCellsCatalogue />
