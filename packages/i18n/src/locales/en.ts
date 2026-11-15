@@ -383,7 +383,6 @@ export const en: Translation = {
     emails: { title: 'Emails', row: 'Choose which emails you get' },
     data: {
       title: 'My data',
-      othersSee: 'What others see',
       comments: 'My comments',
       feedback: 'My sent feedback',
     },

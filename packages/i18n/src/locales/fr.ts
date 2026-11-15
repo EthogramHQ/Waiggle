@@ -471,11 +471,9 @@ export const fr = {
     },
     // Les réglages d'e-mail vivent au profil : « Mon compte » y mène (design, 24/10/2026).
     emails: { title: 'E‑mails', row: 'Choisir les e‑mails reçus' },
-    // R10 : « Ce que les autres voient », le sous-titre du réglage « Ne pas me proposer aux autres ».
     // R11 : « Mes commentaires » et « Mes retours envoyés », l'un sous l'autre (choix 7).
     data: {
       title: 'Mes données',
-      othersSee: 'Ce que les autres voient',
       comments: 'Mes commentaires',
       feedback: 'Mes retours envoyés',
     },
