@@ -25,6 +25,7 @@ import { Icon, type IconName } from './Icon'
 import { MIN_NAME, type PressEvent } from './ListGroup'
 import { RelativeTime, useRelativeDate } from './RelativeTime'
 import { Text } from './Text'
+import { useLargeText } from './textScale'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -64,6 +65,11 @@ type Props = {
 
 /** Le nombre de lignes de l'extrait d'un commentaire qu'on peut ouvrir (planche : deux). */
 const EXCERPT_LINES = 2
+/**
+ * À texte agrandi (200 %), deux lignes ne tiennent que quatre ou cinq mots : l'extrait en garde
+ * quatre, pour qu'on reconnaisse encore son commentaire (batterie R11, 320 px).
+ */
+const EXCERPT_LINES_LARGE = 4
 /** Les icônes de la ligne (planche : 14 points, à la taille des précisions). */
 const SMALL_ICON = 14
 
@@ -86,6 +92,8 @@ export function MyCommentRow({
   // L'identifiant du texte caché qui décrit le lien (web) : unique dans la page.
   const hintId = useId()
   const { full } = useRelativeDate(date)
+  // Le texte est-il agrandi ? Sur le web, une sonde mesure la taille réelle des lettres (`probe`).
+  const { large, probe } = useLargeText()
   const gone = projectTitle === null
   const opens = !gone && onOpen !== undefined
   // La description du lien : les marques, puis la date entière (« le 14 novembre à 19:00 »).
@@ -131,7 +139,7 @@ export function MyCommentRow({
       <Text
         variant="callout"
         tone="secondary"
-        {...(gone ? null : { numberOfLines: EXCERPT_LINES })}
+        {...(gone ? null : { numberOfLines: large ? EXCERPT_LINES_LARGE : EXCERPT_LINES })}
         breakAnywhere
       >
         {body}
@@ -168,6 +176,7 @@ export function MyCommentRow({
 
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      {probe}
       {opens ? (
         <Pressable
           ref={ref}
