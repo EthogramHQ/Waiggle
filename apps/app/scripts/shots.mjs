@@ -974,6 +974,14 @@ const launchProject = {
   latestUpdate: recipesUpdates[2],
   updateCount: 1,
 }
+// R10 : le même projet d'Inès, réservé à Famille (page `projet-partager-ruche`) : sa feuille
+// « Partager » dit « Seuls les membres de Famille pourront l'ouvrir. ».
+const reservedLaunchProject = {
+  ...launchProject,
+  id: '00000000-0000-4000-8000-0000000000f7',
+  visibility: 'hive',
+  hive: { id: familleId, name: 'Famille' },
+}
 // Tranche R6a, la feuille de modification (planches `R6-Modifier`, `R6-Publier-Suite`) : un projet
 // de Léa à trois photos décrites, deux catégories, « Commencé en » et « Facile à refaire ? », et un
 // prompt de départ où traîne une clé d'API (l'encadré « Clé : … » et « Retirer la clé »). La clé
@@ -2529,6 +2537,9 @@ const fakeApi = (
     // R5a : la page projet à trois photos et trois prompts (les pages de captures : la session).
     if (pathname === `/v1/projects/${launchProject.id}`) {
       return json(200, withExtras(launchProject))
+    }
+    if (pathname === `/v1/projects/${reservedLaunchProject.id}`) {
+      return json(200, withExtras(reservedLaunchProject))
     }
     // R6a : la feuille de modification (trois photos décrites, une clé dans le prompt) et un projet
     // d'avant R6a, sans catégorie. Les pages de captures qui les ouvrent : la session.
@@ -4264,6 +4275,31 @@ const pages = [
     fullPage: true,
   },
   { name: 'membre-tuiles', path: `/members/${odileMemberPage.id}`, signedIn: true, fullPage: true },
+  // R10 : l'onglet Projets vu par l'animatrice (Léa anime Famille), le « … » de la première tuile
+  // ouvert (« Retirer l'épingle » sur le projet épinglé, « Épingler » ailleurs) ; et la feuille
+  // « Partager » d'un projet réservé à Famille.
+  {
+    name: 'ruche-projets-animateur',
+    path: `/hives/${familleId}?tab=projects`,
+    signedIn: true,
+    hives: 'animator',
+    prepare: async (page) => {
+      await page
+        .getByRole('button', { name: /^Plus d’options pour / })
+        .first()
+        .click()
+      await page.getByRole('menuitem').first().waitFor()
+    },
+  },
+  {
+    name: 'projet-partager-ruche',
+    path: `/projects/${reservedLaunchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Partager', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Copier le lien' }).waitFor()
+    },
+  },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
 // habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se

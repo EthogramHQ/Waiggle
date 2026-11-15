@@ -3,6 +3,8 @@
 // - un projet public, avec « Partager… » (le menu de l'appareil existe) et sans (Firefox sur
 //   ordinateur) ;
 // - un projet privé : le bandeau dit que le lien ne s'ouvrira que pour son auteur ;
+// - R10 : un projet réservé à Famille (« Seuls les membres de Famille pourront l'ouvrir. »), et
+//   à une ruche dont le nom a été retiré (« Ruche sans nom ») ;
 // - la page d'un membre, sans photo (ses initiales) ;
 // - une copie refusée : toucher « Copier le lien » de cet exemple montre le message du pied ;
 // de jour et de nuit, puis sur ordinateur (panneau centré).
@@ -27,6 +29,9 @@ const fr = {
   project: 'Projet public, avec « Partager… »',
   noSystem: 'Projet public, sans menu de l’appareil (Firefox sur ordinateur)',
   private: 'Projet privé',
+  hive: 'Projet réservé à une ruche (R10)',
+  hiveUnnamed: 'Projet réservé à une ruche dont le nom a été retiré, sans photo',
+  hiveName: 'Famille',
   member: 'Page d’un membre, sans photo',
   failed: 'Copie refusée : touche « Copier le lien » pour voir le message',
   desktop: 'Ordinateur : panneau centré',
@@ -44,6 +49,9 @@ const en: typeof fr = {
   project: 'Public project, with “Share…”',
   noSystem: 'Public project, without a device menu (Firefox on a computer)',
   private: 'Private project',
+  hive: 'Project reserved to a hive (R10)',
+  hiveUnnamed: 'Project reserved to a hive whose name was removed, without a photo',
+  hiveName: 'Family',
   member: 'Page of a member, without a photo',
   failed: 'Copy refused: tap “Copy link” to see the message',
   desktop: 'Computer: centred panel',
@@ -62,6 +70,7 @@ const schemes = ['day', 'night'] as const
 /** Des identifiants valides (la feuille refuse de fabriquer une adresse sans eux). */
 const PROJECT = '00000000-0000-4000-8000-0000000000f1'
 const MEMBER = 'ines'
+const HIVE = '00000000-0000-4000-8000-0000000000a1'
 
 /**
  * La vignette d'exemple (le dépôt n'a pas de photo) : un dégradé SVG entre deux couleurs de la
@@ -91,7 +100,7 @@ function Example({ caption, children }: { caption: string; children: ReactNode }
   )
 }
 
-/** Les cinq feuilles d'un thème, sur téléphone. */
+/** Les sept feuilles d'un thème, sur téléphone. */
 function PhoneSheets({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] }) {
   const project = { kind: 'project' as const, id: PROJECT }
   return (
@@ -127,6 +136,31 @@ function PhoneSheets({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number
             visibility="private"
             image={photo}
             canShare
+            closeLabel={l.close}
+            onClose={noop}
+          />
+        </Example>
+        <Example caption={`${l.hive} — ${l[scheme]}`}>
+          <ShareSheetPanel
+            layout="phone"
+            title={l.projectTitle}
+            target={project}
+            visibility="hive"
+            hive={{ id: HIVE, name: l.hiveName }}
+            image={photo}
+            canShare
+            closeLabel={l.close}
+            onClose={noop}
+          />
+        </Example>
+        <Example caption={`${l.hiveUnnamed} — ${l[scheme]}`}>
+          <ShareSheetPanel
+            layout="phone"
+            title={l.projectTitle}
+            target={project}
+            visibility="hive"
+            hive={{ id: HIVE, name: null }}
+            canShare={false}
             closeLabel={l.close}
             onClose={noop}
           />

@@ -286,6 +286,8 @@ function HivePageView({ page }: { page: HivePage }) {
   const projects = (
     <HiveProjects
       id={id}
+      animator={isAnimator}
+      pinnedId={page.pinned?.id ?? null}
       columns={sizeClass === 'compact' || desktop ? 2 : 4}
       onOpen={(projectId) => openProject(projectId)}
     />
@@ -618,19 +620,37 @@ function ActivityList({
 
 // --- Les projets ----------------------------------------------------------------------------------
 
-/** Les projets réservés à la ruche, en mosaïque de tuiles, du plus récent au plus ancien. */
+/**
+ * Les projets réservés à la ruche, en mosaïque de tuiles, du plus récent au plus ancien. Pour
+ * l'animateur, chaque tuile a un menu « … », à côté de son lien (jamais dedans) : « Épingler », ou
+ * « Retirer l'épingle » sur le projet déjà épinglé.
+ */
 function HiveProjects({
   id,
+  animator,
+  pinnedId,
   columns,
   onOpen,
 }: {
   id: string
+  animator: boolean
+  pinnedId: string | null
   columns: 2 | 4
   onOpen: (projectId: string) => void
 }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const projects = useHiveProjects(id)
+  const patch = usePatchHive(id)
+  // L'épingle qui n'a pas pu changer : dite sous la mosaïque jusqu'au geste suivant.
+  const [pinFailed, setPinFailed] = useState(false)
+  const setPin = (pinnedProjectId: string | null) => {
+    setPinFailed(false)
+    patch.mutateAsync({ pinnedProjectId }).then(
+      () => setPinFailed(false),
+      () => setPinFailed(true),
+    )
+  }
   // Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas deux pages.
   const guard = useTapGuard()
   if (!projects.data) {
@@ -670,10 +690,33 @@ function HiveProjects({
                   : null
               }
               onPress={guard(() => onOpen(project.id))}
+              menu={
+                animator ? (
+                  <ActionMenu
+                    variant="glass"
+                    align="end"
+                    label={t(($) => $.hives.page.projectMenu, { title: project.title })}
+                    items={[
+                      project.id === pinnedId
+                        ? {
+                            label: t(($) => $.hives.page.unpin),
+                            icon: 'push-pin',
+                            onPress: () => setPin(null),
+                          }
+                        : {
+                            label: t(($) => $.hives.page.pin),
+                            icon: 'push-pin',
+                            onPress: () => setPin(project.id),
+                          },
+                    ]}
+                  />
+                ) : undefined
+              }
             />
           )
         })}
       </TileMosaic>
+      {pinFailed ? <Notice message={t(($) => $.hives.page.pinError)} /> : null}
       {projects.isFetchNextPageError ? <Notice message={t(($) => $.hives.page.moreError)} /> : null}
       {projects.hasNextPage ? (
         <Button

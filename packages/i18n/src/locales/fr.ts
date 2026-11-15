@@ -2419,6 +2419,9 @@ export const fr = {
       loadError: 'Cette ruche n’a pas pu se charger.',
       // Sous le nom de soi, dans la liste des membres : « @ines_h · toi » ({{handle}} : member.handle).
       handleYou: '{{handle}} · {{you}}',
+      // Le « … » d'une tuile de l'onglet Projets, pour l'animateur (« Épingler ») : nommé par le
+      // projet, chaque tuile ayant le sien.
+      projectMenu: 'Plus d’options pour {{title}}',
     },
     // « Ne pas me proposer aux autres » : dans l'onglet Membres et dans Mes données.
     hideFromSuggestions: 'Ne pas me proposer aux autres',

@@ -2041,6 +2041,7 @@ export const en: Translation = {
       desktopNote: 'Part of the hive reaches your Sunday recap. Challenges will come later.',
       loadError: 'This hive could not load.',
       handleYou: '{{handle}} · {{you}}',
+      projectMenu: 'More options for {{title}}',
     },
     hideFromSuggestions: 'Don’t suggest me to others',
     hideFromSuggestionsHint:
