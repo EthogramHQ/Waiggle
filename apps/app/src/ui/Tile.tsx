@@ -201,15 +201,14 @@ export function ProjectTile({
             <StatusPill label={badge} nativeID={badgeId} />
           </View>
         ) : null}
-        <Text
-          variant={image ? 'callout' : 'headline'}
-          weight={700}
-          tone={look.title}
-          numberOfLines={image ? 2 : 4}
-        >
+        {/* R10 : ni le titre ni l'auteur ne se coupent par « … » : à 320 px et texte à 200 %, un
+            titre de deux lignes perdait sa fin, et un nom de membre ne se coupe jamais (décision
+            du 1/11). La tuile s'allonge (sa hauteur n'est qu'un minimum) ; dans une mosaïque, la
+            rangée suit la plus haute, et la photo garde sa hauteur minimale. */}
+        <Text variant={image ? 'callout' : 'headline'} weight={700} tone={look.title}>
           {title}
         </Text>
-        <Text variant="caption" tone={look.author} numberOfLines={1}>
+        <Text variant="caption" tone={look.author}>
           {author}
         </Text>
       </View>
