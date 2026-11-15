@@ -15,15 +15,14 @@ type Props = {
 
 export function LegalPageScreen({ page }: Props) {
   const { t } = useTranslation()
-  // Le titre de chaque page. Provisoire : les titres des quatre pages arrivent avec leurs textes ;
-  // en attendant, une clé déjà écrite (« Les règles de {{appName}} ») sert pour les quatre.
+  // Le titre de chaque page, écrit avec ses textes (packages/i18n, `legal.pages`).
   // `Record<LegalPage, …>` oblige à donner un titre à chaque page : une cinquième page ajoutée au
   // contrat ferait échouer le typage ici, au lieu d'afficher une page sans titre.
   const titles: Record<LegalPage, string> = {
-    rules: t(($) => $.moderation.grounds.rules),
-    privacy: t(($) => $.moderation.grounds.rules),
-    legal: t(($) => $.moderation.grounds.rules),
-    accessibility: t(($) => $.moderation.grounds.rules),
+    rules: t(($) => $.legal.pages.rules.title),
+    privacy: t(($) => $.legal.pages.privacy.title),
+    legal: t(($) => $.legal.pages.legal.title),
+    accessibility: t(($) => $.legal.pages.accessibility.title),
   }
   const title = titles[page]
 
