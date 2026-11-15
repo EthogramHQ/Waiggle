@@ -540,7 +540,7 @@ pas** : on prévient Louis.
      un refus réappliqué deux fois ne change rien.
 
      ```bash
-     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all|instant (digest|never)|(reactions|comments|replies|follows|updates|testers) (digest|never))|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all|instant (digest|never)|(reactions|comments|replies|follows|updates|testers|hives) (digest|never))|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
      ```
 
      `grep -E` ne garde que les lignes exactement de ces formes (celles de l'appli d'avant la
@@ -624,6 +624,7 @@ pas** : on prévient Louis.
            email_comments = case when email_comments = 'now' then 'C' else email_comments end,
            email_replies = case when email_replies = 'now' then 'C' else email_replies end,
            email_testers = case when email_testers = 'now' then 'C' else email_testers end,
+           email_hives = case when email_hives = 'now' then 'C' else email_hives end,
            updated_at = now() at time zone 'UTC'
          where user_id = '<identifiant>';
          SQL
@@ -631,7 +632,8 @@ pas** : on prévient Louis.
 
        - `<type> <digest|never>` : seule la colonne du type change, et seulement si elle baisse
          (`email_reactions`, `email_comments`, `email_replies`, `email_follows`,
-         `email_updates` ou `email_testers` à la place de `email_T`, `C` le choix de la ligne) ;
+         `email_updates`, `email_testers` ou `email_hives` à la place de `email_T`, `C` le choix
+         de la ligne) ;
 
          ```bash
          ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
