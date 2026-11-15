@@ -365,7 +365,14 @@ describe('a message of mine (MyTesterMessage)', () => {
     outcome: 'partly',
     device: 'phone',
     createdAt: '2026-11-15T08:30:00.000Z',
-    media: { url: 'https://api.example.com/media/testers/capture.webp' },
+    media: {
+      id: '55555555-5555-4555-8555-555555555555',
+      url: 'https://api.example.com/media/testers/capture.webp',
+      width: 1080,
+      height: 2340,
+      thumbhash: null,
+      description: null,
+    },
     removed: false,
   }
 
@@ -378,12 +385,12 @@ describe('a message of mine (MyTesterMessage)', () => {
     expect(MyTesterMessage.parse(closed)).toEqual(closed)
   })
 
-  it('gives the capture by its address only', () => {
-    const media = { ...sent.media, width: 10, height: 10, description: 'x' }
-    expect(MyTesterMessage.parse({ ...sent, media }).media).toEqual(sent.media)
-    expect(MyTesterMessage.safeParse({ ...sent, media: { url: 'capture.webp' } }).success).toBe(
+  it('gives the capture in the shape of the corner, sizes included, at a full address', () => {
+    expect(MyTesterMessage.safeParse({ ...sent, media: { url: sent.media.url } }).success).toBe(
       false,
     )
+    const relative = { ...sent.media, url: 'capture.webp' }
+    expect(MyTesterMessage.safeParse({ ...sent, media: relative }).success).toBe(false)
   })
 
   it('pages 30 by 30, with the cursor of the corner', () => {
