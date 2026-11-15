@@ -16,8 +16,11 @@ import { useTheme } from './theme/ThemeProvider'
 const DOT = 28
 
 type Props = {
-  /** La phrase qui dit l'essentiel, en gras (« Léa et toi ne vous verrez plus. »). */
-  summary: string
+  /**
+   * La phrase qui dit l'essentiel, en gras (« Léa et toi ne vous verrez plus. »). Facultative
+   * (R11) : l'« En bref » d'une page légale n'a que ses puces, sous son titre.
+   */
+  summary?: string
   /** Les puces courtes, chacune avec son icône (décorative : la phrase dit tout). */
   points: { icon: IconName; text: string }[]
   /** Le texte complet, sous son intertitre (« Ce que change le blocage »), un paragraphe par élément. */
@@ -30,7 +33,7 @@ export function KeyPoints({ summary, points, details }: Props) {
     // alignSelf « stretch » : dans une fenêtre aux éléments centrés, le bloc prend toute la largeur,
     // et ses lignes partent toutes du même bord gauche.
     <View style={{ alignSelf: 'stretch', gap: space.lg }}>
-      <Text weight={700}>{summary}</Text>
+      {summary ? <Text weight={700}>{summary}</Text> : null}
       {/* Une liste annoncée (« liste, 4 éléments ») : la pile pose elle-même chaque élément. */}
       <Stack gap="md" accessibilityRole="list">
         {points.map((point, index) => (
