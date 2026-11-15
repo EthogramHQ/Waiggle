@@ -8,11 +8,12 @@
 // marquée par `removal_id` : les lectures la cachent. La photo de profil passe à une clé
 // `withheld/<id>` que le service des fichiers ne sert qu'à son auteur. Le nom et le pseudo sont
 // remplacés d'office (« Membre », « membre_4f2a ») ; l'ancien est gardé dans la décision
-// (`previous_value`), sans ligne de retrait.
+// (`previous_value`), sans ligne de retrait. R10 : le nom d'une ruche suit le même chemin, mais
+// il est vidé (« Ruche sans nom ») au lieu d'être remplacé.
 import type { ReportPartField, StoredReportTarget } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { type Language, resources } from '@ruche/i18n'
-import { and, desc, eq, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, ne, type SQL, sql } from 'drizzle-orm'
 import { provisionalHandle, restoreHandle } from '../handles/provisional'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
@@ -153,6 +154,9 @@ export const hidePart = async (tx: Tx, args: HideArgs): Promise<ReplacedValue> =
   if (target.kind === 'member' && (part.field === 'name' || part.field === 'handle')) {
     return replaceIdentity(tx, authorId, part.field, args.removalId, now)
   }
+  if (target.kind === 'hive' && part.field === 'name') {
+    return hideHiveName(tx, target.id, args.removalId, now)
+  }
   const rowId = crypto.randomUUID()
   const hidden = await takeOut(tx, args, rowId)
   // La ligne du retrait en cours. « on conflict do nothing » : la partie est déjà retirée (un des
@@ -174,6 +178,66 @@ export const hidePart = async (tx: Tx, args: HideArgs): Promise<ReplacedValue> =
     .returning({ id: cpr.id })
   if (inserted.length === 0) throw new PartAlreadyDecided()
   return null
+}
+
+/**
+ * R10 : retire le nom d'une ruche. Le nom sort de sa colonne (vide : « Ruche sans nom » pour tous),
+ * la décision le garde (`previous_value`, rendu par ReplacedValue) et marque la ruche
+ * (`name_removal_id`). Les copies du nom gardées pour l'Activité (`hive_notice.hive_name`) sont
+ * vidées aussi : un ancien membre ne relit jamais un nom retiré (plan R10, point 4). La ligne de la
+ * ruche est lue `for no key update` : un renommage simultané de l'animateur attend la fin de la
+ * décision, et l'ancien nom gardé est bien celui qui sort. Les copies se trouvent par l'index
+ * hive_notice_hive_idx (hive_id).
+ */
+const hideHiveName = async (
+  tx: Tx,
+  hiveId: string,
+  removalId: string,
+  now: Date,
+): Promise<ReplacedValue> => {
+  const h = schema.hive
+  const [row] = await tx
+    .select({ name: h.name, nameRemovalId: h.nameRemovalId })
+    .from(h)
+    .where(eq(h.id, hiveId))
+    .for('no key update')
+  // Déjà retiré (une autre décision est passée avant) ou nom déjà vide : rien à retirer.
+  if (!row || row.nameRemovalId !== null || row.name === '') throw new PartAlreadyDecided()
+  await tx
+    .update(h)
+    .set({ name: '', nameRemovalId: removalId, updatedAt: now })
+    .where(eq(h.id, hiveId))
+  await tx
+    .update(schema.hiveNotice)
+    .set({ hiveName: '' })
+    .where(eq(schema.hiveNotice.hiveId, hiveId))
+  return { previousValue: row.name, provisionalValue: '' }
+}
+
+/**
+ * R10 : rétablit le nom d'une ruche si la dernière décision sur ce nom est un retrait, et si la
+ * ruche porte encore la marque de ce retrait. Si l'animateur a choisi un autre nom depuis, la
+ * marque a disparu : le nouveau nom reste (comme un pseudo de R9) et le rétablissement est noté
+ * tel quel. `previous_value` de la décision de rétablissement dit alors si l'ancien nom est revenu
+ * (la notification `valueBack` le lit) : renseigné s'il est revenu, vide sinon. Les copies du
+ * nom vidées au retrait ne reviennent pas (la ruche n'était plus nommée pour ceux qui les lisent).
+ */
+const restoreHiveName = async (tx: Tx, hiveId: string, restoreId: string): Promise<boolean> => {
+  const last = await lastIdentityRemoval(tx, 'hive', hiveId, 'name', restoreId)
+  if (!last?.previousValue) return false
+  const h = schema.hive
+  const back = await tx
+    .update(h)
+    .set({ name: last.previousValue, nameRemovalId: null })
+    .where(and(eq(h.id, hiveId), isNotNull(h.nameRemovalId)))
+    .returning({ id: h.id })
+  if (back.length > 0) {
+    await tx
+      .update(schema.moderationDecision)
+      .set({ previousValue: last.previousValue })
+      .where(eq(schema.moderationDecision.id, restoreId))
+  }
+  return true
 }
 
 /** Le nom d'office, dans la langue du compte (« Membre », « Member »). */
@@ -311,6 +375,7 @@ const takeOut = async (
  */
 const lastIdentityRemoval = async (
   tx: Tx,
+  kind: 'member' | 'hive',
   memberId: string,
   field: 'name' | 'handle',
   // Le rétablissement en cours, déjà écrit : il ne compte pas.
@@ -326,7 +391,7 @@ const lastIdentityRemoval = async (
     .from(d)
     .where(
       and(
-        eq(d.targetKind, 'member'),
+        eq(d.targetKind, kind),
         eq(d.targetId, memberId),
         eq(d.partField, field),
         // Un classement (dismiss) ne compte pas : seuls un retrait ou un rétablissement changent la partie.
@@ -389,7 +454,7 @@ export const restorePart = async (
   { now, restoreId }: { now: Date; restoreId: string },
 ): Promise<boolean> => {
   if (target.kind === 'member' && (part.field === 'name' || part.field === 'handle')) {
-    const last = await lastIdentityRemoval(tx, target.id, part.field, restoreId)
+    const last = await lastIdentityRemoval(tx, 'member', target.id, part.field, restoreId)
     if (!last?.previousValue || !last.provisionalValue) return false
     if (part.field === 'handle') {
       await restoreHandle(
@@ -406,6 +471,8 @@ export const restorePart = async (
     }
     return true
   }
+  if (target.kind === 'hive' && part.field === 'name')
+    return restoreHiveName(tx, target.id, restoreId)
   const row = await currentRemoval(tx, target, part, media)
   if (!row) return false
   await putBack(tx, target, row)

@@ -5,6 +5,7 @@
 //
 // Jamais qui a signalé (règle 14) : reporter_id n'est même pas lu ici.
 import {
+  HiveIcon,
   IMAGE_INPUT_FIELDS,
   type MemberInputField,
   MODERATION_DETAILS_SHOWN,
@@ -26,6 +27,7 @@ import {
 import { type Database, schema } from '@ruche/db'
 import {
   and,
+  count,
   desc,
   eq,
   inArray,
@@ -93,6 +95,7 @@ export const voidReportsOfGoneTargets = async (db: Database, now: Date) => {
               select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
             when 'call' then not exists (select 1 from tester_call tc where tc.id = ${id})
             when 'message' then not exists (select 1 from tester_message tm where tm.id = ${id})
+            when 'hive' then not exists (select 1 from hive hv where hv.id = ${id})
             else not exists (select 1 from "user" u where u.id = content_report.target_id)
           end`,
           // R9 (relecture juridique, jur-B1) : une photo supprimée par son auteur (sa photo, sa
@@ -294,6 +297,11 @@ export const loadQueuePage = async (
     copiesOfTargets.set(target, [...(copiesOfTargets.get(target) ?? []), ...copy])
   }
   const present = await imagesStillThere(db, copiesOfTargets)
+  // R10 : ce que la modération voit d'une ruche signalée (une à trois requêtes pour la page).
+  const hives = await hiveCardsOf(
+    db,
+    targets.filter((t) => t.kind === 'hive').map((t) => t.id),
+  )
   // Règle 17 : les auteurs visés que cet administrateur a bloqués (une requête pour la page).
   const authorIds = [
     ...new Set(reports.flatMap((x) => (x.targetAuthorId ? [x.targetAuthorId] : []))),
@@ -353,6 +361,8 @@ export const loadQueuePage = async (
       // que la file montre sans sa clé (tranche 7b, « without its key ») ; la miniature sert à
       // situer un commentaire, une mise à jour, un appel ou un message.
       context: contextOf(projectId, target.kind),
+      // R10 : pour une ruche seulement (null si elle a disparu depuis) ; la clé manque ailleurs.
+      ...(target.kind === 'hive' ? { hive: hives.get(target.id) ?? null } : {}),
       // R9 : la date de publication de la cible ; null si elle a disparu.
       contentCreatedAt: state?.createdAt.toISOString() ?? null,
       projectId,
@@ -397,6 +407,43 @@ export const loadQueuePage = async (
     }
   }
   return { items: items.map(({ target, group }) => toItem(target, group)), nextCursor }
+}
+
+/**
+ * R10 : pour chaque ruche signalée de la page, son icône, le nom de son animateur et son nombre de
+ * membres : tout ce que la modération en voit en plus du nom (la copie), jamais ses projets ni son
+ * actualité. Deux requêtes pour toute la page : les ruches avec leur animateur (clés primaires de
+ * hive et de user), puis le décompte des membres groupé par ruche (clé primaire de hive_member,
+ * (hive_id, user_id), lue par son début).
+ */
+const hiveCardsOf = async (db: Database, hiveIds: string[]) => {
+  const cards = new Map<string, NonNullable<ModerationQueueItem['hive']>>()
+  if (hiveIds.length === 0) return cards
+  const h = schema.hive
+  const hm = schema.hiveMember
+  const [rows, counts] = await Promise.all([
+    db
+      .select({ id: h.id, icon: h.icon, animatorName: schema.user.name })
+      .from(h)
+      .leftJoin(schema.user, eq(schema.user.id, h.animatorId))
+      .where(inArray(h.id, hiveIds)),
+    db
+      .select({ hiveId: hm.hiveId, n: count() })
+      .from(hm)
+      .where(inArray(hm.hiveId, hiveIds))
+      .groupBy(hm.hiveId),
+  ])
+  const countOf = new Map(counts.map((row) => [row.hiveId, row.n]))
+  for (const row of rows) {
+    const icon = HiveIcon.safeParse(row.icon)
+    if (!icon.success) continue
+    cards.set(row.id, {
+      icon: icon.data,
+      animatorName: row.animatorName,
+      memberCount: countOf.get(row.id) ?? 0,
+    })
+  }
+  return cards
 }
 
 /**
@@ -787,6 +834,24 @@ const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
         .select({ id: tm.id, removedAt: tm.removedAt, createdAt: tm.createdAt })
         .from(tm)
         .where(inArray(tm.id, messages)),
+    )
+  }
+  // R10 : une ruche, par la clé primaire de hive ; « retirée » dit que son nom l'est.
+  const hives = idsOf('hive')
+  if (hives.length > 0) {
+    const h = schema.hive
+    note(
+      'hive',
+      (
+        await db
+          .select({ id: h.id, nameRemovalId: h.nameRemovalId, createdAt: h.createdAt })
+          .from(h)
+          .where(inArray(h.id, hives))
+      ).map((row) => ({
+        id: row.id,
+        createdAt: row.createdAt,
+        removedAt: row.nameRemovalId === null ? null : row.createdAt,
+      })),
     )
   }
   const members = idsOf('member')

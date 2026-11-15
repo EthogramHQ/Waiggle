@@ -27,13 +27,14 @@ import {
   Thumbhash,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNull, type SQL, sql } from 'drizzle-orm'
 import { rgbaToThumbHash } from 'thumbhash'
 
 import { type Blocks, blocksOf } from '../blocks/visibility'
 import { sees, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
+import { invitationValidSince, isHiveMember, shownName } from '../hives/load'
 import { mediaUrl } from '../profile/me'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
@@ -51,6 +52,9 @@ const m = schema.projectMedia
 const tc = schema.testerCall
 const tmsg = schema.testerMessage
 const tm = schema.testerMedia
+// Une ruche (R10) et ses invitations.
+const hv = schema.hive
+const hinv = schema.hiveInvitation
 
 /** Ce qu'on sait d'une cible que le membre voit. */
 export type Reportable = {
@@ -68,6 +72,12 @@ export type Reportable = {
   head: Omit<ReportTargetPreview['head'], 'authorName'>
   /** R9 : les parties présentes sur la page, dans l'ordre de la feuille. */
   parts: ReportablePart[]
+  /**
+   * R10 : le membre que l'aperçu présente comme « auteur », quand ce n'est pas `authorId`. Pour une
+   * ruche, `authorId` est celui qui a écrit le nom (la décision le vise), mais l'aperçu montre
+   * l'animateur : un invité le connaît déjà, il ne doit pas apprendre qui a écrit le nom.
+   */
+  shownAuthorId?: string
 }
 
 /** Une miniature : l'adresse de l'image et son résumé flou (contrat ProjectVisual). */
@@ -227,7 +237,7 @@ export const loadReportable = async (
   const blocks = await blocksOf(db, viewerId)
   const found = await loadVisible(db, viewerId, target, blocks, publicApiUrl)
   if (!found) return null
-  const author = await authorOf(db, found.authorId, blocks)
+  const author = await authorOf(db, found.shownAuthorId ?? found.authorId, blocks)
   if (!author) return null
   return { ...found, author }
 }
@@ -606,9 +616,54 @@ const loadVisible = async (
         ],
       }
     }
-    case 'hive':
-      // Provisoire (R10) : une ruche ne se signale pas encore ; répondre comme une cible inconnue.
-      return null
+    case 'hive': {
+      // R10 : une ruche se signale par l'un de ses membres, ou par un invité dont l'invitation est
+      // en attente (ni refusée, ni vieille de plus de 30 jours). Pour tout autre (étranger, ancien
+      // membre, invité qui a refusé), la réponse d'une ruche inconnue : rien ne dit qu'elle existe.
+      // La modération n'en voit que le nom (la copie), jamais ses projets ni son actualité.
+      const now = new Date()
+      // Clé primaire de hive_member (hive_id, user_id), puis, pour un non-membre, l'index unique
+      // hive_invitation_hive_invitee_idx (hive_id, invitee_id).
+      if (!(await isHiveMember(db, target.id, viewerId))) {
+        const [invitation] = await db
+          .select({ id: hinv.id })
+          .from(hinv)
+          .where(
+            and(
+              eq(hinv.hiveId, target.id),
+              eq(hinv.inviteeId, viewerId),
+              isNull(hinv.refusedAt),
+              gt(hinv.createdAt, invitationValidSince(now)),
+            ),
+          )
+        if (!invitation) return null
+      }
+      const [row] = await db
+        .select({
+          name: hv.name,
+          nameRemovalId: hv.nameRemovalId,
+          animatorId: hv.animatorId,
+          nameSetBy: hv.nameSetBy,
+        })
+        .from(hv)
+        .where(eq(hv.id, target.id))
+      if (!row) return null
+      // La décision vise celui qui a écrit le nom ; son compte supprimé, l'animateur.
+      const authorId = row.nameSetBy ?? row.animatorId
+      if (authorId === null) return null
+      // Un nom déjà retiré n'est plus une partie à signaler (« Ruche sans nom »).
+      const name = shownName(row)
+      const nameCopy: ReportSnapshot = name === null ? [] : [{ field: 'name', value: name }]
+      return {
+        authorId,
+        shownAuthorId: row.animatorId ?? authorId,
+        projectId: null,
+        text: name ?? '',
+        snapshot: nameCopy,
+        head: { title: name, image: null },
+        parts: name === null ? [] : [textPart('name', nameCopy)],
+      }
+    }
   }
 }
 
@@ -712,9 +767,22 @@ export const loadDecidable = async (
         .where(eq(schema.user.id, target.id))
       return row ? { authorId: row.id, removed: false } : null
     }
-    case 'hive':
-      // Provisoire (R10) : la ruche signalée, son animateur et son nom retiré.
-      return null
+    case 'hive': {
+      // R10 : la ruche telle qu'elle est (clé primaire de hive). Le nom est « retiré » quand la
+      // modération l'a vidé ; l'auteur visé est celui qui l'a écrit (name_set_by), à défaut
+      // l'animateur.
+      const [row] = await db
+        .select({
+          nameRemovalId: hv.nameRemovalId,
+          nameSetBy: hv.nameSetBy,
+          animatorId: hv.animatorId,
+        })
+        .from(hv)
+        .where(eq(hv.id, target.id))
+      return row
+        ? { authorId: row.nameSetBy ?? row.animatorId, removed: row.nameRemovalId !== null }
+        : null
+    }
   }
 }
 

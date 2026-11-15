@@ -12,6 +12,7 @@
 // d'une mise à jour.
 import {
   EXCERPT_MAX,
+  HiveIcon,
   NOTIFICATION_DAYS,
   NOTIFICATION_PAGE_SIZE,
   type Notification,
@@ -245,6 +246,17 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       where cpr.author_id = ${me} and cpr.object_kind <> 'member'
         and ${during('cpr.created_at')}
         and (project.author_id = ${me} or ${listedProject()})
+      union all
+      -- R10 : le nom de sa ruche retiré par la modération (il anime la ruche). La marque
+      -- hive.name_removal_id vit tant que le retrait dure : rétabli, ou remplacé par un nom que
+      -- l'animateur choisit, elle s'efface, et la notification avec elle. Ses ruches par la clé
+      -- primaire de hive_member (index hive_member_user_idx pour user_id), puis les clés primaires
+      -- de hive et de la décision. Daté de la décision.
+      select 'hive', null, null, null, h.name_removal_id, d.created_at, h.id
+      from hive_member hm
+      join hive h on h.id = hm.hive_id and h.animator_id = ${me}
+      join moderation_decision d on d.id = h.name_removal_id
+      where hm.user_id = ${me} and ${during('d.created_at')}
     ) x
     where x.removal_id is not null
 
@@ -309,6 +321,22 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       d.target_kind, null, d.id, null, null, null, null
     from moderation_decision d
     where d.target_member_id = ${me} and d.action = 'restore' and ${during('d.created_at')}
+
+    union all
+
+    -- 7 quater (R10). Le nom d'une ruche rétabli par la modération, pour son animateur d'aujourd'hui
+    --    (la décision, elle, vise celui qui avait écrit le nom). Ses ruches par hive_member, puis la
+    --    décision par l'index moderation_decision_target_idx (target_kind, target_id, created_at) :
+    --    l'identifiant de la ruche est comparé en texte (« h.id::text »), sans convertir l'identifiant
+    --    d'une cible d'une autre sorte en uuid.
+    select 'restored', 'restored:' || d.id, d.created_at, null, null,
+      null, null, null, null, null, null, null, null, null,
+      'hive', null, d.id, null, null, null, h.id
+    from hive_member hm
+    join hive h on h.id = hm.hive_id and h.animator_id = ${me}
+    join moderation_decision d on d.target_kind = 'hive' and d.target_id = h.id::text
+      and d.action = 'restore'
+    where hm.user_id = ${me} and ${during('d.created_at')}
 
     union all
 
@@ -842,6 +870,10 @@ const ListRow = z.object({
   lift_cause: z.string().nullable(),
   report_part: z.boolean().nullable(),
   value_back: z.boolean().nullable(),
+  // R10 : la ruche d'un nom retiré ou rétabli ; son nom est null quand la modération l'a retiré.
+  hive_id: z.string().nullable(),
+  hive_name: z.string().nullable(),
+  hive_icon: z.string().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -854,7 +886,14 @@ const partOf = (row: ListRow) => {
 /** Les parties d'un profil qu'une notification `profile_removed` peut nommer (contrat). */
 const ProfilePartField = z.enum(['name', 'handle', 'bio', 'favoriteTools', 'avatar'])
 /** Les sortes de contenu d'une notification `restored` (contrat) ; une ancienne note n'en est pas. */
-const RestoredKind = z.enum(['project', 'update', 'comment', 'call', 'message', 'member'])
+const RestoredKind = z.enum(['project', 'update', 'comment', 'call', 'message', 'member', 'hive'])
+
+/** La ruche d'une ligne (nom retiré ou rétabli), telle que le contrat la nomme ; null si elle a disparu. */
+const hiveOf = (row: ListRow) => {
+  if (row.hive_id === null) return null
+  const icon = HiveIcon.safeParse(row.hive_icon)
+  return { id: row.hive_id, name: row.hive_name, icon: icon.success ? icon.data : null }
+}
 
 /**
  * L'extrait d'un commentaire : son texte actuel sur une ligne, 80 caractères au plus, suivi de
@@ -1054,6 +1093,24 @@ export const present = (
               afterReport: row.after_report ?? false,
             })
       const targetKind = row.target_kind
+      // R10 : le nom d'une ruche retiré, pour son animateur : pas de projet, la ruche à la place.
+      if (targetKind === 'hive') {
+        const hive = hiveOf(row)
+        if (!removal || !hive) return null
+        return {
+          ...common,
+          kind: 'removed',
+          targetKind,
+          part: partOf(row),
+          project: null,
+          hive,
+          excerpt: null,
+          ground: removal.ground,
+          explanation: removal.explanation,
+          afterReport: removal.afterReport,
+          projectHidden: false,
+        }
+      }
       if (
         !project ||
         !removal ||
@@ -1142,11 +1199,15 @@ export const present = (
       const targetKind = RestoredKind.safeParse(row.target_kind)
       if (!targetKind.success) return null
       const part = partOf(row)
+      // R10 : le nom d'une ruche rétabli : la ruche, pas de projet.
+      const hive = targetKind.data === 'hive' ? hiveOf(row) : null
+      if (targetKind.data === 'hive' && !hive) return null
       return {
         ...common,
         kind: 'restored',
         targetKind: targetKind.data,
         project,
+        ...(hive ? { hive } : {}),
         part,
         valueBack: row.value_back ?? true,
         handle: part?.field === 'handle' ? row.my_handle : null,
@@ -1264,14 +1325,22 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       ) end as report_part,
       case
         when n.kind <> 'restored' then null
+        -- R10 : le rétablissement d'un nom de ruche note dans sa décision le nom qu'il a rendu ;
+        -- vide, l'animateur avait choisi un autre nom depuis (decide.ts, moderation/parts.ts).
+        when md.target_kind = 'hive' then md.previous_value is not null
         when md.part_field = 'handle' then exists (
           select 1 from member_handle vh
           where vh.handle = prev.previous_value and vh.user_id = ${me}
             and vh.claimed_at = md.created_at)
         when md.part_field = 'name' then a_me.name = prev.previous_value
         else true
-      end as value_back
+      end as value_back,
+      -- R10 : la ruche d'un nom retiré ou rétabli (clé primaire de hive) ; son nom n'est montré que
+      -- tant que la modération ne l'a pas retiré.
+      hv.id as hive_id, hv.icon as hive_icon,
+      case when hv.name = '' or hv.name_removal_id is not null then null else hv.name end as hive_name
     from (${chosen}) n
+    left join hive hv on hv.id = n.item_id and n.target_kind = 'hive'
     left join project on project.id = n.project_id
     -- « lateral » : une sous-requête qui lit les colonnes des tables déjà jointes (ici, l'auteur du
     -- projet), calculée une fois par ligne et réutilisée par deux colonnes. Deux « exists » par les

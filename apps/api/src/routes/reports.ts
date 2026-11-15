@@ -156,7 +156,9 @@ export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Inconnu, privé, retiré, masqué ou supprimé : la même réponse, qui ne révèle rien.
     const found = await loadReportable(db, user.id, target, publicApiUrl)
     if (!found) return notFound(c)
-    if (found.authorId === user.id) return ownContent(c)
+    // R10 : une ruche est à tous ses membres, pas à celui qui a écrit son nom : chacun la signale
+    // (le membre qui a écrit le nom aussi). Pour le reste, on ne signale pas ce qui est à soi.
+    if (found.authorId === user.id && target.kind !== 'hive') return ownContent(c)
     // R9 : une partie doit être sur la page que ce membre voit (une photo d'un autre contenu, une
     // photo retirée, un prompt absent) : sinon le même 404 qu'un contenu inconnu. La copie ne garde
     // alors que cette partie.
@@ -249,7 +251,9 @@ export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
 
     const found = await loadReportable(db, user.id, target, publicApiUrl)
     if (!found) return notFound(c)
-    if (found.authorId === user.id) return ownContent(c)
+    // R10 : une ruche est à tous ses membres, pas à celui qui a écrit son nom : chacun la signale
+    // (le membre qui a écrit le nom aussi). Pour le reste, on ne signale pas ce qui est à soi.
+    if (found.authorId === user.id && target.kind !== 'hive') return ownContent(c)
 
     // R9 : ce que ce membre a déjà signalé et qui reste ouvert, le contenu entier ou ses parties.
     // Servi par l'index unique partiel content_report_reporter_target_idx (reporter_id,

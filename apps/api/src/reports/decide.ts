@@ -140,6 +140,10 @@ const mark = async (
     case 'member':
       // Un profil ne se retire pas (vérifié plus haut) : rien à marquer.
       return 0
+    case 'hive':
+      // R10 : une ruche ne se retire jamais entière, seulement son nom (une partie, traitée par
+      // moderation/parts.ts) : sans partie, il n'y a rien à marquer (« déjà décidé »).
+      return 0
   }
 }
 
