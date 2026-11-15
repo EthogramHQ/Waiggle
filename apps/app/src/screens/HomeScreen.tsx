@@ -13,7 +13,6 @@
 // sur ordinateur, le titre « Fil » porte le bouton des nouveautés à côté de lui, et une colonne de
 // droite propose des proches à suivre et des projets qui cherchent des testeurs.
 
-import { sourceUrl } from '@ruche/brand'
 import {
   type FollowingFeedPage,
   type HiveSummary,
@@ -50,7 +49,6 @@ import {
   useMyHives,
   useRefuseInvitation,
 } from '../hives/api'
-import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { NotificationBell } from '../notifications/NotificationBell'
@@ -66,6 +64,7 @@ import { Hint } from '../ui/Hint'
 import { HiveInvitation } from '../ui/HiveInvitation'
 import { ALL_HIVES, HivePills } from '../ui/HivePills'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
+import { LegalLinks } from '../ui/LegalLinks'
 import { Logo } from '../ui/Logo'
 import { Notice } from '../ui/Notice'
 import { PublishDance } from '../ui/PublishDance'
@@ -76,7 +75,6 @@ import { useScreenFocused } from '../ui/screenFocus'
 import { ScreenScrollContext } from '../ui/scrollLight'
 import { TabPanel } from '../ui/Tabs'
 import { Text } from '../ui/Text'
-import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast, useToastShown } from '../ui/theme/toast'
@@ -99,7 +97,6 @@ function VisitorHome() {
   // useTranslation : donne t() pour traduire, et redessine l'écran quand la langue change.
   const { t } = useTranslation()
   const router = useRouter()
-  const openOutside = useOpenOutside()
   // La carte (scène à gauche) des écrans de marque, dès 1 000 points (R2).
   const wide = useLayout().card
 
@@ -117,16 +114,9 @@ function VisitorHome() {
           <LanguageSwitcher compact />
         </Row>
       }
-      hero={
-        <WelcomeHero
-          tagline={t(($) => $.home.tagline)}
-          source={{
-            note: t(($) => $.home.openSource),
-            link: t(($) => $.home.seeCode),
-            onPress: () => openOutside(sourceUrl),
-          }}
-        />
-      }
+      // R11 : la scène ne porte plus la pastille du logiciel libre ; « Le code source » est dans le
+      // pied de la feuille, avec les quatre pages (planche R11-Pied).
+      hero={<WelcomeHero tagline={t(($) => $.home.tagline)} />}
     >
       {/* Sur ordinateur, la scène de gauche montre déjà la constellation et le grand logo ; la
           feuille porte le nom, l'abeille devant le mot « waiggle » (R3, maquette
@@ -151,19 +141,11 @@ function VisitorHome() {
         />
       </Stack>
       <Hint icon="lock-simple" text={t(($) => $.home.membersOnly)} />
-      {/* Sur téléphone, pas de scène à gauche : le lien vers le code source se place ici. */}
-      {wide ? null : (
-        <Row gap="xs" justify="center" wrap>
-          <Text variant="caption" tone="muted">
-            {t(($) => $.home.openSource)}
-          </Text>
-          <TextLink
-            label={t(($) => $.home.seeCode)}
-            onPress={() => openOutside(sourceUrl)}
-            external
-          />
-        </Row>
-      )}
+      {/* R11 (planche R11-Pied) : le pied des pages publiques, sur téléphone comme sur ordinateur :
+          Règles, Confidentialité, Mentions légales, Accessibilité et « Le code source » (la licence
+          AGPL demande d'offrir le code à ceux qui utilisent l'appli). « Moins de mots » : la phrase
+          « … est un logiciel libre » est partie, le lien suffit. */}
+      <LegalLinks variant="footer" />
     </Screen>
   )
 }
@@ -215,13 +197,12 @@ function MemberHome({ session }: { session: SessionData }) {
   // Afficher les nouveautés : relire le fil montré (« Tout », ou celui de la ruche choisie).
   const showNews = () =>
     hiveFeedKey ? queryClient.refetchQueries({ queryKey: hiveFeedKey }) : feed.refetch()
-  // Le bouton des nouveautés, avec la phrase qui dit ce que montre le fil quand rien n'est neuf.
-  // Sur ordinateur, à côté du titre (la phrase passe en sous-titre) ; sur téléphone, en tête du fil.
-  // R10 : sous une ruche, la phrase de la ruche (« … des membres de la ruche Famille. »).
-  const caption = chosen
-    ? t(($) => $.hives.pills.caption, { hive: chosen.name ?? t(($) => $.hives.unnamedInline) })
-    : t(($) => $.feed.followingCaption)
-  const newsButton = <FeedNews news={news} onPress={showNews} {...(compact ? { caption } : null)} />
+  // Le bouton des nouveautés : sur ordinateur, à côté du titre ; sur téléphone, en tête du fil.
+  // R11 (« Moins de mots ») : plus de phrase qui dit ce que montre le fil (le titre « Fil » et la
+  // pastille choisie le disent ; d'où vient le fil est écrit dans les Règles). Quand rien n'est
+  // neuf, la place du bouton reste réservée, vide (ui/NewItemsBanner.tsx) : le fil ne bouge pas
+  // quand le bouton arrive.
+  const newsButton = <FeedNews news={news} onPress={showNews} />
   // RF (ui-5) : le titre « Fil », où le focus revient quand le bouton des nouveautés est touché.
   const feedTitle = useRef<Focusable>(null)
   // Deux colonnes de cartes dès la tablette (768 points) tant que la colonne de droite n'est pas
@@ -327,10 +308,6 @@ function MemberHome({ session }: { session: SessionData }) {
         titleAside={
           compact ? undefined : <PinnedNews news={news} onShow={showNews} titleRef={feedTitle} />
         }
-        // La phrase qui dit ce que montre le fil ; pas au premier lancement, où le salut et « Ton fil
-        // t'attend » le disent déjà, juste en dessous.
-        // R10 : sous une ruche, le premier lancement ne s'affiche pas : sa phrase reste.
-        subtitle={compact || (firstRun && !chosen) ? undefined : caption}
         pageTitle={t(($) => $.nav.feed)}
         // R10 : les pastilles des ruches, sous l'en-tête. Sur téléphone, Screen les garde collées en
         // haut pendant le défilement ; sur tablette et ordinateur, à droite du titre « Fil ».
