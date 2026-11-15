@@ -94,16 +94,25 @@ export const toolsOfProjects = async (
 
 // Une requête de base : le projet, avec le nom et l'avatar de son auteur.
 // innerJoin : « avec son auteur » (il existe toujours) ; leftJoin : « avec son profil s'il en a un ».
+// R10 : et sa ruche, pour un projet réservé (son nom et la marque d'un nom retiré par la
+// modération). leftJoin par la clé primaire de hive : une lecture de plus par projet réservé, aucune
+// pour les autres (hive_id nul ne trouve rien) ; pas de requête de plus pour une liste. Le nom ne
+// sort que pour un lecteur qui voit déjà le projet : chaque lecture choisit ses lignes par la règle
+// commune (projects/visibility.ts), et seuls l'auteur et les membres de la ruche voient un projet
+// réservé.
 export const selectProjects = (db: Database) =>
   db
     .select({
       project: schema.project,
       authorName: schema.user.name,
       authorAvatarKey: schema.profile.avatarKey,
+      hiveName: schema.hive.name,
+      hiveNameRemovalId: schema.hive.nameRemovalId,
     })
     .from(schema.project)
     .innerJoin(schema.user, eq(schema.user.id, schema.project.authorId))
     .leftJoin(schema.profile, eq(schema.profile.userId, schema.project.authorId))
+    .leftJoin(schema.hive, eq(schema.hive.id, schema.project.hiveId))
 
 type ProjectRow = Awaited<ReturnType<ReturnType<typeof selectProjects>['execute']>>[number]
 
@@ -141,14 +150,28 @@ export const visibleTo = projectVisibleTo
  * garde ses photos retirées à leur place, ou null (« à tous ») pour une carte, dont la couverture
  * n'est jamais une photo retirée.
  */
+/**
+ * La ruche d'un projet réservé (contrat `ProjectHive`), null pour tout autre projet. Son nom vaut
+ * null quand la modération l'a retiré (`name_removal_id` posé, nom vide) : l'appli écrit alors
+ * « Ruche sans nom », et l'ancien nom n'est gardé que dans la décision.
+ */
+const hiveOf = ({ project, hiveName, hiveNameRemovalId }: ProjectRow) =>
+  project.visibility === 'hive' && project.hiveId !== null && hiveName !== null
+    ? {
+        id: project.hiveId,
+        name: hiveNameRemovalId !== null || hiveName === '' ? null : hiveName,
+      }
+    : null
+
 const toProjectBase = (
-  { project, authorName, authorAvatarKey }: ProjectRow,
+  row: ProjectRow,
   allMedia: MediaRow[],
   tools: ProjectTool[],
   viewerId: string,
   publicApiUrl: string,
   photosFor: string | null,
 ): ProjectBase => {
+  const { project, authorName, authorAvatarKey } = row
   const media = allMedia.filter(
     (m) =>
       m.projectId === project.id &&
@@ -171,8 +194,8 @@ const toProjectBase = (
     // mieux vaut le signaler que renvoyer une donnée incohérente).
     status: ProjectStatus.parse(project.status),
     visibility: ProjectVisibility.parse(project.visibility),
-    // Provisoire (R10) : la ruche d'un projet réservé (id et nom), lue avec la règle d'accès.
-    hive: null,
+    // R10 : la ruche d'un projet réservé (id et nom), pour la pastille « Réservé à » et le partage.
+    hive: hiveOf(row),
     demoUrl: project.demoUrl,
     // R6b : lus par `project_tool` (toolsOfProjects) ; les anciennes colonnes ne sont plus lues.
     tools,

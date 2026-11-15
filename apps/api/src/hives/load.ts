@@ -53,7 +53,7 @@ import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { currentHandleOf } from '../handles/load'
 import { avatarUrlOf } from '../profile/me'
 import { rowsToSummaries, selectProjects } from '../projects/load'
-import { listedProjectFor } from '../projects/visibility'
+import { listedProject } from '../projects/visibility'
 import { hasReadableLines, updateOnCards } from '../updates/load'
 
 /** Une lecture seule : la base, ou une transaction (les deux ont `select`). */
@@ -165,6 +165,16 @@ const authorIsMemberOf = (hiveId: string) =>
   sql`${p.authorId} in (select ${sql.raw('hive_member.user_id')} from ${hm} where ${sql.raw('hive_member.hive_id')} = ${hiveId})`
 
 /**
+ * Un projet « Membres » (public, pas retiré) que ce lecteur voit : sans blocage entre lui et son
+ * auteur, dans un sens ou l'autre. Pas `listedProjectFor` : depuis la règle des ruches, il prend
+ * aussi les projets réservés à TOUTES les ruches du lecteur, et une ruche montrerait alors ceux
+ * d'une autre ruche (ou compterait deux fois les siens). Les projets réservés à CETTE ruche ont leur
+ * propre branche (`reservedToHive`).
+ */
+const membersProjectFor = (viewerId: string) =>
+  and(listedProject(), notBlockedWith(viewerId, p.authorId))
+
+/**
  * Ce que la ruche montre à ce lecteur, l'un de ses membres (le scénario, « L'actualité ») : les
  * projets réservés à cette ruche, et les projets « Membres » de ses membres ; jamais un projet
  * réservé à une autre ruche, privé, retiré, ou d'un membre bloqué avec lui dans un sens ou l'autre.
@@ -174,7 +184,7 @@ const authorIsMemberOf = (hiveId: string) =>
 export const hiveProjectFor = (hiveId: string, viewerId: string) =>
   or(
     and(reservedToHive(hiveId), notBlockedWith(viewerId, p.authorId)),
-    and(listedProjectFor(viewerId), authorIsMemberOf(hiveId)),
+    and(membersProjectFor(viewerId), authorIsMemberOf(hiveId)),
   )
 
 /**
@@ -264,7 +274,7 @@ const activityStatsOf = async (
       .from(hm)
       .innerJoin(mate, eq(mate.hiveId, hm.hiveId))
       .innerJoin(p, eq(p.authorId, mate.userId))
-      .where(and(mine, listedProjectFor(viewerId), sql`${publishedAtOf} >= ${utc(since)}`))
+      .where(and(mine, membersProjectFor(viewerId), sql`${publishedAtOf} >= ${utc(since)}`))
       .groupBy(hm.hiveId),
     db
       .select({ hiveId: hm.hiveId, last: max(u.createdAt), news: newsSince(u.createdAt) })
@@ -282,7 +292,7 @@ const activityStatsOf = async (
       .where(
         and(
           mine,
-          listedProjectFor(viewerId),
+          membersProjectFor(viewerId),
           gte(u.createdAt, since),
           updateOnCards(),
           hasReadableLines(),

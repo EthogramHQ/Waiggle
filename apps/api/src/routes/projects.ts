@@ -7,6 +7,8 @@ import { and, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { isHiveMember } from '../hives/load'
+import { isForeignKeyViolation, lockMembershipForShare } from '../hives/write'
 import type { FileStorage } from '../media/storage'
 import { dropProjectPartRemovals, replacedProjectParts } from '../moderation/replaced'
 import { categoriesExist } from '../projects/categories'
@@ -46,6 +48,7 @@ const createProjectRoute = createRoute({
     201: projectResponse('The new project.'),
     400: errorResponse('Invalid data, or a category that does not exist (`unknown_category`).'),
     401: errorResponse('Not signed in.'),
+    404: errorResponse('Reserved to a hive that does not exist, or that the author is not in.'),
     429: errorResponse(
       'Too many projects today, or too many new tools today (`too_many_other_tools`).',
     ),
@@ -83,7 +86,9 @@ const updateProjectRoute = createRoute({
     403: errorResponse(
       'Someone else’s project, or a suspended account sending more than { visibility: private }.',
     ),
-    404: errorResponse('No such project.'),
+    404: errorResponse(
+      'No such project, or reserved to a hive that does not exist or that the author is not in.',
+    ),
     409: errorResponse('My project, removed by the moderation (`removed`).'),
     429: errorResponse('Too many changes, or too many new tools today (`too_many_other_tools`).'),
   },
@@ -102,6 +107,22 @@ const deleteProjectRoute = createRoute({
     429: errorResponse('Too many changes.'),
   },
 })
+
+/**
+ * R10 : la ruche choisie n'est plus là pour cet auteur (il l'a quittée, ou elle a été supprimée,
+ * pendant la demande). La route répond alors le 404 d'une ruche inconnue.
+ */
+const HIVE_GONE = 'hive_gone' as const
+
+/**
+ * À passer au `.catch` d'une transaction qui écrit `hive_id` : une clé étrangère cassée (23503, la
+ * ruche effacée entre le verrou et l'écriture par un geste qui ne passe pas par hive_member) devient
+ * `HIVE_GONE`, donc 404, jamais 500 (relecture du plan, point 5). Toute autre erreur continue.
+ */
+const hiveGone = (error: unknown): typeof HIVE_GONE => {
+  if (isForeignKeyViolation(error)) return HIVE_GONE
+  throw error
+}
 
 type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
 
@@ -177,7 +198,13 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // envoyée par l'appli. Les valeurs absentes prennent leur valeur par défaut.
     const id = crypto.randomUUID()
     const visibility = input.visibility ?? 'public'
+    // R10 : la ruche d'un projet « réservé » (le contrat la demande avec `hive`, et la refuse sinon).
+    const hiveId = visibility === 'hive' ? (input.hiveId ?? null) : null
     const toolNames = input.tools ?? []
+    // R10 : réserver à une ruche dont on n'est pas membre répond le même 404 qu'une ruche inconnue
+    // (la réponse ne dit pas qu'elle existe). Lu ici une première fois, avant de compter les
+    // « Autre » : une demande refusée n'use pas ce quota. La transaction le relit sous verrou.
+    if (hiveId !== null && !(await isHiveMember(db, hiveId, user.id))) return notFound(c)
     // Le contrat accepte tout code de catégorie bien formé : la table `category` dit s'il existe.
     if (!(await categoriesExist(db, [input.primaryCategory, input.secondaryCategory]))) {
       return unknownCategory(c)
@@ -191,6 +218,15 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // ou pas du tout.
     const created = await db
       .transaction(async (tx) => {
+        // R10, les verrous d'une publication « réservée » (relecture du plan, point 5 ; ordre écrit
+        // dans hives/write.ts) : d'abord la ligne de l'auteur dans hive_member, prise en partage
+        // (`for share`), puis le projet. Quitter la ruche efface cette ligne, et l'effacer doit
+        // attendre la fin de cette transaction : le départ, venu après, voit le projet et le rend
+        // privé. Un départ déjà fait ne laisse plus de ligne : 404, rien n'est écrit. C'est le
+        // premier geste de la transaction : rien n'est encore écrit si elle s'arrête.
+        if (hiveId !== null && !(await lockMembershipForShare(tx, hiveId, user.id))) {
+          return HIVE_GONE
+        }
         const resolved = await resolveTools(tx, toolNames)
         await tx.insert(schema.project).values({
           id,
@@ -200,6 +236,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           description: input.description ?? '',
           status: input.status ?? 'idea',
           visibility,
+          hiveId,
           demoUrl: input.demoUrl ?? null,
           // Les anciennes colonnes de texte (tools, tool_slugs) n'existent plus (migration 0018) :
           // les outils ne s'écrivent que dans project_tool.
@@ -212,14 +249,18 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           prompts: input.prompts ?? [],
           // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
           // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
-          publishedAt: visibility === 'public' ? new Date() : null,
+          // R10 : réservé à une ruche, il est publié aussi (pour ses membres) : il entre dans leurs
+          // fils et l'actualité de la ruche à cette date.
+          publishedAt: visibility === 'private' ? null : new Date(),
         })
         await replaceProjectTools(tx, id, resolved.tools)
         return resolved.created
       })
       .catch(noFreeToolSlug)
+      .catch(hiveGone)
     // sec-B4 : plus d'adresse libre pour un nouvel « Autre » : la demande est refusée, rien n'est écrit.
     if (created === NO_FREE_TOOL_SLUG) return c.json(errorBody(languageOf(c), 'validation'), 400)
+    if (created === HIVE_GONE) return notFound(c)
     // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
     if (created > counted) await chargeOtherTools(limiter, user.id, created - counted)
 
@@ -251,6 +292,11 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     // On n'écrit que les champs envoyés (même astuce que pour le profil).
     const changes = c.req.valid('json')
+    // R10 : la ruche visée, si le projet passe en « réservé » (ou change de ruche) ; le contrat
+    // n'accepte `hiveId` qu'avec `visibility: 'hive'`. Même règle qu'à la publication : être membre
+    // de cette ruche, sinon le 404 d'une ruche inconnue, lu avant de compter les « Autre ».
+    const hiveId = changes.visibility === 'hive' ? (changes.hiveId ?? null) : null
+    if (hiveId !== null && !(await isHiveMember(db, hiveId, user.id))) return notFound(c)
     // Les noms hors catalogue se comptent AVANT d'écrire (sec-A5, sec-B1) : trop nombreux, rien
     // n'est gardé.
     const counted =
@@ -262,12 +308,16 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       ...(changes.pitch !== undefined && { pitch: changes.pitch }),
       ...(changes.description !== undefined && { description: changes.description }),
       ...(changes.status !== undefined && { status: changes.status }),
-      ...(changes.visibility !== undefined && { visibility: changes.visibility }),
-      // Rendu public : sa date de publication, si c'est la première fois. coalesce(a, b) vaut a
-      // s'il n'est pas null, sinon b : une date déjà là est gardée (repasser en privé puis en
-      // public ne fait pas remonter le projet dans les fils). « Maintenant » vient de l'horloge de
-      // JavaScript, passé comme paramètre lié par la colonne elle-même (sql.param).
-      ...(changes.visibility === 'public' && {
+      // R10 : la visibilité et la ruche changent ensemble (contrainte project_hive_check de la
+      // base) : « réservé » écrit la ruche choisie, « Membres » ou « Privé » l'efface. Passer d'une
+      // ruche à une autre remplace l'une par l'autre : l'ancienne ne le voit plus.
+      ...(changes.visibility !== undefined && { visibility: changes.visibility, hiveId }),
+      // Rendu public (ou réservé à une ruche, R10 : publié pour ses membres) : sa date de
+      // publication, si c'est la première fois. coalesce(a, b) vaut a s'il n'est pas null, sinon
+      // b : une date déjà là est gardée (repasser en privé puis en public ne fait pas remonter le
+      // projet dans les fils). « Maintenant » vient de l'horloge de JavaScript, passé comme
+      // paramètre lié par la colonne elle-même (sql.param).
+      ...((changes.visibility === 'public' || changes.visibility === 'hive') && {
         publishedAt: sql`coalesce(${schema.project.publishedAt}, ${sql.param(new Date(), schema.project.publishedAt)}::timestamp)`,
       }),
       ...(changes.demoUrl !== undefined && { demoUrl: changes.demoUrl }),
@@ -286,6 +336,13 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     let createdHere = 0
     const outcome = await db
       .transaction(async (tx) => {
+        // R10 : passer en « réservé » prend d'abord la ligne de l'auteur dans hive_member, en
+        // partage, PUIS le projet : l'ordre de la sortie d'une ruche (qui efface cette ligne, puis
+        // rend ses projets privés), pour que l'une attende l'autre sans interblocage (voir la
+        // publication plus haut, et hives/write.ts). Déjà parti : 404, rien n'est écrit.
+        if (hiveId !== null && !(await lockMembershipForShare(tx, hiveId, user.id))) {
+          return HIVE_GONE
+        }
         // Le verrou sur le projet (FOR UPDATE) fait patienter un envoi de photo simultané : l'ordre
         // est vérifié sur la galerie telle qu'elle est vraiment, pas telle qu'elle était un instant avant.
         const [locked] = await tx
@@ -367,7 +424,9 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         return 'ok' as const
       })
       .catch(noFreeToolSlug)
+      .catch(hiveGone)
     if (outcome === NO_FREE_TOOL_SLUG) return c.json(errorBody(languageOf(c), 'validation'), 400)
+    if (outcome === HIVE_GONE) return notFound(c)
     // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
     if (createdHere > counted) await chargeOtherTools(limiter, user.id, createdHere - counted)
     if (outcome === 'gone') return notFound(c)

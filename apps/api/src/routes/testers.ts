@@ -15,6 +15,7 @@ import { errorBody, languageOf } from '../errors'
 import { currentHandleOf } from '../handles/load'
 import { avatarUrlOf } from '../profile/me'
 import { visibleTo } from '../projects/load'
+import { inViewerHiveColumn, sharedWith } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { cornerAccess, isMissingMember } from '../testers/access'
 import type { AppEnv } from '../types'
@@ -169,11 +170,16 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           demoUrl: schema.project.demoUrl,
           visibility: schema.project.visibility,
           removedAt: schema.project.removedAt,
+          // R10 : l'appartenance à la ruche d'un projet réservé, relue sous le verrou (relecture
+          // du plan, point 1) : un membre qui vient de quitter la ruche ne s'inscrit plus.
+          inViewerHive: inViewerHiveColumn(viewer.id),
         })
         .from(schema.project)
         .where(eq(schema.project.id, id))
         .for('update')
-      if (locked?.visibility !== 'public' || locked.removedAt !== null) return 'not_found' as const
+      // La règle commune (projects/visibility.ts) : public, ou réservé à l'une de ses ruches, et
+      // pas retiré. Sinon, la même réponse qu'un projet inconnu.
+      if (!locked || !sharedWith(locked)) return 'not_found' as const
       const t = schema.projectTester
       // Déjà testeur : 204 avant tout autre refus (projet plein, ou plus « Testable »).
       const [mine] = await tx
