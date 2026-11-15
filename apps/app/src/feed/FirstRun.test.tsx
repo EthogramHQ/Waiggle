@@ -89,11 +89,15 @@ beforeEach(() => {
 })
 
 describe('FirstRun', () => {
-  it('greets the member by name, with the title as a heading, and explains', async () => {
+  it('greets the member by name as the heading, without « Ton fil t’attend », and explains', async () => {
     await renderFirstRun()
 
-    expect(screen.getByText(fr.t(($) => $.feed.firstRun.hello, { name: 'Inès' }))).toBeTruthy()
-    expect(screen.getByRole('header', { name: fr.t(($) => $.feed.firstRun.title) })).toBeTruthy()
+    // R11 (« Moins de mots », U4) : « Bonjour Inès ! » devient le titre de la section, et « Ton fil
+    // t’attend » quitte l'écran (écrit en clair : sa clé disparaîtra).
+    expect(
+      screen.getByRole('header', { name: fr.t(($) => $.feed.firstRun.hello, { name: 'Inès' }) }),
+    ).toBeTruthy()
+    expect(screen.queryByText(/Ton fil t.attend/)).toBeNull()
     expect(screen.getByText(fr.t(($) => $.feed.firstRun.body))).toBeTruthy()
   })
 
@@ -173,8 +177,9 @@ describe('FirstRun', () => {
   it('hides « Publier » from a suspended member, and keeps « Suivre » in place but disabled', async () => {
     await renderFirstRun({ ...suspendedMe, id: 'u7', name: 'Inès', handle: 'ines' })
 
-    // Le profil lu dit la suspension : « Publier » part.
-    await screen.findByText(containing(fr.t(($) => $.feed.firstRun.title)))
+    // Le profil lu dit la suspension : « Publier » part. Témoin du premier lancement : la phrase
+    // d'explication (R11 : « Ton fil t’attend » a quitté l'écran).
+    await screen.findByText(containing(fr.t(($) => $.feed.firstRun.body)))
     await screen.findAllByRole('switch', { name: /^Suivre/ })
     const follows = screen.getAllByRole('switch', { name: /^Suivre/ })
     expect(follows).toHaveLength(5)

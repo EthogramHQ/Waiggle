@@ -13,7 +13,8 @@ import { TAP_GUARD_MS } from './tapGuard'
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
 const title = fr.t(($) => $.publishPrompt.title)
-const body = fr.t(($) => $.publishPrompt.body)
+// R11 (« Moins de mots ») : cette phrase quitte l'encart ; écrite en clair, sa clé disparaîtra.
+const body = 'Une idée, un essai, ça compte.'
 const publish = fr.t(($) => $.publishPrompt.action)
 
 /** « Publier » : un lien (il ouvre une page) ou un bouton ; on le cherche par son nom. */
@@ -21,11 +22,11 @@ const publishControl = () =>
   screen.queryByRole('link', { name: publish }) ?? screen.getByRole('button', { name: publish })
 
 describe('PublishPrompt', () => {
-  it('invites to publish a first project, in two sentences', async () => {
+  it('invites to publish a first project, in one sentence', async () => {
     await renderWithProviders(<PublishPrompt onPublish={jest.fn()} />)
 
     expect(screen.getByText(title)).toBeTruthy()
-    expect(screen.getByText(body)).toBeTruthy()
+    expect(screen.queryByText(body)).toBeNull()
   })
 
   it('leads to publishing with « Publier »', async () => {

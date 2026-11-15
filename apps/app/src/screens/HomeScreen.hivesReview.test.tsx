@@ -309,7 +309,11 @@ describe('the news button under a hive pill (R10, review)', () => {
     await act(async () => {})
 
     expect(screen.queryByRole('button', { name: newsOf(2) })).toBeNull()
-    // Témoin : la phrase de la ruche est à la place du bouton.
-    expect(screen.getByText(fr.t(($) => $.hives.pills.caption, { hive: 'Famille' }))).toBeTruthy()
+    // R11 (« Moins de mots ») : plus de phrase de la ruche à la place du bouton (elle est dans les
+    // Règles) ; écrite en clair, sa clé disparaîtra. Témoin : le fil de la ruche est toujours là.
+    expect(
+      screen.queryByText(/Les nouveaux projets et les mises à jour des membres de la ruche/),
+    ).toBeNull()
+    expect(screen.getByRole('link', { name: planDeTable.title })).toBeTruthy()
   })
 })

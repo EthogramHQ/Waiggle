@@ -71,11 +71,15 @@ describe('HomeScreen', () => {
     // Le logo sert de titre à la page : les lecteurs d'écran l'annoncent avec la phrase d'accueil.
     expect(screen.getByRole('header', { name: `Bienvenue sur ${appName}` })).toBeTruthy()
     expect(screen.getByText('Montre à tes proches ce que tu construis avec l’IA.')).toBeTruthy()
-    // R2, décision D2 (jur-B4) : la phrase de confidentialité dit ce qui est vrai aujourd'hui,
-    // moteurs de recherche compris ; R12 la remplacera quand le public existera.
+    // R2, décision D2 (jur-B4) : la phrase de confidentialité dit ce qui est vrai aujourd'hui ;
+    // R12 la remplacera quand le public existera. R11 (planche R11-Pied) : l'accueil et les quatre
+    // pages sont trouvés par les moteurs de recherche, l'ancienne phrase ne le disait pas.
     expect(
-      screen.getByText('Rien n’est visible sans compte, ni trouvé par un moteur de recherche.'),
+      screen.getByText('Les projets et les profils ne se voient qu’avec un compte.'),
     ).toBeTruthy()
+    expect(
+      screen.queryByText('Rien n’est visible sans compte, ni trouvé par un moteur de recherche.'),
+    ).toBeNull()
     expect(
       screen.queryByText(
         'Les projets et les profils ne sont visibles que par les membres connectés.',

@@ -34,7 +34,8 @@ jest.mock('expo-router', () => ({
 }))
 
 const TEXT = {
-  othersSee: fr.t(($) => $.account.data.othersSee),
+  // R11 (« Moins de mots ») : ce sous-titre quitte l'écran ; écrit en clair, sa clé disparaîtra.
+  othersSee: 'Ce que les autres voient',
   hide: fr.t(($) => $.hives.hideFromSuggestions),
   hint: fr.t(($) => $.hives.hideFromSuggestionsHint),
   error: fr.t(($) => $.hives.hideFromSuggestionsError),
@@ -76,11 +77,11 @@ const renderData = () =>
 const hideSwitch = () => screen.findByRole('switch', { name: TEXT.hide })
 
 describe('« Ne pas me proposer aux autres » in Mes données (R10)', () => {
-  it('offers the switch under « Ce que les autres voient », off, with what it changes', async () => {
+  it('offers the switch with no subtitle above it, off, with what it changes', async () => {
     await renderData()
 
     expect(await hideSwitch()).not.toBeChecked()
-    expect(screen.getByText(containing(TEXT.othersSee))).toBeTruthy()
+    expect(screen.queryByText(containing(TEXT.othersSee))).toBeNull()
     expect(screen.getAllByText(containing(TEXT.hint)).length).toBeGreaterThan(0)
     // Témoin : l'export de ses données est toujours là.
     expect(screen.getByRole('button', { name: containing(TEXT.exportRow) })).toBeTruthy()

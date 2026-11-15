@@ -83,11 +83,15 @@ afterEach(() => {
 })
 
 describe('SuggestionList', () => {
-  it('has a section title and says why these members are shown (jur-J5)', async () => {
+  it('has a section title, and no caption: why these members are shown is in the rules', async () => {
     await renderWithProviders(<List />)
 
     expect(screen.getByRole('header', { name: fr.t(($) => $.suggestions.title) })).toBeTruthy()
-    expect(screen.getByText(fr.t(($) => $.suggestions.caption))).toBeTruthy()
+    // R11 (« Moins de mots », choix 9) : la raison (jur-J5) passe dans les Règles, partie « Le
+    // fil, Explorer, les suggestions et la recherche ». Écrite en clair : sa clé disparaîtra.
+    expect(
+      screen.queryByText(/Des membres de tes ruches et des membres qui ont publié récemment/),
+    ).toBeNull()
     expect(shown('Léa Martin')).toBeTruthy()
     expect(shown('Sam Petit')).toBeTruthy()
   })

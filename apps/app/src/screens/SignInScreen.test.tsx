@@ -187,11 +187,12 @@ describe('the contact address on the sign-in page', () => {
 // --- Tranche R2 : les textes de la maquette, la langue, le code source, le mot de passe oublié ---
 
 describe('the sign-in page after the redesign (R2)', () => {
-  it('is titled « Te revoilà », with its subtitle', async () => {
+  it('is titled « Te revoilà », without a subtitle', async () => {
     await renderWithI18n(<SignInScreen />)
 
     expect(screen.getByRole('header', { name: fr.t(($) => $.auth.signIn.title) })).toBeTruthy()
-    expect(screen.getByText(fr.t(($) => $.auth.signIn.subtitle))).toBeTruthy()
+    // R11 (« Moins de mots ») : écrit en clair, sa clé disparaîtra.
+    expect(screen.queryByText('Connecte-toi pour retrouver les projets de tes proches.')).toBeNull()
   })
 
   it('lets the visitor choose the language on this page', async () => {

@@ -27,7 +27,7 @@ import type { FeedItem, FollowingFeedPage, MyHives, ProjectSummary } from '@ruch
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { pathOf } from '../testing/navigation'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
-import { containing, fr } from '../testing/text'
+import { fr } from '../testing/text'
 import { ToastProvider } from '../ui/theme/toast'
 import {
   acceptNamed,
@@ -201,7 +201,9 @@ const TEXT = {
   all: fr.t(($) => $.hives.pills.all),
   side: fr.t(($) => $.hives.side),
   suggestionsSide: fr.t(($) => $.feed.side.suggestions),
-  suggestionsCaption: fr.t(($) => $.suggestions.caption),
+  // R11 (« Moins de mots ») : la légende de « Proches à suivre » quitte l'écran ; son titre sert
+  // de repère.
+  suggestionsTitle: fr.t(($) => $.suggestions.title),
   upToDate: fr.t(($) => $.feed.upToDate.title),
 }
 
@@ -382,8 +384,8 @@ describe('an invitation on the first run of the feed (R10, F-Fil9)', () => {
     await renderHome()
 
     const accept = await screen.findByRole('button', { name: acceptNamed('Atelier IA') })
-    const caption = await screen.findByText(containing(TEXT.suggestionsCaption))
-    expect(comesBefore(accept, caption)).toBe(true)
+    const people = await screen.findByRole('header', { name: TEXT.suggestionsTitle })
+    expect(comesBefore(accept, people)).toBe(true)
   })
 
   it('joins the hive from the invitation of the feed', async () => {
