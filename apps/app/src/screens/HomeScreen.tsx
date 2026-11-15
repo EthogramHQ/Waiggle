@@ -251,8 +251,11 @@ function MemberHome({ session }: { session: SessionData }) {
           hideMascot={published.noticeUp}
         />
       ) : hiveChoice.waiting ? (
-        // Une ruche demandée par l'adresse, ses ruches pas encore lues : on ne montre pas « Tout »
-        // pour le remplacer aussitôt, sous les yeux.
+        // Ses ruches pas encore lues : le squelette du Fil. Une ruche demandée par l'adresse : on ne
+        // montre pas « Tout » pour le remplacer aussitôt, sous les yeux. Relecture du design de R10 :
+        // sans ruche demandée non plus, les pastilles arrivées après le Fil s'inséraient au-dessus
+        // des cartes et les faisaient descendre sous le doigt. Une lecture ratée ne retient pas le
+        // Fil : il se montre, sans pastilles.
         <SkeletonList count={3} shape="feed" />
       ) : (
         <FollowingFeed
@@ -317,14 +320,17 @@ function MemberHome({ session }: { session: SessionData }) {
         subtitle={compact || (firstRun && !chosen) ? undefined : caption}
         pageTitle={t(($) => $.nav.feed)}
         // R10 : les pastilles des ruches, sous l'en-tête. Sur téléphone, Screen les garde collées en
-        // haut pendant le défilement ; sur ordinateur, elles restent en tête du contenu.
+        // haut pendant le défilement ; sur tablette et ordinateur, à droite du titre « Fil ».
+        // Relecture du design de R10 : `null` (et non `undefined`) tant qu'elles ne sont pas là. La
+        // place existe déjà, vide : quand les ruches arrivent après le Fil, Screen garde le même
+        // arbre, et le Fil n'est pas remonté (le focus du clavier restait sur toute la page).
         sticky={
           pills ? (
             <>
               {hiddenTitle}
               {pills}
             </>
-          ) : undefined
+          ) : null
         }
       >
         {pills ? null : hiddenTitle}
@@ -658,7 +664,7 @@ const NO_NEWS: News = { count: null, more: false, authors: [], kinds: [] }
  *
  * - `hives` : ses ruches, dans l'ordre de l'API (les pastilles, « Tes ruches ») ;
  * - `chosen` : la ruche choisie, ou `undefined` pour « Tout » ;
- * - `waiting` : une ruche est demandée par l'adresse, mais ses ruches ne sont pas encore lues ;
+ * - `waiting` : ses ruches ne sont pas encore lues (le Fil attend, voir plus haut) ;
  * - `invitations` : ses invitations valables (le premier lancement les montre).
  */
 const useHiveChoice = () => {
@@ -680,7 +686,7 @@ const useHiveChoice = () => {
   return {
     hives,
     chosen,
-    waiting: wanted !== undefined && mine.isPending,
+    waiting: mine.isPending,
     invitations: mine.data?.invitations ?? [],
     choose,
   }
