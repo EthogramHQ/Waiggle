@@ -243,24 +243,10 @@ export function SuggestionList({
 
   return (
     <View style={{ gap: space.md }}>
-      {/* Le titre de la section et, à côté (dessous quand la place manque), le critère. */}
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          columnGap: space.md,
-          rowGap: space.xxs,
-        }}
-      >
-        <Text variant="heading" heading={2}>
-          {t(($) => $.suggestions.title)}
-        </Text>
-        <Text variant="caption" tone="muted">
-          {t(($) => $.suggestions.caption)}
-        </Text>
-      </View>
+      {/* Le titre de la section, seul : d'où viennent les suggestions est dit dans les Règles. */}
+      <Text variant="heading" heading={2}>
+        {t(($) => $.suggestions.title)}
+      </Text>
       {notice ? (
         notice
       ) : shown.length > 0 ? (
