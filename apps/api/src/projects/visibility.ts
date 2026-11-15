@@ -6,7 +6,7 @@
 // hive_id posé) se voit de son auteur et des membres ACTUELS de sa ruche, partout où ils regardent,
 // et de personne d'autre (scénario refonte.md, R10, « Qui le voit » ; plan de R10, choix 2).
 import { schema } from '@ruche/db'
-import { and, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { and, type Column, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
 import { notBlockedWith } from '../blocks/visibility'
 
 /**
@@ -39,7 +39,31 @@ export const reservedProject = () =>
  * où elle s'efface. L'identifiant du membre entre comme paramètre lié, jamais collé au texte.
  */
 export const hiveMemberOf = (viewerId: string): SQL =>
-  sql`${schema.project.hiveId} in (select hm.hive_id from ${schema.hiveMember} hm where hm.user_id = ${viewerId})`
+  inViewerHives(schema.project.hiveId, viewerId)
+
+/**
+ * « Cette ruche (une colonne qui porte un identifiant de ruche) est l'une de celles de ce membre,
+ * aujourd'hui » : la sous-requête de `hiveMemberOf`, pour une autre colonne que celle du projet
+ * (R10, relecture de sécurité, décision du 15/11/2026 : la ruche pour laquelle un commentaire a été
+ * écrit, `project_comment.hive_id`, lue par `seesSql` et les notifications). Même coût : ses
+ * ruches, lues une fois par requête par l'index hive_member_user_idx. Une ruche supprimée n'a plus
+ * de membres : la condition est fausse pour tous. L'alias « hm » nomme la table de la
+ * sous-requête : la colonne comparée, écrite hors de la parenthèse, reste celle de l'appelant.
+ */
+export const inViewerHives = (hiveId: Column | SQL, viewerId: string): SQL =>
+  sql`${hiveId} in (select hm.hive_id from ${schema.hiveMember} hm where hm.user_id = ${viewerId})`
+
+/**
+ * La règle `readsHiveOf` de comments/load.ts, en SQL (R10, relecture de sécurité, décision du
+ * 15/11/2026) : ce membre lit-il un commentaire qui porte cette ruche (project_comment.hive_id,
+ * ou celle d'un alias) ? Oui s'il a été écrit hors de toute ruche (null), ou si le membre en fait
+ * partie aujourd'hui. L'auteur du projet et l'auteur du commentaire, qui le lisent toujours, sont
+ * traités par l'appelant (seesSql, les notifications, le nombre de commentaires). Ses ruches
+ * viennent de la base (inViewerHives), jamais d'une liste recopiée. Aucun index sur hive_id : la
+ * condition se lit sur des commentaires déjà trouvés par leur projet, leur fil ou leur auteur.
+ */
+export const readsHiveSql = (hiveId: Column | SQL, viewerId: string): SQL =>
+  sql`(${hiveId} is null or ${inViewerHives(hiveId, viewerId)})`
 
 /**
  * Un projet que ce membre a le droit de voir chez les autres, sans regarder les blocages : public

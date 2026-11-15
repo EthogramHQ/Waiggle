@@ -32,6 +32,7 @@ import {
   presentComment,
   sees,
   type Viewer,
+  viewerHivesOf,
   viewerOf,
 } from '../comments/load'
 import { readCursor } from '../cursor'
@@ -249,8 +250,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       .where(and(eq(schema.project.id, projectId), reachable))
     if (!project) return null
     // Le projet, et qui le regarde (voir Viewer, comments/load.ts), avec ses blocages (tranche
-    // 7b) : une requête de plus, par les deux index de member_block (blocksOf).
-    return { ...project, viewer: viewerOf(userId, project, await blocksOf(db, userId)) }
+    // 7b) : une requête de plus, par les deux index de member_block (blocksOf) ; et ses ruches
+    // (R10, relecture de sécurité : les commentaires écrits pour une ruche), une autre, par
+    // hive_member_user_idx. Les deux en même temps.
+    const [blocks, hives] = await Promise.all([blocksOf(db, userId), viewerHivesOf(db, userId)])
+    return { ...project, viewer: viewerOf(userId, project, blocks, hives) }
   }
 
   /**
@@ -268,6 +272,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         rootId: c.rootId,
         hiddenAt: c.hiddenAt,
         removedAt: c.removedAt,
+        hiveId: c.hiveId,
       })
       .from(c)
       .where(and(eq(c.id, commentId), eq(c.projectId, projectId), isNull(c.deletedAt)))
@@ -298,7 +303,15 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    * s'attendent pas. PostgreSQL travaille en READ COMMITTED : une lecture verrouillée qui a dû
    * attendre une écriture en cours rend la version la plus récente de la ligne, déjà validée.
    * 'gone' : le projet n'est plus visible de ce membre (404, comme la garde le dirait maintenant) ;
-   * 'removed' : son propre projet, retiré (409) ; 'open' : on peut écrire.
+   * 'removed' : son propre projet, retiré (409) ; `{ hiveId }` : on peut écrire.
+   *
+   * `hiveId` (R10, relecture de sécurité, décision du 15/11/2026) : la ruche à laquelle le projet
+   * est réservé à cet instant, null s'il ne l'est pas. Un commentaire neuf la garde
+   * (project_comment.hive_id) : il ne sera lu que dans cette ruche, même si le projet s'ouvre
+   * ensuite. Elle est lue ici, sous le même verrou que la visibilité : changer la visibilité est
+   * une écriture sur la ligne du projet, qui attend la fin de cette transaction ; le commentaire
+   * ne peut donc pas être écrit « public » pendant que le projet passe dans une ruche, ni
+   * l'inverse.
    */
   const lockedProjectState = async (
     tx: Pick<Database, 'select'>,
@@ -306,14 +319,20 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     userId: string,
   ) => {
     const [project] = await tx
-      .select({ removedAt: schema.project.removedAt })
+      .select({
+        removedAt: schema.project.removedAt,
+        visibility: schema.project.visibility,
+        hiveId: schema.project.hiveId,
+      })
       .from(schema.project)
       .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
       .for('share')
     // visibleTo cache un projet retiré à tout autre que son auteur : s'il est encore trouvé et
     // retiré, c'est donc le sien.
     if (!project) return 'gone' as const
-    return project.removedAt === null ? ('open' as const) : ('removed' as const)
+    if (project.removedAt !== null) return 'removed' as const
+    // La contrainte project_hive_check garantit déjà « hive_id posé ⇔ réservé » ; on le redit.
+    return { hiveId: project.visibility === 'hive' ? project.hiveId : null }
   }
 
   /** Compte la demande dans un quota du membre ; renvoie le délai d'attente s'il est dépassé. */
@@ -409,6 +428,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       deletedAt: null,
       removedAt: null,
       removalId: null,
+      // R10 : la ruche du commentaire, connue seulement sous le verrou du projet (plus bas).
+      hiveId: null,
     }
 
     // Une « transaction » : plusieurs opérations qui réussissent toutes, ou aucune. Pour une
@@ -418,7 +439,10 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const written = await db.transaction(async (tx) => {
       // D'abord le projet, relu sous verrou (règle 30 : rien ne s'ajoute à un projet retiré).
       const state = await lockedProjectState(tx, id, user.id)
-      if (state !== 'open') return state
+      if (typeof state === 'string') return state
+      // R10, relecture de sécurité (décision du 15/11/2026) : écrit pendant que le projet est
+      // réservé à une ruche, le commentaire en garde la trace, et n'en sortira plus.
+      row.hiveId = state.hiveId
       if (replyTo !== undefined) {
         const [root] = await tx
           .select({
@@ -426,6 +450,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
             rootId: c.rootId,
             hiddenAt: c.hiddenAt,
             removedAt: c.removedAt,
+            hiveId: c.hiveId,
             // Tranche 7b : un blocage entre ce membre et l'auteur de la racine, relu ici, dans la
             // transaction, plutôt que dans le Viewer lu avant elle (blockedWith : deux « exists »
             // par les index de member_block).
@@ -449,6 +474,12 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         ) {
           return 'gone' as const
         }
+        // Une réponse à un commentaire écrit pour une ruche reste dans cette ruche, même écrite
+        // une fois le projet ouvert : elle répond à une conversation que seule la ruche lit, et un
+        // fil ne se montre pas à moitié (les autres verraient la réponse sous une place vide).
+        // Seuls les membres de cette ruche et l'auteur du projet lisent la racine (sees, plus
+        // haut), donc peuvent y répondre.
+        if (root.hiveId !== null) row.hiveId = root.hiveId
       }
       // Les membres que mentionne le texte (« @ines_morel »), lus AVANT d'écrire : un membre que
       // l'auteur a bloqué refuse le texte entier (règle 2b, 422), et rien n'est alors écrit.
@@ -486,8 +517,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const edited = await db.transaction(async (tx) => {
       // Le projet relu sous verrou : retiré depuis la garde, son commentaire dessus ne se modifie
       // plus (règle 4) ; devenu invisible pour ce membre, il est introuvable.
+      // Modifier ne change pas sa ruche (R10) : il reste lu par ceux pour qui il a été écrit.
       const state = await lockedProjectState(tx, id, user.id)
-      if (state !== 'open') return state
+      if (typeof state === 'string') return state
       // Les mentions d'abord, avant d'écrire (règle 2b de la tranche 7b : un membre que l'auteur a
       // bloqué refuse le texte entier, et rien n'est alors modifié). Les mentions déjà gardées
       // d'abord : un pseudo encore écrit garde le membre qu'il désignait à l'écriture, même si ce
@@ -521,6 +553,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           deletedAt: c.deletedAt,
           removedAt: c.removedAt,
           removalId: c.removalId,
+          hiveId: c.hiveId,
         })
       if (!row) return 'gone' as const
       await saveMentions(tx, row.id, mentions, editedAt)
@@ -541,7 +574,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // rechargement, et rien ne trahit le blocage.
     const shown = presentComment(
       row,
-      { id: user.id, isProjectAuthor: false, projectIsPrivate: false, blocks },
+      // Ses ruches ne comptent pas non plus : on lit son propre commentaire (R10).
+      { id: user.id, isProjectAuthor: false, projectIsPrivate: false, blocks, hives: new Set() },
       authors,
       false,
       mentions.filter((m) => !blocks.byMe.has(m.memberId) && !blocks.ofMe.has(m.memberId)),

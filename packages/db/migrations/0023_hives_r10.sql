@@ -71,6 +71,10 @@ UPDATE "email_preference" SET "email_hives" = CASE
 		AND 'now' NOT IN ("email_comments", "email_replies", "email_testers");--> statement-breakpoint
 ALTER TABLE "profile" ADD COLUMN "hide_from_suggestions" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "project" ADD COLUMN "hive_id" uuid;--> statement-breakpoint
+-- Relecture de sécurité de R10 (décision du 15/11/2026) : la ruche pour laquelle un commentaire a
+-- été écrit, sans clé étrangère (supprimer la ruche ne doit pas rouvrir ses commentaires). Les
+-- commentaires existants restent à null : avant R10, aucun projet n'était réservé à une ruche.
+ALTER TABLE "project_comment" ADD COLUMN "hive_id" uuid;--> statement-breakpoint
 ALTER TABLE "hive" ADD CONSTRAINT "hive_name_removal_id_moderation_decision_id_fk" FOREIGN KEY ("name_removal_id") REFERENCES "public"."moderation_decision"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "hive" ADD CONSTRAINT "hive_name_set_by_user_id_fk" FOREIGN KEY ("name_set_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "hive" ADD CONSTRAINT "hive_animator_id_user_id_fk" FOREIGN KEY ("animator_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

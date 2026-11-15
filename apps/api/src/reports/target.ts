@@ -31,7 +31,7 @@ import { and, asc, eq, gt, inArray, isNull, type SQL, sql } from 'drizzle-orm'
 import { rgbaToThumbHash } from 'thumbhash'
 
 import { type Blocks, blocksOf } from '../blocks/visibility'
-import { sees, viewerOf } from '../comments/load'
+import { sees, viewerHivesOf, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { invitationValidSince, isHiveMember, shownName } from '../hives/load'
@@ -440,6 +440,8 @@ const loadVisible = async (
           authorId: c.authorId,
           hiddenAt: c.hiddenAt,
           removedAt: c.removedAt,
+          // R10 : la ruche pour laquelle il a été écrit (sees : seuls ses membres le lisent).
+          hiveId: c.hiveId,
           body: c.body,
           projectId: c.projectId,
           projectAuthorId: p.authorId,
@@ -464,6 +466,8 @@ const loadVisible = async (
           inViewerHive: row.inViewerHive,
         },
         blocks,
+        // R10 : ses ruches d'aujourd'hui, une requête de plus pour un commentaire seulement.
+        await viewerHivesOf(db, viewerId),
       )
       if (!sees({ ...row, mentionsViewer: row.mentionsMe }, viewer)) return null
       if (row.removedAt !== null && row.authorId !== viewerId) return null

@@ -662,6 +662,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "hive_id": {
+          "name": "hive_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
