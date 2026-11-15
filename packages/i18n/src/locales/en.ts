@@ -43,7 +43,6 @@ export const en: Translation = {
     haveAccount: 'I already have an account',
     publish: 'Publish a project',
     membersOnly: 'Projects and profiles are only visible with an account.',
-    openSource: '{{appName}} is free software.',
     seeCode: 'See the code',
   },
   legal: {
@@ -2339,7 +2338,6 @@ export const en: Translation = {
     pills: {
       label: 'Feed hives',
       all: 'All',
-      caption: 'New projects and updates from the members of the {{hive}} hive.',
     },
     side: 'Your hives',
   },
@@ -2755,8 +2753,6 @@ export const en: Translation = {
     nobodyAction: 'Explore projects',
     discoverEmpty: 'No public project yet.',
     testersEmpty: 'No project is looking for testers yet.',
-    followingCaption:
-      'New projects from the people you follow, and updates to their projects and to the projects you follow.',
     discoverCaption: 'The latest projects published by members.',
     testersCaption: 'Projects to try: their makers are waiting for your feedback.',
     more: 'Show more',

@@ -3,7 +3,7 @@
 // d'accueil à gauche et le panneau en carte à droite, avec ses deux onglets (AuthPanel).
 // L'adresse suit l'onglet : changer d'onglet remplace la page (/sign-in ↔ /sign-up), et le relais
 // (accounts/authHandoff.ts) passe à la nouvelle ce qui était tapé et le focus de l'onglet.
-import { contactEmail, sourceUrl } from '@ruche/brand'
+import { contactEmail } from '@ruche/brand'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,16 +15,14 @@ import {
   leaveHandoff,
   takeHandoff,
 } from '../accounts/authHandoff'
-import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { useGoBack } from '../navigation/useGoBack'
 import { AuthPanel } from '../ui/AuthPanel'
 import { Hint } from '../ui/Hint'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
+import { LegalLinks } from '../ui/LegalLinks'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
-import { Text } from '../ui/Text'
-import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
 import { WelcomeHero } from '../ui/WelcomeHero'
 import { SignInForm } from './SignInForm'
@@ -36,7 +34,6 @@ export function AuthScreen({ tab: initial }: { tab: AuthTab }) {
   const { t } = useTranslation()
   const router = useRouter()
   const back = useGoBack('/')
-  const openOutside = useOpenOutside()
   // La carte à onglets (ordinateur) ; sur téléphone, un formulaire et un lien vers l'autre.
   const { card } = useLayout()
   // La page où revenir après la connexion (?next=…) : elle suit d'un onglet à l'autre.
@@ -89,16 +86,8 @@ export function AuthScreen({ tab: initial }: { tab: AuthTab }) {
           <LanguageSwitcher compact visitor />
         </Row>
       }
-      hero={
-        <WelcomeHero
-          tagline={t(($) => $.home.tagline)}
-          source={{
-            note: t(($) => $.home.openSource),
-            link: t(($) => $.home.seeCode),
-            onPress: () => openOutside(sourceUrl),
-          }}
-        />
-      }
+      // R11 : « Le code source » a quitté la scène pour le pied de la page (LegalLinks, plus bas).
+      hero={<WelcomeHero tagline={t(($) => $.home.tagline)} />}
     >
       <AuthPanel
         // Le nom de la rangée d'onglets, lu par les lecteurs d'écran : « Connexion ou inscription ».
@@ -132,19 +121,11 @@ export function AuthScreen({ tab: initial }: { tab: AuthTab }) {
           }}
         />
       </Stack>
-      {/* Sur téléphone, pas de scène à gauche : le lien vers le code source se place ici. */}
-      {card ? null : (
-        <Row gap="xs" justify="center" wrap>
-          <Text variant="caption" tone="muted">
-            {t(($) => $.home.openSource)}
-          </Text>
-          <TextLink
-            label={t(($) => $.home.seeCode)}
-            onPress={() => openOutside(sourceUrl)}
-            external
-          />
-        </Row>
-      )}
+      {/* R11 (planche R11-Pied) : le pied des pages publiques, comme à l'accueil des visiteurs,
+          sur téléphone comme sur ordinateur : on peut lire les Règles et la Confidentialité avant
+          de créer son compte. « Le code source » y est ; la phrase du logiciel libre est partie
+          (« Moins de mots »). */}
+      <LegalLinks variant="footer" />
     </Screen>
   )
 }

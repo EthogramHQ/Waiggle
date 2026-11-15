@@ -137,6 +137,9 @@ export function LegalLinks({ variant, current }: Props) {
           spokenLabel={
             Platform.OS === 'web' ? `${sourceCode}, ${t(($) => $.common.externalSite)}` : sourceCode
           }
+          // Sur téléphone, le lecteur d'écran lit l'indice après le nom (comme TextLink `external`) :
+          // il sait aussi que le lien quitte l'appli.
+          nativeHint={t(($) => $.common.externalSite)}
           trailingIcon="arrow-up-right"
           href={sourceHref}
           onPress={openSource}
@@ -150,6 +153,8 @@ type FooterLinkProps = {
   label: string
   /** Le nom lu, s'il diffère du texte affiché (il le contient toujours). */
   spokenLabel?: string
+  /** L'indice lu après le nom, sur téléphone seulement (sur le web, le nom lu le porte déjà). */
+  nativeHint?: string
   href: string
   onPress: (event?: PressEvent) => void
   /** Une icône avant le texte (l'enveloppe de l'adresse de contact). */
@@ -164,6 +169,7 @@ type FooterLinkProps = {
 function FooterLink({
   label,
   spokenLabel,
+  nativeHint,
   href,
   onPress,
   icon,
@@ -174,6 +180,7 @@ function FooterLink({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={spokenLabel ?? label}
+      {...(nativeHint && Platform.OS !== 'web' ? { accessibilityHint: nativeHint } : null)}
       {...linkProps(href, false)}
       // Entrée ouvre le lien sur le web même quand le routeur intercepte le clic (keyboard.ts).
       {...enterActivates(onPress)}

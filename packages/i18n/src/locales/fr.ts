@@ -59,7 +59,6 @@ export const fr = {
     // par un moteur de recherche, ce qui est faux (l'accueil et les quatre pages le sont). Écriture
     // neutre ; R12 dira « Rien n’est public sans ton accord. »
     membersOnly: 'Les projets et les profils ne se voient qu’avec un compte.',
-    openSource: '{{appName}} est un logiciel libre.',
     seeCode: 'Voir le code',
   },
   // R11 : les quatre pages publiques (/rules, /privacy, /legal, /accessibility), lisibles sans compte.
@@ -2782,9 +2781,6 @@ export const fr = {
     pills: {
       label: 'Ruches du fil',
       all: 'Tout',
-      // R10 : ce que montre le Fil sous la pastille d'une ruche (la phrase de « Tout » est
-      // `feed.followingCaption`). Sans nom : `unnamedInline` (« de la ruche sans nom »).
-      caption: 'Les nouveaux projets et les mises à jour des membres de la ruche {{hive}}.',
     },
     // La colonne de droite du Fil, sur ordinateur (F-Fil11).
     side: 'Tes ruches',
@@ -3305,8 +3301,6 @@ export const fr = {
     nobodyAction: 'Explorer les projets',
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
-    followingCaption:
-      'Les nouveaux projets des personnes que tu suis, et les mises à jour de leurs projets et des projets que tu suis.',
     discoverCaption: 'Les derniers projets publiés par les membres.',
     testersCaption:
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
