@@ -415,16 +415,21 @@ function HandOverSheet({ id, open, onClose, onChoose }: HandOverSheetProps) {
         <Text tone="muted">{t(($) => $.hives.settings.handOverNone)}</Text>
       ) : (
         <ListGroup list>
-          {others.map((member) => (
-            <ListRow
-              key={member.face.id}
-              label={member.face.name}
-              // Un membre qui nous a bloqués : son nom seul (relecture du plan, Q3).
-              detail={member.reduced ? undefined : `@${member.handle}`}
-              trailing="chevron"
-              onPress={() => onChoose(member)}
-            />
-          ))}
+          {others.map((member) => {
+            // Un membre qui nous a bloqués : son nom seul (relecture du plan, Q3). Un membre sans
+            // pseudo (`handle` nul au contrat) : rien sous son nom, jamais « @null » (R10,
+            // relecture de l'interface) ; le « @ » vient de la clé commune `member.handle`.
+            const handle = member.reduced ? null : member.handle
+            return (
+              <ListRow
+                key={member.face.id}
+                label={member.face.name}
+                detail={handle === null ? undefined : t(($) => $.member.handle, { handle })}
+                trailing="chevron"
+                onPress={() => onChoose(member)}
+              />
+            )
+          })}
         </ListGroup>
       )
   } else if (members.error) {
