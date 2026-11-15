@@ -129,7 +129,7 @@ export const reactionTotalsOf = async (
     .where(
       and(
         inArray(r.projectId, projectIds),
-        // Sans lecteur (comme commentCountsOf) : un projet réservé compte les réactions de ses
+        // Sans lecteur : un projet réservé compte les réactions de ses
         // membres actuels ; les routes ne demandent le total que de cartes que le lecteur voit déjà.
         or(listedProject(), and(reservedProject(), reactorStillMember)),
       ),

@@ -31,7 +31,8 @@ import { visibleTo } from '../projects/load'
 import { mediaOnCoversSql } from '../projects/media-visibility'
 // R10 : `sharedProjectWith` remplace `listedProject` (sans lecteur, il écarte tout projet réservé à
 // une ruche) dans les sources qui nomment un projet : public, ou réservé à l'une des ruches de `me`.
-import { listedProjectFor, sharedProjectWith } from '../projects/visibility'
+// `readsHiveSql` (R10, relecture de sécurité) : la règle de la ruche d'un commentaire.
+import { listedProjectFor, readsHiveSql, sharedProjectWith } from '../projects/visibility'
 import { afterReportSql, toRemoval } from '../removals/load'
 import { photoRankSql } from '../reports/part-rank'
 // suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
@@ -82,12 +83,19 @@ const parisDay = (column: string) =>
  *   « exists » par les index de member_block). Et pas sur le projet d'un membre bloqué avec lui
  *   (`listedProjectFor`) : la notification nommerait un projet qu'il ne peut plus ouvrir.
  *   Débloquer fait revenir ces notifications (règle 3) : rien n'est effacé, tout est recalculé.
+ * - (R10, relecture de sécurité, décision du 15/11/2026) écrit pendant que le projet était
+ *   réservé à une ruche (c.hive_id posé) : seulement pour l'auteur du projet et les membres
+ *   actuels de cette ruche (`readsHiveSql`, la règle `readsHiveOf` de `sees`), même si le projet
+ *   a été ouvert depuis. Sans cela, une réponse ou une mention écrite dans la ruche préviendrait,
+ *   avec son début, un membre qui n'en fait pas partie. Les e-mails (tout de suite, récap) lisent
+ *   ces mêmes sources.
  * Une mention ne notifie ainsi que qui peut lire (scénario de la tranche 6b).
  */
 const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is null
   and c.author_id <> ${me} and ${listedProjectFor(me)}
   and ${notBlockedWith(me, sql.raw('c.author_id'))}
-  and (c.hidden_at is null or project.author_id = ${me}))`
+  and (c.hidden_at is null or project.author_id = ${me})
+  and (project.author_id = ${me} or ${readsHiveSql(sql.raw('c.hive_id'), me)}))`
 
 /**
  * Toutes les notifications de `me` dont le geste est postérieur à `since`, une ligne par
@@ -403,6 +411,10 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
           join project on project.id = c.project_id
           where c.id = r.target_id::uuid and c.deleted_at is null and c.removed_at is null
             and c.author_id is not null and (c.hidden_at is null or project.author_id = ${me})
+            -- R10 : un commentaire écrit pour une ruche dont il n'est plus membre ne mène plus
+            -- à rien (readsHiveSql, comme readable plus haut).
+            and (project.author_id = ${me} or c.author_id = ${me}
+              or ${readsHiveSql(sql.raw('c.hive_id'), me)})
             and ${visibleTo(me)})
       end,
       null, null, null, null, null, null, null, null, null, null,

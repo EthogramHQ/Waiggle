@@ -494,6 +494,9 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     deleted_at: 'date',
     removed_at: 'date',
     removal_id: 'identifiant',
+    // R10 (relecture de sécurité, 15/11/2026) : la ruche pour laquelle il a été écrit, copiée du
+    // projet par l'API.
+    hive_id: 'identifiant',
   },
   comment_mention: {
     comment_id: 'identifiant',

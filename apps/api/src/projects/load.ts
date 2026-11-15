@@ -252,7 +252,8 @@ const toProjects = async (
       updateSummariesOf(db, ids),
       testerStatesOf(db, authors, viewerId),
       reactionStatesOf(db, ids, viewerId),
-      commentCountsOf(db, ids),
+      // R10 : le nombre dépend du lecteur (les commentaires écrits pour une ruche, comments/load.ts).
+      commentCountsOf(db, ids, viewerId),
     ])
   const [removals, tools, removedFrom, removedParts] = await Promise.all([
     removalsOf(db, rows.map(removalIdOf)),
