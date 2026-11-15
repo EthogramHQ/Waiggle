@@ -19,7 +19,7 @@ import { queryClient } from '../api/query-client'
 import { webAppUrl } from '../config'
 import { clearAllDrafts } from '../testers/drafts'
 import { authClient } from './auth-client'
-import { type AuthErrorKey, authErrorKey } from './errors'
+import { type AuthErrorKey, authErrorKey, type SignUpErrorKey, signUpErrorKey } from './errors'
 import { setPendingEmail } from './pendingVerification'
 
 /** Résultat d'une action : réussie, ou ratée avec la clé du message à afficher. */
@@ -201,7 +201,11 @@ export const getSessionCookie = (): Promise<string> => authClient.getCookie()
  * son option `onError` reçoit la réponse entière : on y lit Retry-After au passage. Ce petit
  * « témoin » est créé pour chaque appel : deux connexions en même temps ne mêlent pas leurs délais.
  */
-const retryAfterWitness = () => {
+// `toKey` traduit le refus en clé de message : `authErrorKey` pour la connexion ; l'inscription y
+// ajoute ses deux accords (R11, `signUpErrorKey`). `E` est un « paramètre de type » : le type des clés
+// possibles, choisi par l'appelant.
+type BetterAuthError = { status: number; code?: string | undefined }
+const retryAfterWitness = <E extends string>(toKey: (error: BetterAuthError) => E) => {
   let headers: Headers | null = null
   return {
     fetchOptions: {
@@ -210,18 +214,19 @@ const retryAfterWitness = () => {
       },
     },
     /** Le résultat final : un 429 reçoit le délai lu ; les autres refus, leur clé de message. */
-    result: (error: { status: number; code?: string | undefined } | null): LimitedResult => {
+    result: (error: BetterAuthError | null): LimitedResult<E> => {
       if (!error) return { ok: true }
-      const key = authErrorKey(error)
+      const key = toKey(error)
+      // TypeScript ne retire pas seul 'tooManyAttempts' d'un type générique : on le lui dit.
       return key === 'tooManyAttempts'
         ? tooManyAttempts(headers ?? new Headers())
-        : { ok: false, error: key }
+        : { ok: false, error: key as Exclude<E, 'tooManyAttempts'> }
     },
   }
 }
 
-export const signUp = async (input: SignUpRequest): Promise<LimitedResult> => {
-  const witness = retryAfterWitness()
+export const signUp = async (input: SignUpRequest): Promise<LimitedResult<SignUpErrorKey>> => {
+  const witness = retryAfterWitness(signUpErrorKey)
   try {
     const { error } = await authClient.signUp.email({
       ...input,
@@ -236,7 +241,7 @@ export const signUp = async (input: SignUpRequest): Promise<LimitedResult> => {
 }
 
 export const signIn = async (input: SignInRequest): Promise<LimitedResult> => {
-  const witness = retryAfterWitness()
+  const witness = retryAfterWitness(authErrorKey)
   try {
     const { error } = await authClient.signIn.email({
       ...input,

@@ -1,4 +1,5 @@
-// Traduit une erreur renvoyée par Better Auth en clé de message de l'appli (auth.errors.*).
+// Traduit une erreur renvoyée par Better Auth en clé de message de l'appli (auth.errors.*, et
+// errors.* pour les deux accords de l'inscription, R11).
 // Les codes techniques (INVALID_EMAIL_OR_PASSWORD…) ne sont jamais montrés tels quels au membre.
 
 export type AuthErrorKey =
@@ -57,3 +58,38 @@ export const authErrorKey = ({
   if (status === 401) return 'sessionExpired'
   return 'generic'
 }
+
+/**
+ * Tranche R11 : les deux refus de l'inscription propres aux accords (400, contrat
+ * `SignUpRefusalCode`). Leurs messages sont avec les autres erreurs de l'API (`errors.*` de
+ * packages/i18n), pas dans `auth.errors.*` : on les garde donc hors d'`AuthErrorKey`, que tous
+ * les écrans du compte lisent dans `auth.errors`.
+ */
+export type AccordErrorKey = 'rulesNotAccepted' | 'ageNotDeclared'
+
+/** Ce que peut répondre une inscription : un refus du compte, ou l'un des deux accords. */
+export type SignUpErrorKey = AuthErrorKey | AccordErrorKey
+
+const byAccordCode: Record<string, AccordErrorKey> = {
+  // La case « J'accepte les règles » n'est pas cochée (l'API le dit aussi s'il manque les deux).
+  RULES_NOT_ACCEPTED: 'rulesNotAccepted',
+  // La case « J'ai 15 ans ou plus » n'est pas cochée.
+  AGE_NOT_DECLARED: 'ageNotDeclared',
+}
+
+/** La clé de message d'un refus de l'inscription : un accord d'abord, puis les refus du compte. */
+export const signUpErrorKey = (error: {
+  status: number
+  code?: string | undefined
+}): SignUpErrorKey => {
+  // Un 429 reste « Trop d'essais », quel que soit son code.
+  const accord = error.status === 429 || !error.code ? undefined : byAccordCode[error.code]
+  return accord ?? authErrorKey(error)
+}
+
+/**
+ * Vrai pour un refus d'accord. Un « prédicat de type » (`key is AccordErrorKey`) : après ce test,
+ * TypeScript sait dans quelle section lire le message (`errors` ou `auth.errors`).
+ */
+export const isAccordError = (key: SignUpErrorKey): key is AccordErrorKey =>
+  key === 'rulesNotAccepted' || key === 'ageNotDeclared'
