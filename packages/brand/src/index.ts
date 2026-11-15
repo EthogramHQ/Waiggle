@@ -15,6 +15,7 @@ export {
   schemes,
 } from './colors'
 export { contrastRatio, parseColor } from './contrast'
+export { legal, legalPlaceholder, legalPlaceholders } from './legal'
 export {
   type DurationName,
   durations,

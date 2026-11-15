@@ -6,6 +6,7 @@
 // (textes, photos, retraits, mises à jour) : les notifications, les signalements et l'export le
 // lisent, et le faire dépendre d'eux ferait une boucle d'imports.
 import { z } from 'zod'
+import { MY_DATA_PAGE_SIZE, MyDataProject } from './my-data'
 import { Removal, RemovedPart } from './removal'
 import { VisibleFreeText } from './text'
 import { UpdateId } from './updates'
@@ -334,6 +335,48 @@ export const OpenFeedbackList = z
   .max(OPEN_FEEDBACK_MAX)
   .meta({ id: 'OpenFeedbackList' })
 export type OpenFeedbackList = z.infer<typeof OpenFeedbackList>
+
+/**
+ * R11, « Mes retours envoyés » (GET /v1/me/tester-messages) : un retour ou une réponse que le membre
+ * a écrit **comme testeur**, dans le coin de n'importe quel projet, liste à plat (l'appli regroupe
+ * par projet). Jamais un message de l'auteur du projet, ni un message qu'il a écrit chez lui comme
+ * auteur. Un message qu'il a supprimé n'y est plus ; « Supprimer » reprend la route du coin.
+ * - `project` : null quand il ne voit plus le projet (voir `MyDataProject`) ;
+ * - `closed` : le coin lui est fermé (projet retiré ou devenu privé, testeur parti, retiré ou
+ *   bloqué) : le message se relit ici en lecture seule, et se supprime encore ;
+ * - `removed` : retiré par la modération ; il en reste l'expéditeur et voit encore son texte ;
+ * - `media` : l'adresse de sa capture, qu'il lit même dans un coin fermé ; null sans capture, ou
+ *   quand la modération l'a retirée seule (elle reste dans l'export).
+ */
+export const MyTesterMessage = z
+  .object({
+    id: z.uuid(),
+    projectId: z.uuid(),
+    project: MyDataProject.nullable(),
+    closed: z.boolean(),
+    kind: TesterMessageKind,
+    text: z.string().nullable(),
+    outcome: FeedbackOutcome.nullable(),
+    device: FeedbackDevice.nullable(),
+    createdAt: z.iso.datetime(),
+    media: z.object({ url: z.url() }).nullable(),
+    removed: z.boolean(),
+  })
+  .meta({ id: 'MyTesterMessage' })
+export type MyTesterMessage = z.infer<typeof MyTesterMessage>
+
+/** Les paramètres d'adresse de « Mes retours envoyés » : sans curseur, la première page. */
+export const MyTesterMessagesQuery = z.object({ cursor: TesterCursor.optional() })
+export type MyTesterMessagesQuery = z.infer<typeof MyTesterMessagesQuery>
+
+/** Une page de « Mes retours envoyés », les plus récents d'abord ; `nextCursor` vaut null tout au bout. */
+export const MyTesterMessagesPage = z
+  .object({
+    items: z.array(MyTesterMessage).max(MY_DATA_PAGE_SIZE),
+    nextCursor: TesterCursor.nullable(),
+  })
+  .meta({ id: 'MyTesterMessagesPage' })
+export type MyTesterMessagesPage = z.infer<typeof MyTesterMessagesPage>
 
 /**
  * Dans l'export de l'auteur : un appel qu'il a lancé. `title` vaut null quand le projet n'est plus

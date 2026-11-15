@@ -8,9 +8,13 @@ import {
   CommentPage,
   CommentsQuery,
   EditedComment,
+  MyComment,
+  MyCommentsPage,
+  MyCommentsQuery,
   NewComment,
 } from './comments'
 import { MENTIONS_MAX } from './mentions'
+import { MY_DATA_PAGE_SIZE } from './my-data'
 
 const rootId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const replyId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
@@ -154,5 +158,55 @@ describe('Comment', () => {
     expect(CommentPage.safeParse({ items: tooMany, nextCursor: null }).success).toBe(false)
     expect(CommentsQuery.safeParse({ cursor: 'eyJhdCI6IjIwMjYifQ' }).success).toBe(true)
     expect(CommentsQuery.safeParse({ cursor: '{"at":"2026"}' }).success).toBe(false)
+  })
+})
+
+// R11, « Mes commentaires » : ce que la liste montre d'un commentaire du membre.
+describe('MyComment', () => {
+  const projectId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e500'
+  const mine = {
+    id: replyId,
+    projectId,
+    project: { id: projectId, title: 'Recettes', cover: null, author: { name: 'Sam' } },
+    replyTo: rootId,
+    hasReplies: false,
+    body: 'Bravo !',
+    createdAt: '2026-11-15T08:30:00.000Z',
+    editedAt: null,
+    hidden: false,
+    removed: false,
+  }
+
+  it('reads a reply back as the API sends it', () => {
+    expect(MyComment.parse(mine)).toEqual(mine)
+  })
+
+  it('gives a project it no longer sees as null, and keeps its identifier', () => {
+    expect(MyComment.parse({ ...mine, project: null })).toMatchObject({ project: null, projectId })
+  })
+
+  it('names the comment it answers by its identifier alone', () => {
+    expect(MyComment.parse({ ...mine, replyTo: null }).replyTo).toBeNull()
+    // z.object ne garde que les champs listés : l'auteur ou le texte de la racine ne sortent jamais.
+    const leaked = MyComment.parse({ ...mine, replyTo: rootId, replyToAuthor: lea })
+    expect(leaked).not.toHaveProperty('replyToAuthor')
+    expect(MyComment.safeParse({ ...mine, replyTo: { id: rootId } }).success).toBe(false)
+  })
+
+  it('never gives the handle or the photo of the author of the project', () => {
+    const project = { ...mine.project, author: { name: 'Sam', handle: 'sam', avatarUrl: null } }
+    expect(MyComment.parse({ ...mine, project }).project?.author).toEqual({ name: 'Sam' })
+  })
+
+  it('pages 30 by 30, with the opaque cursor of the feed', () => {
+    const items = Array.from({ length: MY_DATA_PAGE_SIZE + 1 }, () => mine)
+    expect(MY_DATA_PAGE_SIZE).toBe(30)
+    expect(MyCommentsPage.safeParse({ items: items.slice(0, -1), nextCursor: null }).success).toBe(
+      true,
+    )
+    expect(MyCommentsPage.safeParse({ items, nextCursor: null }).success).toBe(false)
+    expect(MyCommentsQuery.safeParse({}).success).toBe(true)
+    expect(MyCommentsQuery.safeParse({ cursor: 'eyJhdCI6IjIwMjYifQ' }).success).toBe(true)
+    expect(MyCommentsQuery.safeParse({ cursor: '{"at":"2026"}' }).success).toBe(false)
   })
 })

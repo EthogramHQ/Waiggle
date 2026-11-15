@@ -30,14 +30,40 @@ export const InviteCode = z.string().trim().min(1).max(INVITE_CODE_MAX_LENGTH)
  */
 export const normalizeInviteCode = (code: string) => code.normalize('NFKC').trim().toLowerCase()
 
+/**
+ * L'inscription (POST /api/auth/sign-up/email). R11 : deux cases à cocher, deux accords séparés
+ * (choix 5 du scénario : chaque accord a sa preuve), « J'accepte les règles » et « J'ai 15 ans ou
+ * plus ». z.literal(true) n'accepte que le booléen `true` : ni `"true"`, ni `1`, ni une case
+ * absente. La version acceptée n'est pas envoyée : le serveur écrit la sienne (`RULES_VERSION`,
+ * rules.ts), pour qu'une ancienne page ne fasse pas accepter une ancienne version.
+ */
 export const SignUpRequest = z.object({
   name: DisplayName, // 1 à 30 caractères, sans caractère invisible (voir text.ts)
   email: z.email(),
   password: Password,
   inviteCode: InviteCode,
   language: LanguageSchema.optional(),
+  acceptRules: z.literal(true),
+  ageDeclared: z.literal(true),
 })
 export type SignUpRequest = z.infer<typeof SignUpRequest>
+
+/**
+ * Les codes des refus de l'inscription que l'appli reconnaît (apps/app/src/accounts/errors.ts),
+ * renvoyés par l'API (apps/api/src/auth/auth.ts) avec un message dans la langue du visiteur :
+ * - INVITE_CODE_INVALID : code d'invitation faux ou absent (403) ;
+ * - RULES_NOT_ACCEPTED (R11) : la case des règles n'est pas cochée (400) ;
+ * - AGE_NOT_DECLARED (R11) : la case de l'âge n'est pas cochée (400).
+ * Les deux accords sont lus avant de chercher si l'adresse a déjà un compte : la réponse ne dit
+ * rien de l'adresse. S'il manque les deux, l'API répond RULES_NOT_ACCEPTED (l'ordre de l'écran) ;
+ * l'appli, qui connaît ses deux cases, dit déjà ce qui manque avant l'envoi.
+ */
+export const SignUpRefusalCode = z.enum([
+  'INVITE_CODE_INVALID',
+  'RULES_NOT_ACCEPTED',
+  'AGE_NOT_DECLARED',
+])
+export type SignUpRefusalCode = z.infer<typeof SignUpRefusalCode>
 
 export const SignInRequest = z.object({
   email: z.email(),
@@ -170,6 +196,17 @@ export const Me = z
      * pour toutes ses ruches ; il se change par PATCH /v1/me (`ProfileUpdate`).
      */
     hideFromSuggestions: z.boolean(),
+    /**
+     * R11 : vrai s'il a accepté la version des règles en vigueur (`RULES_VERSION`, rules.ts). Faux,
+     * l'appli ouvre l'écran « Accepter » avant toute autre page, et l'API refuse ses écritures
+     * (`rules_required`), sauf les sorties. Comme `isAdmin`, ce champ ne donne aucun droit.
+     */
+    rulesAccepted: z.boolean(),
+    /**
+     * R11 : « Ce qui change », les clés de texte de la nouvelle version (`RULES_CHANGES`), quand il
+     * en a accepté une plus ancienne ; vide sinon (déjà acceptée, ou jamais aucune).
+     */
+    rulesChanges: z.array(z.string()),
   })
   .meta({ id: 'Me' })
 export type Me = z.infer<typeof Me>
