@@ -105,7 +105,7 @@ export const en: Translation = {
           },
           moderation: {
             title: 'Moderation',
-            body: 'Any member can report content or a profile. Only the people in moderation, administrators of {{appName}}, read reports, and they never say who reported.\n\nFrom lightest to heaviest, moderation can:\n\n- remove part of a content (a photo, a title…);\n- remove the whole content;\n- suspend an account for a time, or indefinitely.\n\nEach decision is explained: the person concerned receives the facts and the rule or law applied. A suspension is also announced by email. While suspended, you can read everything, remove your content, export your data or delete your account, but no longer post.\n\nDisagree with a decision? Write to {{contactEmail}}: a person will review it and reply. You can also go to court.',
+            body: 'Any member can report content or a profile. Reports are read by moderation, the administrators of {{appName}}, helped by the coding assistant (see Privacy). Moderation never says who reported.\n\nFrom lightest to heaviest, moderation can:\n\n- remove part of a content (a photo, a title…);\n- remove the whole content;\n- suspend an account for a time, or indefinitely.\n\nEach decision is explained: the person concerned receives the facts and the rule or law applied. A suspension is also announced by email. While suspended, you can read everything, remove your content, export your data or delete your account, but no longer post.\n\nDisagree with a decision? Write to {{contactEmail}}: a person will review it and reply. You can also go to court.',
           },
           authors: {
             title: 'What a project’s author can do',
@@ -117,7 +117,7 @@ export const en: Translation = {
           },
           changes: {
             title: 'Changes to the rules',
-            body: 'A new version of the rules has a new date. You read and accept it on your next visit, with what changes at the top. Until then, you can read everything, download your data or delete your account, but not post.\n\nA correction of form, such as a typo or a link, does not change the version.',
+            body: 'A new version of the rules has a new date. You read and accept it on your next visit, with what changes at the top. Until then, only the agreement screen opens: there you can download your data, delete your account or sign out.\n\nA correction of form, such as a typo or a link, does not change the version.',
           },
           liability: {
             title: 'Liability, law and contact',
@@ -141,7 +141,7 @@ export const en: Translation = {
           },
           data: {
             title: 'What is kept, and why',
-            body: 'Unless stated otherwise, the basis is the contract: the rules you accept to use {{appName}}.\n\n- **Your account**: your display name, your email address, your language, your password (only its fingerprint, never the password itself). To sign you in and write to you. Signed-in members see your name; nobody sees your address.\n- **Your profile**: your handle, your bio, your photo and your favourite tools. Seen by signed-in members. The photo is cropped and cleaned of its hidden information.\n- **Your projects and their updates**: texts, prompts, photos, demo links, categories. Seen by the people you choose: all signed-in members, a hive, or only you.\n- **Reactions and follows**: who reacts to or follows what. Others only see numbers.\n- **Comments and mentions**: the text, the date, who is mentioned. Seen by those who see the project; the mention, by the person mentioned.\n- **The feed and suggestions**: the date you last read the feed, the suggestions you dismissed, your “Don’t suggest me to others” choice. Seen only by you.\n- **Search**: nothing you search for is kept.\n- **Testers**: your sign-up as a tester, your feedback, your messages and their screenshots. Seen by the project’s author and you.\n- **Hives**: the hives you belong to, who invited you, the invitations. Seen by the members of each hive.\n- **Notifications and emails**: what happened to you, your email choices, the sending dates. Seen only by you.\n- **Reports and moderation**: who reports, the reason, a copy of the reported texts, the decisions and suspensions. Seen by administrators; the person concerned receives the decision, never the name of who reported. Basis: the legitimate interest of protecting members, and the law for illegal content.\n- **Blocking**: the members you blocked. The blocked person is not notified.\n- **Account security**: your sign-in sessions (with the IP address and browser of their creation), the links sent by email, counters against abuse. Seen by no one. Basis: the legitimate interest of protecting accounts.\n- **The accepted rules**: the version, the date, and your statement that you are 15 or older, never your date of birth. To prove your agreement.\n- **The date of your last visit**: to delete an account inactive for 3 years.',
+            body: 'Unless stated otherwise, the basis is the contract: the rules you accept to use {{appName}}.\n\n- **Your account**: your display name, your email address, your language, your password (only its fingerprint, never the password itself). To sign you in and write to you. Signed-in members see your name; nobody sees your address.\n- **Your profile**: your handle, your bio, your photo and your favourite tools. Seen by signed-in members. The photo is cropped and cleaned of its hidden information.\n- **Your projects and their updates**: texts, prompts, photos, demo links, categories. Seen by the people you choose: all signed-in members, a hive, or only you.\n- **Reactions and follows**: who reacts to or follows what. Others only see numbers.\n- **Comments and mentions**: the text, the date, who is mentioned. Seen by those who see the project; the mention, by the person mentioned.\n- **The feed and suggestions**: the date you last read the feed, the suggestions you dismissed, your “Don’t suggest me to others” choice. Seen only by you.\n- **Search**: nothing you search for is kept.\n- **Testers**: your sign-up as a tester, your feedback, your messages and their screenshots. Seen by the project’s author and you; in the project’s comments, a “Tester” badge shows next to your name. A reported message, and its screenshot, is read by moderation, never the rest of the thread.\n- **Hives**: the hives you belong to, who invited you, the invitations. Seen by the members of each hive.\n- **Notifications and emails**: what happened to you, your email choices, the sending dates. Seen only by you.\n- **Reports and moderation**: who reports, the reason, a copy of the reported texts, the decisions and suspensions. Seen by administrators; the person concerned receives the decision, never the name of who reported. Basis: the legitimate interest of protecting members, and the law for illegal content.\n- **Blocking**: the members you blocked. The blocked person is not notified.\n- **Account security**: your sign-in sessions (with the IP address and browser of their creation), the links sent by email, counters against abuse. Seen by no one. Basis: the legitimate interest of protecting accounts.\n- **The accepted rules**: the version, the date, and your statement that you are 15 or older, never your date of birth. To prove your agreement.\n- **The date of your last visit**: to delete an account inactive for 3 years.',
           },
           retention: {
             title: 'How long',
@@ -358,6 +358,7 @@ export const en: Translation = {
     suspended:
       'Accepting the rules does not lift your suspension: you can read everything, but not post, until it ends.',
     error: 'Your agreement could not be saved. Try again.',
+    outdated: 'The rules have changed in the meantime. Reload the page to read the new version.',
   },
   account: {
     about: { title: 'About' },
@@ -2336,6 +2337,8 @@ export const en: Translation = {
     delete: 'Delete',
     deleteNamed: 'Delete the message: {{excerpt}}',
     deleteBody: 'It will disappear, with its screenshot.',
+    deleteBodyRemoved:
+      'It will disappear, with its screenshot. The moderation decision and the copy of the report are kept for up to a year after the decision.',
     more: 'Show more',
     moreError: 'More of your feedback could not load.',
     loadError: 'Your feedback could not load.',
