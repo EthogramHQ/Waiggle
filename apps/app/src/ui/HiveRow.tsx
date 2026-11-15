@@ -67,7 +67,9 @@ export function HiveRow({ hive, onPress, compact = false, toSource }: Props) {
     : t(($) => $.hives.rowNameNoAnimator, { hive: name, members, news })
 
   return (
-    <Pressed label={label} onPress={onPress} role="link">
+    // `inset` : rangée dans un `ListGroup` qui rogne, la ligne dessine son anneau de focus à
+    // l'intérieur (relecture du design de R10 : la dernière ligne n'en montrait que le haut).
+    <Pressed label={label} onPress={onPress} role="link" inset>
       <View
         style={{
           flexDirection: 'row',

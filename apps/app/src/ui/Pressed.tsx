@@ -10,6 +10,7 @@ import { Pressable, type StyleProp, StyleSheet, type View, type ViewStyle } from
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { enterActivates } from './keyboard'
+import { insetFocus } from './theme/document'
 import { spring } from './theme/motion'
 
 type Props = {
@@ -31,6 +32,13 @@ type Props = {
   radius?: Radius
   /** L'élément touchable, pour y poser le focus (une carte d'aperçu qui l'a rendu à une feuille). */
   ref?: Ref<View>
+  /**
+   * R10 (relecture du design, anneau rogné) : l'élément est rangé dans un cadre qui rogne ce qui
+   * dépasse (une ligne d'un `ListGroup`) ; l'anneau de focus du clavier se dessine alors à
+   * l'intérieur de l'élément, comme celui de `ListRow` (`insetFocus`). Sans lui, l'anneau, posé
+   * autour, était coupé sur trois côtés de la dernière ligne.
+   */
+  inset?: boolean
 }
 
 /** Le rayon écrit dans le style du contenu, s'il est une seule vue qui en a un. */
@@ -50,6 +58,7 @@ export function Pressed({
   describedBy,
   radius,
   ref,
+  inset = false,
 }: Props) {
   const borderRadius = radius === undefined ? radiusOf(children) : radii[radius]
   const scale = useSharedValue(1)
@@ -64,6 +73,7 @@ export function Pressed({
         // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
         {...(role === 'link' ? enterActivates(onPress) : null)}
         onPress={onPress}
+        {...(inset ? insetFocus : null)}
         onPressIn={() => {
           scale.value = spring(pressScale, 'firm')
         }}
