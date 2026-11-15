@@ -74,7 +74,11 @@ confort.
   (`apps/app/scripts/site-check.mjs`).
 - **Les sauvegardes** :
   - une sauvegarde chaque nuit sur le serveur, gardée 14 jours, plus une avant chaque déploiement ;
-  - les sauvegardes hebdomadaires de Hostinger couvrent le serveur entier.
+    celles-ci, comme toute sauvegarde d'une autre étiquette, partent après 30 jours, en gardant
+    les 5 dernières dans cette limite (tranche R11) ;
+  - les sauvegardes hebdomadaires de Hostinger couvrent le serveur entier ;
+  - les journaux du système (journald) sont gardés 6 mois : assez pour retrouver une intrusion,
+    sans garder plus (tranche R11).
   - La CI vérifie la boucle « sauvegarder, puis restaurer » à chaque pull request : une
     sauvegarde jamais restaurée ne prouve rien.
 
@@ -87,7 +91,8 @@ confort.
   contiennent aucun secret.
 - Le domaine est écrit dans l'image web, au moment de la construction. Changer de domaine
   demande donc une nouvelle publication (`infra/site.env`).
-- Les sauvegardes restent chez Hostinger : celles du serveur (14 jours) et la sauvegarde
+- Les sauvegardes restent chez Hostinger : celles du serveur (14 jours, 30 jours au plus pour une
+  sauvegarde faite avant une opération) et la sauvegarde
   hebdomadaire du VPS entier, incluse dans l'offre. Risques acceptés par Louis :
   - si le VPS disparaît, on revient à la dernière sauvegarde hebdomadaire : jusqu'à 7 jours de
     données perdus ;

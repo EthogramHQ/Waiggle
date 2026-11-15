@@ -110,8 +110,9 @@ européen sur les services numériques, DSA).
 - **Retirer** le contenu dans l'appli, fondement « la loi ». Ne pas supprimer le compte ni les
   données soi-même : les enquêteurs peuvent en avoir besoin. La décision reste comme trace.
 - **Ne rien restaurer** : une image supprimée depuis le signalement ne reste que dans les
-  sauvegardes : 14 jours pour les quotidiennes ; les 5 dernières d'avant déploiement (et les 5
-  dernières d'avant restauration), quel que soit leur âge (rotation de `infra/backup.sh`). Ne jamais la rechercher ni la restaurer pour la voir : Pharos et les
+  sauvegardes : 14 jours pour les quotidiennes ; 30 jours au plus pour les autres (avant
+  déploiement, avant restauration…), dont les 5 dernières de chaque étiquette dans cette limite
+  (rotation de `infra/backup.sh`). Ne jamais la rechercher ni la restaurer pour la voir : Pharos et les
   enquêteurs savent la demander.
 
 ### Une photo ou un pseudo illicite sur un profil
@@ -145,7 +146,8 @@ sauvegarde (`serveur.md`, « Sauvegardes »), jamais directement.
   bandeau) : relire la décision, rétablir si elle était mal fondée, et répondre dans tous les cas.
 - **Une demande sur ses données** (accès, rectification, effacement, RGPD) : réponse **sous un
   mois**. L'export de « Mon compte » contient les signalements faits par le membre et les retraits
-  de ses contenus ; jamais les signalements qui le visent.
+  de ses contenus ; jamais les signalements qui le visent. La procédure complète (identité, délai,
+  ce qu'on garde) : [`donnees.md`](donnees.md), § 2.
 
 ## 6. Repérer les signalements abusifs
 
