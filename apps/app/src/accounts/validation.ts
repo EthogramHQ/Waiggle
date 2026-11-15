@@ -5,9 +5,17 @@ import type { AuthErrorKey } from './errors'
 
 export type FieldErrors = Partial<
   Record<
-    'name' | 'email' | 'password' | 'inviteCode',
+    // R11 : les deux cases de l'inscription (« J'accepte les règles », « J'ai 15 ans ou plus »).
+    'name' | 'email' | 'password' | 'inviteCode' | 'acceptRules' | 'ageDeclared',
     // R2 : un champ laissé vide dit ce qu'il attend (« Indique ton adresse e-mail. »).
-    AuthErrorKey | 'nameRequired' | 'inviteRequired' | 'emailRequired' | 'passwordRequired'
+    | AuthErrorKey
+    | 'nameRequired'
+    | 'inviteRequired'
+    | 'emailRequired'
+    | 'passwordRequired'
+    // R11 : une case laissée vide dit pourquoi elle compte.
+    | 'rulesUnchecked'
+    | 'ageUnchecked'
   >
 >
 
@@ -22,6 +30,9 @@ export const fieldErrorsFrom = (error: ValidationError): FieldErrors => {
     if (field === 'name') errors.name = 'nameRequired'
     if (field === 'email') errors.email = 'invalidEmail'
     if (field === 'inviteCode') errors.inviteCode = 'inviteRequired'
+    // Les cases valent `true` seulement (z.literal(true)) : non cochées, elles sont refusées.
+    if (field === 'acceptRules') errors.acceptRules = 'rulesUnchecked'
+    if (field === 'ageDeclared') errors.ageDeclared = 'ageUnchecked'
     if (field === 'password') {
       // too_small : trop court ; too_big : trop long.
       errors.password = issue.code === 'too_big' ? 'passwordTooLong' : 'passwordTooShort'
