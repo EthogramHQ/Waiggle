@@ -59,6 +59,10 @@ const result = await build({
   absWorkingDir: root,
   entryPoints,
   bundle: true,
+  // Sans découpage, esbuild fabrique un paquet complet par point d'entrée, chacun avec sa copie de
+  // tout ce qu'il importe : 1 500 fichiers montaient à 7 Go de mémoire (15/11/2026). Découpé, le
+  // code partagé n'est produit qu'une fois ; la carte des imports (`metafile`) reste la même.
+  splitting: true,
   write: false,
   metafile: true,
   outdir: 'unused',
