@@ -79,7 +79,7 @@ members() {
 sign_up() {
   web -f -o /dev/null -X POST "https://$API_HOST/api/auth/sign-up/email" \
     -H 'Content-Type: application/json' -H "Origin: https://$APP_HOST" \
-    -d "{\"name\":\"Essai\",\"email\":\"$1\",\"password\":\"stack-test-password\",\"inviteCode\":\"$INVITE_CODE\"}"
+    -d "{\"name\":\"Essai\",\"email\":\"$1\",\"password\":\"stack-test-password\",\"acceptRules\":true,\"ageDeclared\":true,\"inviteCode\":\"$INVITE_CODE\"}"
   sleep 1
   local link
   link=$(compose logs api 2>&1 | grep -o "https://$API_HOST/api/auth/verify-email[^ ]*" | tail -1)

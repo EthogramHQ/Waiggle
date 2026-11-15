@@ -169,6 +169,13 @@
       "when": 1794685695424,
       "tag": "0023_hives_r10",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794764042258,
+      "tag": "0024_compliance_r11",
+      "breakpoints": true
     }
   ]
 }

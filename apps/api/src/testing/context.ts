@@ -46,7 +46,18 @@ export const fastPasswordHashing: PasswordHashing = {
 }
 
 type Credentials = { email: string; password: string }
-type SignUpBody = Credentials & { name: string; language?: string; inviteCode?: string }
+/**
+ * R11 : `acceptRules` et `ageDeclared`, les deux cases de l'inscription, valent `true` si le test
+ * ne les donne pas (`signUp` plus bas). `unknown` : un test de refus peut envoyer `false`, un texte,
+ * ou `undefined`, que JSON.stringify retire du corps (la case absente).
+ */
+type SignUpBody = Credentials & {
+  name: string
+  language?: string
+  inviteCode?: string
+  acceptRules?: unknown
+  ageDeclared?: unknown
+}
 
 /**
  * Une API complète pour un test. `inviteCode` : le code d'invitation exigé à l'inscription, comme
@@ -106,11 +117,15 @@ export const createTestContext = async ({
       body: JSON.stringify(body),
     })
 
-  /** Inscription par e-mail ; le lien de vérification ramènera vers la page /verified de l'appli. */
+  /**
+   * Inscription par e-mail ; le lien de vérification ramènera vers la page /verified de l'appli.
+   * R11 : les deux accords (les règles, « 15 ans ou plus ») sont cochés par défaut, comme le fait
+   * tout membre qui s'inscrit ; un test qui les donne lui-même l'emporte.
+   */
   const signUp = (body: SignUpBody, headers?: Record<string, string>) =>
     postJson(
       '/api/auth/sign-up/email',
-      { ...body, callbackURL: `${TEST_APP_URL}/verified` },
+      { acceptRules: true, ageDeclared: true, ...body, callbackURL: `${TEST_APP_URL}/verified` },
       headers,
     )
 

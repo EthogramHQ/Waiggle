@@ -7,6 +7,7 @@ import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
 import { and, eq, isNull } from 'drizzle-orm'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
+import { rulesStateOf } from '../rules/acceptance'
 import { loadActiveSuspension } from '../suspension/load'
 import { provisionalOf } from './provisional'
 import { favoriteToolsOf } from './tools'
@@ -90,5 +91,8 @@ export const loadMe = async (
     provisional: await provisionalOf(db, user.id, { name: user.name, handle }),
     // R10 : « Ne pas me proposer aux autres ».
     hideFromSuggestions: profile?.hideFromSuggestions ?? false,
+    // R11 : la version des règles en vigueur acceptée ou non, et « Ce qui change » sinon ; une
+    // requête de plus, par la clé primaire de rules_acceptance (rules/acceptance.ts).
+    ...(await rulesStateOf(db, user.id)),
   }
 }

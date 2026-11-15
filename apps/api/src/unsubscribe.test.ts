@@ -68,6 +68,8 @@ const DEFAULTS = {
   // R10 : « Ruches » vaut « Tout de suite » par défaut ; un lien « tout de suite » le baisse comme
   // les autres types « Tout de suite » (INSTANT_EMAIL_TYPES).
   hives: 'now',
+  // R11 : « Découvertes », dans le récap par défaut (contrat, DEFAULT_EMAIL_PREFERENCES).
+  discoveries: 'digest',
 } as const
 
 /**

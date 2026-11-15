@@ -34,6 +34,12 @@ export const emailPreference = pgTable(
     // R10 : les ruches (invitations, partie « Dans tes ruches » du récap). « now » par défaut, seul
     // type à l'être (scénario, « Le réglage Ruches ») : une invitation attend une réponse.
     emailHives: text('email_hives').notNull().default('now'),
+    // R11 : « Découvertes », les parties du récap qui font découvrir (nouveaux projets des proches,
+    // appels à testeurs). Jamais un e-mail à part : « digest » (dans le récap, par défaut, inscrits
+    // d'avant compris) ou « never » (le récap sans ces parties) ; pas de « now » (check plus bas).
+    // Sans le préfixe `email_` : ce n'est pas un type d'e-mail, mais une partie du récap (le nom
+    // est celui que cite la procédure de reprise des désinscriptions, docs/ops/serveur.md).
+    discoveries: choice('discoveries'),
     // Le dernier récap envoyé (heure UTC, sans fuseau, comme les autres tables) ; null : jamais.
     recapSentAt: timestamp('recap_sent_at'),
     // Le nombre de récaps envoyés de suite sans visite du membre (0 à 3) : à 3, plus de récap
@@ -71,7 +77,8 @@ export const emailPreference = pgTable(
         and ${t.emailHives} in ('now', 'digest', 'never')
         and ${t.emailReactions} in ('digest', 'never')
         and ${t.emailFollows} in ('digest', 'never')
-        and ${t.emailUpdates} in ('digest', 'never')`,
+        and ${t.emailUpdates} in ('digest', 'never')
+        and ${t.discoveries} in ('digest', 'never')`,
     ),
   ],
 )

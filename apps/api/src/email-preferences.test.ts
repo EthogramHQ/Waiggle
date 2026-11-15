@@ -63,6 +63,8 @@ const DEFAULTS = {
   // R10 : « Ruches » vaut « Tout de suite » par défaut (DEFAULT_EMAIL_PREFERENCES) : une invitation
   // attend une réponse.
   hives: 'now',
+  // R11 : « Découvertes », dans le récap par défaut (contrat, DEFAULT_EMAIL_PREFERENCES).
+  discoveries: 'digest',
 } as const
 
 beforeEach(async () => {

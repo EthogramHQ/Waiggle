@@ -55,14 +55,14 @@ echo "ok"
 step "Sans le code d'invitation, l'inscription est refusée"
 STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/api/auth/sign-up/email \
   -H 'Content-Type: application/json' -H "Origin: $APP" \
-  -d '{"name":"Smoke","email":"smoke@example.com","password":"smoke-test-password"}')
+  -d '{"name":"Smoke","email":"smoke@example.com","password":"smoke-test-password","acceptRules":true,"ageDeclared":true}')
 test "$STATUS" = 403
 echo "ok"
 
 step "Inscription, puis lien de vérification (les e-mails sont écrits dans les logs)"
 curl -fsS -o /dev/null -X POST $API/api/auth/sign-up/email \
   -H 'Content-Type: application/json' -H "Origin: $APP" \
-  -d "{\"name\":\"Smoke\",\"email\":\"smoke@example.com\",\"password\":\"smoke-test-password\",\"inviteCode\":\"$INVITE\"}"
+  -d "{\"name\":\"Smoke\",\"email\":\"smoke@example.com\",\"password\":\"smoke-test-password\",\"acceptRules\":true,\"ageDeclared\":true,\"inviteCode\":\"$INVITE\"}"
 sleep 1
 LINK=$(docker logs smoke-api 2>&1 | grep -o "$API/api/auth/verify-email[^ ]*" | tail -1)
 curl -fsS -o /dev/null -c "$WORK/cookies" "$LINK"
