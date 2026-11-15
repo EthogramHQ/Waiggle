@@ -1538,6 +1538,8 @@ export const en: Translation = {
     authorOn: '{{name}}, on {{title}}',
     detail: {
       commentOn: 'A comment on {{title}}',
+      hiveName: 'The name of a hive',
+      hiveLine: '{{members}}, run by {{name}}',
       partOf: '{{part}} of {{title}}',
       seeInContext: 'See in context',
       firstReport: 'First report',
