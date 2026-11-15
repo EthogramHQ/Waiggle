@@ -83,6 +83,10 @@ export const suspendedProfileChange = (
     switch (key) {
       case 'language':
         return true
+      // R10 : « Ne pas me proposer aux autres » ne publie rien (contrat, ProfileUpdate) : permis
+      // dans les deux sens, comme la langue. La valeur est vérifiée ensuite par le validateur.
+      case 'hideFromSuggestions':
+        return true
       case 'bio':
         return value === ''
       case 'favoriteTools':

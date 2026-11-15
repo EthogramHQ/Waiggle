@@ -227,7 +227,7 @@ const blockedEitherWay = (blocks: Blocks, memberId: string) =>
   blocks.byMe.has(memberId) || blocks.ofMe.has(memberId)
 
 /** Le nom d'une ruche tel qu'on le montre : null quand la modération l'a retiré (« Ruche sans nom »). */
-const shownName = (row: { name: string; nameRemovalId: string | null }) =>
+export const shownName = (row: { name: string; nameRemovalId: string | null }) =>
   row.name === '' || row.nameRemovalId !== null ? null : row.name
 
 // ─── La ligne d'une ruche ─────────────────────────────────────────────────────────────────────────

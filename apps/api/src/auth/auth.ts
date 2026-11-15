@@ -24,6 +24,7 @@ import type { Mailer } from '../email/mailer'
 // L'e-mail de vérification part de auth/verification-resend.ts (tranche R2).
 import { existingAccountEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
+import { removeFromHive } from '../hives/write'
 import { describeError, writeAuthLog } from '../log'
 import type { FileStorage } from '../media/storage'
 import { releaseAvatarKey } from '../moderation/replaced'
@@ -313,6 +314,29 @@ export const createAuth = ({
             .update(schema.moderationDecision)
             .set({ previousValue: null, provisionalValue: null })
             .where(eq(schema.moderationDecision.targetMemberId, user.id))
+          // R10 : il quitte chacune de ses ruches, comme par « Quitter la ruche »
+          // (hives/write.ts, `removeFromHive`), avec les mêmes verrous et le même ordre (la ruche,
+          // puis sa ligne de membre, puis ses projets réservés) : s'il animait, l'animation passe
+          // au membre le plus ancien, qui lit « Tu animes maintenant la ruche Famille. » ; s'il
+          // était le dernier, la ruche est supprimée avec ses invitations (cascade). Ici, avant la
+          // suppression du compte, et pas en laissant faire la base : la cascade effacerait bien sa
+          // ligne de membre, mais l'animateur deviendrait nul (set null) sans successeur, et une
+          // ruche vide resterait. Ses projets réservés passent un instant en privé (sinon leur clé
+          // étrangère retiendrait une ruche vide), puis partent avec le compte.
+          // Ses ruches par l'index hive_member_user_idx (20 au plus : HIVE_LIMITS.joined). Une
+          // transaction par ruche, l'une après l'autre : chacune ne verrouille que sa ruche, et un
+          // geste simultané d'un autre membre sur l'une n'attend pas les autres.
+          // Ce qu'il laisse chez les autres reste lisible sans lui : ses invitations encore en
+          // attente gardent leur ruche, sans inviteur (inviter_id remis à null par la base) ; une
+          // épingle qu'il a posée reste à la ruche, sans « épinglé par » (pinned_by remis à null).
+          const memberships = await db
+            .select({ hiveId: schema.hiveMember.hiveId })
+            .from(schema.hiveMember)
+            .where(eq(schema.hiveMember.userId, user.id))
+          const leftAt = new Date()
+          for (const { hiveId } of memberships) {
+            await removeFromHive(db, hiveId, user.id, user.id, leftAt)
+          }
         },
         // Juste après : on efface les fichiers eux-mêmes du stockage, les compteurs anti-abus
         // qui portent son identifiant, et les commentaires restés sans auteur (un commentaire
