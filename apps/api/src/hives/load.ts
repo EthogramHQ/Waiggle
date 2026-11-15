@@ -161,7 +161,7 @@ export const reservedToHive = (hiveId: string) =>
  * Les noms de colonnes sont écrits en toutes lettres (sql.raw : du texte fixe) : la sous-requête
  * nomme sa propre table, quelle que soit la requête qui l'entoure.
  */
-const authorIsMemberOf = (hiveId: string) =>
+export const authorIsMemberOf = (hiveId: string) =>
   sql`${p.authorId} in (select ${sql.raw('hive_member.user_id')} from ${hm} where ${sql.raw('hive_member.hive_id')} = ${hiveId})`
 
 /**
