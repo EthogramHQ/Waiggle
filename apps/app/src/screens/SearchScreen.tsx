@@ -3,9 +3,10 @@
 // arrivent pendant qu'on tape, rangés en trois groupes, avec la partie trouvée surlignée de miel.
 //
 // Le texte vit dans l'adresse (« /search?q=carn ») : on peut partager une recherche entre membres, et
-// revenir dessus. Il s'y écrit à chaque frappe par `setParams`, qui remplace l'adresse au lieu d'en
-// ajouter une : taper « carnaval » ne crée pas huit pages dans l'historique du navigateur
-// (relecture juridique, jur-J5).
+// revenir dessus. Il s'y écrit à la pause de la frappe (250 ms) par `setParams`, qui remplace
+// l'adresse au lieu d'en ajouter une : taper « carnaval » ne crée pas huit pages dans l'historique
+// du navigateur (relecture juridique, jur-J5), et ni lui ni les journaux du serveur ne gardent
+// chaque préfixe tapé (R11).
 //
 // Où est le champ ?
 // - Sur téléphone, dans la page, avec « Annuler » à côté (revenir à Explorer), ou dessous quand le
@@ -119,8 +120,24 @@ export function SearchScreen() {
 
   // Le minuteur de l'attente (on dit « debounce ») : chaque frappe le relance ; l'ancien est effacé
   // par le nettoyage de useEffect (la fonction rendue, appelée avant l'effet suivant).
+  // À la même pause, la frappe est écrite dans l'adresse : l'historique et les journaux du serveur
+  // ne gardent pas chaque préfixe tapé (« c », « ca », « car »…), seulement le mot où l'on s'arrête
+  // (R11). `typed` garde ce qui a été tapé et pas encore écrit ; l'adresse qui change sans nous
+  // (« Précédent », barre du haut) ne passe pas par là et n'est donc pas réécrite.
+  const typed = useRef<string | null>(null)
+  // Le routeur dans une `ref` : l'effet ne repart pas (et ne relance pas l'attente) quand le
+  // routeur change d'identité d'un rendu à l'autre.
+  const routerRef = useRef(router)
+  routerRef.current = router
   useEffect(() => {
-    const timer = setTimeout(() => setQuery(text), SEARCH_DELAY_MS)
+    const timer = setTimeout(() => {
+      setQuery(text)
+      if (typed.current !== text) return
+      typed.current = null
+      pending.current.push(text)
+      // Un champ vide retire le paramètre, plutôt que de laisser « ?q= » dans l'adresse.
+      routerRef.current.setParams({ q: text === '' ? undefined : text })
+    }, SEARCH_DELAY_MS)
     return () => clearTimeout(timer)
   }, [text])
 
@@ -161,17 +178,19 @@ export function SearchScreen() {
   if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   if (!session) return <SignedOutScreen />
 
+  // Une frappe : le champ la montre tout de suite, l'adresse l'écrira à la pause (voir plus haut).
   const write = (next: string) => {
     setText(next)
-    pending.current.push(next)
-    // Un champ vide retire le paramètre, plutôt que de laisser « ?q= » dans l'adresse.
-    router.setParams({ q: next === '' ? undefined : next })
+    typed.current = next
   }
 
   // « Annuler » : vider, puis revenir à Explorer (la page d'où l'on vient d'ordinaire ; sinon, elle
-  // remplace la recherche).
+  // remplace la recherche). Le départ est un geste fini : l'adresse est vidée sans attendre.
   const cancel = () => {
-    write('')
+    setText('')
+    typed.current = null
+    pending.current.push('')
+    router.setParams({ q: undefined })
     router.dismissTo('/explore')
   }
 

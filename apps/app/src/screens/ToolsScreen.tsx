@@ -100,7 +100,6 @@ function MemberTools() {
   return (
     <Screen
       title={t(($) => $.tools.title)}
-      subtitle={t(($) => $.tools.subtitle)}
       pageTitle={t(($) => $.tools.title)}
       header={<TopNav />}
       onBack={back}

@@ -97,8 +97,6 @@ function MemberExplore({ userId }: { userId: string }) {
       width="page"
       header={<TopNav />}
       title={t(($) => $.explore.title)}
-      // Sur téléphone, la place va vite au contenu : la phrase ne s'affiche que sur ordinateur.
-      subtitle={compact ? undefined : t(($) => $.explore.subtitle)}
       pageTitle={t(($) => $.explore.title)}
     >
       {compact ? (

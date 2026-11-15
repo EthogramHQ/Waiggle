@@ -2360,8 +2360,6 @@ export const fr = {
   // R3 : l'onglet Explorer (planches R3-Explorer*), qui reprend « Découvrir ».
   explore: {
     title: 'Explorer',
-    /** Le sous-titre, sur ordinateur (Louis, 30/10/2026). */
-    subtitle: 'Les projets de tous les membres : à tester, à suivre, pour t’inspirer.',
     testers: 'Ils cherchent des testeurs',
     /** « Tester », posé sur la photo d'une carte ; la flèche « ↗ » est dessinée, pas lue. */
     test: 'Tester',
@@ -2447,8 +2445,6 @@ export const fr = {
     // R6b : le catalogue (planche R3-Outils). « projets » sans « publics » : depuis R6a, un projet
     // des membres de Waiggle n'est pas public (choix 1 du plan, scénario R6b).
     title: 'Outils',
-    subtitle:
-      'Le catalogue des outils d’IA, de développement et de projets numériques, et les projets des membres qui s’en servent.',
     projects_one: '{{count}} projet',
     projects_other: '{{count}} projets',
     /** Un outil du catalogue sans projet (0 serait « 0 projet » au singulier en français). */
@@ -3341,7 +3337,6 @@ export const fr = {
   // R4 : l'encart en pointillés sous « Proches à suivre », au premier lancement.
   publishPrompt: {
     title: 'Ou publie ton premier projet.',
-    body: 'Une idée, un essai, ça compte.',
     action: 'Publier',
   },
   // R4 (F-Fil3) : les dates relatives, à l'heure de Paris. Au-delà de 7 jours, la date courte vient
