@@ -314,6 +314,13 @@ L'ancienne variable `MAIL_PROVIDER` (`scaleway` pour l'API HTTP) marche encore q
 son port (`SMTP_PORT`) ne se changent pas d'ordinaire : le port est 465 (TLS dès la connexion, par
 défaut) ou 587 (STARTTLS exigé), aucun autre, et l'API refuse de démarrer sans l'un des deux.
 
+**Les droits de la clé** (console Scaleway, IAM, politique de l'application de l'API) : chaque voie
+a son propre droit. `TransactionalEmailEmailApiCreate` pour `scaleway-api`,
+`TransactionalEmailEmailSmtpCreate` pour `scaleway-smtp` ; on garde les deux, pour pouvoir revenir
+à l'API en une ligne. Jamais `TransactionalEmailFullAccess` : l'API n'a besoin que d'envoyer. Sans
+le droit SMTP, le serveur répond `535 5.7.8 Permission denied` à l'identification, et le journal
+de l'API dit seulement `SMTP server refused the email` (constaté le 15/11/2026).
+
 **À vérifier** (l'assistant de code peut le faire : ces commandes comptent les lignes remplies, sans rien
 afficher) :
 
