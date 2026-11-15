@@ -28,6 +28,7 @@ import { hiveInvitationRoutes } from './routes/hive-invitations'
 import { hiveRoutes } from './routes/hives'
 import { meRoutes } from './routes/me'
 import { meCommentRoutes } from './routes/me-comments'
+import { meTesterMessageRoutes } from './routes/me-tester-messages'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
 import { moderationRoutes } from './routes/moderation'
@@ -377,6 +378,8 @@ export const createApp = ({
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   // « Mes commentaires » (R11) : la liste, et la suppression depuis les réglages.
   app.route('/', meCommentRoutes({ db, limiter, publicApiUrl }))
+  // « Mes retours envoyés » (R11) : ses messages de testeur, coins fermés compris.
+  app.route('/', meTesterMessageRoutes({ db, publicApiUrl }))
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
   // « Proches à suivre » : la liste et « × » (tranche R4).
   app.route('/', suggestionRoutes({ db, limiter, publicApiUrl }))

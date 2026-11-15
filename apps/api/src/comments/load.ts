@@ -860,6 +860,37 @@ export const commentsOfAuthor = async (db: Reader, authorId: string) => {
 }
 
 /**
+ * La couverture de ces projets : la première photo de la galerie, sans celles que la modération a
+ * retirées (« à tous », projects/media-visibility.ts : pas même pour l'auteur, une couverture se
+ * montre comme les autres la voient). Une seule requête, par l'index project_media_project_idx
+ * (project_id, slot, position) ; aucune pour une liste vide. Lue par « Mes commentaires » et « Mes
+ * retours envoyés » (testers/my-messages.ts).
+ */
+export const coversOf = async (
+  db: Reader,
+  projectIds: string[],
+  publicApiUrl: string,
+): Promise<Map<string, ProjectVisual>> => {
+  const covers = new Map<string, ProjectVisual>()
+  if (projectIds.length === 0) return covers
+  const media = await db
+    .select()
+    .from(schema.projectMedia)
+    .where(
+      and(
+        inArray(schema.projectMedia.projectId, projectIds),
+        eq(schema.projectMedia.slot, 'gallery'),
+        visibleMedia(schema.projectMedia.removalId, null),
+      ),
+    )
+    .orderBy(asc(schema.projectMedia.position), asc(schema.projectMedia.createdAt))
+  for (const row of media) {
+    if (!covers.has(row.projectId)) covers.set(row.projectId, toVisual(row, publicApiUrl))
+  }
+  return covers
+}
+
+/**
  * « Mes commentaires » (R11) : la page des commentaires et réponses que ce membre a écrits, du plus
  * récent au plus ancien, `MY_DATA_PAGE_SIZE` par page, sur tous les projets. Quatre requêtes, quelle
  * que soit la page :
@@ -937,27 +968,8 @@ export const myCommentsPage = async (
     ).map((project) => [project.id, project]),
   )
 
-  // 4. La couverture : la première photo de la galerie, sans celles que la modération a retirées
-  // (« à tous », projects/media-visibility.ts : pas même pour l'auteur, une couverture se montre
-  // comme les autres la voient).
-  const covers = new Map<string, ProjectVisual>()
-  const media =
-    projects.size === 0
-      ? []
-      : await db
-          .select()
-          .from(schema.projectMedia)
-          .where(
-            and(
-              inArray(schema.projectMedia.projectId, [...projects.keys()]),
-              eq(schema.projectMedia.slot, 'gallery'),
-              visibleMedia(schema.projectMedia.removalId, null),
-            ),
-          )
-          .orderBy(asc(schema.projectMedia.position), asc(schema.projectMedia.createdAt))
-  for (const row of media) {
-    if (!covers.has(row.projectId)) covers.set(row.projectId, toVisual(row, publicApiUrl))
-  }
+  // 4. Les couvertures.
+  const covers = await coversOf(db, [...projects.keys()], publicApiUrl)
 
   const items = page.map((row) => {
     const project = projects.get(row.projectId)
