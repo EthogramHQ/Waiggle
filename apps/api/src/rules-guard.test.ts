@@ -4,7 +4,11 @@
 // de la route, comme pour la suspension. Restent permis (décision D1 de la relecture du plan) : tout
 // GET et HEAD, tout DELETE (retirer ce qui est à soi, J1), et les sorties : accepter (POST
 // /v1/me/rules), régler ses e-mails, se désinscrire par le lien d'un e-mail ; supprimer son compte
-// et se déconnecter passent par /api/auth, hors de la garde. Scénario : docs/scenarios/refonte.md,
+// et se déconnecter passent par /api/auth, hors de la garde. Décision D4 (15/11/2026) : se protéger
+// ne demande pas d'accepter. Les gestes entièrement permis à un compte suspendu (signaler, bloquer,
+// masquer un commentaire sur son projet, marquer vu ou lu…) le restent ; ceux qu'une route ne
+// permet qu'en partie (son profil, son projet, la décision de modération) sont refusés.
+// Scénario : docs/scenarios/refonte.md,
 // « R11 — La conformité », « Les membres déjà inscrits, et chaque nouvelle version » ; relecture de
 // sécurité du plan (S-B1, « Vérifié sans problème ») et juridique (J1).
 //
@@ -168,11 +172,8 @@ describe('the guard of the rules', () => {
       ['PUT', `/v1/projects/${leaProject}/reactions/bravo`],
       ['POST', `/v1/members/${leaId}/follow`],
       ['POST', `/v1/projects/${leaProject}/threads/${karimId}/messages`],
-      // Des gestes permis à un compte suspendu, mais pas sans l'accord : seules les sorties passent.
-      ['POST', '/v1/reports'],
-      ['PUT', `/v1/members/${leaId}/block`],
-      ['PUT', '/v1/notifications/seen'],
-      ['PUT', '/v1/feed/read'],
+      // Créer une ruche est refusé à un compte suspendu comme à un membre sans l'accord (D4 ne
+      // permet que les gestes permis pendant une suspension).
       ['POST', '/v1/hives'],
     ]
     for (const [method, path] of writes) {
@@ -228,6 +229,32 @@ describe('the guard of the rules', () => {
     expect((await act.send('DELETE', `/v1/projects/${leaProject}/follow`, karim)).status).toBe(204)
     expect((await act.send('DELETE', `/v1/projects/${leaProject}/testers`, karim)).status).toBe(204)
     expect((await act.send('DELETE', `/v1/projects/${karimProject}`, karim)).status).toBe(204)
+  })
+
+  // Décision D4 de Louis (15/11/2026) : se protéger ne demande pas d'accepter, comme pendant une
+  // suspension (suspension.test.ts, « still reports, blocks and unblocks »).
+  it('lets him report, block, hide a comment on his project and mark his notifications seen without accepting', async () => {
+    const leaComment = (await act.comment(karimProject, lea, 'Joli carnet.')).id
+    later()
+    // Témoin d'abord : la garde vise bien Karim.
+    await expectRulesRequired(
+      await act.send('POST', `/v1/projects/${leaProject}/comments`, karim, { body: 'Encore !' }),
+    )
+
+    const hide = `/v1/projects/${karimProject}/comments/${leaComment}/hide`
+    expect((await act.send('PUT', hide, karim)).status).toBe(204)
+    later()
+    await act.report(karim, { kind: 'project', id: leaProject }, 'scam_spam')
+    later()
+    await act.block(louisId, karim)
+    later()
+    await act.openNotifications(karim)
+
+    // Les gestes permis seulement « en partie » à un compte suspendu restent refusés sans l'accord.
+    await expectRulesRequired(await act.send('PATCH', '/v1/me', karim, { language: 'fr' }))
+    await expectRulesRequired(
+      await act.send('PATCH', `/v1/projects/${karimProject}`, karim, { visibility: 'private' }),
+    )
   })
 
   // Relecture juridique J1 : retirer un commentaire ou un retour ne demande pas d'accepter.

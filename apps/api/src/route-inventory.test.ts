@@ -33,10 +33,13 @@
 // R11 (relecture de sécurité du plan, S-B1) : une troisième colonne dit si la route reste permise à
 // un membre qui n'a pas accepté la version des règles en vigueur (`allowed`), ou s'il reçoit 403
 // `rules_required` (`refused`). La garde de l'accord (rules/guard.ts) laisse passer tout GET, HEAD
-// et DELETE (décision D1), et ses seules sorties : accepter, régler ses e-mails, se désinscrire par
-// le lien d'un e-mail. Rien d'autre, pas même ce que la suspension permet (signaler, bloquer, la
-// décision de modération). La colonne est comparée à la liste de la garde, et une boucle, avec un
-// membre sans l'accord et un corps invalide, la prouve route par route. Accepter reste aussi permis
+// et DELETE (décision D1), ses sorties (accepter, régler ses e-mails, se désinscrire par le lien
+// d'un e-mail), et, décision D4 (15/11/2026), les écritures que la suspension permet entièrement
+// (signaler, bloquer, masquer un commentaire sur son projet, marquer vu ou lu…). Celles qu'elle ne
+// permet qu'en partie restent refusées : son profil, son projet (`partial`) et la décision de
+// modération (une route d'administrateur). La colonne est comparée à la liste de la garde, et une
+// boucle, avec un membre sans l'accord et un corps invalide, la prouve route par route. Accepter
+// reste aussi permis
 // à un compte suspendu (S-B1) : la colonne « suspension » le dit, et ALLOWED_WRITES le contient.
 import { existsSync, readFileSync } from 'node:fs'
 import { ErrorResponse } from '@ruche/contracts'
@@ -131,9 +134,9 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'GET /v1/projects/:id/threads': ['hidesBlocked', 'allowed', 'allowed'],
   'GET /v1/projects/:id/threads/:testerId/messages': ['hidesBlocked', 'allowed', 'allowed'],
   'POST /v1/projects/:id/threads/:testerId/messages': ['hidesBlocked', 'refused', 'refused'],
-  'POST /v1/projects/:id/threads/:testerId/read': ['own', 'allowed', 'refused'],
+  'POST /v1/projects/:id/threads/:testerId/read': ['own', 'allowed', 'allowed'],
   'DELETE /v1/projects/:id/messages/:messageId': ['own', 'allowed', 'allowed'],
-  'POST /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed', 'refused'],
+  'POST /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed', 'allowed'],
   'DELETE /v1/projects/:id/messages/:messageId/settled': ['own', 'allowed', 'allowed'],
   'GET /v1/projects/:id/feedback/open': ['own', 'allowed', 'allowed'],
   'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused', 'refused'],
@@ -142,7 +145,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'POST /v1/projects/:id/comments': ['hidesBlocked', 'refused', 'refused'],
   'PATCH /v1/projects/:id/comments/:commentId': ['hidesBlocked', 'refused', 'refused'],
   'DELETE /v1/projects/:id/comments/:commentId': ['own', 'allowed', 'allowed'],
-  'PUT /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed', 'refused'],
+  'PUT /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed', 'allowed'],
   'DELETE /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed', 'allowed'],
   // R8 : « Voir en contexte » depuis une notification, le fil du commentaire visé.
   'GET /v1/comments/:commentId/context': ['hidesBlocked', 'allowed', 'allowed'],
@@ -154,7 +157,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   // Les membres, les étiquettes, le fil.
   'GET /v1/members/mentionable': ['hidesBlocked', 'allowed', 'allowed'],
   'GET /v1/members/:id': ['hidesBlocked', 'allowed', 'allowed'],
-  'PUT /v1/members/:id/block': ['hidesBlocked', 'allowed', 'refused'],
+  'PUT /v1/members/:id/block': ['hidesBlocked', 'allowed', 'allowed'],
   'DELETE /v1/members/:id/block': ['own', 'allowed', 'allowed'],
   'GET /v1/tags/:slug': ['hidesBlocked', 'allowed', 'allowed'],
   'GET /v1/feed/following': ['hidesBlocked', 'allowed', 'allowed'],
@@ -163,9 +166,9 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   // ne touche qu'à soi ; les suggestions montrent d'autres membres, et écarter répond le même 404
   // que « Suivre » à un membre bloqué dans un sens ou l'autre (sec-B1). Lire son fil et écarter
   // restent permis pendant une suspension, comme marquer ses notifications vues.
-  'PUT /v1/feed/read': ['own', 'allowed', 'refused'],
+  'PUT /v1/feed/read': ['own', 'allowed', 'allowed'],
   'GET /v1/suggestions/members': ['hidesBlocked', 'allowed', 'allowed'],
-  'PUT /v1/suggestions/members/:id/dismissed': ['hidesBlocked', 'allowed', 'refused'],
+  'PUT /v1/suggestions/members/:id/dismissed': ['hidesBlocked', 'allowed', 'allowed'],
   // La recherche par mots et la liste des outils (tranche R3) : des lectures qui montrent les
   // contenus des autres, cachées à un membre bloqué dans un sens ou dans l'autre.
   'GET /v1/search': ['hidesBlocked', 'allowed', 'allowed'],
@@ -173,9 +176,9 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   // Les notifications.
   'GET /v1/notifications': ['hidesBlocked', 'allowed', 'allowed'],
   'GET /v1/notifications/unread': ['hidesBlocked', 'allowed', 'allowed'],
-  'PUT /v1/notifications/seen': ['own', 'allowed', 'refused'],
+  'PUT /v1/notifications/seen': ['own', 'allowed', 'allowed'],
   // Signaler : la cible d'un membre bloqué répond 404 (sauf les exceptions des règles 1 et 2).
-  'POST /v1/reports': ['hidesBlocked', 'allowed', 'refused'],
+  'POST /v1/reports': ['hidesBlocked', 'allowed', 'allowed'],
   'GET /v1/reports/target': ['hidesBlocked', 'allowed', 'allowed'],
   // La modération.
   'GET /v1/moderation/reports': ['admin', 'allowed', 'allowed'],
@@ -226,7 +229,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'POST /v1/hives/:id/animator': ['own', 'refused', 'refused'],
   'GET /v1/hives/:id/invitable': ['hidesBlocked', 'allowed', 'allowed'],
   'POST /v1/hives/:id/invitations': ['hidesBlocked', 'refused', 'refused'],
-  'POST /v1/hive-invitations/:id/accept': ['own', 'allowed', 'refused'],
+  'POST /v1/hive-invitations/:id/accept': ['own', 'allowed', 'allowed'],
   'DELETE /v1/hive-invitations/:id': ['own', 'allowed', 'allowed'],
 }
 
@@ -819,12 +822,33 @@ describe('the inventory of routes', () => {
       .sort()
 
     expect([...RULES_ALLOWED_WRITES].sort()).toEqual(exits)
-    // Témoin : les trois sorties du plan (accepter, régler ses e-mails, se désinscrire).
+    // Témoin : les trois sorties du plan (accepter, régler ses e-mails, se désinscrire), et selon D4
+    // les écritures entièrement permises pendant une suspension.
     expect(exits).toEqual([
       'PATCH /v1/me/email-preferences',
       'POST /v1/email/unsubscribe',
+      'POST /v1/hive-invitations/:id/accept',
       'POST /v1/me/rules',
+      'POST /v1/projects/:id/messages/:messageId/settled',
+      'POST /v1/projects/:id/threads/:testerId/read',
+      'POST /v1/reports',
+      'PUT /v1/feed/read',
+      'PUT /v1/members/:id/block',
+      'PUT /v1/notifications/seen',
+      'PUT /v1/projects/:id/comments/:commentId/hide',
+      'PUT /v1/suggestions/members/:id/dismissed',
     ])
+    // D4 : exactement les écritures permises pendant une suspension, sans les trois qu'une route ne
+    // permet qu'en partie ou réserve aux administrateurs, plus l'accord lui-même.
+    const partly = new Set([
+      'PATCH /v1/me',
+      'PATCH /v1/projects/:id',
+      'POST /v1/moderation/decisions',
+    ])
+    const fromSuspension = [...ALLOWED_WRITES]
+      .filter((route) => !route.startsWith('DELETE ') && !partly.has(route))
+      .concat('POST /v1/me/rules')
+    expect([...new Set(fromSuspension)].sort()).toEqual(exits)
   })
 
   // Relecture de sécurité du plan R11, S-B1 (bloquant) : sans cela, un membre suspendu sans l'accord
