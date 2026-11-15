@@ -109,7 +109,8 @@ describe('LegalPageScreen (R11)', () => {
       for (const section of legalDocument(page, fr.t).sections) {
         expect(screen.getByRole('header', { name: section.title })).toBeTruthy()
       }
-      view.unmount()
+      // Avec RNTL 14, démonter est asynchrone : sans `await`, le rendu suivant chevauche son `act`.
+      await view.unmount()
     }
   })
 
@@ -130,7 +131,7 @@ describe('LegalPageScreen (R11)', () => {
     // Témoin : la page est là.
     expect(screen.getByRole('header', { name: titles.rules })).toBeTruthy()
     expect(screen.queryByLabelText(contents)).toBeNull()
-    phone.unmount()
+    await phone.unmount()
 
     const restore = setDesktopWindow()
     try {
