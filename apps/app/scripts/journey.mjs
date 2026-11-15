@@ -10,7 +10,11 @@
 // « Réglages », en rubriques (/settings/<rubrique>) ; le second membre renvoie son lien de
 // vérification depuis « Vérifie ta boîte mail » ; le premier oublie son mot de passe, en choisit un
 // nouveau par le lien reçu, puis le change depuis la rubrique « Sécurité » : chaque fois, son autre
-// appareil est déconnecté. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque
+// appareil est déconnecté. Puis le projet devient privé, est supprimé. Tranche R10 (« Ruches ») :
+// Léa crée la ruche « Famille » et y invite Sam, qui la rejoint ; Léa publie un projet réservé à la
+// ruche, que Sam voit (Actualité, Projets, Fil) et que Malik, hors de la ruche, ne trouve nulle part ;
+// Sam quitte la ruche, puis Léa (la dernière) : le projet redevient privé. Enfin le compte de Léa est
+// supprimé. À chaque
 // étape, on vérifie ce que voit chacun (le membre, l'autre membre, une personne sans compte) et ce
 // qui reste sur le disque du serveur.
 //
@@ -1578,8 +1582,11 @@ try {
   )
   expectEqual('projet réservé, pour Sam', await statusFor(sam, hiveProjectUrl), 200)
   await open(sam.page, `${appUrl}/hives/${hiveId}`)
-  await byRole(sam.page, 'link', hiveRegexp).first().waitFor()
-  console.log('  ok : l’Actualité de la ruche montre le projet à Sam')
+  // La ligne de l'Actualité se lit en entier : le projet, puis la pastille « Réservé à Famille ».
+  await byRole(sam.page, 'link', new RegExp(`${hiveProject}.*${reserved}`))
+    .first()
+    .waitFor()
+  console.log('  ok : l’Actualité de la ruche montre le projet à Sam, « Réservé à Famille »')
   await byRole(sam.page, 'tab', /^Projets/)
     .first()
     .click()
@@ -1594,10 +1601,8 @@ try {
   await cardInFeed.waitFor()
   await cardInFeed.click()
   await sam.page.waitForURL((url) => url.pathname === `/projects/${hiveProjectId}`)
-  await sam.page.getByText(reserved, { exact: true }).first().waitFor()
-  console.log(
-    '  ok : le Fil de « Famille » montre la carte ; la page du projet dit « Réservé à Famille »',
-  )
+  await sam.page.getByText('Publié à l’instant').first().waitFor()
+  console.log('  ok : le Fil de « Famille » montre la carte, qui ouvre la page du projet')
   // La recherche de Sam le trouve : le témoin de l'absence de Malik plus bas.
   await open(sam.page, `${appUrl}/search?q=${hiveWord}`)
   await byRole(sam.page, 'link', hiveRegexp).first().waitFor()
