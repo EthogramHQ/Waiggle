@@ -137,15 +137,9 @@ function MemberRow({ member, removable, onOpen, onRemove, toSource, targetRef }:
   const name = member.face.name
   const handle =
     member.handle === null ? null : t(($) => $.member.handle, { handle: member.handle })
-  const you = t(($) => $.hives.page.you)
-  // « @ines_h · toi », « toi » seul sans pseudo ; un membre réduit n'a ni l'un ni l'autre.
-  const detail = member.reduced
-    ? undefined
-    : member.isMe
-      ? handle === null
-        ? you
-        : t(($) => $.hives.page.handleYou, { handle, you })
-      : (handle ?? undefined)
+  // Le pseudo seul, pour soi comme pour les autres (la ligne de soi se reconnaît à son nom et sa
+  // photo) ; un membre réduit n'a pas de pseudo.
+  const detail = member.reduced ? undefined : (handle ?? undefined)
   const animator = member.role === 'animator' ? t(($) => $.hives.page.animator) : null
   const description = [detail, animator].filter(Boolean).join(', ')
 
