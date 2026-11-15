@@ -430,8 +430,9 @@ describe('EmailSettings, the recap', () => {
     await renderWithProviders(<EmailSettings />)
 
     await screen.findByRole('button', { name: rowName('comments', 'digest') })
-    await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(4))
-    // Les quatre types « Dans le récap » (réactions, commentaires, abonnés, testeurs) gardent leur
+    await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5))
+    // Les cinq types « Dans le récap » (réactions, commentaires, abonnés, testeurs, et les ruches que
+    // Léa y a mises) gardent leur
     // choix ; « Tout de suite » et « Jamais » n'ont pas la phrase.
     expect(screen.getByRole('button', { name: rowName('reactions', 'digest') })).toBeTruthy()
     expect(screen.getByRole('button', { name: rowName('testers', 'digest') })).toBeTruthy()
@@ -448,7 +449,7 @@ describe('EmailSettings, the recap', () => {
     expect(screen.queryByText(TEXT.recapOff)).toBeNull() // le récap est activé
 
     await fireEvent.press(await recapSwitch())
-    expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(4)
+    expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5)
 
     await fireEvent.press(await recapSwitch())
     expect(screen.queryByText(TEXT.recapOff)).toBeNull()
