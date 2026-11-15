@@ -10,13 +10,17 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking, Platform } from 'react-native'
 import { downloadMyData, signOut } from '../../accounts/api'
+import { useSetHideFromSuggestions } from '../../hives/api'
 import { useOpenOutside } from '../../navigation/links'
 import { firstParam } from '../../navigation/params'
+import { useMe } from '../../profile/hooks'
 import { useChooseLanguage } from '../../profile/useChooseLanguage'
 import { type Focusable, focusWithoutScroll } from '../../ui/focus'
 import type { IconName } from '../../ui/Icon'
 import { ListGroup, ListRow, type PressEvent } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
+import { Stack } from '../../ui/Stack'
+import { Switch } from '../../ui/Switch'
 import { Text } from '../../ui/Text'
 import type { Appearance } from '../../ui/theme/appearance'
 import { useHydrated } from '../../ui/theme/hydration'
@@ -133,7 +137,8 @@ function DataSection() {
     )
   }
   return (
-    <>
+    <Stack gap="lg">
+      <HideFromSuggestions />
       <ListGroup>
         <ListRow
           label={t(($) => $.account.export.button)}
@@ -144,7 +149,35 @@ function DataSection() {
         />
       </ListGroup>
       {message ? <Notice tone={message.ok ? 'success' : 'error'} message={message.text} /> : null}
-    </>
+    </Stack>
+  )
+}
+
+// R10 : « Ne pas me proposer aux autres », rangé sous « Ce que les autres voient ». L'interrupteur
+// se lit sur le profil (GET /v1/me) ; le toucher le change tout de suite, et `set` le remet à la
+// valeur du serveur si l'enregistrement échoue (un message le dit alors, sous le groupe).
+function HideFromSuggestions() {
+  const { t } = useTranslation()
+  const me = useMe()
+  const hide = useSetHideFromSuggestions()
+  const [failed, setFailed] = useState(false)
+  return (
+    <Stack gap="sm">
+      <ListGroup title={t(($) => $.account.data.othersSee)}>
+        <Switch
+          inGroup
+          label={t(($) => $.hives.hideFromSuggestions)}
+          hint={t(($) => $.hives.hideFromSuggestionsHint)}
+          value={me.data?.hideFromSuggestions ?? false}
+          disabled={!me.data}
+          onValueChange={(value) => {
+            setFailed(false)
+            void hide.set(value).then((ok) => setFailed(!ok))
+          }}
+        />
+      </ListGroup>
+      {failed ? <Notice message={t(($) => $.hives.hideFromSuggestionsError)} /> : null}
+    </Stack>
   )
 }
 

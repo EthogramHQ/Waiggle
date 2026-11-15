@@ -29,7 +29,7 @@ import { StatusPill } from '../../ui/StatusPill'
 import { Switch } from '../../ui/Switch'
 import { Text } from '../../ui/Text'
 
-/** Les six types, dans l'ordre de la planche (celui du contrat). */
+/** Les sept types, dans l'ordre de la planche (celui du contrat) ; « Ruches » (R10) en dernier. */
 const TYPES: readonly EmailType[] = [
   'reactions',
   'comments',
@@ -37,6 +37,7 @@ const TYPES: readonly EmailType[] = [
   'follows',
   'updates',
   'testers',
+  'hives',
 ]
 
 /** Les types où « Tout de suite » se propose ; les autres n'ont que le récap ou rien. */
