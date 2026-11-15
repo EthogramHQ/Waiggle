@@ -88,6 +88,12 @@ export const project = pgTable(
     index('project_public_published_idx')
       .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
       .where(sql`${t.visibility} = 'public'`),
+    // R10 : Explorer et les suggestions lisent les projets publics **ou réservés à une ruche** du
+    // lecteur. Le `or` de la règle d'accès empêche PostgreSQL d'utiliser l'index ci-dessus : sans
+    // celui-ci, Explorer triait 10 000 projets (300 ms et plus) au lieu de lire l'index (1,4 ms).
+    index('project_shared_published_idx')
+      .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
+      .where(sql`${t.visibility} in ('public', 'hive') and ${t.removedAt} is null`),
     index('project_author_published_idx').on(t.authorId, t.publishedAt),
     // Les filtres par catégorie (principale ou seconde) et les nombres de projets par catégorie ;
     // ils servent aussi aux vérifications de la clé étrangère quand une catégorie change de code.

@@ -79,6 +79,7 @@ CREATE INDEX "hive_notice_recipient_idx" ON "hive_notice" USING btree ("recipien
 CREATE INDEX "hive_notice_hive_idx" ON "hive_notice" USING btree ("hive_id");--> statement-breakpoint
 ALTER TABLE "project" ADD CONSTRAINT "project_hive_id_hive_id_fk" FOREIGN KEY ("hive_id") REFERENCES "public"."hive"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "project_hive_created_idx" ON "project" USING btree ("hive_id","created_at") WHERE "project"."visibility" = 'hive';--> statement-breakpoint
+CREATE INDEX "project_shared_published_idx" ON "project" USING btree ("published_at" DESC NULLS FIRST,"id" DESC NULLS FIRST) WHERE "project"."visibility" in ('public', 'hive') and "project"."removed_at" is null;--> statement-breakpoint
 CREATE INDEX "project_media_removal_idx" ON "project_media" USING btree ("removal_id") WHERE "project_media"."removal_id" is not null;--> statement-breakpoint
 CREATE INDEX "tester_media_removal_idx" ON "tester_media" USING btree ("removal_id") WHERE "tester_media"."removal_id" is not null;--> statement-breakpoint
 CREATE INDEX "email_preference_instant_idx" ON "email_preference" USING btree ("user_id") WHERE "email_preference"."email_comments" = 'now' or "email_preference"."email_replies" = 'now' or "email_preference"."email_testers" = 'now' or "email_preference"."email_hives" = 'now';--> statement-breakpoint

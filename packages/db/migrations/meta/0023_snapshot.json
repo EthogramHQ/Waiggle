@@ -3287,6 +3287,28 @@
           "method": "btree",
           "with": {}
         },
+        "project_shared_published_idx": {
+          "name": "project_shared_published_idx",
+          "columns": [
+            {
+              "expression": "published_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "first"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "first"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"project\".\"visibility\" in ('public', 'hive') and \"project\".\"removed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "project_author_published_idx": {
           "name": "project_author_published_idx",
           "columns": [
