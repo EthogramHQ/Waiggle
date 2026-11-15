@@ -180,7 +180,8 @@ describe('AcceptRulesScreen (R11)', () => {
     // Témoin : « En bref » est là ; « Ce qui change » non (aucune version acceptée avant).
     expect(screen.getByRole('header', { name: summaryTitle })).toBeTruthy()
     expect(screen.queryByText(fr.t(($) => $.rules.changesTitle))).toBeNull()
-    first.unmount()
+    // Avec RNTL 14, démonter est asynchrone : sans `await`, le rendu suivant chevauche son `act`.
+    await first.unmount()
 
     await show({ ...ines, rulesChanges: ['hivesClarified'] })
 
