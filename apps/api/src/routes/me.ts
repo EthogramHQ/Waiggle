@@ -45,6 +45,7 @@ import { listedProjectFor, sharedProjectWith } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
 import { partOwnerKey, removedPartsOf } from '../removals/parts'
+import { rulesAcceptancesOf } from '../rules/acceptance'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isJsonObject, suspendedProfileChange } from '../suspension/guard'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
@@ -542,6 +543,15 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Ses réglages d'e-mail et les dates des derniers envois (tranche 6c), valeurs par défaut
     // comprises. Jamais de jeton de désinscription : il se recalcule, il n'est pas gardé.
     const emailPreferences = await exportEmailPreferences(db, user.id)
+    // R11 : chaque version des règles qu'il a acceptée, avec sa date (rules/acceptance.ts, par la clé
+    // primaire de rules_acceptance), et sa dernière visite connue, lue par la clé primaire de `user`.
+    // Jamais `inactive_notice_at` : une date de service, qu'une visite efface aussitôt.
+    const rulesAcceptances = await rulesAcceptancesOf(db, user.id)
+    const [activity] = await db
+      .select({ lastActiveAt: schema.user.lastActiveAt })
+      .from(schema.user)
+      .where(eq(schema.user.id, user.id))
+    if (!activity) return unauthorized(c)
     // Les signalements qu'il a faits (tranche 7a, règle 18 de la relecture du plan), des plus
     // anciens aux plus récents : la cible, le motif, sa précision, la date et l'issue. Ni le texte
     // visé (snapshot : il appartient à un autre, et a pu devenir privé), ni l'explication de la
@@ -682,6 +692,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         feed: { readAt: feedReadAt?.toISOString() ?? null },
         dismissedSuggestions,
         emailPreferences,
+        rulesAcceptances,
+        lastActiveAt: activity.lastActiveAt.toISOString(),
         hives,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
