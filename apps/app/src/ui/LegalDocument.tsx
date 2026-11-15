@@ -133,7 +133,15 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
   }
 
   const text = (
-    <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: space.xxl }}>
+    // Sur ordinateur, la colonne du texte prend la place que laisse le sommaire (une base nulle
+    // dans une rangée). Jamais sur téléphone : en colonne, une base nulle qui rétrécit écrase la
+    // hauteur du texte, qui déborde alors sur ce qui suit (vu au catalogue).
+    <View
+      style={[
+        { gap: space.xxl },
+        wide ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } : { alignSelf: 'stretch' },
+      ]}
+    >
       <VersionBadge label={t(($) => $.legal.version, { date: parisDay(version, i18n.language) })} />
       <ListGroup title={t(($) => $.legal.summaryTitle)}>
         <ListBlock>
