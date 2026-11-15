@@ -12,15 +12,14 @@ import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
 import { useMediaSources } from '../api/media'
 import { type CommentFailure, useComments, useDeleteComment, useHideComment } from '../comments/api'
+import { DeleteCommentDialog } from '../comments/DeleteCommentDialog'
 import { threadLines } from '../comments/lines'
 import type { useCommentDraft } from '../comments/useCommentDraft'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { removalBanner } from '../reports/removal'
-import { Button } from '../ui/Button'
 import { type ActionMenuItem, CommentCard, type CommentCardHandle } from '../ui/CommentCard'
 import { CommentList } from '../ui/CommentList'
 import { CommentThread } from '../ui/CommentThread'
-import { Dialog } from '../ui/Dialog'
 import type { Focusable } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
@@ -141,8 +140,6 @@ export function CommentThreads({
   const [showDeleteError, setShowDeleteError] = useState(false)
   // Après une suppression : les cartes voisines à essayer, une fois la fenêtre fermée.
   const focusAfterClose = useRef<string[] | null>(null)
-  // « Annuler » de la fenêtre de suppression reçoit le focus à l'ouverture (H3).
-  const cancelDeleteRef = useRef<Focusable>(null)
   // Masquer : le commentaire dont le dernier changement a échoué, et ceux en cours d'envoi. La `ref`
   // est lue tout de suite (un double clic n'envoie qu'une fois) ; l'état fait attendre le bouton.
   const [hideFailed, setHideFailed] = useState<string | null>(null)
@@ -392,47 +389,26 @@ export function CommentThreads({
       )}
       {/* Supprimer est définitif : une fenêtre demande confirmation. guardTaps : elle s'ouvre sous le
           doigt qui vient de toucher « Supprimer » ; une seconde tape trop rapide n'y décide rien. */}
-      <Dialog
+      <DeleteCommentDialog
         visible={deleting !== null}
-        guardTaps
-        title={t(($) => $.project.comments.deleteTitle)}
-        // Une racine qui a des réponses ne disparaît pas tout à fait : la fenêtre le dit.
-        message={
-          deleting?.hasReplies
-            ? t(($) => $.project.comments.deleteBodyReplies)
-            : t(($) => $.project.comments.deleteBody)
+        // Une racine qui a des réponses ne disparaît pas tout à fait : la fenêtre le dit. Pendant la
+        // suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
+        hasReplies={deleting?.hasReplies ?? false}
+        busy={removing}
+        error={
+          showDeleteError && remove.error
+            ? failure(
+                remove.reason,
+                t(($) => $.project.comments.deleteError),
+                t(($) => $.errors.rateLimited),
+              )
+            : null
         }
-        // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
-        onDismiss={() => {
-          if (!removing) setDeleting(null)
-        }}
+        errorAction={remove.reason === 'expired' ? signInAgain(() => setDeleting(null)) : undefined}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleting(null)}
         onClosed={focusNeighbor}
-        initialFocusRef={cancelDeleteRef}
-      >
-        {showDeleteError && remove.error ? (
-          <Notice
-            message={failure(
-              remove.reason,
-              t(($) => $.project.comments.deleteError),
-              t(($) => $.errors.rateLimited),
-            )}
-            action={remove.reason === 'expired' ? signInAgain(() => setDeleting(null)) : undefined}
-          />
-        ) : null}
-        <Button
-          label={t(($) => $.project.comments.confirmDelete)}
-          variant="confirm"
-          onPress={() => void confirmDelete()}
-          loading={removing}
-        />
-        <Button
-          ref={cancelDeleteRef}
-          label={t(($) => $.common.cancel)}
-          variant="secondary"
-          onPress={() => setDeleting(null)}
-          disabled={removing}
-        />
-      </Dialog>
+      />
     </>
   )
 }
