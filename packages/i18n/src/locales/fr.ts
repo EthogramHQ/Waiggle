@@ -59,7 +59,6 @@ export const fr = {
     // par un moteur de recherche, ce qui est faux (l'accueil et les quatre pages le sont). Écriture
     // neutre ; R12 dira « Rien n’est public sans ton accord. »
     membersOnly: 'Les projets et les profils ne se voient qu’avec un compte.',
-    seeCode: 'Voir le code',
   },
   // R11 : les quatre pages publiques (/rules, /privacy, /legal, /accessibility), lisibles sans compte.
   // Chaque page a un titre, un « En bref » (des puces courtes : `summary`, l'icône de chaque puce est

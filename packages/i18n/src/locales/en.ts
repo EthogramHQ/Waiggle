@@ -43,7 +43,6 @@ export const en: Translation = {
     haveAccount: 'I already have an account',
     publish: 'Publish a project',
     membersOnly: 'Projects and profiles are only visible with an account.',
-    seeCode: 'See the code',
   },
   legal: {
     version: 'Version of {{date}}',

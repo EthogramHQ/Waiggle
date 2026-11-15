@@ -1,7 +1,7 @@
 // Tests de l'écran d'inscription. On remplace (« mock ») le module qui parle à l'API par de faux
 // appels : on teste l'écran seul, sans réseau, et on décide nous-mêmes de la réponse de l'API.
 // Depuis la refonte (tranche R2) : « Créer ton compte » et « Créer mon compte », le choix de la
-// langue, « Voir le code » annoncé comme un site externe, le bouton toujours actif (les champs
+// langue, « Le code source » (pied, R11) annoncé comme un site externe, le bouton toujours actif (les champs
 // incomplets sont signalés à l'envoi, le premier reçoit le focus), l'adresse absente de l'URL de
 // « Vérifie ta boîte mail » (jur-9), les onglets sur ordinateur, et « Trop d'essais » à heure fixe.
 import { sourceUrl } from '@ruche/brand'
@@ -202,10 +202,12 @@ describe('the sign-up page after the redesign (R2)', () => {
     ).toBeTruthy()
   })
 
-  it('announces « Voir le code » as a link to an external site', async () => {
+  it('announces « Le code source » (pied, R11) as a link to an external site', async () => {
     await renderWithI18n(<SignUpScreen />)
 
-    const link = screen.getByRole('link', { name: containing(fr.t(($) => $.home.seeCode)) })
+    const link = screen.getByRole('link', {
+      name: containing(fr.t(($) => $.legal.links.sourceCode)),
+    })
     const external = fr.t(($) => $.common.externalSite)
     const props = link.props as Record<string, unknown>
     expect(

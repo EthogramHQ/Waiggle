@@ -1,6 +1,6 @@
 // Tests de l'écran de connexion. On remplace (« mock ») le module qui parle à l'API par de faux
 // appels : on teste l'écran seul, sans réseau, et on décide nous-mêmes de la réponse de l'API.
-// Depuis la refonte (tranche R2) : « Te revoilà », le choix de la langue, « Voir le code » annoncé
+// Depuis la refonte (tranche R2) : « Te revoilà », le choix de la langue, « Le code source » (pied, R11) annoncé
 // comme un site externe, « Mot de passe oublié ? », l'adresse de contact en lien ; sur ordinateur,
 // connexion et inscription sont deux onglets d'un même panneau (AuthPanel) dont l'adresse suit ;
 // et « Trop d'essais » bloque le bouton jusqu'à une heure fixe (décision D3 du 29/10/2026).
@@ -206,10 +206,12 @@ describe('the sign-in page after the redesign (R2)', () => {
     ).toBeTruthy()
   })
 
-  it('announces « Voir le code » as a link to an external site, and still opens it through the warning page', async () => {
+  it('announces « Le code source » (pied, R11) as a link to an external site, and still opens it through the warning page', async () => {
     await renderWithI18n(<SignInScreen />)
 
-    const link = screen.getByRole('link', { name: containing(fr.t(($) => $.home.seeCode)) })
+    const link = screen.getByRole('link', {
+      name: containing(fr.t(($) => $.legal.links.sourceCode)),
+    })
     expect(announcedExternal(link)).toBe(true)
 
     await fireEvent.press(link)

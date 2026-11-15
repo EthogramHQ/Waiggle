@@ -150,10 +150,12 @@ describe('the visitor home after the redesign (R2)', () => {
     expect(screen.getByText(createI18n('en').t(($) => $.home.membersOnly))).toBeTruthy()
   })
 
-  it('announces « Voir le code » as a link to an external site', async () => {
+  it('announces « Le code source » (pied, R11) as a link to an external site', async () => {
     await renderWithI18n(<HomeScreen />)
 
-    const link = screen.getByRole('link', { name: containing(fr.t(($) => $.home.seeCode)) })
+    const link = screen.getByRole('link', {
+      name: containing(fr.t(($) => $.legal.links.sourceCode)),
+    })
     const external = fr.t(($) => $.common.externalSite)
     const props = link.props as Record<string, unknown>
     expect(
