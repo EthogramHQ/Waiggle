@@ -24,7 +24,12 @@ Internet ──443──▶ web (Caddy + appli construite) ─┬─ waiggle.com
 
 Ce qui se fait tout seul :
 
-- **chaque nuit à 3 h 30** : une sauvegarde de la base et des avatars, gardée 14 jours ;
+- **chaque nuit à 3 h 30** : une sauvegarde de la base et des avatars, gardée 14 jours ; au même
+  passage, les sauvegardes d'une autre étiquette (`avant-deploi`, `manuel`…) et les fichiers
+  `refus-*.txt` de plus de 30 jours partent (les 5 dernières de chaque étiquette restent dans
+  cette limite) ;
+- **les journaux du système** (journald : connexions SSH, `sudo`, rôle d'administrateur) : gardés
+  6 mois (`MaxRetentionSec`, réglé par `infra/server/bootstrap.sh`) ;
 - **chaque jour** : les correctifs de sécurité du système, avec un redémarrage à 4 h si besoin ;
 - **les certificats HTTPS** : Caddy les obtient et les renouvelle seul ;
 - **après un redémarrage** : les conteneurs repartent seuls.
@@ -530,12 +535,14 @@ pas** : on prévient Louis.
        `all` pour tout) : un e-mail coupé, par le lien d'un e-mail, par le bouton « Se désabonner »
        de la messagerie, ou dans l'appli (Mon profil) ;
      - `Unsubscribe <identifiant> <type> <digest|never>`, avec `<type>` parmi `reactions`,
-       `comments`, `replies`, `follows`, `updates`, `testers` : un choix baissé pour ce type
+       `comments`, `replies`, `follows`, `updates`, `testers`, `hives`, ou `discoveries` (les
+       découvertes du récap, depuis R11) : un choix baissé pour ce type
        (« dans le récap » ou « jamais ») ;
      - `Unsubscribe <identifiant> instant <digest|never>` : le lien « tout de suite » d'un e-mail
        ou son bouton « Se désabonner » : tous les types qui étaient « tout de suite » passent au
        choix donné ;
-     - `Account deleted <identifiant>` : un compte supprimé par son membre ;
+     - `Account deleted <identifiant>` : un compte supprimé par son membre, ou par la tâche des
+       comptes inactifs (depuis R11 : 3 ans sans visite), qui écrit la même ligne ;
      - `Email changed <identifiant>` : une adresse changée par son membre (tranche « adresse ») ;
        la sauvegarde ramènerait l'ancienne, peut-être rendue depuis à quelqu'un d'autre.
 
@@ -547,7 +554,7 @@ pas** : on prévient Louis.
      un refus réappliqué deux fois ne change rien.
 
      ```bash
-     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all|instant (digest|never)|(reactions|comments|replies|follows|updates|testers|hives) (digest|never))|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all|instant (digest|never)|(reactions|comments|replies|follows|updates|testers|hives|discoveries) (digest|never))|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
      ```
 
      `grep -E` ne garde que les lignes exactement de ces formes (celles de l'appli d'avant la
@@ -578,7 +585,18 @@ pas** : on prévient Louis.
      ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose up -d api'
      ```
 
-  2. restaurer (`restore.sh`, avec l'accord de Louis) ;
+  2. restaurer (`restore.sh`, avec l'accord de Louis), puis **aussitôt**, avant que les tâches de
+     la nuit ne repartent, effacer les avertissements d'inactivité (depuis R11). La base restaurée
+     peut montrer un membre averti depuis plus de 30 jours, alors qu'il est revenu après la
+     sauvegarde : sa visite est perdue, et la tâche des comptes inactifs le supprimerait. Remis à
+     nul, l'avertissement repart, et le membre a de nouveau 30 jours ;
+
+     ```bash
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+     update "user" set inactive_notice_at = null where inactive_notice_at is not null;
+     SQL
+     ```
+
   3. réappliquer les refus du fichier de l'étape 0, dans l'ordre, avec l'accord de Louis (ce sont
      des écritures dans la base), ainsi que ceux reçus autrement (une demande écrite à Louis). Les
      requêtes passent par `db_query` (`infra/lib.sh`), qui lit le SQL sur l'entrée standard :
@@ -639,8 +657,8 @@ pas** : on prévient Louis.
 
        - `<type> <digest|never>` : seule la colonne du type change, et seulement si elle baisse
          (`email_reactions`, `email_comments`, `email_replies`, `email_follows`,
-         `email_updates`, `email_testers` ou `email_hives` à la place de `email_T`, `C` le choix
-         de la ligne) ;
+         `email_updates`, `email_testers`, `email_hives`, ou `discoveries`, sans préfixe, pour
+         la ligne `discoveries`, à la place de `email_T`, `C` le choix de la ligne) ;
 
          ```bash
          ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
@@ -849,7 +867,9 @@ images inutilisées depuis plus d'une semaine.
   rejoué sans risque.
 - **Plus d'accès SSH** : la console de hPanel (VNC). Elle ne passe pas par SSH.
 - **Le serveur est perdu** : restaurer la dernière sauvegarde hebdomadaire de Hostinger (le
-  serveur entier, dans hPanel), avec l'accord explicite de Louis.
+  serveur entier, dans hPanel), avec l'accord explicite de Louis. Puis, comme après toute
+  restauration, effacer les avertissements d'inactivité (requête de l'étape 2 de « Les e-mails de
+  notification pendant une restauration »).
   - **Ce qui est perdu** : tout ce qui a été écrit depuis cette sauvegarde, jusqu'à 7 jours.
   - **Si la base ne repart pas proprement** (l'image a été prise pendant que PostgreSQL
     tournait) : `restore.sh` avec la sauvegarde de la nuit qui précède l'image, dans

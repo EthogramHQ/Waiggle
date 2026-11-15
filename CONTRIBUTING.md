@@ -110,6 +110,9 @@ L'interface doit rester facile à modifier : chaque décision de design vit à u
 - **Il manque quelque chose ?** On crée ou complète un composant de `src/ui` plutôt que de styler
   dans l'écran. Puis on l'ajoute au catalogue (`src/catalogue/`) dans tous ses états, et on teste
   son comportement (rôle, nom, état) dans son propre fichier de test, `src/ui/<Composant>.test.tsx`.
+- **Moins de mots** : un titre, une rubrique, un bouton ou un réglage se suffit ; pas de sous-titre
+  ni de phrase d'aide qui le redit. Reste seulement ce que l'écran ne montre pas (une suite
+  irréversible, qui voit quoi, une limite) et la phrase d'un état vide.
 - **Couleurs** : par rôle (`textMuted`, `honey`), de jour et de nuit, dans
   `packages/brand/src/colors.ts`. Un texte sur un nouveau fond : ajouter le couple à
   `contrastPairs`.
