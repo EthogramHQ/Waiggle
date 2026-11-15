@@ -266,6 +266,13 @@ const signUp = async (someone, name, { resend = false } = {}) => {
   await page.getByLabel('Adresse e‑mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await page.getByLabel('Code d’invitation').fill(inviteCode)
+  // R11 : les deux accords, deux cases séparées sous le mot de passe (chacun a sa preuve). Sans
+  // elles, l'API refuse l'inscription ; avec elles, elle écrit l'accord du membre
+  // (table rules_acceptance, version en vigueur), si bien que chaque membre du parcours a le sien.
+  // Noms lus par expression régulière : l'apostrophe typographique (’) et une précision ajoutée
+  // au nom lu ne font pas échouer le parcours loin de sa cause.
+  await byRole(page, 'checkbox', /^J.accepte les règles de /).click()
+  await byRole(page, 'checkbox', /^J.ai 15 ans ou plus/).click()
   // R2 : sur ordinateur, « Créer un compte » est l'onglet ; le bouton dit « Créer mon compte ».
   await byRole(page, 'button', 'Créer mon compte').click()
   await page.waitForURL(/\/check-email/)

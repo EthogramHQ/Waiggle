@@ -80,6 +80,9 @@
 		error @devtools 404
 		# 1. Le fichier lui-même (/_expo/static/js/…), ou la page du même nom :
 		#    /sign-in → sign-in.html, /account/delete → account/delete.html.
+		#    R11 : les quatre pages publiques, sans paramètre, sont trouvées ici sans règle à elles :
+		#    /rules → rules.html, /privacy → privacy.html, /legal → legal.html,
+		#    /accessibility → accessibility.html.
 		try_files {path} {path}.html {path}/index.html
 		# 2. Les pages à paramètre sont construites une seule fois, sous le nom du paramètre :
 		#    /projects/0192abcd → projects/[id].html. Les « [^/.]+ » n'acceptent ni barre ni point :
