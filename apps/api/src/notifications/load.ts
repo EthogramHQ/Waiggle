@@ -1442,14 +1442,30 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join tool notice_tool on notice_tool.id = cn.tool_id
     -- R10 : l'invitation ou la trace de item_id, puis la ruche qu'elle nomme (pour « a rejoint »,
     -- item_id est la ruche elle-même). Trois clés primaires, pour les seules lignes de ruche.
-    left join hive_invitation hi on n.kind = 'hive_invited' and hi.id = n.item_id
-    left join hive_notice hn on n.kind in ('hive_removed', 'hive_animator', 'hive_deleted')
-      and hn.id = n.item_id
-    left join hive on hive.id = case
-      when n.kind = 'hive_joined' then n.item_id
-      when n.kind = 'hive_invited' then hi.hive_id
-      else hn.hive_id
-    end
+    -- « lateral » impose une lecture par ligne gardée (21 au plus), par la clé primaire : EXPLAIN
+    -- ANALYZE a montré qu'une jointure simple pouvait lire toute la table pour la hacher, faute de
+    -- savoir que item_id ne vient que de quelques lignes (mesure de R10, 400 invitations). « limit
+    -- 1 » (la clé primaire n'en rend de toute façon qu'une) empêche PostgreSQL de « déplier » la
+    -- sous-requête en jointure simple, ce qu'il fait sinon, et le ramènerait au hachage.
+    left join lateral (
+      select hi.id, hi.hive_id from hive_invitation hi
+      where n.kind = 'hive_invited' and hi.id = n.item_id
+      limit 1
+    ) hi on true
+    left join lateral (
+      select hn.id, hn.hive_id, hn.hive_name from hive_notice hn
+      where n.kind in ('hive_removed', 'hive_animator', 'hive_deleted') and hn.id = n.item_id
+      limit 1
+    ) hn on true
+    left join lateral (
+      select hive.id, hive.name, hive.name_removal_id, hive.icon from hive
+      where hive.id = case
+        when n.kind = 'hive_joined' then n.item_id
+        when n.kind = 'hive_invited' then hi.hive_id
+        else hn.hive_id
+      end
+      limit 1
+    ) hive on true
     order by n.at desc, n.key desc
   `
   return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows
