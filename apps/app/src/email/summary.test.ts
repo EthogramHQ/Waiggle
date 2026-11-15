@@ -157,6 +157,56 @@ describe('emailSummary', () => {
     expect(note({ ...leaEmailPreferences, hives: 'never' })).toBeNull()
   })
 
+  // R11, relecture juridique du plan (J4) : « Découvertes » à « Jamais » retire du récap les
+  // nouveaux projets des proches et « Ils cherchent des testeurs » (jobs/weekly-recap.ts). Les trois
+  // phrases qui promettaient « seulement les nouveaux projets de tes proches » deviendraient fausses :
+  // le récap qui n'a plus rien à porter ne part pas, et la phrase le dit avec les textes de R8.
+  describe('with the discoveries off (R11, J4)', () => {
+    const noDiscoveries = (preferences: EmailPreferences): EmailPreferences => ({
+      ...preferences,
+      discoveries: 'never',
+    })
+
+    it('says nothing leaves when no type goes in the recap and the discoveries are off', () => {
+      // Témoin : avec les découvertes, le récap part encore (test plus haut, nothingFriends).
+      expect(inFrench(allTypes('never'))).toBe(fr.t(($) => $.notifications.summary.nothingFriends))
+      expect(inFrench(noDiscoveries(allTypes('never')))).toBe(
+        fr.t(($) => $.notifications.summary.nothing),
+      )
+    })
+
+    it('says the rest stays in the Activity when only some types go at once and the discoveries are off', () => {
+      expect(inFrench(noDiscoveries({ ...allTypes('never'), replies: 'now' }))).toBe(
+        fr.t(($) => $.notifications.summary.nowOnly, { types: 'Les réponses et les mentions' }),
+      )
+      expect(inEnglish(noDiscoveries({ ...allTypes('never'), replies: 'now' }))).toBe(
+        en.t(($) => $.notifications.summary.nowOnly, { types: 'Replies and mentions' }),
+      )
+    })
+
+    // Les ruches à « Tout de suite » : leurs nouveautés partent encore dans le récap (« Dans tes
+    // ruches »), mais plus les nouveaux projets des proches. La phrase ne promet plus ces derniers ;
+    // la phrase des ruches (`hivesNowNote`), dessous, dit où vont leurs nouveautés.
+    it('no longer promises the new projects of my close ones when only the hives go at once', () => {
+      const preferences = noDiscoveries({ ...allTypes('never'), hives: 'now' })
+      expect(inFrench(preferences)).toBe(
+        fr.t(($) => $.notifications.summary.nowOnly, { types: 'Les ruches' }),
+      )
+      expect(hivesNowNote(preferences, fr.t as unknown as T)).toBe(
+        fr.t(($) => $.notifications.summary.hivesNow),
+      )
+    })
+
+    it('changes nothing while some types still go in the recap', () => {
+      expect(inFrench(noDiscoveries(allInRecap))).toBe(
+        fr.t(($) => $.notifications.summary.recapAll),
+      )
+      expect(inFrench(noDiscoveries({ ...allInRecap, replies: 'now' }))).toBe(
+        fr.t(($) => $.notifications.summary.nowAndRest, { types: 'Les réponses et les mentions' }),
+      )
+    })
+  })
+
   it('writes the list the English way, with a capital first letter', () => {
     expect(inEnglish({ ...allInRecap, replies: 'now' })).toBe(
       en.t(($) => $.notifications.summary.nowAndRest, { types: 'Replies and mentions' }),
