@@ -416,7 +416,8 @@ export function CatalogueScreen() {
         <VisualEditorSample l={l} />
         {/* Sans couverture verticale : le bouton seul. */}
         <VisualEditorSample l={l} empty />
-        {/* La jauge vide (discrète), en cours, puis remplie. */}
+        {/* La jauge vide (discrète), en cours, puis remplie : sans phrase visible, mais sa place
+            est gardée et la phrase reste le nom de la barre de progression. */}
         <HoneyMeter value={0} max={12} label={l.meterEmpty} />
         <HoneyMeter value={9} max={12} label={l.meter} />
         <HoneyMeter value={12} max={12} label={l.meterDone} />
