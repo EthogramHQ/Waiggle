@@ -10,6 +10,7 @@ import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 import { Removal, RemovedPart } from './removal'
 import { ModerationDecisionExport, ReportExport } from './reports'
+import { RulesAcceptance } from './rules'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
 import {
@@ -169,8 +170,21 @@ export const AccountExport = z
      * réglage « Ne pas me proposer aux autres » est dans `user.hideFromSuggestions`.
      */
     hives: HiveExport,
-    /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
+    /**
+     * Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c), « Découvertes » compris
+     * (R11).
+     */
     emailPreferences: EmailPreferencesExport,
+    /**
+     * R11 : chaque version des règles qu'il a acceptée, avec sa date et sa déclaration d'âge, des
+     * plus anciennes aux plus récentes. L'historique entier : c'est la preuve de ses accords.
+     */
+    rulesAcceptances: z.array(RulesAcceptance),
+    /**
+     * R11 : sa dernière visite connue (au plus une mise à jour par jour), celle qui compte pour la
+     * suppression d'un compte inactif depuis 3 ans (`INACTIVE_ACCOUNT_YEARS`, email.ts).
+     */
+    lastActiveAt: z.iso.datetime(),
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),
     sessions: z.array(
       z.object({

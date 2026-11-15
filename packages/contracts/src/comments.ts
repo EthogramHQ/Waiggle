@@ -6,6 +6,7 @@
 import { z } from 'zod'
 import { FeedCursor } from './feed'
 import { MENTIONS_MAX, Mention } from './mentions'
+import { MY_DATA_PAGE_SIZE, MyDataProject } from './my-data'
 import { ProjectAuthor, ProjectId } from './projects'
 import { Removal } from './removal'
 import { VisibleFreeText } from './text'
@@ -156,3 +157,51 @@ export const CommentContext = z
   .object({ projectId: ProjectId, thread: Comment })
   .meta({ id: 'CommentContext' })
 export type CommentContext = z.infer<typeof CommentContext>
+
+/**
+ * R11, « Mes commentaires » (GET /v1/me/comments) : un commentaire ou une réponse que le membre a
+ * écrit, sur n'importe quel projet, qu'il le voie encore ou non (il doit pouvoir le supprimer :
+ * DELETE /v1/me/comments/{commentId}). Un commentaire qu'il a supprimé n'y est plus.
+ * - `project` : null quand il ne voit plus le projet (voir `MyDataProject`) ; `projectId` reste,
+ *   comme dans l'export, pour ouvrir le fil d'un projet visible ;
+ * - `replyTo` : l'identifiant de la racine à laquelle il répond, ou null pour une racine. Rien
+ *   d'autre sur ce commentaire-là (ni son auteur, ni son texte : ils appartiennent à un autre) ;
+ * - `hasReplies` : vrai pour une racine qui a des réponses. La supprimer la laisse en
+ *   « Commentaire supprimé » et garde ses réponses : la fenêtre de confirmation le dit ;
+ * - `body` : le texte entier tel qu'il l'a écrit (l'appli n'en montre que le début) ;
+ * - `hidden` : masqué par l'auteur du projet ; `removed` : retiré par la modération. Il en reste
+ *   l'auteur, et voit donc encore son texte, ici comme dans le fil.
+ */
+export const MyComment = z
+  .object({
+    id: CommentId,
+    projectId: ProjectId,
+    project: MyDataProject.nullable(),
+    replyTo: CommentId.nullable(),
+    hasReplies: z.boolean(),
+    body: z.string(),
+    createdAt: z.iso.datetime(),
+    editedAt: z.iso.datetime().nullable(),
+    hidden: z.boolean(),
+    removed: z.boolean(),
+  })
+  .meta({ id: 'MyComment' })
+export type MyComment = z.infer<typeof MyComment>
+
+/**
+ * Les paramètres d'adresse de « Mes commentaires » : sans curseur, la première page. Le curseur est
+ * le même marque-page opaque que celui du fil (date et identifiant du dernier élément), dont l'API
+ * vérifie la date à la lecture (`CursorDate`, apps/api/src/cursor.ts) : une date avant l'an 2000
+ * est refusée (400), au lieu de faire échouer la requête.
+ */
+export const MyCommentsQuery = z.object({ cursor: FeedCursor.optional() })
+export type MyCommentsQuery = z.infer<typeof MyCommentsQuery>
+
+/** Une page de « Mes commentaires », les plus récents d'abord ; `nextCursor` vaut null tout au bout. */
+export const MyCommentsPage = z
+  .object({
+    items: z.array(MyComment).max(MY_DATA_PAGE_SIZE),
+    nextCursor: FeedCursor.nullable(),
+  })
+  .meta({ id: 'MyCommentsPage' })
+export type MyCommentsPage = z.infer<typeof MyCommentsPage>

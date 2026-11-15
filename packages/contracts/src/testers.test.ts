@@ -6,6 +6,7 @@
 // Les caractères invisibles sont fabriqués par String.fromCodePoint dans des constantes nommées :
 // écrits tels quels dans le fichier, ils seraient impossibles à relire.
 import { describe, expect, it } from 'vitest'
+import { MY_DATA_PAGE_SIZE } from './my-data'
 import {
   CALL_PHOTOS_PER_PROJECT_MAX,
   CALL_TEXT_MAX,
@@ -14,6 +15,9 @@ import {
   CAPTURES_PER_THREAD_MAX,
   MESSAGE_TEXT_MAX,
   MESSAGES_PAGE_SIZE,
+  MyTesterMessage,
+  MyTesterMessagesPage,
+  MyTesterMessagesQuery,
   NewTesterCall,
   NewTesterMessage,
   OPEN_FEEDBACK_MAX,
@@ -345,5 +349,50 @@ describe('the queries of the lists', () => {
     expect(TesterCursor.safeParse('abc_DEF-123').success).toBe(true)
     expect(TesterCursor.safeParse("x' or '1'='1").success).toBe(false)
     expect(TesterCursor.safeParse('').success).toBe(false)
+  })
+})
+
+// R11, « Mes retours envoyés » : ce que la liste montre d'un message du membre.
+describe('a message of mine (MyTesterMessage)', () => {
+  const projectId = '33333333-3333-4333-8333-333333333333'
+  const sent = {
+    id: '44444444-4444-4444-8444-444444444444',
+    projectId,
+    project: { id: projectId, title: 'Recettes', cover: null, author: { name: 'Sam' } },
+    closed: false,
+    kind: 'feedback',
+    text: 'Le bouton ne répond pas.',
+    outcome: 'partly',
+    device: 'phone',
+    createdAt: '2026-11-15T08:30:00.000Z',
+    media: { url: 'https://api.example.com/media/testers/capture.webp' },
+    removed: false,
+  }
+
+  it('reads a feedback back as the API sends it', () => {
+    expect(MyTesterMessage.parse(sent)).toEqual(sent)
+  })
+
+  it('keeps a message of a closed corner, its project hidden, without its capture', () => {
+    const closed = { ...sent, project: null, closed: true, media: null, removed: true }
+    expect(MyTesterMessage.parse(closed)).toEqual(closed)
+  })
+
+  it('gives the capture by its address only', () => {
+    const media = { ...sent.media, width: 10, height: 10, description: 'x' }
+    expect(MyTesterMessage.parse({ ...sent, media }).media).toEqual(sent.media)
+    expect(MyTesterMessage.safeParse({ ...sent, media: { url: 'capture.webp' } }).success).toBe(
+      false,
+    )
+  })
+
+  it('pages 30 by 30, with the cursor of the corner', () => {
+    const items = Array.from({ length: MY_DATA_PAGE_SIZE + 1 }, () => sent)
+    expect(
+      MyTesterMessagesPage.safeParse({ items: items.slice(0, -1), nextCursor: null }).success,
+    ).toBe(true)
+    expect(MyTesterMessagesPage.safeParse({ items, nextCursor: null }).success).toBe(false)
+    expect(MyTesterMessagesQuery.safeParse({}).success).toBe(true)
+    expect(MyTesterMessagesQuery.safeParse({ cursor: "x' or '1'='1" }).success).toBe(false)
   })
 })
