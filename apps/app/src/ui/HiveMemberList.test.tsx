@@ -57,7 +57,8 @@ const NAMES = family.map((one) => one.face.name)
 
 const text = {
   animator: fr.t(($) => $.hives.page.animator),
-  you: fr.t(($) => $.hives.page.you),
+  // R11 (« Moins de mots ») : « toi » quitte l'écran ; écrit en clair, sa clé disparaîtra avec lui.
+  you: 'toi',
   remove: (name: string) => fr.t(($) => $.hives.page.removeNamed, { name }),
 }
 
@@ -150,15 +151,16 @@ describe('HiveMemberList', () => {
     expect(onOpen).toHaveBeenCalledWith(ODILE)
   })
 
-  it('shows each handle, « Animateur » for the animator and « toi » for oneself', async () => {
-    expect(text.you).toBe('toi')
+  it('shows each handle, « Animateur » for the animator and no « toi » for oneself', async () => {
     await renderWithProviders(list([{ ...JEAN, isMe: false }, LEA, { ...INES, isMe: true }]))
 
     expect(screen.getByText(containing('lea_moreau'))).toBeTruthy()
     expect(screen.getByText(containing('papi_jean'))).toBeTruthy()
-    // Seuls dans leur texte, ou à côté du pseudo (« @ines_h · toi ») : un mot entier, une fois.
+    expect(screen.getByText(containing('ines_h'))).toBeTruthy()
+    // Seul dans son texte : un mot entier, une fois.
     expect(screen.getAllByText(new RegExp(`\\b${text.animator}\\b`))).toHaveLength(1)
-    expect(screen.getAllByText(new RegExp(`\\b${text.you}\\b`))).toHaveLength(1)
+    // R11 (« Moins de mots ») : ni « toi » seul, ni « @ines_h · toi ».
+    expect(screen.queryAllByText(new RegExp(`\\b${text.you}\\b`))).toHaveLength(0)
   })
 
   it('names "Retirer Tante Odile de la ruche" beside the member link', async () => {

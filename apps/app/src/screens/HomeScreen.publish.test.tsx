@@ -271,7 +271,10 @@ describe('the feed after publishing a project (R6a)', () => {
     mockParams = { published: mine.project.id }
     await renderHome()
 
-    expect(screen.getByText(fr.t(($) => $.feed.firstRun.title).replace(/\s+/g, ' '))).toBeTruthy()
+    // R11 (« Moins de mots ») : le premier lancement se lit à sa phrase ; « Ton fil t’attend » est
+    // parti (écrit en clair : sa clé disparaîtra).
+    expect(screen.queryByText(/Ton fil t.attend/)).toBeNull()
+    expect(screen.getByText(fr.t(($) => $.feed.firstRun.body).replace(/\s+/g, ' '))).toBeTruthy()
     expect(screen.getAllByRole('switch', { name: /^Suivre/ }).length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: 'Le ciel de ce soir' })).toBeTruthy()
 

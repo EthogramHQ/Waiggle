@@ -87,15 +87,19 @@ describe('the first run of a member who follows nobody (R4)', () => {
   const dismissOf = (name: string) => fr.t(($) => $.suggestions.dismiss, { name })
   const suspensionBanner = () => screen.findByText(containing(fr.t(($) => $.suspension.title)))
 
-  it('greets the member by name, says the feed is waiting, and explains', async () => {
+  it('greets the member by name and explains, without « Ton fil t’attend » or a caption', async () => {
     await renderFirstRun()
 
     expect(
       screen.getByText(shown(fr.t(($) => $.feed.firstRun.hello, { name: 'Inès' }))),
     ).toBeTruthy()
-    expect(screen.getByText(shown(fr.t(($) => $.feed.firstRun.title)))).toBeTruthy()
+    // R11 (« Moins de mots ») : « Ton fil t’attend » et la légende de « Proches à suivre » quittent
+    // l'écran (la légende est dite dans les Règles). Écrits en clair : leurs clés disparaîtront.
+    expect(screen.queryByText(/Ton fil t.attend/)).toBeNull()
     expect(screen.getByText(shown(fr.t(($) => $.feed.firstRun.body)))).toBeTruthy()
-    expect(screen.getByText(shown(fr.t(($) => $.suggestions.caption)))).toBeTruthy()
+    expect(
+      screen.queryByText(/Des membres de tes ruches et des membres qui ont publié récemment/),
+    ).toBeNull()
   })
 
   it('lists the five people to follow, each with « Suivre » and its « × »', async () => {
@@ -172,8 +176,8 @@ describe('the first run of a member who follows nobody (R4)', () => {
     await renderFirstRun(suspendedInes)
 
     await suspensionBanner()
-    // Témoin : le premier lancement est là.
-    expect(screen.getByText(shown(fr.t(($) => $.feed.firstRun.title)))).toBeTruthy()
+    // Témoin : le premier lancement est là (R11 : par sa phrase, « Ton fil t’attend » est parti).
+    expect(screen.getByText(shown(fr.t(($) => $.feed.firstRun.body)))).toBeTruthy()
     expect(screen.queryByRole('button', { name: fr.t(($) => $.publishPrompt.action) })).toBeNull()
   })
 

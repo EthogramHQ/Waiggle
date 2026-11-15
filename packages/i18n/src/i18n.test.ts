@@ -75,8 +75,11 @@ describe('translations', () => {
   // R6a (relecture du plan, jur-J5) : « public » est gardé pour R12, « Public sur le web ». Les
   // phrases qui disent qui voit un projet parlent des « membres », dans les deux langues.
   it('never calls a project visible to members « public » in the sentences about who sees it', () => {
+    // R11 (« Moins de mots ») : « Toute personne qui a un compte. » (`project.form.membersHint`)
+    // quitte l'écran et le fichier ; la partie des Règles qui dit à qui un projet se montre prend
+    // sa place dans la liste.
     const audienceKeys = [
-      'project.form.membersHint',
+      'legal.pages.rules.sections.content.body',
       'project.form.privateHint',
       'project.form.audienceMembers',
       'project.form.audienceMembersEdit',
