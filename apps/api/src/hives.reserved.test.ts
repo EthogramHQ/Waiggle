@@ -89,7 +89,8 @@ describe('a hive-reserved project', () => {
     later()
     const plan = await hives.publishReserved(ines.cookie, 'Le plan de table', familleId, visible)
     later()
-    const comment = await act.comment(plan.id, lea.cookie, 'Je viens avec les cousins.')
+    // Le commentaire est d'Inès : Léa, témoin, peut ainsi le signaler (on ne signale pas le sien).
+    const comment = await act.comment(plan.id, ines.cookie, 'Je viens avec les cousins.')
     const routes = (projectId: string, commentId: string, testerId: string) => [
       `/v1/projects/${projectId}`,
       `/v1/projects/${projectId}/updates`,
