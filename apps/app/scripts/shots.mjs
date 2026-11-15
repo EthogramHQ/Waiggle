@@ -4391,7 +4391,9 @@ const pages = [
     path: '/settings/data/comments',
     signedIn: true,
     prepare: async (page) => {
-      const deleteOf = fr.myComments.deleteNamed.split('{{')[0].trimEnd()
+      // Le nom lu par le navigateur ramène l'insécable avant « : » à une espace ordinaire : chaque
+      // blanc du texte devient `\s+` dans l'expression.
+      const deleteOf = fr.myComments.deleteNamed.split('{{')[0].trim().split(/\s+/u).join('\\s+')
       await page
         .getByRole('button', { name: new RegExp(`^${deleteOf}`) })
         .first()
