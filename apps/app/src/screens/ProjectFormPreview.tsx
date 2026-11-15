@@ -1,11 +1,13 @@
 // La colonne de l'aperçu de la feuille de publication, sur ordinateur (R6a, planche
 // R6-Publier-Desktop), sortie de `ProjectFormScreen` après les relectures (ui-C6) : la carte du fil
 // telle qu'elle paraîtra, qui suit la frappe, puis « Qui peut le voir ? ».
+import type { RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMe } from '../profile/hooks'
 import { demoUrlLooksValid, type ProjectForm } from '../projects/form'
 import { useCategory } from '../projects/useCategory'
 import { CardPreview } from '../ui/CardPreview'
+import type { Focusable } from '../ui/focus'
 import type { PhotoTile } from '../ui/PhotoTiles'
 import { ProjectCard } from '../ui/ProjectCard'
 import { Stack } from '../ui/Stack'
@@ -18,13 +20,17 @@ type Props = {
   /** L'image de la première photo (la couverture), ou rien. */
   cover: PhotoTile['image'] | null
   change: ChangeField
+  /** R10 : « Une ruche » envoyé sans ruche (la phrase sous « Quelle ruche ? »). */
+  hiveError?: string | undefined
+  /** R10 : l'entrée de « Quelle ruche ? », où l'écran pose le focus après un envoi refusé. */
+  hiveRef?: RefObject<Focusable | null> | undefined
 }
 
 /**
  * L'aperçu de la carte du fil (caché aux lecteurs d'écran et au clavier par `CardPreview` : il ne
  * fait que répéter les champs), puis « Qui peut le voir ? ».
  */
-export function ProjectFormPreview({ form, cover, change }: Props) {
+export function ProjectFormPreview({ form, cover, change, hiveError, hiveRef }: Props) {
   const { t } = useTranslation()
   const me = useMe()
   // Pas encore lue, ou en panne : l'aperçu n'a pas d'étiquette de catégorie, il reste dessiné.
@@ -64,7 +70,13 @@ export function ProjectFormPreview({ form, cover, change }: Props) {
           {t(($) => $.project.form.previewLight)}
         </Text>
       </Stack>
-      <ProjectAudienceChoice audience={form.audience} change={change} />
+      <ProjectAudienceChoice
+        audience={form.audience}
+        hiveId={form.hiveId}
+        change={change}
+        hiveError={hiveError}
+        hiveRef={hiveRef}
+      />
     </Stack>
   )
 }
