@@ -651,7 +651,7 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     links: linksFor(deps, member.id, 'recap'),
   }
   const language = languageOfMember(taken)
-  const email = { to: taken.email, ...recapEmail(language, data) }
+  const email = { to: taken.email, ...recapEmail(language, data, deps.appUrl) }
   try {
     await deps.mailer.send(email)
   } catch (error) {
@@ -666,7 +666,7 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
       friends: data.friends.map((friend) => ({ ...friend, image: null })),
       testersWanted: data.testersWanted && { ...data.testersWanted, image: null },
     }
-    await deps.mailer.send({ to: taken.email, ...recapEmail(language, plain) })
+    await deps.mailer.send({ to: taken.email, ...recapEmail(language, plain, deps.appUrl) })
   }
   return true
 }

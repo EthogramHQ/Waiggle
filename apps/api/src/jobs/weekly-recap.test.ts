@@ -167,6 +167,8 @@ const frameOf = (name: string) => [
   fr.changePreferences,
   fr.manage,
   fill(fr.footer),
+  // R11 : la dernière ligne du pied (son adresse est retirée avant, avec les autres).
+  fill(fr.privacy, { url: '' }),
   fill(fr.greeting, { name }),
   appName,
 ]

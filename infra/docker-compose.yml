@@ -34,6 +34,17 @@ services:
     image: pgvector/pgvector:0.8.7-pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
     restart: unless-stopped
     logging: *logging
+    # Journaux de PostgreSQL (R11, relecture de sécurité S-C4) : « postgres » est le programme de
+    # l'image, « -c » change un réglage. log_error_verbosity=terse : une erreur ne recopie plus
+    # la ligne de détail (qui contient la valeur d'une donnée de membre, par exemple une adresse en
+    # double). log_min_error_statement=panic : la requête fautive n'est recopiée que pour une panne
+    # du serveur lui-même, jamais pour une erreur ordinaire (une adresse déjà prise, etc.).
+    command:
+      - postgres
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_min_error_statement=panic
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ruche}
       POSTGRES_USER: ${POSTGRES_USER:-ruche}

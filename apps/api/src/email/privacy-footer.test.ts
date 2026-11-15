@@ -4,6 +4,8 @@
 // fichier.
 import { fill, resources } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
+import { instantEmail, instantPreviewData } from './instant'
+import { emailPreviews } from './preview'
 import {
   changeEmailConfirmationEmail,
   type EmailContent,
@@ -66,4 +68,29 @@ describe('the common footer of the e-mails', () => {
       expect(build().text).not.toContain(`${APP_URL}/privacy`)
     })
   }
+})
+
+// Le récap de la semaine et l'e-mail « tout de suite » ont leur propre mise en page : leurs
+// aperçus (preview.ts) les rendent avec l'adresse de l'appli, comme le fait chaque envoi du serveur.
+describe('the footer of the weekly recap and of the instant e-mail', () => {
+  const previews = emailPreviews()
+  const names = ['recap-short', 'recap-long', 'recap-first', 'instant-one', 'instant-many']
+
+  for (const language of ['fr', 'en'] as const) {
+    const line = fill(resources[language].translation.email.privacy, {
+      url: 'https://waiggle.com/privacy',
+    })
+    for (const name of names) {
+      it(`ends the ${name} e-mail with the address of the Privacy page (${language})`, () => {
+        const sent = previews.find((p) => p.file === `${name}.${language}.html`)?.email
+
+        expect(sent?.text.endsWith(line)).toBe(true)
+        expect(sent?.html).toContain(line)
+      })
+    }
+  }
+
+  it('leaves the instant e-mail without the line when the address of the app is unknown', () => {
+    expect(instantEmail(instantPreviewData(), 'fr').text).not.toContain('/privacy')
+  })
 })
