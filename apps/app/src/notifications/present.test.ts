@@ -1184,6 +1184,35 @@ describe('the moderation of a hive name (R10)', () => {
     expect(detail).toContain(fr.t(($) => $.removal.contest))
   })
 
+  // R10, relecture juridique (C2) : l'API donne l'identifiant de la ruche au seul animateur actuel
+  // (il peut la renommer) ; celui qui a écrit le nom sans animer la reçoit sans identifiant.
+  it('invites the current animator to rename the hive, and leads to its settings', () => {
+    const shown = present(removedName)
+
+    expect(shown.detail).toContain(fr.t(($) => $.removal.part.rest.hive))
+    expect(shown.target).toEqual({ pathname: '/hives/[id]/settings', params: { id: famille.id } })
+    expect(shown.leading).toEqual({ kind: 'icon', icon: 'house-line', tone: 'danger' })
+  })
+
+  it('tells the member who wrote the name, without a way to rename the hive', () => {
+    const shown = present({ ...removedName, hive: { ...hiveOf(null), id: null } })
+
+    expect(sentenceOf(shown)).toBe(fr.t(($) => $.notifications.removed.hive))
+    expect(shown.detail).toContain(fr.t(($) => $.removal.part.restHiveWriter))
+    expect(shown.detail).not.toContain(fr.t(($) => $.removal.part.rest.hive))
+    expect(shown.detail).toContain(removedName.explanation)
+    expect(shown.target).toBeNull()
+  })
+
+  it('names the hive by its current name once renamed, never by the removed one', () => {
+    const shown = present({ ...removedName, hive: { ...hiveOf('Les Mésanges'), id: null } })
+
+    expect(sentenceOf(shown)).toBe(
+      plain(fr.t(($) => $.notifications.removed.hiveRenamed, { hive: 'Les Mésanges' })),
+    )
+    expect(shown.detail).not.toContain(fr.t(($) => $.removal.part.restHiveWriter))
+  })
+
   it('says the name of Famille is visible again once restored', () => {
     const shown = present(restored({ targetKind: 'hive', project: null, hive: famille }))
 

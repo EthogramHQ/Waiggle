@@ -322,3 +322,98 @@ describe('restoring the name of a hive', () => {
     ])
   })
 })
+
+// R10, relecture juridique (C2) : la décision vise celui qui a écrit le nom (`name_set_by`) ; sa
+// motivation lui est due (article 17 du DSA), comme à l'animateur actuel, seul à pouvoir renommer.
+// La ligne de l'animateur garde l'identifiant de la ruche (elle mène à ses réglages) ; celle de qui
+// a écrit le nom sans animer n'en a pas (rien à y faire). Le nom retiré n'y revient jamais ; le nom
+// actuel, seulement à un membre et une fois la ruche renommée.
+describe('who learns that a hive name was removed', () => {
+  const removedLines = async (cookie: string) => {
+    const { items, raw } = await notificationsOf(cookie)
+    return { lines: items.filter((item) => item.kind === 'removed'), raw }
+  }
+
+  it('tells the member who wrote a removed hive name why it was removed', async () => {
+    await removeName()
+
+    const zoeLines = await removedLines(zoe)
+    expect(zoeLines.lines).toEqual([
+      expect.objectContaining({
+        targetKind: 'hive',
+        project: null,
+        hive: { id: null, name: null, icon: 'leaf' },
+        part: { field: 'name', position: null },
+        ground: 'rules',
+        explanation: EXPLANATION,
+        afterReport: true,
+      }),
+    ])
+    expect(zoeLines.raw).not.toContain('Pivert')
+
+    // Inès renomme la ruche : Zoé, membre, lit le nom actuel ; jamais celui qui a été retiré.
+    later()
+    const renamed = await act.send('PATCH', `/v1/hives/${hiveId}`, ines, { name: 'Les Mésanges' })
+    expect(renamed.status).toBe(200)
+    const afterRename = await removedLines(zoe)
+    expect(afterRename.lines).toEqual([
+      expect.objectContaining({ hive: { id: null, name: 'Les Mésanges', icon: 'leaf' } }),
+    ])
+    expect(afterRename.raw).not.toContain('Pivert')
+
+    // Partie de la ruche, elle garde la motivation, sans le nom actuel.
+    await ctx.db.delete(schema.hiveMember).where(eq(schema.hiveMember.userId, zoeId))
+    const gone = await removedLines(zoe)
+    expect(gone.lines).toEqual([
+      expect.objectContaining({ hive: { id: null, name: null, icon: 'leaf' } }),
+    ])
+    expect(gone.raw).not.toContain('Mésanges')
+    // Témoin : Max, invité, n'a rien écrit et ne reçoit rien.
+    expect((await removedLines(max)).lines).toEqual([])
+  })
+
+  it('tells the current animator too, with a way to rename the hive', async () => {
+    await removeName()
+    // L'animation passe à Malik après la décision : c'est lui qui peut renommer.
+    await hives.join(hiveId, { id: malikId })
+    await ctx.db.update(schema.hive).set({ animatorId: malikId }).where(eq(schema.hive.id, hiveId))
+
+    const expected = {
+      targetKind: 'hive',
+      hive: { id: hiveId, name: null, icon: 'leaf' },
+      ground: 'rules',
+      explanation: EXPLANATION,
+    }
+    expect((await removedLines(malik)).lines).toEqual([expect.objectContaining(expected)])
+    // Inès n'anime plus ; Zoé garde sa ligne à elle, une seule.
+    expect((await removedLines(ines)).lines).toEqual([])
+    expect((await removedLines(zoe)).lines).toEqual([
+      expect.objectContaining({ hive: { id: null, name: null, icon: 'leaf' } }),
+    ])
+
+    // Zoé anime à son tour : une seule ligne, celle qui permet de renommer.
+    await ctx.db.update(schema.hive).set({ animatorId: zoeId }).where(eq(schema.hive.id, hiveId))
+    expect((await removedLines(zoe)).lines).toEqual([expect.objectContaining(expected)])
+  })
+
+  it('tells the member who wrote the name that it is restored, and the animator, once each', async () => {
+    await removeName()
+    later()
+    await act.decide(louis, { action: 'restore', target: target(), part: { field: 'name' } })
+
+    for (const cookie of [zoe, ines]) {
+      const { items } = await notificationsOf(cookie)
+      expect(items.filter((item) => item.kind === 'removed')).toEqual([])
+      expect(items.filter((item) => item.kind === 'restored')).toEqual([
+        expect.objectContaining({
+          targetKind: 'hive',
+          hive: expect.objectContaining({ name: NAME, icon: 'leaf' }),
+          valueBack: true,
+        }),
+      ])
+    }
+    // Témoin : Max, invité, ne reçoit rien.
+    const maxItems = (await notificationsOf(max)).items
+    expect(maxItems.filter((item) => item.kind === 'restored')).toEqual([])
+  })
+})
