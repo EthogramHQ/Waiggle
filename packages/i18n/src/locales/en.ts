@@ -1570,13 +1570,9 @@ export const en: Translation = {
     memberSuspendedIndefinite: 'Account suspended until further notice',
     catalogueLinksLabel: 'The catalogue',
     toolsLink: 'Tools',
-    toolsLinkHint: 'Other tools to review, and the catalogue',
     categoriesLink: 'Categories',
-    categoriesLinkHint: 'Projects to sort, and the categories',
     catalogue: {
       title: 'Tools',
-      subtitle:
-        'Other tools typed by members, and the catalogue. Every change goes into “Recent changes”.',
       tabPending: 'To review',
       tabCatalogue: 'Catalogue',
       emptyPending: 'No other tool to review.',
@@ -1640,8 +1636,6 @@ export const en: Translation = {
     },
     categories: {
       title: 'Categories',
-      subtitle:
-        'Projects filed under “Other”, and the categories. Every change goes into “Recent changes”.',
       tabUncategorized: 'To sort',
       tabCategories: 'Categories',
       /** The tab group's name (ui-S3): it says the choice, not the page title. */
@@ -1704,7 +1698,6 @@ export const en: Translation = {
       },
       otherDetail: 'Always last · {{projects}}',
     },
-    subtitle: 'Members’ reports arrive here. Each decision goes into the history.',
     adminOnly: 'Admins only',
     pendingCount: 'To review ({{count}})',
     reportedTimes_one: 'Reported {{count}} time',
@@ -1775,7 +1768,6 @@ export const en: Translation = {
     recent: {
       title: 'History',
       phoneTitle: 'Recent decisions',
-      order: 'Most recent first',
       all: 'See the whole history',
       what: {
         project: 'a project',
