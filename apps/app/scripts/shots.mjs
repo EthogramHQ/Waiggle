@@ -87,6 +87,7 @@ import {
   myHivesAnimator,
   noHives,
   odileMemberPage,
+  papiJean,
   quizJeudi,
   readyPage,
 } from '../src/testing/hives.ts'
@@ -987,6 +988,39 @@ const reservedLaunchProject = {
 // prompt de départ où traîne une clé d'API (l'encadré « Clé : … » et « Retirer la clé »). La clé
 // est écrite en morceaux : un faux, mais à la forme connue, que l'analyse des secrets de GitHub
 // prendrait pour un vrai si elle était d'un seul tenant.
+// R10 : le nom de la ruche « Famille » (4 membres, animée par Papi Jean), signalé deux fois ; la
+// modération n'en voit que le nom, l'alvéole, l'animateur et le nombre de membres.
+const hiveNameReport = {
+  target: { kind: 'hive', id: familleId },
+  part: { field: 'name', mediaId: null, position: null },
+  context: null,
+  hive: { icon: 'house-line', animatorName: papiJean.name, memberCount: 4 },
+  contentCreatedAt: '2026-10-01T08:00:00.000Z',
+  projectId: null,
+  snapshot: [{ field: 'name', value: 'Famille' }],
+  images: [],
+  snapshotsDiffer: false,
+  state: 'present',
+  concernsMe: false,
+  reasons: [{ reason: 'harassment', count: 2 }],
+  details: [],
+  count: 2,
+  firstReportedAt: '2026-10-20T08:00:00.000Z',
+  lastReportedAt: '2026-10-20T09:00:00.000Z',
+  authorRecord: {
+    memberId: papiJean.id,
+    name: papiJean.name,
+    handle: 'papi_jean',
+    joinedAt: '2026-08-14T09:00:00.000Z',
+    projectCount: 1,
+    commentCount: 2,
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
+}
+
 const fakeApiKey = ['sk', '-proj-', 'Qm7Lr2Xv9TkB4sWn8JcY', '3pHd6FaZ1uE5gNoa91f'].join('')
 const skyProject = {
   ...recipesProject,
@@ -2122,6 +2156,7 @@ const newestFirst = (messages) => [...messages].reverse()
 // l'ouverture) ; 'part-removed', la 2e photo du projet aux photos de Léa est retirée seule (elle la
 // voit encore, avec « Retiré par la modération ») ; 'provisional', son pseudo a été retiré et
 // remplacé par un pseudo provisoire (la feuille « Choisir un pseudo », le bandeau de « Moi »).
+// R10 : `moderation: 'hive'` met en tête de la file le nom de « Famille », signalé deux fois.
 // `emailChoices` (R8) : les réglages d'e-mail de départ, 'default' (tout « Dans le récap »),
 // 'replies-now' (les réponses et mentions « Tout de suite ») ou 'recap-off' (récap coupé, les
 // commentaires « Tout de suite », les abonnés « Jamais »).
@@ -2798,6 +2833,22 @@ const fakeApi = (
           remainingToday,
         })
       }
+      // R10 : la ruche « Famille » que Léa signale (page signaler-ruche) ; l'animateur y est montré
+      // comme auteur, sa seule partie est le nom.
+      if (kind === 'hive' && id === familleId) {
+        return json(200, {
+          target: { kind: 'hive', id: familleId },
+          text: 'Famille',
+          projectId: null,
+          author: { id: papiJean.id, name: papiJean.name, handle: 'papi_jean', isBlocked: false },
+          head: { title: null, authorName: papiJean.name, image: null },
+          parts: [
+            { field: 'name', mediaId: null, position: null, thumb: null, reportedByMe: false },
+          ],
+          reportedByMe: false,
+          remainingToday,
+        })
+      }
       const comment = notMineComments.find((c) => c.id === id)
       if (kind !== 'comment' || !comment) {
         return json(404, { error: { code: 'not_found', message: '' } })
@@ -2843,7 +2894,10 @@ const fakeApi = (
     }
     if (pathname === '/v1/moderation/reports') {
       // R9 : la 2e photo de « Météo » en tête (une partie), puis la file d'avant.
-      const page = moderationQueuePageOf(moderationQueueR9)
+      // R10 (`moderation: 'hive'`) : le nom d'une ruche signalé, en tête (page moderation-ruche).
+      const page = moderationQueuePageOf(
+        moderation === 'hive' ? [hiveNameReport, ...moderationQueueR9] : moderationQueueR9,
+      )
       return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
     }
     if (pathname === '/v1/moderation/removed') {
@@ -3878,6 +3932,25 @@ const pages = [
       await page.waitForTimeout(800)
       await page.getByRole('button', { name: 'Bloquer', exact: true }).click()
       await page.getByText(/^Tu as aussi bloqué/).waitFor()
+    },
+  },
+  // R10 : signaler le nom d'une ruche (`/report?kind=hive&id=…`, ouvert par le menu de sa page) :
+  // « Quelle partie ? » propose « Toute la ruche » et « Le nom ».
+  {
+    name: 'signaler-ruche',
+    path: `/report?kind=hive&id=${familleId}`,
+    signedIn: true,
+  },
+  // R10 : le détail du nom d'une ruche signalé, pour la modération : alvéole, membres, animateur.
+  {
+    name: 'moderation-ruche',
+    path: `/moderation?item=hive:${familleId}:name`,
+    signedIn: true,
+    admin: true,
+    moderation: 'hive',
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('img', { name: 'Ruche Famille' }).waitFor()
     },
   },
   {

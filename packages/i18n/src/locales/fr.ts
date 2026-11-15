@@ -1806,6 +1806,10 @@ export const fr = {
     // Le détail d'un signalement (la colonne du milieu, ou sa page sur téléphone).
     detail: {
       commentOn: 'Un commentaire sur {{title}}',
+      // R10 : le nom d'une ruche signalé (le titre n'a pas de projet à citer), puis ce que la
+      // modération voit d'elle en plus du nom : « 4 membres, animée par Papi Jean ».
+      hiveName: 'Le nom d’une ruche',
+      hiveLine: '{{members}}, animée par {{name}}',
       partOf: '{{part}} de {{title}}',
       seeInContext: 'Voir en contexte',
       firstReport: 'Premier signalement',
