@@ -313,7 +313,6 @@ export const fr = {
     },
     signIn: {
       title: 'Te revoilà',
-      subtitle: 'Connecte-toi pour retrouver les projets de tes proches.',
       submit: 'Me connecter',
       noAccount: 'Pas encore de compte ?',
       createOne: 'Créer un compte',
@@ -360,7 +359,6 @@ export const fr = {
       // R2 (D4, relecture juridique B1) : après une correction d'adresse, rien n'affirme l'envoi.
       bodyChanged:
         'Si {{email}} n’est pas déjà utilisée, un lien d’activation vient d’y partir. Ouvre-le pour activer ton compte : la connexion se fait directement.',
-      locked: 'Tant que tu n’as pas ouvert ce lien, tu ne peux pas te connecter.',
       expires:
         'Sans vérification dans les {{days}} jours qui suivent l’inscription, elle est effacée.',
       back: 'Retour à la connexion',
@@ -608,18 +606,6 @@ export const fr = {
       account: 'Compte',
       about: 'À propos',
       moderation: 'Modération',
-    },
-    // Ce que contient chaque rubrique, sous son nom dans la liste du téléphone.
-    hints: {
-      profile: 'Photo, nom, pseudo et présentation',
-      notifications: 'Les e‑mails que tu reçois',
-      language: 'Celle de l’appli et de tes e‑mails',
-      appearance: 'Jour, nuit ou automatique',
-      data: 'Télécharger tes données',
-      security: 'Mot de passe, membres bloqués',
-      account: 'Adresse e‑mail, déconnexion, suppression',
-      about: 'Le code source et sa licence',
-      moderation: 'Les signalements à traiter',
     },
     // Rubrique « Sécurité » : changer son mot de passe.
     changePassword: {

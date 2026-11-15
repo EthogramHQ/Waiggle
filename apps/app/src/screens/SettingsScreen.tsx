@@ -93,7 +93,6 @@ export function SettingsScreen({ section }: Props) {
       icon,
       href,
       label: label(key),
-      hint: t(($) => $.settings.hints[key]),
     }))
 
   // Le profil ne se charge pas : la page le dit en tête, et tout le reste reste utilisable.

@@ -262,7 +262,6 @@ export const en: Translation = {
     },
     signIn: {
       title: 'Welcome back',
-      subtitle: 'Sign in to find the projects of the people close to you.',
       submit: 'Sign in',
       noAccount: 'No account yet?',
       createOne: 'Create an account',
@@ -300,7 +299,6 @@ export const en: Translation = {
       bodyNoEmail: 'We sent you a link by email. Click it to activate your account.',
       bodyChanged:
         'If {{email}} is not already in use, an activation link has just been sent to it. Open it to activate your account: you will be signed in directly.',
-      locked: 'Until you open this link, you cannot sign in.',
       expires: 'Without verification within {{days}} days of signing up, the sign-up is deleted.',
       back: 'Back to sign in',
       openMailbox: 'Open my mailbox',
@@ -500,17 +498,6 @@ export const en: Translation = {
       account: 'Account',
       about: 'About',
       moderation: 'Moderation',
-    },
-    hints: {
-      profile: 'Photo, name, handle and bio',
-      notifications: 'The emails you receive',
-      language: 'For the app and your emails',
-      appearance: 'Day, night or automatic',
-      data: 'Download your data',
-      security: 'Password, blocked members',
-      account: 'Email address, sign out, deletion',
-      about: 'The source code and its licence',
-      moderation: 'Reports awaiting a decision',
     },
     changePassword: {
       title: 'Change my password',
