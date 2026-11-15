@@ -11,7 +11,8 @@
 # (la rotation, plus bas, s'appuie sur ce format exact : date_heure-étiquette)
 # Ils ne sont lisibles que par leur propriétaire : ils contiennent les données des membres.
 #
-# Rotation automatique : 14 jours de sauvegardes quotidiennes, les 5 dernières des autres.
+# Rotation automatique : 14 jours de sauvegardes quotidiennes ; pour les autres étiquettes, les 5
+# dernières et jamais plus de 30 jours (les fichiers refus-*.txt aussi).
 # C'est le seul endroit où des sauvegardes sont effacées.
 set -euo pipefail
 # shellcheck source=infra/lib.sh
@@ -51,6 +52,15 @@ main() {
   # Les noms complets (date_heure-étiquette) : « deploi » ne doit pas toucher « avant-deploi ».
   local stamp='????-??-??_??????'
   find "$RUCHE_BACKUPS" -maxdepth 1 -type f -name "$stamp-quotidien.*" -mtime +13 -print -delete
+  # Toute sauvegarde d'une autre étiquette (avant-deploi, avant-restauration, manuel…) de plus de
+  # 29 jours part aussi, à chaque passage, la quotidienne comprise (R11, relecture de sécurité
+  # S-C5) : sans cela, une sauvegarde « avant-restauration » garderait des données de membres
+  # effacés bien au-delà de la durée annoncée. -mtime +29 : 30 jours pleins ou plus. Le « ! -name »
+  # exclut les quotidiennes, déjà traitées plus haut avec leur propre borne.
+  find "$RUCHE_BACKUPS" -maxdepth 1 -type f -name "$stamp-*" ! -name "$stamp-quotidien.*" -mtime +29 -print -delete
+  # Les fichiers « refus-*.txt » (écrits lors d'une restauration : des identifiants de membres)
+  # suivent la même borne.
+  find "$RUCHE_BACKUPS" -maxdepth 1 -type f -name 'refus-*.txt' -mtime +29 -print -delete
   # Les autres (avant-deploi, avant-restauration…) : on garde les 5 dernières de chaque étiquette.
   if [ "$label" != quotidien ]; then
     find "$RUCHE_BACKUPS" -maxdepth 1 -type f -name "$stamp-$label.db.dump" -printf '%f\n' |
