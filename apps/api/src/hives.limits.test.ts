@@ -10,7 +10,9 @@
 //
 // Statuts choisis ici, que le plan ne fixait pas : 409 pour les trois limites de taille (`hive_full`,
 // `hives_created_limit`, `hives_joined_limit`), comme les autres conflits d'état ; 429
-// `rate_limited` pour les invitations du jour et le compteur des écritures, comme tout quota.
+// `rate_limited` pour le compteur des écritures, comme tout quota. Les invitations du jour ont leur
+// code, `hive_invitations_limited` (relecture du design de R10 : « Réessaie dans quelques minutes »
+// était faux pour un quota de 24 h).
 import { randomUUID } from 'node:crypto'
 import { ErrorResponse, HIVE_LIMITS } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -200,7 +202,7 @@ describe('the quotas', () => {
     await expectError(
       await inviteRaw(famille.id, ines.cookie, invitees[20]?.id ?? ''),
       429,
-      'rate_limited',
+      'hive_invitations_limited',
     )
     // Le quota est celui d'Inès, pas de la ruche : Léa, membre, invite encore.
     later()

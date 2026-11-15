@@ -2072,6 +2072,8 @@ export const en: Translation = {
       // Places left in the hive: 50 at most, pending invitations included.
       placesLeft_one: '{{count}} place left in the hive.',
       placesLeft_other: '{{count}} places left in the hive.',
+      dailyLimit:
+        'You have sent your {{count}} invitations for today: the next ones can go tomorrow.',
       // Under 3 letters, only followed members and members of one's hives.
       shortQuery: 'From 3 letters on, you also find the other members of {{appName}}.',
       // 404: unknown member, or a block between the two (the API says the same).
@@ -2823,6 +2825,8 @@ export const en: Translation = {
     alreadyHiveMember: 'This member is already in the hive.',
     alreadyInvited: 'This member already has an invitation to this hive.',
     invitationExpired: 'This invitation is no longer valid.',
+    hiveInvitationsLimited:
+      'You have sent all your invitations for today: the next ones can go tomorrow.',
     pinNotVisible: 'This project can’t be pinned: not the whole hive can see it.',
   },
 }

@@ -2457,6 +2457,10 @@ export const fr = {
       // Les places qui restent dans la ruche : 50 au plus, invitations en attente comprises.
       placesLeft_one: 'Encore {{count}} place dans la ruche.',
       placesLeft_other: 'Encore {{count}} places dans la ruche.',
+      // Relecture du design de R10 : le quota court sur 24 h ; {{count}}, celui du contrat
+      // (HIVE_LIMITS.invitationsPerDay).
+      dailyLimit:
+        'Tu as envoyé tes {{count}} invitations du jour : les suivantes pourront partir demain.',
       // Sous 3 lettres, seulement les membres suivis et ceux de ses ruches (relecture du plan, A3).
       shortQuery: 'À partir de 3 lettres, tu trouves aussi les autres membres de {{appName}}.',
       // 404 : un membre inconnu, ou un blocage entre les deux (l'API répond pareil).
@@ -3367,6 +3371,9 @@ export const fr = {
     alreadyHiveMember: 'Ce membre fait déjà partie de la ruche.',
     alreadyInvited: 'Ce membre a déjà une invitation dans cette ruche.',
     invitationExpired: 'Cette invitation n’est plus valable.',
+    // Relecture du design de R10 : la 21e invitation du jour (`hive_invitations_limited`).
+    hiveInvitationsLimited:
+      'Tu as envoyé toutes tes invitations du jour : les suivantes pourront partir demain.',
     pinNotVisible: 'Ce projet ne peut pas être épinglé : toute la ruche ne peut pas le voir.',
   },
 } as const

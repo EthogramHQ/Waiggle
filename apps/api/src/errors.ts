@@ -66,6 +66,8 @@ const errorMessages = {
   already_invited: 'alreadyInvited',
   invitation_expired: 'invitationExpired',
   pin_not_visible: 'pinNotVisible',
+  // Relecture du design de R10 : le quota des invitations du jour a son propre message (« demain »).
+  hive_invitations_limited: 'hiveInvitationsLimited',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

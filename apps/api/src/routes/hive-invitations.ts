@@ -103,7 +103,9 @@ const inviteRoute = createRoute({
     403: errorResponse('The animator keeps invitations to themselves, or a suspended account.'),
     404: errorResponse('No such hive for this member, or no such member to invite.'),
     409: errorResponse('`already_hive_member`, `already_invited` or `hive_full`.'),
-    429: errorResponse('Too many invitations today.'),
+    429: errorResponse(
+      'Twenty invitations sent in the last 24 hours (`hive_invitations_limited`).',
+    ),
   },
 })
 
@@ -150,21 +152,25 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
 
   const unauthorized = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'unauthorized'), 401)
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
-  const tooMany = (c: Context<AppEnv>, decision: RateDecision) => {
+  // Deux codes pour un même 429 (relecture du design de R10) : `hive_invitations_limited` pour les
+  // 20 invitations du jour (l'appli dit « demain »), `rate_limited` pour les autres quotas, à
+  // l'heure (« dans quelques minutes »).
+  type QuotaCode = 'rate_limited' | 'hive_invitations_limited'
+  const tooMany = (c: Context<AppEnv>, decision: RateDecision, code: QuotaCode) => {
     if (!decision.allowed) c.header('Retry-After', String(decision.retryAfterSeconds))
-    return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+    return c.json(errorBody(languageOf(c), code), 429)
   }
 
   // Les quotas, posés AVANT la vérification de la demande (que Hono place juste avant la route) :
   // chaque demande compte, même mal écrite. Un « middleware » est une fonction qui passe avant la
   // route, et peut répondre à sa place.
   const quota =
-    (hit: (userId: string) => Promise<RateDecision>) =>
+    (hit: (userId: string) => Promise<RateDecision>, code: QuotaCode = 'rate_limited') =>
     async (c: Context<AppEnv>, next: () => Promise<void>) => {
       const user = c.get('user')
       if (!user) return unauthorized(c)
       const decision = await hit(user.id)
-      if (!decision.allowed) return tooMany(c, decision)
+      if (!decision.allowed) return tooMany(c, decision, code)
       await next()
     }
   app.on(
@@ -175,7 +181,10 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   app.on(
     'POST',
     '/v1/hives/:id/invitations',
-    quota((userId) => limiter.hit(memberCounterKeys(userId).hiveInvitations, invitationRule)),
+    quota(
+      (userId) => limiter.hit(memberCounterKeys(userId).hiveInvitations, invitationRule),
+      'hive_invitations_limited',
+    ),
   )
   const writes = quota((userId) => limiter.hit(memberCounterKeys(userId).hiveWrite, writeRule))
   app.on('POST', '/v1/hive-invitations/:id/accept', writes)

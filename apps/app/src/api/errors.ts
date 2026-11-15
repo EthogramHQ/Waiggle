@@ -62,6 +62,8 @@ export type ApiErrorKey =
   | 'alreadyInvited'
   | 'invitationExpired'
   | 'pinNotVisible'
+  // Relecture du design de R10 : les 20 invitations du jour sont parties (« demain »).
+  | 'hiveInvitationsLimited'
   | 'internal'
   | 'network'
 
@@ -163,6 +165,9 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   already_invited: 'alreadyInvited',
   invitation_expired: 'invitationExpired',
   pin_not_visible: 'pinNotVisible',
+  // Relecture du design de R10 : un 429 de plus, le quota des invitations du jour, qui a son propre
+  // message (« demain », pas « dans quelques minutes »).
+  hive_invitations_limited: 'hiveInvitationsLimited',
   // Tranche R7b : le quota des appels d'un projet (429) a le message de « trop de demandes » ; son
   // code est lu à part (`projectLimit`).
   project_calls_limited: 'rateLimited',

@@ -83,6 +83,9 @@ export const ErrorCode = z.enum([
   'already_invited',
   'invitation_expired',
   'pin_not_visible',
+  // Relecture du design de R10 : la 21e invitation du jour (429). Le quota court sur 24 h : l'appli
+  // dit « demain », pas « dans quelques minutes » comme pour `rate_limited`.
+  'hive_invitations_limited',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>
