@@ -80,12 +80,13 @@ const expectOpen = async (pathname: string) => {
   // Témoin : le profil (non accepté) est arrivé dans le cache.
   await waitFor(() => expect(view.queryClient.getQueryData(meQueryKey)).toBeTruthy())
   expect({ pathname, gated: rulesShown() }).toEqual({ pathname, gated: false })
-  view.unmount()
+  // Avec RNTL 14, démonter est asynchrone : sans `await`, le rendu suivant chevauche son `act`.
+  await view.unmount()
 }
 const expectGated = async (pathname: string) => {
   const view = await showAt(pathname)
   expect(await screen.findByRole('header', { name: title })).toBeTruthy()
-  view.unmount()
+  await view.unmount()
 }
 
 beforeEach(() => {
