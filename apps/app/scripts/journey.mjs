@@ -13,8 +13,11 @@
 // appareil est déconnecté. Puis le projet devient privé, est supprimé. Tranche R10 (« Ruches ») :
 // Léa crée la ruche « Famille » et y invite Sam, qui la rejoint ; Léa publie un projet réservé à la
 // ruche, que Sam voit (Actualité, Projets, Fil) et que Malik, hors de la ruche, ne trouve nulle part ;
-// Sam quitte la ruche, puis Léa (la dernière) : le projet redevient privé. Enfin le compte de Léa est
-// supprimé. À chaque
+// Sam quitte la ruche, puis Léa (la dernière) : le projet redevient privé. Tranche R11 (« La
+// conformité ») : Max lit les Règles depuis l'accueil avant de s'inscrire (refusé sans les deux cases,
+// accepté avec) ; Inès, dont l'accord aux règles manque, voit l'écran « Accepter », coche, et
+// retrouve son Fil ; Léa supprime depuis « Mes commentaires » un commentaire sur un projet devenu
+// privé. Enfin le compte de Léa est supprimé. À chaque
 // étape, on vérifie ce que voit chacun (le membre, l'autre membre, une personne sans compte) et ce
 // qui reste sur le disque du serveur.
 //
@@ -29,6 +32,11 @@
 //                        modération, son adresse ajoutée à la fin (infra/grant-admin.sh sur la
 //                        pile d'essai). Sans elle, la base doit le faire seule : le parcours local
 //                        (journey-local.mjs) prépare la sienne pour le compte « admin-… » ;
+//   JOURNEY_FORGET_RULES_CMD  (facultatif, R11) une commande qui efface l'accord aux règles d'un
+//                        membre, son adresse ajoutée à la fin : c'est ainsi qu'Inès « a oublié
+//                        d'accepter ». Sans elle, le parcours local la remplace par un déclencheur de
+//                        sa base (JOURNEY_RULES_TRIGGER=1, posé par journey-local.mjs) ; sans l'un ni
+//                        l'autre, cette étape est passée, et le dit ;
 //   JOURNEY_SHELL        (facultatif) le shell de ces commandes (par défaut celui du système).
 // La pile d'essai (infra/stack-test.sh) le lance sur https://ruche.localhost. Jamais sur le vrai site :
 // il crée des comptes, et le vrai site n'écrit pas ses e-mails dans les logs.
@@ -43,6 +51,14 @@ const mailCommand = process.env.JOURNEY_MAIL_CMD
 const mediaCommand = process.env.JOURNEY_MEDIA_CMD
 const shell = process.env.JOURNEY_SHELL
 const adminCommand = process.env.JOURNEY_ADMIN_CMD
+// R11 : un membre dont l'accord aux règles manque (le cas d'un membre inscrit avant leur arrivée).
+// Aucune route de l'API ne retire un accord : soit une commande l'efface dans la base une fois
+// l'inscription faite, soit la base elle-même ne l'écrit pas (le parcours local pose un
+// déclencheur, journey-local.mjs). Ni l'une ni l'autre : cette partie du parcours est passée, et
+// elle le dit.
+const forgetRulesCommand = process.env.JOURNEY_FORGET_RULES_CMD
+const rulesDroppedByDatabase = process.env.JOURNEY_RULES_TRIGGER === '1'
+const canForgetRules = Boolean(forgetRulesCommand) || rulesDroppedByDatabase
 if (!appUrl?.startsWith('http') || !apiUrl?.startsWith('http') || !mailCommand) {
   console.error(
     'Usage : JOURNEY_MAIL_CMD=… node apps/app/scripts/journey.mjs <adresse de l’appli> <adresse de l’API>',
@@ -252,16 +268,26 @@ const pick = async (page, button, file) => {
   await chooser.setFiles(file)
 }
 
+/** Efface l'accord aux règles de cette adresse, quand c'est une commande qui le fait (la pile d'essai). */
+const forgetAgreement = async (email) => {
+  if (forgetRulesCommand) execSync(`${forgetRulesCommand} ${email}`, { shell, stdio: 'inherit' })
+}
+
 const password = `parcours-${randomBytes(8).toString('hex')}`
 /**
  * S'inscrire, puis ouvrir le lien de vérification. Avec `resend` (tranche R2), la personne touche
  * d'abord « Renvoyer l'e-mail » sur « Vérifie ta boîte mail », et c'est le lien renvoyé qui active
  * son compte.
  */
-const signUp = async (someone, name, { resend = false } = {}) => {
+const signUp = async (
+  someone,
+  name,
+  { resend = false, refusedFirst = false, onPage = false, forgetRules = false } = {},
+) => {
   const email = `${name.toLowerCase()}-${randomBytes(4).toString('hex')}@example.com`
   const { page } = someone
-  await open(page, `${appUrl}/sign-up`)
+  // `onPage` : la personne est déjà sur « Créer un compte » (elle y est venue de l'accueil).
+  if (!onPage) await open(page, `${appUrl}/sign-up`)
   await page.getByLabel('Nom affiché', { exact: true }).fill(name)
   await page.getByLabel('Adresse e‑mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
@@ -271,11 +297,48 @@ const signUp = async (someone, name, { resend = false } = {}) => {
   // (table rules_acceptance, version en vigueur), si bien que chaque membre du parcours a le sien.
   // Noms lus par expression régulière : l'apostrophe typographique (’) et une précision ajoutée
   // au nom lu ne font pas échouer le parcours loin de sa cause.
-  await byRole(page, 'checkbox', /^J.accepte les règles de /).click()
-  await byRole(page, 'checkbox', /^J.ai 15 ans ou plus/).click()
+  const rulesBox = byRole(page, 'checkbox', /^J.accepte les règles de /)
+  const ageBox = byRole(page, 'checkbox', /^J.ai 15 ans ou plus/)
   // R2 : sur ordinateur, « Créer un compte » est l'onglet ; le bouton dit « Créer mon compte ».
-  await byRole(page, 'button', 'Créer mon compte').click()
+  const submit = byRole(page, 'button', 'Créer mon compte')
+  if (refusedFirst) {
+    // R11 : sans case cochée, le formulaire refuse et dit ce qui manque (rien ne part) ; avec la
+    // seule case des règles, il dit qu'il manque l'âge. Les espaces avant « : » sont insécables,
+    // d'où `\s`.
+    await submit.click()
+    await page
+      .getByText(/^Il manque deux choses\s*: ton accord aux règles et ton âge\.$/)
+      .filter({ visible: true })
+      .first()
+      .waitFor()
+    expectEqual('page après le refus sans case', new URL(page.url()).pathname, '/sign-up')
+    await rulesBox.click()
+    await submit.click()
+    await page
+      .getByText(/^Il manque une chose\s*: ton âge\.$/)
+      .filter({ visible: true })
+      .first()
+      .waitFor()
+    expectEqual('page après le refus sans l’âge', new URL(page.url()).pathname, '/sign-up')
+    // Le formulaire n'est pas la seule barrière : l'API, appelée sans les deux accords, refuse
+    // aussi (le contrôle de l'écran n'est qu'un confort), et aucun e-mail ne part. Une seule
+    // demande : l'inscription est limitée à 10 par heure et par adresse IP en production.
+    const refused = await someone.request.post(`${apiUrl}/api/auth/sign-up/email`, {
+      headers: { Origin: appUrl },
+      data: { name, email, password, inviteCode, language: 'fr' },
+    })
+    expectEqual('inscription sans accord, par l’API', refused.status(), 400)
+    expectEqual('code du refus', (await refused.json()).code, 'RULES_NOT_ACCEPTED')
+    expectEqual('e-mails envoyés après le refus', mailsTo(email).length, 0)
+    await ageBox.click() // reste l'âge : la case des règles est déjà cochée
+  } else {
+    await rulesBox.click()
+    await ageBox.click()
+  }
+  await submit.click()
   await page.waitForURL(/\/check-email/)
+  // `forgetRules` : l'accord que l'inscription vient d'écrire est effacé (voir `forgetAgreement`).
+  if (forgetRules) await forgetAgreement(email)
   // Le lien connecte au compte, puis mène à la page « Adresse vérifiée ».
   let link = await verificationLink(email)
   if (resend) {
@@ -292,7 +355,14 @@ const signUp = async (someone, name, { resend = false } = {}) => {
     console.log(`  ok : ${name} a reçu un second lien de vérification`)
   }
   await open(page, link)
-  await page.getByText('Adresse vérifiée').waitFor()
+  if (forgetRules) {
+    // Sans accord, l'écran « Accepter » passe au-dessus de la page « Adresse vérifiée » : on lit
+    // la vérification dans l'API plutôt qu'à l'écran.
+    await waitFor(
+      `adresse de ${name} vérifiée`,
+      async () => (await (await someone.request.get(`${apiUrl}/v1/me`)).json()).emailVerified,
+    )
+  } else await page.getByText('Adresse vérifiée').waitFor()
   console.log(`  ok : ${name} inscrite et vérifiée${resend ? ' par le lien renvoyé' : ''}`)
   return { email, link }
 }
@@ -336,8 +406,90 @@ const malik = await person('Malik')
 const admin = await person('Admin')
 // Tranche 7c : Karim, que l'administrateur suspend 7 jours, puis dont il lève la suspension.
 const karim = await person('Karim')
+// Tranche R11 (« La conformité ») : Max lit les règles avant de s'inscrire ; Inès, dont l'accord
+// manque, doit l'écrire avant de retrouver son Fil.
+const max = await person('Max')
+const ines = await person('Ines')
 
 try {
+  // --- Tranche R11 : les règles, avant et après l'inscription. ---
+  step('Max lit les Règles depuis l’accueil, puis revient et touche « Créer un compte »')
+  await open(max.page, `${appUrl}/`)
+  // Le pied de l'accueil : une navigation nommée, dont « Règles » est un lien (sans compte).
+  const footer = byRole(max.page, 'navigation', 'Les pages de Waiggle')
+  await byRole(footer, 'link', 'Règles').click()
+  await max.page.waitForURL((url) => url.pathname === '/rules')
+  await byRole(max.page, 'heading', 'Les règles de Waiggle', { level: 1 }).waitFor()
+  // La date de version, et l'« En bref » : de quoi lire ce qu'il va accepter.
+  await max.page
+    .getByText(/^Version du /)
+    .first()
+    .waitFor()
+  await byRole(max.page, 'heading', 'En bref').first().waitFor()
+  console.log('  ok : Max lit les règles sans compte, avec leur version et leur « En bref »')
+  await max.page.goBack()
+  await max.page.waitForURL((url) => url.pathname === '/')
+  await byRole(max.page, 'button', 'Créer un compte').click()
+  await max.page.waitForURL((url) => url.pathname === '/sign-up')
+  console.log('  ok : Max revient à l’accueil, puis à « Créer un compte »')
+
+  step('Max crée son compte : refusé sans les deux cases, accepté avec')
+  await signUp(max, 'Max', { refusedFirst: true, onPage: true })
+  const maxRules = await (await max.request.get(`${apiUrl}/v1/me`)).json()
+  expectEqual('accord de Max, écrit à l’inscription', maxRules.rulesAccepted, true)
+
+  step(
+    'Inès, dont l’accord aux règles manque, voit l’écran « Accepter » ; elle coche et retrouve son Fil',
+  )
+  if (!canForgetRules) {
+    console.log(
+      '  (étape passée : ni JOURNEY_FORGET_RULES_CMD ni le déclencheur du parcours local ne retirent son accord)',
+    )
+  } else {
+    // Inscrite avec les deux cases, mais sans la ligne d'accord (base ou commande, voir plus haut).
+    await signUp(ines, 'Ines', { forgetRules: true })
+    const inesBefore = await (await ines.request.get(`${apiUrl}/v1/me`)).json()
+    expectEqual('accord d’Inès avant l’écran', inesBefore.rulesAccepted, false)
+    // L'écran « Accepter » passe au-dessus de la page ouverte : le titre des règles, en niveau 1.
+    await open(ines.page, `${appUrl}/`)
+    await byRole(ines.page, 'heading', 'Les règles de Waiggle', { level: 1 }).waitFor()
+    // Ses écritures sont refusées par l'API tant qu'elle n'a pas accepté (403, avant tout le reste).
+    const blocked = await ines.request.post(`${apiUrl}/v1/projects`, {
+      headers: { Origin: appUrl },
+      data: {},
+    })
+    expectEqual('écriture d’Inès sans accord', blocked.status(), 403)
+    // « Continuer » sans case dit ce qui manque ; rien ne part.
+    await byRole(ines.page, 'button', 'Continuer').click()
+    await ines.page
+      .getByText(/^Il manque deux choses\s*: ton accord aux règles et ton âge\.$/)
+      .filter({ visible: true })
+      .first()
+      .waitFor()
+    expectEqual(
+      'accord d’Inès après « Continuer » sans case',
+      (await (await ines.request.get(`${apiUrl}/v1/me`)).json()).rulesAccepted,
+      false,
+    )
+    await byRole(ines.page, 'checkbox', /^J.accepte les règles de /).click()
+    await byRole(ines.page, 'checkbox', /^J.ai 15 ans ou plus/).click()
+    await byRole(ines.page, 'button', 'Continuer').click()
+    // L'écran s'efface de lui-même ; l'API garde l'accord, et le Fil l'accueille.
+    await byRole(ines.page, 'heading', 'Les règles de Waiggle', { level: 1 }).waitFor({
+      state: 'hidden',
+    })
+    await waitFor(
+      'accord d’Inès enregistré',
+      async () => (await (await ines.request.get(`${apiUrl}/v1/me`)).json()).rulesAccepted === true,
+    )
+    await open(ines.page, `${appUrl}/`)
+    await ines.page
+      .getByText(/^Bonjour Ines\s*!$/)
+      .first()
+      .waitFor()
+    console.log('  ok : Inès a accepté les règles et retrouve son Fil')
+  }
+
   step('Deux personnes s’inscrivent avec le code d’invitation, et vérifient leur adresse')
   const leaSignUp = await signUp(lea, 'Lea')
   // Tranche R2 : Sam ne trouve pas le premier e-mail ; il en demande un autre, qui active son compte.
@@ -545,8 +697,13 @@ try {
     'Sam ne suit personne : son fil l’attend ; il lit le pseudo de Léa et la suit depuis sa page',
   )
   await open(sam.page, `${appUrl}/`)
-  // R4 (F-Fil9) : le premier lancement accueille au lieu de constater un vide.
-  await sam.page.getByText('Ton fil t’attend').waitFor()
+  // R4 (F-Fil9) : le premier lancement accueille au lieu de constater un vide. R11 (« Moins de
+  // mots ») : le salut « Bonjour Sam ! » est le titre de cette section (l'espace avant « ! » est
+  // insécable, d'où `\s`).
+  await sam.page
+    .getByText(/^Bonjour Sam\s*!$/)
+    .first()
+    .waitFor()
   await open(sam.page, `${appUrl}/members/${me.id}`)
   await sam.page.getByText(`@${handle}`, { exact: true }).waitFor()
   await byRole(sam.page, 'switch', 'Suivre Lea').click()
@@ -962,7 +1119,7 @@ try {
   await sam.page.getByLabel('Titre').fill(samProject)
   await sam.page.getByLabel('En une phrase').fill('Il range mes essais de prompts.')
   await chooseCategory(sam.page, 'Code et outils')
-  await publishToFeed(sam.page)
+  const samProjectId = await publishToFeed(sam.page)
   await signUp(malik, 'Malik')
   /**
    * R3 : « Découvrir » est devenu « Récents », dans l'onglet Explorer. On attend le projet de Léa
@@ -1697,6 +1854,69 @@ try {
   expectEqual('projet redevenu privé, pour Sam', await statusFor(sam, hiveProjectUrl), 404)
   console.log('  ok : le projet est privé, jamais « Membres »')
 
+  // --- Tranche R11 : « Mes commentaires ». Léa commente le projet de Sam ; Sam le passe en privé :
+  // Léa ne le voit plus, et son commentaire y reste, sans qu'elle puisse l'ouvrir. Elle le supprime
+  // depuis ses réglages (« Mes données », « Mes commentaires »). ---
+  step('Léa commente le projet de Sam ; Sam le passe en privé : Léa ne le voit plus')
+  const leaRemark = 'Joli carnet, merci de l’avoir partagé.'
+  await open(lea.page, `${appUrl}/projects/${samProjectId}`)
+  await lea.page.getByRole('combobox', { name: 'Écrire un commentaire' }).fill(leaRemark)
+  await byRole(lea.page, 'button', 'Envoyer le commentaire').click()
+  await shownText(lea.page, leaRemark).waitFor()
+  await waitFor(
+    'commentaire de Léa enregistré',
+    async () => (await readProject(sam, samProjectId)).commentCount === 1,
+  )
+  await open(sam.page, `${appUrl}/projects/${samProjectId}/edit`)
+  await byRole(sam.page, 'radio', 'Privé').click()
+  await byRole(sam.page, 'button', 'Enregistrer').last().click()
+  await sam.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
+  expectEqual(
+    'visibilité du projet de Sam',
+    (await readProject(sam, samProjectId)).visibility,
+    'private',
+  )
+  expectEqual(
+    'projet de Sam devenu privé, pour Léa',
+    await statusFor(lea, `${apiUrl}/v1/projects/${samProjectId}`),
+    404,
+  )
+  await open(lea.page, `${appUrl}/projects/${samProjectId}`)
+  await lea.page.getByText('Ce projet est introuvable').waitFor()
+  console.log('  ok : le projet de Sam est introuvable pour Léa')
+
+  step(
+    'Léa supprime son commentaire depuis « Mes commentaires », sur un projet qu’elle ne voit plus',
+  )
+  await openSettings(lea, 'Mes données', '/settings/data')
+  await byRole(lea.page, 'link', /^Mes commentaires/).click()
+  await lea.page.waitForURL((url) => url.pathname === '/settings/data/comments')
+  // La ligne ne nomme pas le projet : « Projet qui n'est plus visible », sans lien pour l'ouvrir.
+  await lea.page.getByText('Projet qui n’est plus visible').first().waitFor()
+  await shownText(lea.page, leaRemark).waitFor()
+  const removeRemark = byRole(lea.page, 'button', /^Supprimer le commentaire\s*: /)
+  expectEqual('commentaires de Léa, à l’écran', await removeRemark.count(), 1)
+  await removeRemark.click()
+  // La fenêtre de confirmation ignore les tapes de ses 600 premières ms (garde de double tape).
+  const removeRemarkDialog = lea.page.getByRole('dialog')
+  await removeRemarkDialog.waitFor()
+  await lea.page.waitForTimeout(800)
+  await byRole(removeRemarkDialog, 'button', 'Supprimer', { exact: true }).click()
+  // Sa seule ligne partie, la page dit qu'il ne reste rien ; l'API ne le liste plus.
+  await lea.page.getByText('Tu n’as encore écrit aucun commentaire.').waitFor()
+  expectEqual('ligne supprimée, à l’écran', await removeRemark.count(), 0)
+  await waitFor('liste des commentaires de Léa vidée, dans l’API', async () => {
+    const { items } = await (await lea.request.get(`${apiUrl}/v1/me/comments`)).json()
+    return !items.some((item) => item.body === leaRemark)
+  })
+  // Sam, l'auteur du projet, ne le lit plus non plus.
+  expectEqual(
+    'commentaires du projet de Sam',
+    (await readProject(sam, samProjectId)).commentCount,
+    0,
+  )
+  console.log('  ok : Léa a supprimé son commentaire, sur un projet qu’elle ne voit plus')
+
   step('Léa supprime son compte : son avatar disparaît du disque')
   // R2 : depuis la rubrique « Compte », une feuille posée sur les réglages
   // (/settings/account/delete), avec le mot de passe choisi dans la rubrique « Sécurité ».
@@ -1711,7 +1931,7 @@ try {
 } catch (error) {
   // Une capture de chaque navigateur, et le texte qu'il affiche : de quoi comprendre où le
   // parcours s'est arrêté, même sans ouvrir les captures (gardées par la CI).
-  for (const [who, someone] of Object.entries({ lea, sam, malik, admin, karim })) {
+  for (const [who, someone] of Object.entries({ lea, sam, malik, admin, karim, max, ines })) {
     await someone.page.screenshot({ path: `journey-${who}.png`, fullPage: true }).catch(() => {})
     const text = await someone.page
       .locator('body')
