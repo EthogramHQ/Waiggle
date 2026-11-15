@@ -2442,6 +2442,16 @@ export const fr = {
       previewTitle: 'Ce que reçoit {{name}}',
       previewTitleAnyone: 'Ce que reçoit la personne invitée',
       close: 'Fermer',
+      // Les places qui restent dans la ruche : 50 au plus, invitations en attente comprises.
+      placesLeft_one: 'Encore {{count}} place dans la ruche.',
+      placesLeft_other: 'Encore {{count}} places dans la ruche.',
+      // Sous 3 lettres, seulement les membres suivis et ceux de ses ruches (relecture du plan, A3).
+      shortQuery: 'À partir de 3 lettres, tu trouves aussi les autres membres de {{appName}}.',
+      // 404 : un membre inconnu, ou un blocage entre les deux (l'API répond pareil).
+      notFound: 'Ce membre ne peut pas être invité.',
+      // Le nombre de résultats, lu après chaque recherche.
+      results_one: '{{count}} membre trouvé',
+      results_other: '{{count}} membres trouvés',
     },
     settings: {
       title: 'Réglages de la ruche',

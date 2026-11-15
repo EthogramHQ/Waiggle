@@ -2063,6 +2063,16 @@ export const en: Translation = {
       previewTitle: 'What {{name}} receives',
       previewTitleAnyone: 'What the invited person receives',
       close: 'Close',
+      // Places left in the hive: 50 at most, pending invitations included.
+      placesLeft_one: '{{count}} place left in the hive.',
+      placesLeft_other: '{{count}} places left in the hive.',
+      // Under 3 letters, only followed members and members of one's hives.
+      shortQuery: 'From 3 letters on, you also find the other members of {{appName}}.',
+      // 404: unknown member, or a block between the two (the API says the same).
+      notFound: 'This member cannot be invited.',
+      // Number of results, read out after each search.
+      results_one: '{{count}} member found',
+      results_other: '{{count}} members found',
     },
     settings: {
       title: 'Hive settings',
