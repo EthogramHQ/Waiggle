@@ -15,6 +15,8 @@ export type InputObject =
   // R7b : un appel à tester et un message d'un fil de testeur (le coin des testeurs).
   | 'call'
   | 'message'
+  // R10 : une ruche, signalée par l'un de ses membres ou de ses invités (son nom).
+  | 'hive'
 
 /** La sorte de champ : un texte, une liste de textes, un lien, ou une image (une clé de stockage). */
 export type InputKind = 'text' | 'list' | 'link' | 'image'
@@ -319,6 +321,19 @@ const WRITTEN_INPUTS: readonly WrittenInput[] = [
     snapshot: true,
     export: false,
   },
+  // R10 : le nom d'une ruche, tapé par son créateur, puis par l'animateur qui le change (son auteur
+  // est `hive.name_set_by`, que vise une décision de retrait). Il est lu par les membres et les
+  // invités : signalable, copié au signalement, retirable seul (« Ruche sans nom »), et dans l'export
+  // de chaque membre de la ruche (ses ruches, par leur nom).
+  {
+    field: 'name',
+    object: 'hive',
+    table: 'hive',
+    column: 'name',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
   // La précision d'un signalement : saisie par un membre, montrée à la modération seule.
   {
     field: null,
@@ -367,7 +382,12 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     updated_at: 'date',
     language: "la langue de l'interface, choisie dans une liste fermée (fr, en), jamais montrée",
   },
-  profile: { user_id: 'identifiant', updated_at: 'date' },
+  profile: {
+    user_id: 'identifiant',
+    updated_at: 'date',
+    // R10 : « Ne pas me proposer aux autres ».
+    hide_from_suggestions: 'booléen',
+  },
   member_handle: {
     user_id: 'identifiant',
     claimed_at: 'date',
@@ -379,7 +399,7 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     id: 'identifiant',
     author_id: 'identifiant',
     status: 'une étape choisie dans une liste fermée par Zod (idée, en cours, testable…)',
-    visibility: 'public ou privé, une liste fermée par Zod',
+    visibility: 'public, réservé à une ruche (R10) ou privé, une liste fermée par Zod',
     primary_category:
       'un code de la table category, vérifié par la base et par l’API (clé étrangère)',
     secondary_category:
@@ -391,6 +411,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     published_at: 'date',
     removed_at: 'date',
     removal_id: 'identifiant',
+    // R10 : la ruche d'un projet réservé (null sinon), vérifiée par la base (clé étrangère).
+    hive_id: 'identifiant',
   },
   project_media: {
     id: 'identifiant',
@@ -513,6 +535,53 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     email_testers: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
     recap_v2_at: 'date',
     instant_sent_at: 'date',
+    // R10 : le réglage « Ruches » (l'e-mail d'une invitation, la partie du récap).
+    email_hives: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+  },
+  // R10 : les ruches. Le nom est au registre (MEMBER_INPUTS) ; le reste est écrit par l'API ou
+  // choisi dans une liste fermée par Zod et par le `check` de la table.
+  hive: {
+    id: 'identifiant',
+    name_removal_id: 'identifiant',
+    name_set_by: 'identifiant',
+    icon: 'une icône choisie dans une liste fermée par Zod (HiveIcon) et par la base, jamais un texte libre',
+    animator_id: 'identifiant',
+    invite_policy:
+      'qui peut inviter (members, animator), une liste fermée par Zod et par la base, écrite par l’animateur',
+    pinned_project_id: 'identifiant',
+    pinned_by: 'identifiant',
+    pinned_at: 'date',
+    created_by: 'identifiant',
+    created_at: 'date',
+    updated_at: 'date',
+  },
+  hive_member: {
+    hive_id: 'identifiant',
+    user_id: 'identifiant',
+    invited_by: 'identifiant',
+    joined_at: 'date',
+    seen_at: 'date',
+  },
+  hive_invitation: {
+    id: 'identifiant',
+    hive_id: 'identifiant',
+    invitee_id: 'identifiant',
+    inviter_id: 'identifiant',
+    created_at: 'date',
+    refused_at: 'date',
+  },
+  // Les lignes d'Activité gardées d'une ruche (retiré, animateur, supprimée), écrites par l'API.
+  hive_notice: {
+    id: 'identifiant',
+    recipient_id: 'identifiant',
+    kind: 'une sorte d’une liste fermée (removed, animator, deleted), écrite par l’API et vérifiée par la base',
+    hive_id: 'identifiant',
+    // Pas une saisie à modérer à part : une copie, faite par l'API, de hive.name (au registre) au
+    // moment du geste, parce que la ruche peut disparaître. Montrée à son seul destinataire, qui
+    // était membre ; vidée quand la modération retire ce nom, effacée à 90 jours.
+    hive_name:
+      'copie par l’API de hive.name (au registre), montrée à son seul destinataire, vidée au retrait du nom, 90 jours',
+    created_at: 'date',
   },
   notification_state: {
     user_id: 'identifiant',
