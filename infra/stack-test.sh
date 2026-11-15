@@ -376,7 +376,22 @@ step "Le parcours réel d'un membre, dans un vrai navigateur (apps/app/scripts/j
 # les fichiers du dossier des médias, dans le conteneur lui-même. Son administrateur de la
 # modération (tranche 7a) reçoit le rôle par le script de production, grant-admin.sh.
 api_container=$(compose ps -q api)
-JOURNEY_ADMIN_CMD=infra/grant-admin.sh \
+# R11 : Inès s'inscrit, puis « a oublié d'accepter » les règles, pour voir l'écran « Accepter ».
+# Aucune route ne retire un accord : ce petit script, écrit dans le dossier temporaire de l'essai
+# (jamais sur le serveur), efface ses lignes d'accord. L'adresse est vérifiée avant la requête, puis
+# passée à psql par une variable (:'email'), qui l'écrit comme une chaîne SQL échappée.
+cat >"$WORK/forget-rules.sh" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+source "$RUCHE_REPO/infra/lib.sh"
+[[ ${1:-} =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "adresse invalide"
+printf '\\set email %s\n%s\n' "'${1,,}'" \
+  "delete from rules_acceptance where user_id = (select id from \"user\" where lower(email) = :'email');" |
+  db_query >/dev/null
+SCRIPT
+chmod +x "$WORK/forget-rules.sh"
+JOURNEY_FORGET_RULES_CMD="$WORK/forget-rules.sh" \
+  JOURNEY_ADMIN_CMD=infra/grant-admin.sh \
   JOURNEY_INVITE_CODE=$INVITE_CODE \
   JOURNEY_MAIL_CMD="docker logs $api_container" \
   JOURNEY_MEDIA_CMD="docker exec $api_container find /app/media -name '*.webp'" \
