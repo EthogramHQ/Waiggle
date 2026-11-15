@@ -73,7 +73,8 @@ const unsubscribeRoute = createRoute({
   description:
     'Lowers what the signed token names: the recap, the « now » types (to choice, digest by ' +
     'default), or replies for an old mentions link; scope=all lowers the recap and the « now » ' +
-    'types. Never turns anything on. The body is never read (RFC 8058 sends ' +
+    'types; scope=discoveries (a recap link only) lowers only the discoveries of the recap. ' +
+    'Never turns anything on. The body is never read (RFC 8058 sends ' +
     '« List-Unsubscribe=One-Click »).',
   request: { query: UnsubscribeQuery },
   responses: {
@@ -196,6 +197,9 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
       const { token, scope, choice } = c.req.valid('query')
       const link = readUnsubscribeToken(secret, token)
       if (!link) return invalidLink(c)
+      // R11 : « Couper les découvertes » n'existe que sur le lien du récap (les autres e-mails ne
+      // portent pas de découvertes) : la même réponse qu'un lien invalide, rien ne change.
+      if (scope === 'discoveries' && link.kind !== 'recap') return invalidLink(c)
 
       // Le quota du membre, seulement pour un lien signé par nous : un faux lien ne peut pas
       // épuiser le quota d'un autre.
@@ -209,7 +213,12 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
       const lowered = await unsubscribeMember(
         db,
         link.userId,
-        { kind: link.kind, all: scope === 'all', choice: choice ?? 'digest' },
+        {
+          kind: link.kind,
+          all: scope === 'all',
+          choice: choice ?? 'digest',
+          discoveries: scope === 'discoveries',
+        },
         new Date(),
       )
       if (!lowered) return invalidLink(c)
