@@ -21,6 +21,9 @@ export function ProvisionalNameGate() {
   const pathname = usePathname()
   const layers = useOpenModalLayers()
   if (!session || !me) return null
+  // R11 : tant que les règles ne sont pas acceptées, l'écran « Accepter » est au-dessus de tout
+  // (`RulesGate`) : le pseudo attend, il ne s'ouvre pas dessous.
+  if (!me.rulesAccepted) return null
   const onTabPage = placeOf(pathname, me.id).kind !== 'hidden'
   return <ProvisionalNameSheet me={me} otherSheetOpen={!onTabPage || layers > 0} />
 }

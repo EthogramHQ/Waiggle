@@ -75,6 +75,9 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: ApiErrorKey; projectLimit?: true }
 
+/** Le code d'API d'une écriture refusée faute d'accord aux règles (R11, 403). */
+export const RULES_REQUIRED_CODE = 'rules_required' satisfies ErrorCode
+
 /** Le code d'API du quota des appels d'un projet (contrat : `project_calls_limited`). */
 export const PROJECT_CALLS_LIMITED_CODE = 'project_calls_limited' satisfies ErrorCode
 
