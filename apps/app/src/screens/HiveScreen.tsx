@@ -37,6 +37,7 @@ import {
   useSetHideFromSuggestions,
 } from '../hives/api'
 import { QuitHiveDialog, RemoveMemberDialog } from '../hives/HiveDialogs'
+import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
@@ -132,6 +133,13 @@ function HivePageView({ page }: { page: HivePage }) {
   const { summary } = page
   const id = summary.id
   const isAnimator = summary.role === 'animator'
+  // R10 : un compte suspendu ne peut ni inviter, ni retirer un membre, ni épingler (l'API répond
+  // 403 `suspended`) ; ces gestes ne sont donc pas proposés, comme ailleurs dans l'appli. Quitter la
+  // ruche et « Ne pas me proposer aux autres » restent. Tant que le profil n'est pas lu, rien n'est
+  // retiré (`useSuspension`), et l'API refuserait de toute façon.
+  const { suspended } = useSuspension()
+  // Les gestes d'animateur que la suspension retire (retirer, épingler).
+  const animates = isAnimator && !suspended
   // Le nom affiché (« Ruche sans nom » quand la modération l'a retiré) et le nom dans une phrase
   // (« Plus d'options pour la ruche sans nom »).
   const shownName = summary.name ?? t(($) => $.hives.unnamed)
@@ -198,13 +206,13 @@ function HivePageView({ page }: { page: HivePage }) {
 
   // --- Les morceaux -----------------------------------------------------------------------------
 
-  const canInvite = page.invite === 'allowed'
+  const canInvite = page.invite === 'allowed' && !suspended
   const ready = summary.memberCount === 1 && page.pendingInvitations === 0
 
   const head = <HiveHead page={page} desktop={desktop} />
 
   const invite =
-    page.invite === 'animatorOnly' ? null : (
+    page.invite === 'animatorOnly' || suspended ? null : (
       <Button
         label={t(($) => $.hives.page.invite)}
         icon="user-plus"
@@ -270,7 +278,7 @@ function HivePageView({ page }: { page: HivePage }) {
           }
         />
       ) : null}
-      <PinnedProject page={page} />
+      <PinnedProject page={page} canUnpin={animates} />
       {/* Sur ordinateur, les testeurs sont dans la colonne de droite. */}
       {desktop ? null : testers}
       {ready ? null : (
@@ -286,7 +294,7 @@ function HivePageView({ page }: { page: HivePage }) {
   const projects = (
     <HiveProjects
       id={id}
-      animator={isAnimator}
+      animator={animates}
       pinnedId={page.pinned?.id ?? null}
       columns={sizeClass === 'compact' || desktop ? 2 : 4}
       onOpen={(projectId) => openProject(projectId)}
@@ -298,7 +306,7 @@ function HivePageView({ page }: { page: HivePage }) {
       members={shownMembers}
       loadFailed={members.isError && shownMembers === undefined}
       onRetry={() => void members.refetch()}
-      canRemove={isAnimator}
+      canRemove={animates}
       canInvite={canInvite}
       onInvite={openInvite}
       onOpen={openMember}
@@ -462,7 +470,7 @@ function HiveHead({ page, desktop }: { page: HivePage; desktop: boolean }) {
  * Le projet épinglé, en grande carte, « Épinglé par Papi Jean » dans sa pastille. Pour l'animateur,
  * un menu « … » sur la photo, à côté du lien de la carte (jamais dedans) : « Retirer l'épingle ».
  */
-function PinnedProject({ page }: { page: HivePage }) {
+function PinnedProject({ page, canUnpin }: { page: HivePage; canUnpin: boolean }) {
   const { t } = useTranslation()
   const patch = usePatchHive(page.summary.id)
   const [failed, setFailed] = useState(false)
@@ -483,7 +491,7 @@ function PinnedProject({ page }: { page: HivePage }) {
         badge={
           by ? t(($) => $.hives.page.pinnedBy, { name: by.name }) : t(($) => $.hives.page.pinned)
         }
-        {...(page.summary.role === 'animator'
+        {...(canUnpin
           ? {
               overlay: (
                 <ActionMenu
