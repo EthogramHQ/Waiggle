@@ -50,6 +50,7 @@ import {
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
+import { CursorDate } from '../cursor'
 import { currentHandleOf } from '../handles/load'
 import { avatarUrlOf } from '../profile/me'
 import { rowsToSummaries, selectProjects } from '../projects/load'
@@ -638,8 +639,12 @@ export const readHivePageMark = (cursor: string | undefined): HivePageMark | nul
   if (cursor === undefined) return null
   const [at, rank, id, ...rest] = Buffer.from(cursor, 'base64url').toString('utf8').split('~')
   const date = new Date(at ?? '')
+  // R10, relecture de sécurité (A4) : la date passe par le schéma borné des autres curseurs
+  // (`CursorDate`, cursor.ts) : ISO, année de quatre chiffres, pas avant 2000. Sans lui, l'an 0 ou
+  // +275760 arrivait jusqu'à PostgreSQL, qui le refuse (500 au lieu de 400).
   if (
     rest.length > 0 ||
+    !CursorDate.safeParse(at).success ||
     Number.isNaN(date.getTime()) ||
     !['0', '1', '2'].includes(rank ?? '') ||
     !HiveId.safeParse(id).success
