@@ -93,10 +93,16 @@ describe('creating an account', () => {
 
   it('ignores a profile picture hosted elsewhere, sent along with the sign-up', async () => {
     // Une image hébergée n'importe où révélerait l'adresse IP de chaque visiteur du profil.
+    // R11 : les deux cases cochées, sans quoi l'inscription est refusée avant même l'image.
     await ctx.request('/api/auth/sign-up/email', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...lea, image: 'https://tracker.example/pixel.png' }),
+      body: JSON.stringify({
+        ...lea,
+        acceptRules: true,
+        ageDeclared: true,
+        image: 'https://tracker.example/pixel.png',
+      }),
     })
 
     const [user] = await ctx.db.select({ image: schema.user.image }).from(schema.user)
