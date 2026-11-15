@@ -262,6 +262,8 @@ function HivePageView({ page }: { page: HivePage }) {
   )
 
   const testers = <SeekingTesters projects={page.seekingTesters} onOpen={openProject} />
+  // Même règle que `SeekingTesters` : seuls les projets avec une démo se testent.
+  const hasTesters = page.seekingTesters.some((project) => project.demoUrl !== null)
 
   const activity = (
     <Stack gap="lg">
@@ -365,14 +367,9 @@ function HivePageView({ page }: { page: HivePage }) {
               </Stack>
             }
             main={tabs}
-            aside={
-              <Stack gap="md">
-                {testers}
-                <Text variant="caption" tone="muted">
-                  {t(($) => $.hives.page.desktopNote)}
-                </Text>
-              </Stack>
-            }
+            // La colonne de droite n'existe que si elle a un contenu : sans projet à tester, la
+            // page garde deux colonnes, sans vide à droite.
+            aside={hasTesters ? testers : undefined}
           />
         ) : (
           tabs
@@ -403,7 +400,7 @@ function HivePageView({ page }: { page: HivePage }) {
 // --- Le haut --------------------------------------------------------------------------------------
 
 /**
- * L'alvéole, « Ma ruche », le nom (le titre de la page), les visages et le nombre de membres ; sur
+ * L'alvéole, le nom (le titre de la page), les visages et le nombre de membres ; sur
  * ordinateur, « animée par Papi Jean ». Une ruche pleine, ou où seul l'animateur invite, le dit ici.
  */
 function HiveHead({ page, desktop }: { page: HivePage; desktop: boolean }) {
@@ -428,9 +425,6 @@ function HiveHead({ page, desktop }: { page: HivePage; desktop: boolean }) {
     <Row gap="md" align="center">
       <HiveBadge icon={summary.icon} name={summary.name} size={64} />
       <Stack gap="xxs" grow>
-        <Text variant="caption" weight={700} tone="accent">
-          {t(($) => $.hives.myHive)}
-        </Text>
         <Text variant="title1" heading={1}>
           {summary.name ?? t(($) => $.hives.unnamed)}
         </Text>
@@ -815,7 +809,7 @@ function MembersPanel({
 }
 
 /**
- * « Ne pas me proposer aux autres », sous « Mes suggestions » : le curseur bouge au toucher ; un
+ * « Ne pas me proposer aux autres », seul dans son groupe : le curseur bouge au toucher ; un
  * refus le remet où il était et le dit dessous.
  */
 function SuggestionsChoice() {
@@ -825,7 +819,7 @@ function SuggestionsChoice() {
   const [failed, setFailed] = useState(false)
   return (
     <Stack gap="sm">
-      <ListGroup title={t(($) => $.hives.page.suggestions)}>
+      <ListGroup>
         <Switch
           inGroup
           label={t(($) => $.hives.hideFromSuggestions)}

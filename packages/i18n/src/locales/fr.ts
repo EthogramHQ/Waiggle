@@ -2679,16 +2679,10 @@ export const fr = {
       membersPhrase:
         'L’animateur épingle un projet, choisit qui peut inviter et peut retirer un membre. Les membres d’une ruche se voient entre eux, jamais les autres membres de {{appName}}.',
       animator: 'Animateur',
-      you: 'toi',
       inviteOne: 'Inviter un proche',
       remove: 'Retirer de la ruche',
       removeNamed: 'Retirer {{name}} de la ruche',
-      suggestions: 'Mes suggestions',
-      desktopNote:
-        'Une partie de la ruche arrive dans ton récap du dimanche. Les défis viendront plus tard.',
       loadError: 'Cette ruche n’a pas pu se charger.',
-      // Sous le nom de soi, dans la liste des membres : « @ines_h · toi » ({{handle}} : member.handle).
-      handleYou: '{{handle}} · {{you}}',
       // Le « … » d'une tuile de l'onglet Projets, pour l'animateur (« Épingler ») : nommé par le
       // projet, chaque tuile ayant le sien.
       projectMenu: 'Plus d’options pour {{title}}',
