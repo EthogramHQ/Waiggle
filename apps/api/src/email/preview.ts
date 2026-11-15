@@ -13,6 +13,7 @@ import {
   type EmailContent,
   emailChangedEmail,
   existingAccountEmail,
+  inactiveAccountEmail,
   type MentionData,
   mentionEmail,
   moderationAlertEmail,
@@ -422,6 +423,19 @@ const variants: [string, (language: Language) => EmailContent][] = [
         ground: 'illegal',
         explanation: LONG_EXPLANATION,
         afterReport: false,
+      }),
+  ],
+  // R11 : l'e-mail d'un compte inactif, un mois avant sa suppression (e-mail de service). Un nom de
+  // 88 caractères sans espace dans la salutation (adresse-E1), la date de suppression écrite à
+  // l'heure de Paris (23 h 30 UTC un soir d'hiver : déjà le lendemain), le vrai lien du bouton
+  // (la connexion, puis « Mes données ») et le pied avec la page Confidentialité.
+  [
+    'inactive-account',
+    (language) =>
+      inactiveAccountEmail(language, {
+        name: LONG_NAME,
+        deleteOn: new Date('2031-02-28T23:30:00.000Z'),
+        appUrl: APP_URL,
       }),
   ],
 ]

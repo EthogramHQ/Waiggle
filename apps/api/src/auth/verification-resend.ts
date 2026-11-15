@@ -177,10 +177,14 @@ export const createVerificationResend = ({
       sendInBackground(
         {
           to: user.email,
-          ...verificationEmail(languageOfMember(user), {
-            name: user.name,
-            url: withPage(url, verifiedPage),
-          }),
+          ...verificationEmail(
+            languageOfMember(user),
+            {
+              name: user.name,
+              url: withPage(url, verifiedPage),
+            },
+            appUrl,
+          ),
         },
         path || '/api/auth',
       )

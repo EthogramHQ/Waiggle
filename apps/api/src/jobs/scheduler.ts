@@ -3,7 +3,7 @@
 // Paris, une seule à la fois, même si l'API tournait un jour sur plusieurs serveurs.
 //
 // Il ne fait qu'appeler les tâches (weekly-recap.ts, instant-emails.ts, moderation-alert.ts,
-// nightly-purge.ts, other-recap.ts), qui
+// nightly-purge.ts, other-recap.ts, inactive-accounts.ts), qui
 // contiennent toutes les règles et se testent sans lui. Il ne démarre qu'avec un vrai PostgreSQL
 // (DATABASE_URL) : en développement, en test et pendant le parcours local (PGlite), aucune tâche
 // automatique ne tourne.
@@ -20,6 +20,7 @@
 //   et n'arrête jamais l'API.
 import { PgBoss } from 'pg-boss'
 import { describeError } from '../log'
+import { inactiveAccounts } from './inactive-accounts'
 import { instantEmails } from './instant-emails'
 import { moderationAlert } from './moderation-alert'
 import { nightlyPurge } from './nightly-purge'
@@ -31,7 +32,13 @@ const TIME_ZONE = 'Europe/Paris'
 const SEVEN_DAYS = 7 * 24 * 60 * 60
 
 type Task = {
-  name: 'weekly-recap' | 'instant-emails' | 'moderation-alert' | 'nightly-purge' | 'other-recap'
+  name:
+    | 'weekly-recap'
+    | 'instant-emails'
+    | 'moderation-alert'
+    | 'nightly-purge'
+    | 'other-recap'
+    | 'inactive-accounts'
   /** Quand : une expression « cron » (minute, heure, jour du mois, mois, jour de la semaine). */
   cron: string
   /** Combien de secondes une exécution peut durer avant d'être déclarée perdue. */
@@ -99,6 +106,18 @@ const tasks: Task[] = [
       return nightlyPurge(deps.db, now, deps.storage)
     },
   },
+  {
+    // R11 : les comptes inactifs, chaque nuit à 3 h 30, après la purge : l'e-mail un mois avant,
+    // puis la suppression à 3 ans (inactive-accounts.ts). Une nuit manquée est rattrapée une fois ;
+    // la date notée de l'e-mail empêche tout second envoi. C'est un e-mail : EMAIL_JOBS=off la
+    // coupe, et, sans e-mail parti, aucun compte n'est supprimé.
+    name: 'inactive-accounts',
+    cron: '30 3 * * *',
+    expireInSeconds: 60 * 60,
+    missed: 'once',
+    sendsEmails: true,
+    run: inactiveAccounts,
+  },
 ]
 
 export type Scheduler = { stop: () => Promise<void> }
@@ -112,7 +131,7 @@ type SchedulerOptions = {
 }
 
 /**
- * Démarre pg-boss et ses cinq planifications. Lève une erreur si le démarrage échoue : index.ts
+ * Démarre pg-boss et ses six planifications. Lève une erreur si le démarrage échoue : index.ts
  * la note dans les journaux et l'API continue sans tâches.
  */
 export const startScheduler = async ({

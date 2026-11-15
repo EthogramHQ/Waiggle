@@ -130,3 +130,30 @@ describe('the recap of the « other » items', () => {
     )
   })
 })
+
+// R11 : les comptes inactifs, chaque nuit à 3 h 30 de Paris, après la purge. Elle envoie l'e-mail
+// d'avant la suppression : EMAIL_JOBS=off la coupe, et sans e-mail parti aucun compte ne part.
+describe('the inactive accounts task', () => {
+  it('runs every night at 3:30, Paris time, and catches up a missed night once', async () => {
+    await start()
+
+    expect(boss.schedule).toHaveBeenCalledWith(
+      'inactive-accounts',
+      '30 3 * * *',
+      null,
+      expect.objectContaining({ tz: 'Europe/Paris', missed: 'once' }),
+    )
+  })
+
+  it('is switched off with the other e-mails', async () => {
+    await startScheduler({ databaseUrl: 'postgres://test', deps, emailJobs: false })
+
+    expect(boss.unschedule).toHaveBeenCalledWith('inactive-accounts')
+    expect(boss.schedule).not.toHaveBeenCalledWith(
+      'inactive-accounts',
+      expect.anything(),
+      null,
+      expect.anything(),
+    )
+  })
+})

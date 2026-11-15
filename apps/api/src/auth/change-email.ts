@@ -239,11 +239,15 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
     sendInBackground(
       {
         to: user.email,
-        ...changeEmailConfirmationEmail(languageOfMember(user), {
-          name: user.name,
-          newEmail,
-          url: withPage(url, pageOf['change-email-confirmation']),
-        }),
+        ...changeEmailConfirmationEmail(
+          languageOfMember(user),
+          {
+            name: user.name,
+            newEmail,
+            url: withPage(url, pageOf['change-email-confirmation']),
+          },
+          appUrl,
+        ),
       },
       REQUEST,
     )
@@ -307,7 +311,7 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
       sendInBackground(
         {
           to: user.email,
-          ...newEmailVerificationEmail(languageOfMember(user), { url: link.toString() }),
+          ...newEmailVerificationEmail(languageOfMember(user), { url: link.toString() }, appUrl),
         },
         LINK,
       )
@@ -340,7 +344,11 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
       sendInBackground(
         {
           to: payload.email,
-          ...emailChangedEmail(languageOfMember(user), { name: user.name, newEmail: user.email }),
+          ...emailChangedEmail(
+            languageOfMember(user),
+            { name: user.name, newEmail: user.email },
+            appUrl,
+          ),
         },
         LINK,
       )

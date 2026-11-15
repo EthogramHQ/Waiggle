@@ -262,7 +262,18 @@ export const suspensionEmailKey = (userId: string) => `suspension-email:${userId
  * personnelles et ne défait pas la décision (comme jobs/moderation-alert.ts).
  */
 export const sendSuspensionEmail = async (
-  { db, mailer, limiter }: { db: Database; mailer: Mailer; limiter: RateLimiter },
+  {
+    db,
+    mailer,
+    limiter,
+    appUrl,
+  }: {
+    db: Database
+    mailer: Mailer
+    limiter: RateLimiter
+    /** R11 : l'adresse de l'appli, pour le pied de l'e-mail (la page Confidentialité). */
+    appUrl: string
+  },
   memberId: string,
   now: Date,
 ) => {
@@ -278,12 +289,16 @@ export const sendSuspensionEmail = async (
     const { endsAt, ground, explanation, afterReport } = active.suspension
     await mailer.send({
       to: member.email,
-      ...suspensionEmail(languageOfMember(member), {
-        endsAt: endsAt === null ? null : new Date(endsAt),
-        ground,
-        explanation,
-        afterReport,
-      }),
+      ...suspensionEmail(
+        languageOfMember(member),
+        {
+          endsAt: endsAt === null ? null : new Date(endsAt),
+          ground,
+          explanation,
+          afterReport,
+        },
+        appUrl,
+      ),
     })
   } catch (error) {
     console.error(

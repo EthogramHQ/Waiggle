@@ -12,6 +12,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { secureHeaders } from 'hono/secure-headers'
+import { activityMiddleware } from './account/activity'
 import type { Auth } from './auth/auth'
 import { sessionMiddleware } from './auth/session'
 import type { Mailer } from './email/mailer'
@@ -330,6 +331,10 @@ export const createApp = ({
       c.req.path === UNVERIFIED_EMAIL_PATH ? next() : readSession(c, next),
     ),
   )
+  // R11 : la visite d'un membre connecté est notée (au plus une fois par jour), et un avertissement
+  // d'inactivité déjà parti est effacé (account/activity.ts). Juste après la session, avant les
+  // gardes de la suspension et de l'accord : une requête qu'elles refusent compte quand même.
+  app.use('/v1/*', activityMiddleware(db))
   // Les images aussi demandent de savoir qui regarde : elles sont réservées aux membres.
   app.use('/media/*', sessionMiddleware(auth))
   // Les réponses de /v1/… sont personnelles (profil, export…) : aucun cache intermédiaire
@@ -393,7 +398,7 @@ export const createApp = ({
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl }))
+  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl, appUrl }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter }))
   app.route('/', mediaRoutes({ db, storage }))
