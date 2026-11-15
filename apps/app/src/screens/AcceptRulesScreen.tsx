@@ -159,14 +159,18 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
         </Stack>
       ) : null}
       <LegalVersionBadge version={rules.version} />
-      {me.rulesChanges.length > 0 ? (
+      {changes.length > 0 ? (
         <ListGroup title={t(($) => $.rules.changesTitle)}>
-          {changes.length > 0 ? (
-            <ListBlock>
-              <KeyPoints points={changes.map((phrase) => ({ icon: 'sparkle', text: phrase }))} />
-            </ListBlock>
-          ) : null}
+          <ListBlock>
+            <KeyPoints points={changes.map((phrase) => ({ icon: 'sparkle', text: phrase }))} />
+          </ListBlock>
         </ListGroup>
+      ) : me.rulesChanges.length > 0 ? (
+        // Aucune phrase connue de cette version de l'appli : le titre seul dit que la version a
+        // changé, sans le cadre vide d'une liste (le texte complet, lui, est à jour).
+        <Text variant="headline" heading={2}>
+          {t(($) => $.rules.changesTitle)}
+        </Text>
       ) : null}
       <ListGroup title={t(($) => $.legal.summaryTitle)}>
         <ListBlock>
