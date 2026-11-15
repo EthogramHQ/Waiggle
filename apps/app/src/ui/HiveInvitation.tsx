@@ -12,7 +12,7 @@
 //   quand l'écran le permet (`onReport`).
 // - En aperçu (`preview`, « Ce que reçoit Max » dans la feuille « Inviter ») : la même carte, ses
 //   promesses et ses boutons dessinés mais inertes (ni rôle, ni geste, ni focus : `Button drawing`),
-//   sans « … ».
+//   sans « … », avec « Refuser ne prévient personne. » dessous, comme sur la carte reçue.
 // - Refusée (`refused`) : elle reste à sa place, « Invitation refusée. » au lieu des boutons,
 //   jusqu'au prochain passage sur la page ; le focus, qui était sur « Refuser », va au message.
 //
@@ -216,11 +216,11 @@ export function HiveInvitation({
               />
             </ButtonPair>
           )}
-          {preview ? null : (
-            <Text variant="caption" tone="muted" nativeID={hintId}>
-              {t(($) => $.hives.invitations.refuseHint)}
-            </Text>
-          )}
+          {/* Aussi dans l'aperçu : la feuille « Inviter » montre la carte telle que l'invité la
+              lira, cette phrase comprise (elle n'y décrit alors aucun bouton). */}
+          <Text variant="caption" tone="muted" {...(preview ? null : { nativeID: hintId })}>
+            {t(($) => $.hives.invitations.refuseHint)}
+          </Text>
         </Stack>
       </Surface>
     </View>
