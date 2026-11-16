@@ -723,6 +723,7 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     // la file ne la sélectionne ; seuls l'accusé et la décision la lisent, puis la clôture l'efface.
     reporter_email:
       'l’adresse e-mail facultative d’un visiteur (z.email, 254 caractères), jamais montrée ni exportée, effacée à la clôture',
+    reporter_language: 'la langue du visiteur, fr ou en (liste fermée), effacée avec son adresse',
   },
   // R9 (7d) : les parties retirées en cours, écrites par l'API sur la décision d'un administrateur.
   // Pas « * » : `hidden_value` est du JSON, qui demande sa raison écrite (B7).

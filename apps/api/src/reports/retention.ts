@@ -22,6 +22,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { utc } from '../notifications/load'
 import { voidReportsOfDepartedAuthors, voidReportsOfGoneTargets } from './queue'
 import { targetUuid } from './target'
+import { eraseClosedVisitorAddresses } from './visitor'
 
 const DAY = 24 * 60 * 60 * 1000
 const r = schema.contentReport
@@ -30,6 +31,9 @@ const daysBefore = (now: Date, days: number) => new Date(now.getTime() - days * 
 export const purgeModeration = async (db: Database, now: Date) => {
   const voided =
     (await voidReportsOfGoneTargets(db, now)) + (await voidReportsOfDepartedAuthors(db, now))
+  // R12 : l'adresse d'un visiteur ne survit à aucune clôture. Celles que personne n'a lues depuis
+  // (un compte supprimé a classé son signalement « sans objet ») sont effacées ici, sans e-mail.
+  await eraseClosedVisitorAddresses(db)
 
   // Les signalements clos sont peu nombreux à la fois (une purge par nuit) : la table est lue en
   // entier, une fois par nuit. Un index sur decided_at le jour où elle grandira (à surveiller).

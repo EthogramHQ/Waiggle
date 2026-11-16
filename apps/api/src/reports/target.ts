@@ -25,6 +25,7 @@ import {
   type ReportTargetPreview,
   type StoredReportTarget,
   Thumbhash,
+  type VisitorReportTarget,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq, gt, inArray, isNull, type SQL, sql } from 'drizzle-orm'
@@ -37,10 +38,11 @@ import { currentHandleOf } from '../handles/load'
 import { invitationValidSince, isHiveMember, shownName } from '../hives/load'
 import { notificationCutoff } from '../notifications/load'
 import { mediaUrl } from '../profile/me'
+import { publicPageOpen } from '../profile/public-page'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
 import { type MediaMark, mediaShownTo, visibleMedia } from '../projects/media-visibility'
-import { inViewerHiveColumn, projectVisibleTo } from '../projects/visibility'
+import { inViewerHiveColumn, projectVisibleTo, visitorVisibleProject } from '../projects/visibility'
 import { type MediaRow, toVisual } from '../projects/visual'
 import { cornerAccess } from '../testers/access'
 import { photosOfUpdates, readLines, updateShownTo } from '../updates/load'
@@ -243,6 +245,91 @@ export const loadReportable = async (
   return { ...found, author }
 }
 
+/** Ce qu'on sait d'une cible qu'un visiteur voit : comme `Reportable`, sans auteur à bloquer. */
+export type VisitorReportable = Omit<Reportable, 'author' | 'shownAuthorId'> & {
+  /** Le nom de l'auteur, pour le rappel de la feuille : jamais son pseudo ni son identifiant. */
+  authorName: string
+}
+
+/**
+ * La page publique d'un membre telle qu'un visiteur la voit (R12) : son nom et sa photo, et ce qu'il
+ * a coché (la bio, les outils favoris). Jamais son pseudo : ni dans le texte, ni dans les parties,
+ * ni dans la copie (plan, Q8). Une page fermée, un compte inconnu ou jamais vérifié : null, la
+ * réponse d'un membre inconnu. Une lecture jointe (clés primaires de "user" et `profile`), puis les
+ * outils favoris seulement si la case est cochée.
+ */
+const loadVisitorMember = async (
+  db: Database,
+  memberId: string,
+  publicApiUrl: string,
+): Promise<VisitorReportable | null> => {
+  const [row] = await db
+    .select({
+      id: schema.user.id,
+      name: schema.user.name,
+      bio: schema.profile.bio,
+      avatarKey: schema.profile.avatarKey,
+      showBio: schema.profile.publicBio,
+      showTools: schema.profile.publicTools,
+    })
+    .from(schema.user)
+    .innerJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
+    .where(and(eq(schema.user.id, memberId), publicPageOpen()))
+  if (!row) return null
+  // Une photo retirée par la modération porte une clé « withheld/… » : pour un visiteur, pas de photo.
+  const avatarKey = row.avatarKey?.startsWith('withheld/') ? null : row.avatarKey
+  const avatar = avatarKey
+    ? { url: mediaUrl(publicApiUrl, avatarKey), thumbhash: NEUTRAL_THUMBHASH }
+    : null
+  const bio = row.showBio ? filled('bio', row.bio) : []
+  const favoriteTools = row.showTools ? (await favoriteToolsOf(db, row.id)).map((t) => t.label) : []
+  const tools = filled('favoriteTools', oneLine(favoriteTools))
+  const name: ReportSnapshot = [{ field: 'name', value: row.name }]
+  return {
+    authorId: row.id,
+    authorName: row.name,
+    projectId: null,
+    text: row.name,
+    snapshot: [...name, ...bio, ...tools, ...filled('avatar', avatarKey)],
+    head: { title: null, image: avatar },
+    parts: [
+      textPart('name', name),
+      ...(bio.length === 0 ? [] : [textPart('bio', bio)]),
+      ...(tools.length === 0 ? [] : [textPart('favoriteTools', tools)]),
+      ...(avatar && avatarKey
+        ? [{ ...textPart('avatar', filled('avatar', avatarKey)), thumb: avatar }]
+        : []),
+    ],
+  }
+}
+
+/**
+ * La cible d'un signalement de visiteur (R12, décision 12), ou null si un visiteur ne la voit pas :
+ * projet qui n'est pas « Public », retiré, d'un auteur parti ou non vérifié ; mise à jour retirée ou
+ * d'un tel projet ; page fermée ou membre inconnu. La route répond alors le 404 d'une cible inconnue.
+ * Les projets et les mises à jour passent par la lecture des membres (une seule règle écrite pour
+ * les parties et la copie), avec la règle des visiteurs (`visitorVisibleProject`) et sans lecteur.
+ * Un nombre fixe de requêtes, comme pour un membre.
+ */
+export const loadVisitorReportable = async (
+  db: Database,
+  target: VisitorReportTarget,
+  publicApiUrl: string,
+): Promise<VisitorReportable | null> => {
+  if (target.kind === 'member') return loadVisitorMember(db, target.id, publicApiUrl)
+  const noBlocks: Blocks = { byMe: new Set(), ofMe: new Set() }
+  const found = await loadVisible(db, '', target, noBlocks, publicApiUrl, 'visitor')
+  if (!found) return null
+  // Le nom de l'auteur seul (clé primaire de user) ; pas de pseudo ni d'`ensureHandle` : un visiteur
+  // n'a pas à en créer un.
+  const [author] = await db
+    .select({ name: schema.user.name })
+    .from(schema.user)
+    .where(eq(schema.user.id, found.authorId))
+  if (!author) return null
+  return { ...found, authorName: author.name }
+}
+
 /**
  * R9 : la partie demandée parmi celles de la page, ou null si elle n'y est pas (un prompt sur un
  * projet qui n'en a pas, une photo d'un autre contenu, une photo retirée) : la route répond alors
@@ -257,13 +344,26 @@ export const findPart = (
       candidate.field === part.field && candidate.mediaId === (part.mediaId?.toLowerCase() ?? null),
   ) ?? null
 
+/**
+ * `scope` dit qui lit. « member » : un membre connecté (`viewerId` est lui). « visitor » : un
+ * visiteur sans compte (R12, plan, décision 12), `viewerId` vaut alors '' (un id qu'aucun membre n'a,
+ * il n'est l'auteur de rien) : il ne lit que ce que montre la page publique (`visitorVisibleProject`)
+ * et n'a aucun blocage. Un visiteur ne signale que des projets et des mises à jour ici ; son cas
+ * d'un membre est à part (`loadVisitorMember`).
+ */
 const loadVisible = async (
   db: Database,
   viewerId: string,
   target: ReportTarget,
   blocks: Blocks,
   publicApiUrl: string,
+  scope: 'member' | 'visitor' = 'member',
 ): Promise<Omit<Reportable, 'author'> | null> => {
+  // Le contrat refuse déjà les autres sortes à un visiteur (VisitorReportTarget) ; cette garde le
+  // garantit encore si un appel futur l'oubliait.
+  if (scope === 'visitor' && target.kind !== 'project' && target.kind !== 'update') return null
+  const projectRule = () =>
+    scope === 'visitor' ? visitorVisibleProject() : projectVisibleTo(viewerId)
   switch (target.kind) {
     case 'project': {
       // Public et non retiré, ou l'un des siens (projectVisibleTo) : la règle de la page du projet,
@@ -280,7 +380,7 @@ const loadVisible = async (
           secondaryCategory: p.secondaryCategory,
         })
         .from(p)
-        .where(and(eq(p.id, target.id), projectVisibleTo(viewerId)))
+        .where(and(eq(p.id, target.id), projectRule()))
       if (!row) return null
       // R6b : les outils par project_tool (le nom tapé par l'auteur pour un « Autre »), plus par
       // l'ancienne colonne `project.tools`.
@@ -387,9 +487,7 @@ const loadVisible = async (
         })
         .from(u)
         .innerJoin(p, eq(p.id, u.projectId))
-        .where(
-          and(eq(u.id, target.id), projectVisibleTo(viewerId), updateShownTo(p.authorId, viewerId)),
-        )
+        .where(and(eq(u.id, target.id), projectRule(), updateShownTo(p.authorId, viewerId)))
       if (!row) return null
       const lines = readLines(row.lines)
       // Ses photos rattachées, dans l'ordre (index project_media_update_idx) : une photo en attente

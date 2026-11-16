@@ -38,6 +38,7 @@ import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { publicRoutes } from './routes/public'
 import { publicHeadRoutes } from './routes/public-head'
+import { publicReportRoutes } from './routes/public-reports'
 import { publicSitemapRoutes } from './routes/public-sitemap'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
@@ -436,6 +437,8 @@ export const createApp = ({
   // Les lectures sans compte (R12) : un projet public, ses mises à jour, une page publique, la
   // vitrine de l'accueil.
   app.route('/', publicRoutes({ db, publicApiUrl }))
+  // Le signalement d'un visiteur (R12) et la cible que sa feuille lit.
+  app.route('/', publicReportRoutes({ db, limiter, mailer, publicApiUrl, appUrl, secret }))
   // La tête HTML des pages publiques et le plan du site (R12, plan, choix 5 et 6), que Caddy
   // demande pour les moteurs de recherche et les aperçus de liens.
   app.route('/', publicHeadRoutes({ db, appUrl, publicApiUrl }))

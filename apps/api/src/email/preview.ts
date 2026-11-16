@@ -27,6 +27,8 @@ import {
   resetPasswordEmail,
   suspensionEmail,
   verificationEmail,
+  visitorReportDecisionEmail,
+  visitorReportReceivedEmail,
 } from './templates'
 import { createUnsubscribeToken } from './unsubscribe-token'
 
@@ -451,6 +453,28 @@ const variants: [string, (language: Language) => EmailContent][] = [
         deleteOn: new Date('2031-02-28T23:30:00.000Z'),
         appUrl: APP_URL,
       }),
+  ],
+  // R12 : les deux e-mails d'un visiteur sans compte qui a donné son adresse en signalant. Ils ne
+  // portent ni texte d'un membre, ni adresse écrite par le visiteur, ni lien autre que celui de la
+  // page Confidentialité du pied (le vrai, depuis APP_URL) : rien ne peut donc être trop long ; ces
+  // aperçus gardent la mise en page sur écran étroit, et le motif le plus long de la liste.
+  [
+    'visitor-report-received',
+    (language) =>
+      visitorReportReceivedEmail(
+        language,
+        { kind: 'update', reason: 'dangerous_link', sentAt: new Date('2026-11-17T08:00:00.000Z') },
+        APP_URL,
+      ),
+  ],
+  [
+    'visitor-report-decided',
+    (language) =>
+      visitorReportDecisionEmail(
+        language,
+        { kind: 'member', part: false, outcome: 'removed' },
+        APP_URL,
+      ),
   ],
 ]
 
