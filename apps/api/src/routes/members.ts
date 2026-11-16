@@ -8,6 +8,7 @@ import { createRoute, z } from '@hono/zod-openapi'
 import { Member, MemberId, MentionableList, MentionableQuery } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, count, eq, sql } from 'drizzle-orm'
+import { isExampleAccountSql, withExampleFlag } from '../accounts/example'
 import { requireUser } from '../auth/session'
 import { blocksOf } from '../blocks/visibility'
 import { reachableBy } from '../blocks/write'
@@ -213,6 +214,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         isBlocked: sql<boolean>`exists (select 1 from ${schema.memberBlock}
           where ${schema.memberBlock.blockerId} = ${viewer.id}
           and ${schema.memberBlock.blockedId} = ${schema.user.id})`,
+        // R12b : un compte d'exemples ? Même forme, sur la clé primaire d'example_account
+        // (accounts/example.ts).
+        example: isExampleAccountSql(schema.user.id),
       })
       .from(schema.user)
       .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
@@ -226,16 +230,21 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // ici, en filet (ensureHandle lit lui-même sa langue, que cette route ne lit pas).
     const handle = row.handle ?? (await ensureHandle(db, row.id))
     if (handle === null) return notFound()
-    const header = {
-      id: row.id,
-      name: row.name,
-      handle,
-      // R9 : une photo retirée par la modération ne paraît plus ici (avatarUrlOf), pas même pour
-      // elle ; elle la relit dans `removedParts`.
-      avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
-      isMe: row.id === viewer.id,
-      publicPage: row.publicPage ?? false,
-    }
+    // R12b : la pastille « Exemple » est dans l'en-tête, si bien qu'elle reste aussi sur la page
+    // d'un compte d'exemples que le lecteur a bloqué ; absente pour tout autre membre.
+    const header = withExampleFlag(
+      {
+        id: row.id,
+        name: row.name,
+        handle,
+        // R9 : une photo retirée par la modération ne paraît plus ici (avatarUrlOf), pas même pour
+        // elle ; elle la relit dans `removedParts`.
+        avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
+        isMe: row.id === viewer.id,
+        publicPage: row.publicPage ?? false,
+      },
+      row.example,
+    )
 
     // Un membre que j'ai bloqué (précision 2 et règle 6) : l'en-tête seul, pour le reconnaître, le
     // débloquer ou le signaler. Ni bio, ni outils, ni projets, ni abonnés : rien de ce qu'il écrit

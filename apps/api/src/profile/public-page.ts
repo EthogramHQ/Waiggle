@@ -12,6 +12,7 @@
 import { MemberId, type PublicAuthor, type PublicPageSettings } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, type SQL, sql } from 'drizzle-orm'
+import { isExampleAccountSql, withExampleFlag } from '../accounts/example'
 import { avatarUrlOf } from './me'
 
 type Reader = Pick<Database, 'select'>
@@ -68,16 +69,21 @@ export const authorCardForVisitor = async (
       name: schema.user.name,
       avatarKey: schema.profile.avatarKey,
       publicPage: sql<boolean>`${publicPageOpen()}`,
+      // R12b : un compte d'exemples ? Dans la même lecture (accounts/example.ts).
+      example: isExampleAccountSql(schema.user.id),
     })
     .from(schema.user)
     .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
     .where(and(eq(schema.user.id, userId), eq(schema.user.emailVerified, true)))
     .limit(1)
   if (!row) return null
-  return {
-    id: row.id,
-    name: row.name,
-    avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
-    publicPage: row.publicPage === true,
-  }
+  return withExampleFlag(
+    {
+      id: row.id,
+      name: row.name,
+      avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
+      publicPage: row.publicPage === true,
+    },
+    row.example,
+  )
 }
