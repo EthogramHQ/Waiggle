@@ -14,7 +14,10 @@
 // - un doublon (même cible, même adresse, déjà ouvert) répond exactement comme un premier
 //   signalement, sans nouvelle ligne ni second e-mail : la réponse ne dit jamais qu'une adresse
 //   avait déjà signalé ;
-// - au plus un accusé de réception par adresse et par jour, compté par l'empreinte de l'adresse.
+// - au plus un accusé de réception par boîte et par jour, compté par l'empreinte de la boîte
+//   (sous-adresses « +… » et points de Gmail ensemble, relecture de sécurité R12, A1) ;
+// - au plus 20 signalements de visiteurs ouverts par cible ; au-delà, la réponse d'un premier
+//   signalement, sans nouvelle ligne ni e-mail (A2).
 import { createRoute } from '@hono/zod-openapi'
 import {
   PublicReportTarget,
@@ -24,16 +27,16 @@ import {
   VisitorReportTarget,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
+import { and, eq, isNull } from 'drizzle-orm'
 import type { Context } from 'hono'
 import type { Mailer } from '../email/mailer'
 import { visitorReportReceivedEmail } from '../email/templates'
 import { errorBody, languageOf } from '../errors'
 import {
-  ADDRESS_COUNTER_PURPOSES,
-  addressCounterKey,
   normalizeAddress,
   type RateLimiter,
   type RateRule,
+  visitorReportAckKey,
   visitorReportKey,
 } from '../rate-limit'
 import { findPart, loadVisitorReportable } from '../reports/target'
@@ -43,8 +46,15 @@ import { createRouter, errorResponse } from './router'
 const DAY = 24 * 60 * 60 * 1000
 /** 5 signalements par jour et par réseau (VISITOR_REPORTS_PER_DAY, contrat). */
 const reportRule: RateRule = { windowMs: DAY, max: VISITOR_REPORTS_PER_DAY }
-/** Un accusé de réception par adresse et par jour. */
+/** Un accusé de réception par boîte et par jour. */
 const ackRule: RateRule = { windowMs: DAY, max: 1 }
+/**
+ * Au plus 20 signalements de visiteurs ouverts sur une même cible (relecture de sécurité R12, A2).
+ * Le quota par réseau ne suffit pas : un /48 IPv6 compte 65 536 réseaux de 5 envois par jour, et
+ * chaque signalement garde une copie entière du contenu (`snapshot`). Au-delà, la cible est déjà dans
+ * la file de modération : un signalement de plus n'apprend rien à l'équipe, il remplirait la base.
+ */
+const VISITOR_OPEN_REPORTS_PER_TARGET = 20
 
 const postRoute = createRoute({
   method: 'post',
@@ -129,44 +139,64 @@ export const publicReportRoutes = ({ db, limiter, mailer, publicApiUrl, appUrl, 
     // l'index unique partiel content_report_visitor_target_idx (cible, adresse en minuscules, où
     // le signalement est ouvert) refuse alors un doublon.
     const address = email === undefined ? null : normalizeAddress(email)
+
+    // Le plafond par cible (A2) : les signalements ouverts de visiteurs (`reporter_id` nul) de cette
+    // cible, toutes parties ensemble. `limit` arrête la lecture au 20e : on veut savoir si le plafond
+    // est atteint, pas le nombre exact. La requête passe par l'index content_report_target_idx
+    // (sorte, identifiant de la cible), qui ne mène qu'aux signalements de cette cible ; statut et
+    // auteur se vérifient sur ces seules lignes. Sans transaction, deux envois au même instant
+    // peuvent dépasser de peu le plafond : il borne une quantité, une ligne de plus est sans effet.
+    const open = await db
+      .select({ id: schema.contentReport.id })
+      .from(schema.contentReport)
+      .where(
+        and(
+          eq(schema.contentReport.targetKind, target.kind),
+          eq(schema.contentReport.targetId, target.id),
+          eq(schema.contentReport.status, 'open'),
+          isNull(schema.contentReport.reporterId),
+        ),
+      )
+      .limit(VISITOR_OPEN_REPORTS_PER_TARGET)
+    const full = open.length >= VISITOR_OPEN_REPORTS_PER_TARGET
+
     // « on conflict do nothing » : un doublon encore ouvert est refusé par cet index sans erreur,
     // et « returning » ne rend rien ; la réponse reste la même (décision 1, relecture B2). Sans
     // adresse, rien ne dit qui a signalé : chaque envoi crée sa ligne (le quota borne le nombre).
     // Une cible déjà examinée (adresse effacée) : l'API ne sait plus que c'est la même personne, une
-    // nouvelle ligne est créée (décision 2).
-    const inserted = await db
-      .insert(schema.contentReport)
-      .values({
-        id: crypto.randomUUID(),
-        // Jamais le membre de la session, même s'il en envoie une : il est un visiteur ici.
-        reporterId: null,
-        reporterEmail: address,
-        reporterLanguage: address === null ? null : languageOf(c),
-        targetKind: target.kind,
-        targetId: target.id,
-        projectId: found.projectId,
-        targetAuthorId: found.authorId,
-        reason,
-        details: details === undefined || details === '' ? null : details,
-        snapshot: reported ? reported.copy : found.snapshot,
-        partField: part?.field ?? null,
-        partMediaId: reported?.mediaId ?? null,
-        status: 'open',
-        // L'heure de JavaScript, comme toutes les dates qui rangent.
-        createdAt: new Date(),
-      })
-      .onConflictDoNothing()
-      .returning({ id: schema.contentReport.id })
+    // nouvelle ligne est créée (décision 2). Plafond atteint : rien n'est écrit, et la suite se
+    // déroule comme pour un doublon (même réponse, compteur d'accusés touché, aucun e-mail).
+    const inserted = full
+      ? []
+      : await db
+          .insert(schema.contentReport)
+          .values({
+            id: crypto.randomUUID(),
+            // Jamais le membre de la session, même s'il en envoie une : il est un visiteur ici.
+            reporterId: null,
+            reporterEmail: address,
+            reporterLanguage: address === null ? null : languageOf(c),
+            targetKind: target.kind,
+            targetId: target.id,
+            projectId: found.projectId,
+            targetAuthorId: found.authorId,
+            reason,
+            details: details === undefined || details === '' ? null : details,
+            snapshot: reported ? reported.copy : found.snapshot,
+            partField: part?.field ?? null,
+            partMediaId: reported?.mediaId ?? null,
+            status: 'open',
+            // L'heure de JavaScript, comme toutes les dates qui rangent.
+            createdAt: new Date(),
+          })
+          .onConflictDoNothing()
+          .returning({ id: schema.contentReport.id })
 
     if (address !== null) {
-      // Le compteur de l'accusé se touche dans les deux cas, doublon ou non : le travail de la
-      // route est ainsi le même, et seul l'e-mail dit la différence (que personne d'autre ne lit).
-      const allowed = (
-        await limiter.hit(
-          addressCounterKey(secret, ADDRESS_COUNTER_PURPOSES.visitorReportAck, address),
-          ackRule,
-        )
-      ).allowed
+      // Le compteur de l'accusé se touche dans tous les cas, doublon, plafond ou non : le travail de
+      // la route est ainsi le même, et seul l'e-mail dit la différence (que personne d'autre ne lit).
+      // Il compte la boîte, pas l'écriture de l'adresse (A1) : `visitorReportAckKey`.
+      const allowed = (await limiter.hit(visitorReportAckKey(secret, address), ackRule)).allowed
       if (inserted.length > 0 && allowed) {
         // Sans attendre l'envoi : la réponse ne dépend ni de sa durée ni de son échec (un doublon,
         // qui n'envoie rien, répond aussi vite). Un échec est noté sans l'adresse ni le détail.

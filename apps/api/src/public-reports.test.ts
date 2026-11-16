@@ -19,10 +19,16 @@ import {
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { visitorReportAckKey } from './rate-limit'
 import { activity } from './testing/activity'
-import { createTestContext, TEST_VISITOR_IP, type TestContext } from './testing/context'
+import {
+  createTestContext,
+  TEST_AUTH_SECRET,
+  TEST_VISITOR_IP,
+  type TestContext,
+} from './testing/context'
 import { answerOf, later, UNKNOWN_ID, visitorGestures } from './testing/visitor-world'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -633,6 +639,114 @@ describe('the moderation queue', () => {
       const text = await (await act.send('GET', path, louis)).text()
       expect(text, path).not.toContain('secrete')
     }
+  })
+})
+
+describe('the caps on visitor reports (security review R12, A1 and A2)', () => {
+  it('counts the sub-addresses of one mailbox as one address for the acknowledgement', async () => {
+    /** Les accusés reçus par l'une de ces écritures d'adresse. */
+    const acksTo = (addresses: string[]) => {
+      const wanted = addresses.map((address) => address.toLowerCase())
+      return ctx.mailer.sent.filter(
+        (mail) =>
+          mail.subject === fill(t.received.subject) && wanted.includes(mail.to.toLowerCase()),
+      )
+    }
+    // Une boîte, plusieurs écritures : la partie « +… », les capitales ; chez Gmail, les points du
+    // nom et l'autre domaine. Témoin : hors de Gmail, un point change de boîte.
+    const mailboxes = {
+      plain: ['x+1@example.org', 'x+2@example.org', 'X@example.org'],
+      gmail: ['x.y@gmail.com', 'xy@gmail.com', 'X.Y+z@googlemail.com'],
+      dotted: ['x.y@example.org'],
+      undotted: ['xy@example.org'],
+    }
+    // Un réseau par envoi : seul le compteur de la boîte peut retenir un accusé.
+    let network = 0
+    for (const addresses of Object.values(mailboxes)) {
+      for (const address of addresses) {
+        network++
+        const res = await reportProject(project, address, `2001:db8:e1:${network}::1`)
+        expect(res.status, address).toBe(204)
+      }
+    }
+    // Tous les signalements entrent (les adresses tapées diffèrent) ; un accusé par boîte.
+    expect(await openReports()).toHaveLength(network)
+    for (const [name, addresses] of Object.entries(mailboxes)) {
+      expect(acksTo(addresses), name).toHaveLength(1)
+    }
+    // L'adresse rangée reste celle tapée, en minuscules (seule la clé du compteur change).
+    expect((await storedReports()).map((row) => row.reporterEmail)).toContain(
+      'x.y+z@googlemail.com',
+    )
+  })
+
+  it('erases the acknowledgement counter of a mailbox with the account that has it', async () => {
+    // Un compte dont l'adresse n'est pas l'écriture simple de sa boîte (des points chez Gmail, une
+    // partie « +… ») ; sa titulaire signale en visiteuse avec l'écriture simple : un seul compteur,
+    // celui de la boîte, que la suppression du compte doit retrouver.
+    const zoe = await ctx.verifiedMember({
+      name: 'Zoé',
+      email: 'zo.e+site@gmail.com',
+      password: 'zoe-long-password',
+    })
+    expect((await reportProject(project, 'zoe@gmail.com', '2001:db8:e2:1::1')).status).toBe(204)
+    const key = visitorReportAckKey(TEST_AUTH_SECRET, 'zoe@gmail.com')
+    const counters = () =>
+      ctx.db
+        .select({ key: schema.apiRateLimit.key })
+        .from(schema.apiRateLimit)
+        .where(eq(schema.apiRateLimit.key, key))
+    expect(await counters()).toHaveLength(1)
+
+    later()
+    await act.deleteAccount(zoe, 'zoe-long-password')
+    expect(await counters()).toEqual([])
+  })
+
+  it('keeps at most 20 open visitor reports on one target, and answers the next ones like a first one, without an e-mail', async () => {
+    // Le signalement d'un membre n'entre pas dans le plafond des visiteurs.
+    later()
+    await act.report(max, { kind: 'project', id: project }, 'other')
+    // Un réseau par envoi : le quota de 5 par jour ne joue pas ici.
+    const first = await answerOf(await reportProject(project, undefined, '2001:db8:f0:1::1'))
+    expect(first.status).toBe(204)
+    for (let i = 2; i <= 20; i++) {
+      const res = await reportProject(project, undefined, `2001:db8:f0:${i}::1`)
+      expect(res.status, String(i)).toBe(204)
+    }
+    expect(await openReports()).toHaveLength(21)
+
+    // Le 21e et les suivants : la réponse d'un premier, sans ligne ni accusé, avec ou sans adresse,
+    // pour le contenu entier comme pour une partie.
+    const before = ctx.mailer.sent.length
+    const next = [
+      await reportProject(project, undefined, '2001:db8:f1:1::1'),
+      await reportProject(project, 'tardif@example.org', '2001:db8:f1:2::1'),
+      await report(
+        {
+          target: projectTarget(),
+          part: { field: 'description' },
+          reason: 'other',
+          email: 'partie@example.org',
+        },
+        '2001:db8:f1:3::1',
+      ),
+    ]
+    for (const [i, res] of next.entries()) {
+      expect(await answerOf(res), String(i)).toEqual(first)
+    }
+    expect(await openReports()).toHaveLength(21)
+    expect(ctx.mailer.sent.slice(before)).toEqual([])
+
+    // Témoin : une autre cible reçoit encore des signalements, et leur accusé.
+    const other = await anotherProject('Pas encore plein')
+    expect((await reportProject(other, 'autre@example.org', '2001:db8:f2:1::1')).status).toBe(204)
+    expect(acknowledgements('autre@example.org', before)).toHaveLength(1)
+    // Une fois la cible examinée, ses signalements sont clos : le plafond se libère.
+    later()
+    await act.decide(louis, { action: 'dismiss', target: { kind: 'project', id: project } })
+    expect((await reportProject(project, undefined, '2001:db8:f2:2::1')).status).toBe(204)
+    expect((await openReports()).map((row) => row.targetId)).toEqual([other, project])
   })
 })
 
