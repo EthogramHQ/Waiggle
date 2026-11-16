@@ -3991,3 +3991,16 @@ prendre pour de vrais projets (décision du 16/11/2026).
 
 Un projet d'exemple se signale, se modère et se met dans la vitrine comme les autres. Ses réactions
 et ses commentaires sont ceux de vrais membres.
+
+### Ce que l'équipe publie (relecture juridique de R12b)
+
+Des règles de contenu, sans code : l'équipe les suit en publiant.
+
+- Un projet d'exemple n'est jamais « Testable » et n'a pas de démo.
+- Il ne demande rien aux membres (ni conseil, ni astuce, ni test) : un vrai membre écrirait à
+  une personne qui n'existe pas.
+- Le compte d'exemples ne réagit pas, ne commente pas et ne suit personne. Si l'équipe répond à un
+  commentaire, c'est depuis son propre compte, au nom de l'équipe.
+- Ses projets comptent dans « Outils populaires » et dans le nombre de projets d'un outil, comme
+  ceux des membres : les outils d'un même éditeur n'apparaissent pas dans plus de 4 projets
+  d'exemple, pour ne pas faire le classement à la place des membres.
