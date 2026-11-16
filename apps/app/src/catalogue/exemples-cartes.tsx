@@ -3,7 +3,8 @@
 // d'exemples : celle de la vitrine (`ShowcaseCard`, accueil et « À la une » d'Explorer), avec et
 // sans photo, avec un titre long qui fait passer « Exemple » sous le statut, à côté d'une carte
 // ordinaire ; et celle du fil (`ProjectCard`, Fil, Explorer, recherche), avec et sans démo, « Privé »
-// en plus. De jour et de nuit. Les en-têtes de pages ont leur propre section (exemples-pages.tsx).
+// en plus. Puis « Ils cherchent des testeurs » (`TesterCard`, `TesterRow`), les tuiles
+// (`ProjectTile`) et les résultats de projet de la recherche (`ListRow`). De jour et de nuit. Les en-têtes de pages ont leur propre section (exemples-pages.tsx).
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
@@ -11,12 +12,16 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ExampleBadge } from '../ui/ExampleBadge'
+import { ListGroup, ListRow } from '../ui/ListGroup'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ShowcaseCard } from '../ui/ShowcaseCard'
 import { Row, Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
 import { Surface } from '../ui/Surface'
+import { TesterCard } from '../ui/TesterCard'
+import { TesterRow } from '../ui/TesterRow'
 import { Text } from '../ui/Text'
+import { ProjectTile } from '../ui/Tile'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
 
 const fr = {
@@ -27,6 +32,12 @@ const fr = {
   showcase:
     'Carte de la vitrine (accueil, « À la une ») : avec photo, sans photo, titre long, puis un membre ordinaire',
   feed: 'Carte du fil (Fil, Explorer, recherche) : avec démo, puis sans photo ni démo, privé',
+  testers:
+    'Ils cherchent des testeurs : la carte d’Explorer (avec et sans photo), puis la ligne du fil et d’une ruche',
+  tiles: 'Tuiles (une étiquette, une ruche) : avec photo, sans photo et réservée à une ruche',
+  search: 'Résultats de projet de la recherche : un projet d’exemple, puis un ordinaire',
+  results: 'Projets',
+  family: 'Réservé à Famille',
   photo: 'Photo du projet',
   plants: 'Le carnet des plantes',
   plantsPitch: 'Une photo de la feuille, et il dit quand arroser.',
@@ -50,6 +61,12 @@ const en: typeof fr = {
   showcase:
     'Showcase card (home, “Featured”): with a photo, without, long title, then an ordinary member',
   feed: 'Feed card (Feed, Explore, search): with a demo, then without a photo or a demo, private',
+  testers:
+    'Looking for testers: the Explore card (with and without a photo), then the row of the feed and of a hive',
+  tiles: 'Tiles (a tag, a hive): with a photo, without, and shared with a hive',
+  search: 'Project results of the search: an example project, then an ordinary one',
+  results: 'Projects',
+  family: 'Shared with Family',
   photo: 'Project photo',
   plants: 'The plant notebook',
   plantsPitch: 'A photo of the leaf, and it tells you when to water.',
@@ -171,6 +188,116 @@ function FeedCards({ l }: { l: Labels }) {
   )
 }
 
+/** « Ils cherchent des testeurs » : deux cartes d'Explorer, puis deux lignes (fil, ruche). */
+function TesterExamples({ l }: { l: Labels }) {
+  return (
+    <Stack gap="lg">
+      <Row gap="md" align="start" wrap>
+        <TesterCard
+          title={l.plants}
+          author={EXAMPLES_NAME}
+          image={{ source: null, thumbhash: butterfly, label: l.photo }}
+          onTest={noop}
+          onOpen={noop}
+          example
+        />
+        <TesterCard
+          title={l.long}
+          author={EXAMPLES_NAME}
+          image={null}
+          onTest={noop}
+          onOpen={noop}
+          example
+        />
+      </Row>
+      <View style={{ width: FEED_CARD_WIDTH, maxWidth: '100%' }}>
+        <ListGroup>
+          <TesterRow
+            title={l.plants}
+            author={EXAMPLES_NAME}
+            image={{ source: null, thumbhash: butterfly, label: l.photo }}
+            onTest={noop}
+            onOpen={noop}
+            example
+          />
+          <TesterRow
+            title={l.rocket}
+            author="Papi Jean"
+            image={{ source: null, thumbhash: rocket, label: l.photo }}
+            onTest={noop}
+            onOpen={noop}
+          />
+        </ListGroup>
+      </View>
+    </Stack>
+  )
+}
+
+/** Les tuiles d'un projet d'exemple : avec photo, sans photo, réservée à une ruche. */
+function TileExamples({ l }: { l: Labels }) {
+  return (
+    <Row gap="md" align="start" wrap>
+      <ProjectTile
+        title={l.plants}
+        author={EXAMPLES_NAME}
+        image={{ source: null, thumbhash: butterfly, label: l.photo }}
+        onPress={noop}
+        example
+      />
+      <ProjectTile title={l.sky} author={EXAMPLES_NAME} onPress={noop} example variant="cream" />
+      <ProjectTile
+        title={l.long}
+        author={EXAMPLES_NAME}
+        onPress={noop}
+        example
+        badge={l.family}
+        variant="ink"
+      />
+    </Row>
+  )
+}
+
+/**
+ * Deux résultats de projet de la recherche, comme SearchScreen les assemble : la pastille du
+ * statut à droite, « Exemple » dessous, et le nom lu qui dit les deux.
+ */
+function SearchExamples({ l }: { l: Labels }) {
+  const { t } = useTranslation()
+  const testable = t(($) => $.project.status.testable)
+  const named = (title: string, status: string) =>
+    t(($) => $.search.projectWithStatus, { title, status })
+  return (
+    <View style={{ width: FEED_CARD_WIDTH, maxWidth: '100%' }}>
+      <ListGroup title={l.results}>
+        <ListRow
+          label={l.plants}
+          detail={EXAMPLES_NAME}
+          spokenLabel={named(
+            named(l.plants, testable),
+            t(($) => $.common.example),
+          )}
+          hint={EXAMPLES_NAME}
+          trailing={
+            <Stack gap="xs">
+              <StatusPill label={testable} strong />
+              <ExampleBadge />
+            </Stack>
+          }
+          onPress={noop}
+        />
+        <ListRow
+          label={l.rocket}
+          detail="Papi Jean"
+          spokenLabel={named(l.rocket, testable)}
+          hint="Papi Jean"
+          trailing={<StatusPill label={testable} strong />}
+          onPress={noop}
+        />
+      </ListGroup>
+    </View>
+  )
+}
+
 export function ExampleCardsCatalogue() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -197,6 +324,15 @@ export function ExampleCardsCatalogue() {
             </Example>
             <Example caption={`${l.feed} — ${l[scheme]}`}>
               <FeedCards l={l} />
+            </Example>
+            <Example caption={`${l.testers} — ${l[scheme]}`}>
+              <TesterExamples l={l} />
+            </Example>
+            <Example caption={`${l.tiles} — ${l[scheme]}`}>
+              <TileExamples l={l} />
+            </Example>
+            <Example caption={`${l.search} — ${l[scheme]}`}>
+              <SearchExamples l={l} />
             </Example>
           </Stack>
         </ThemeProvider>

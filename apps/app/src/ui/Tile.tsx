@@ -11,9 +11,11 @@
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
 import { createContext, type ReactNode, type Ref, useContext, useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy } from './aria'
+import { ExampleBadge } from './ExampleBadge'
 import { Icon } from './Icon'
 import { enterActivates } from './keyboard'
 import type { CoverImage } from './ProjectCover'
@@ -145,6 +147,12 @@ type ProjectTileProps = {
    */
   badge?: string | undefined
   /**
+   * R12b : l'auteur est un compte d'exemples (`example: true` du contrat) ; « Exemple » se pose
+   * alors au-dessus du titre, après la pastille de visibilité, et décrit le lien comme elle.
+   * Absent ou faux : rien.
+   */
+  example?: boolean
+  /**
    * R10 : un menu « … » (`ActionMenu`, « Épingler » sur la tuile d'une ruche), posé en haut à droite
    * de la tuile, à côté de son lien, jamais dedans (un bouton dans un lien ne se lit ni ne se touche
    * bien : relecture du plan R10, interface 13). Il est lu après le lien.
@@ -160,10 +168,20 @@ export function ProjectTile({
   image = null,
   ref,
   badge,
+  example = false,
   menu,
 }: ProjectTileProps) {
+  const { t } = useTranslation()
   const { colors } = useTheme()
   const badgeId = useId()
+  const exampleId = useId()
+  // Ce qui décrit le lien : la pastille de visibilité, puis « Exemple » ; sur le web, leurs textes
+  // désignés l'un après l'autre (`aria-describedby` en prend plusieurs), sur téléphone l'indice.
+  const exampleLabel = example ? t(($) => $.common.example) : null
+  const descriptionIds = [badge ? badgeId : null, example ? exampleId : null]
+    .filter(Boolean)
+    .join(' ')
+  const descriptionText = [badge, exampleLabel].filter(Boolean).join('. ')
   const cell = useContext(TileCellContext)
   // Chaque teinte a son fond et ses deux couleurs de texte, toutes mesurées dans contrastPairs :
   // l'encre sur le miel, le brun sur le miel (onHoneyTile), l'encre et le brun de statut sur la
@@ -180,7 +198,7 @@ export function ProjectTile({
       role="link"
       onPress={onPress}
       frameRef={ref}
-      description={badge ? { id: badgeId, text: badge } : undefined}
+      description={descriptionIds ? { id: descriptionIds, text: descriptionText } : undefined}
       style={{ backgroundColor: look.background, padding: space.sm, gap: space.sm }}
     >
       {/* Sans photo, le menu se pose sur le fond de la tuile : sa place est gardée en haut, pour
@@ -211,11 +229,22 @@ export function ProjectTile({
           ...(image ? null : { flexGrow: 1, justifyContent: 'flex-end' }),
         }}
       >
-        {badge ? (
-          // La pastille, au-dessus du titre : le titre garde sa hauteur dans la rangée. Un
-          // `nativeID` sur le texte, que le lien désigne comme sa description (voir TileFrame).
-          <View style={{ flexShrink: 1, maxWidth: '100%', marginBottom: space.xxs }}>
-            <StatusPill label={badge} nativeID={badgeId} />
+        {badge || example ? (
+          // Les pastilles, au-dessus du titre : le titre garde sa hauteur dans la rangée. Un
+          // `nativeID` sur chaque texte, que le lien désigne comme sa description (voir
+          // TileFrame). R12b : « Exemple » après la visibilité, dessous quand la tuile est étroite.
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: space.xxs,
+              flexShrink: 1,
+              maxWidth: '100%',
+              marginBottom: space.xxs,
+            }}
+          >
+            {badge ? <StatusPill label={badge} nativeID={badgeId} /> : null}
+            {example ? <ExampleBadge nativeID={exampleId} /> : null}
           </View>
         ) : null}
         {/* R10 : ni le titre ni l'auteur ne se coupent par « … » : à 320 px et texte à 200 %, un
