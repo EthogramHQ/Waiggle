@@ -50,6 +50,7 @@ export const en: Translation = {
     signIn: 'Sign in',
     signUp: 'Create an account',
     commentsMembersOnly: 'Comments are for members only.',
+    react: 'React',
     reactions_one: '{{count}} reaction from a member',
     reactions_other: '{{count}} reactions from members',
     noProjects: 'No public project yet.',

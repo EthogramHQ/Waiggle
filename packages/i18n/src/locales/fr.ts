@@ -73,6 +73,8 @@ export const fr = {
     commentsMembersOnly: 'Les commentaires sont réservés aux membres.',
     reactions_one: '{{count}} réaction de membre',
     reactions_other: '{{count}} réactions de membres',
+    // Le bouton à côté du nombre de réactions : il ouvre la feuille « Compte requis ».
+    react: 'Réagir',
     // La page publique d'un membre sans projet public à montrer.
     noProjects: 'Pas encore de projet public.',
     // La feuille « Compte requis » (planche R12-Compte-Requis) : le titre suffit (Q11), puis la
