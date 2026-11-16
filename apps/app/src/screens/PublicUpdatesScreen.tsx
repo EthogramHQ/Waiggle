@@ -19,7 +19,6 @@ import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { publicPath } from '../navigation/publicPath'
-import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { usePageLanguage, usePublicProject, usePublicUpdates } from '../public/api'
 import { BeforeAfter } from '../ui/BeforeAfter'
@@ -34,6 +33,7 @@ import { StateMessage } from '../ui/StateMessage'
 import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
 import { UpdateTimeline } from '../ui/UpdateTimeline'
+import { VisitorBar } from '../ui/VisitorBar'
 import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
 export function PublicUpdatesScreen({ id }: { id: string }) {
@@ -163,9 +163,14 @@ function UpdatesView({ project }: { project: PublicProject }) {
   return (
     <Screen
       width="page"
-      // La barre du haut : celle d'un membre ne dessine rien sans session ; la barre d'un visiteur
-      // (« Se connecter », R12) prend cette place.
-      header={<TopNav />}
+      // La barre d'un visiteur (R12) : le logo ramène à l'accueil dans la langue de la page, « Se
+      // connecter » revient sur cette frise (la barre d'un membre ne dessine rien sans session).
+      header={
+        <VisitorBar
+          homeHref={publicPath('home', lang)}
+          next={publicPath('updates', lang, project.id)}
+        />
+      }
       onBack={back}
       backLabel={t(($) => $.project.page.back)}
       pageTitle={t(($) => $.project.updates.pageTitle, { title: project.title })}

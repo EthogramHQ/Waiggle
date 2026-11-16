@@ -52,9 +52,13 @@ export type AuthorLineProps = {
    */
   handle?: string | null | undefined
   avatar: ImageSource | null
-  /** Le nom du lien vers sa page (« Voir la page de Léa »). */
+  /** Le nom du lien vers sa page (« Voir la page de Léa »). Ignoré sans `onOpen`. */
   openLabel: string
-  onOpen: () => void
+  /**
+   * Toucher la photo ou le nom : sa page. Absent (R12 : un visiteur, quand la page de l'auteur
+   * n'est pas publique), la ligne n'est pas un lien : la photo et le nom, en texte simple.
+   */
+  onOpen?: (() => void) | undefined
   /** La pastille ; null ou absente : aucune (sa propre page, état pas encore connu). */
   follow?: AuthorFollow | null | undefined
   /** Le message si le dernier geste sur la pastille n'a pas pu être enregistré. */
@@ -73,6 +77,26 @@ export function AuthorLine({
   error,
   errorAction,
 }: AuthorLineProps) {
+  // La photo et le nom (et le pseudo) : le contenu du lien, ou la ligne seule sans lien.
+  const identity = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+      {/* La photo est décorative : le nom du lien (ou le nom écrit à côté) dit qui c'est. */}
+      <Avatar name={name} source={avatar} label="" size={AVATAR_SIZE} />
+      <View style={{ flexShrink: 1, minWidth: 0 }}>
+        {/* Un nom ne se coupe jamais par « … » : il passe sur deux lignes s'il le faut. */}
+        <Text weight={700} breakAnywhere>
+          {name}
+        </Text>
+        {/* Le pseudo, discret ; une espace insécable tant qu'il n'est pas lu, pour que la
+            ligne garde sa hauteur et que rien ne bouge à son arrivée. */}
+        {handle === null ? null : (
+          <Text variant="caption" tone="muted" breakAnywhere>
+            {handle ?? KEEP_LINE}
+          </Text>
+        )}
+      </View>
+    </View>
+  )
   return (
     <View style={{ gap: space.sm }}>
       <View
@@ -88,25 +112,13 @@ export function AuthorLine({
             quand la pastille ne tient plus à côté, elle passe dessous. flexShrink et maxWidth : un
             nom très long ne sort pas de l'écran (sur le web, une vue ne rétrécit pas seule). */}
         <View style={{ flexGrow: 1, flexBasis: 'auto', flexShrink: 1, maxWidth: '100%' }}>
-          <Pressed label={openLabel} role="link" onPress={onOpen}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              {/* La photo est décorative : le nom du lien dit déjà de qui il s'agit. */}
-              <Avatar name={name} source={avatar} label="" size={AVATAR_SIZE} />
-              <View style={{ flexShrink: 1, minWidth: 0 }}>
-                {/* Un nom ne se coupe jamais par « … » : il passe sur deux lignes s'il le faut. */}
-                <Text weight={700} breakAnywhere>
-                  {name}
-                </Text>
-                {/* Le pseudo, discret ; une espace insécable tant qu'il n'est pas lu, pour que la
-                    ligne garde sa hauteur et que rien ne bouge à son arrivée. */}
-                {handle === null ? null : (
-                  <Text variant="caption" tone="muted" breakAnywhere>
-                    {handle ?? KEEP_LINE}
-                  </Text>
-                )}
-              </View>
-            </View>
-          </Pressed>
+          {onOpen ? (
+            <Pressed label={openLabel} role="link" onPress={onOpen}>
+              {identity}
+            </Pressed>
+          ) : (
+            identity
+          )}
         </View>
         {follow ? (
           // marginLeft auto : à droite de la rangée, et à droite encore quand elle passe dessous.
