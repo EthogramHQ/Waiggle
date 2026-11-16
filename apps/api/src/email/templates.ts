@@ -16,7 +16,7 @@
 // Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 7a, règle 23), écrite en
 // texte et jamais en lien « mailto: » : tout lien d'un e-mail mène à l'appli ou à l'API.
 import { appName, contactEmail, palettes, radii } from '@ruche/brand'
-import type { RemovalGround } from '@ruche/contracts'
+import type { RemovalGround, ReportReason } from '@ruche/contracts'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
 
@@ -1482,6 +1482,106 @@ export const inactiveAccountEmail = (
       reason: fill(i.reason),
       footer: fill(t.footer),
       privacy: privacyLine(language, appUrl),
+    }),
+  }
+}
+
+// ─── Le signalement d'un visiteur sans compte (R12) ──────────────────────────────────────────────
+
+/** Ce qu'un visiteur peut signaler : la nature du contenu, dite dans l'e-mail (jamais son texte). */
+export type VisitorReportKind = 'project' | 'update' | 'member'
+
+/**
+ * Les motifs du contrat (`scam_spam`) et leurs clés de texte (`scamSpam`) : `satisfies` fait
+ * échouer le typage si un motif du contrat manque ici.
+ */
+const REASON_KEYS = {
+  illegal: 'illegal',
+  harassment: 'harassment',
+  sexual_violent: 'sexualViolent',
+  scam_spam: 'scamSpam',
+  impersonation: 'impersonation',
+  privacy: 'privacy',
+  dangerous_link: 'dangerousLink',
+  other: 'other',
+} as const satisfies Record<ReportReason, string>
+
+export type VisitorReportReceivedData = {
+  kind: VisitorReportKind
+  reason: ReportReason
+  /** L'heure de l'envoi, écrite à l'heure de Paris. */
+  sentAt: Date
+}
+
+/**
+ * L'accusé de réception d'un visiteur qui a donné son adresse en signalant (plan R12, décision 12 ;
+ * au plus un par adresse et par jour). Un e-mail de service : ni bouton, ni lien de désinscription
+ * (l'adresse n'est rattachée à aucun compte). Il ne contient **aucun texte d'un membre ni du
+ * visiteur** : seulement la nature du contenu, le motif choisi dans la liste et l'heure. Personne
+ * n'est nommé : « Bonjour, ».
+ */
+export const visitorReportReceivedEmail = (
+  language: Language,
+  { kind, reason, sentAt }: VisitorReportReceivedData,
+  appUrl?: string,
+): EmailContent => {
+  const translation = resources[language].translation
+  const t = translation.email.visitorReport
+  return {
+    subject: fill(t.received.subject),
+    ...render({
+      language,
+      heading: fill(t.received.heading),
+      greeting: fill(t.greeting),
+      paragraphs: [
+        fill(t.received.body),
+        fill(t.kind, { kind: t.kinds[kind] }),
+        fill(t.reason, { reason: translation.report.reasons[REASON_KEYS[reason]] }),
+        fill(t.sentAt, parisEnd(language, sentAt)),
+        fill(t.received.next),
+      ],
+      notes: [fill(t.ignore)],
+      reason: fill(t.reasonWhy),
+      footer: fill(translation.email.footer),
+      privacy: privacyOf(language, appUrl),
+    }),
+  }
+}
+
+export type VisitorReportDecisionData = {
+  kind: VisitorReportKind
+  /** Le signalement visait une partie du contenu (une photo, la description…) et non le tout. */
+  part: boolean
+  /** « removed » : retiré (ou cible disparue) ; « dismissed » : classé sans retrait. */
+  outcome: 'removed' | 'dismissed'
+}
+
+/**
+ * La décision, pour le visiteur qui a donné son adresse : l'issue seulement (comme la notification
+ * d'un membre), jamais l'explication ni le fondement écrits pour l'auteur, jamais le nom de
+ * personne. Elle dit comment contester (DSA, art. 16.5 : l'adresse de contact, en texte, puis la
+ * justice) et que l'adresse est maintenant effacée : c'est le dernier e-mail sur ce signalement.
+ */
+export const visitorReportDecisionEmail = (
+  language: Language,
+  { kind, part, outcome }: VisitorReportDecisionData,
+  appUrl?: string,
+): EmailContent => {
+  const translation = resources[language].translation
+  const t = translation.email.visitorReport
+  const says = t.decided.outcome[part ? 'part' : kind]
+  return {
+    subject: fill(t.decided.subject),
+    ...render({
+      language,
+      heading: fill(t.decided.heading),
+      greeting: fill(t.greeting),
+      paragraphs: [fill(says[outcome])],
+      after: [withBold(t.decided.contest, 'contactEmail', contactEmail)],
+      notes: [fill(t.decided.erased)],
+      reason: fill(t.reasonWhy),
+      footer: fill(translation.email.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }

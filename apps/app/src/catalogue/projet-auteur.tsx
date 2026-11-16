@@ -29,12 +29,15 @@ const fr = {
   mine: 'Vu par l’auteur',
   private: 'Projet privé, vu par l’auteur (une seule catégorie)',
   linked: 'La catégorie est un lien (vers Explorer filtré sur elle), comme sur la page',
+  web: 'Projet public (R12) : « Public » à côté du statut et de la catégorie',
   legacy: 'Projet publié avant les catégories (R6a) : rien à côté du statut',
   lineTitle: 'La ligne de l’auteur, ses autres états',
   unknown: 'Pas encore lue : ni pastille ni pseudo, leur place est gardée',
   followed: 'Déjà suivie à l’ouverture',
   failed: 'Le dernier geste a échoué (session expirée)',
   disabled: 'Compte suspendu, l’abonnement retiré : à sa place, inactive',
+  noLink:
+    'Vu par un visiteur (R12), la page de l’auteur non publique : ni lien, ni pseudo, ni pastille',
   expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
   signIn: 'Me reconnecter',
   sampleTitle: 'Décollage !',
@@ -53,12 +56,14 @@ const en: typeof fr = {
   mine: 'Seen by the author',
   private: 'Private project, seen by the author (a single category)',
   linked: 'The category is a link (to Explore filtered on it), as on the page',
+  web: 'Public project (R12): “Public” beside the status and the category',
   legacy: 'Project published before categories (R6a): nothing beside the status',
   lineTitle: 'The author line, its other states',
   unknown: 'Not read yet: no chip, no handle, their place is kept',
   followed: 'Already followed at opening',
   failed: 'The last gesture failed (session expired)',
   disabled: 'Suspended account, follow removed: in place, inactive',
+  noLink: 'Seen by a visitor (R12), the author page not public: no link, no handle, no chip',
   expired: 'Your session has expired. Sign in again to continue.',
   signIn: 'Sign in again',
   sampleTitle: 'Lift-off!',
@@ -122,6 +127,9 @@ export function ProjectPartsCatalogue() {
                   secondaryCategory: null,
                 }}
               />
+            </Example>
+            <Example caption={`${l.web} — ${l[scheme]}`}>
+              <Parts l={l} project={{ ...sample(l), visibility: 'web', hive: null }} />
             </Example>
             <Example caption={`${l.legacy} — ${l[scheme]}`}>
               <Parts
@@ -263,6 +271,14 @@ function LineStates({ l }: { l: Labels }) {
       </Captioned>
       <Captioned caption={l.disabled}>
         <AuthorLine {...line} follow={{ ...notFollowed, disabled: true }} />
+      </Captioned>
+      <Captioned caption={l.noLink}>
+        <AuthorLine
+          name={line.name}
+          avatar={line.avatar}
+          openLabel={line.openLabel}
+          handle={null}
+        />
       </Captioned>
     </Stack>
   )

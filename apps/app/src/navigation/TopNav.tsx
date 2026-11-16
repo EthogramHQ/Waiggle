@@ -70,15 +70,20 @@ type Props = {
 type NavKey = 'feed' | 'explore' | 'hives' | 'moderation'
 
 const SEARCH_PATH = '/search'
+/** Le Fil, à sa propre adresse depuis R12 (`/` est devenu l'accueil et sa vitrine, pour tous). */
+const FEED_PATH = '/feed'
+/** L'accueil, où mène le logo (plan R12, décision 2 de Louis). */
+const HOME_PATH = '/'
 
 /**
  * Le lien de la page ouverte, d'après son adresse : la même table que la barre d'onglets du
  * téléphone (plan de R3, « La barre d'onglets »). Explorer reste actif sur ses pages filles : la
  * recherche, « Tous les outils » et la page d'un outil. Une page posée par-dessus (un projet, un
- * membre, une notification) n'est d'aucun lien.
+ * membre, une notification) n'est d'aucun lien. Depuis R12, le Fil est à `/feed` ; l'accueil (`/`,
+ * la vitrine) n'est d'aucun lien : le logo y mène (plan R12, choix 8).
  */
 const activeFor = (pathname: string): NavKey | null => {
-  if (pathname === '/') return 'feed'
+  if (pathname === FEED_PATH) return 'feed'
   if (
     pathname === '/explore' ||
     pathname === SEARCH_PATH ||
@@ -210,7 +215,7 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   const onSearchPage = pathname === SEARCH_PATH && focusedScreen
   const onOwnPage = pathname === '/me' || pathname === `/members/${session.user.id}`
   const links: NavLinkEntry<NavKey>[] = [
-    { key: 'feed', label: t(($) => $.nav.feed), href: '/' },
+    { key: 'feed', label: t(($) => $.nav.feed), href: FEED_PATH },
     { key: 'explore', label: t(($) => $.nav.explore), href: '/explore' },
     { key: 'hives', label: t(($) => $.nav.hives), href: '/hives' },
     // « Modération » pour un administrateur seulement (sur téléphone, la ligne reste dans les
@@ -219,7 +224,7 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
       ? [{ key: 'moderation' as const, label: t(($) => $.nav.moderation), href: '/moderation' }]
       : []),
   ]
-  const hrefOf = (key: NavKey) => links.find((link) => link.key === key)?.href ?? '/'
+  const hrefOf = (key: NavKey) => links.find((link) => link.key === key)?.href ?? FEED_PATH
 
   // Le champ, au milieu : il prend la place qui reste. En largeur moyenne, une loupe (et rien sur
   // la page de recherche, qui montre alors son propre champ).
@@ -256,7 +261,7 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
       {/* Les groupes passent à la ligne quand la place manque (texte agrandi, petite fenêtre),
           au lieu de se chevaucher. Le champ, entre les deux, prend la place qui reste. */}
       <Row gap="md" paddingX="sm" wrap>
-        <Wordmark logo onPress={() => router.push('/')} />
+        <Wordmark logo onPress={() => router.push(HOME_PATH)} />
         <NavLinks
           label={t(($) => $.nav.label)}
           links={links}

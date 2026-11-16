@@ -47,7 +47,8 @@ type Task = {
   missed: 'once' | 'skip'
   /** Une tâche d'e-mails, coupée par EMAIL_JOBS=off ; la purge, elle, continue toujours. */
   sendsEmails: boolean
-  run: (deps: JobDeps, now: Date) => Promise<object>
+  /** `emailJobs` : EMAIL_JOBS ; seule la purge le lit (elle tourne même coupée, sans e-mail). */
+  run: (deps: JobDeps, now: Date, emailJobs: boolean) => Promise<object>
 }
 
 const tasks: Task[] = [
@@ -100,10 +101,14 @@ const tasks: Task[] = [
     expireInSeconds: 60 * 60,
     missed: 'once',
     sendsEmails: false,
-    run: (deps, now) => {
+    run: (deps, now, emailJobs) => {
       // La purge efface aussi des fichiers : sans stockage, elle ne doit pas partir à moitié.
       if (!deps.storage) throw new Error('The nightly purge needs the file storage')
-      return nightlyPurge(deps.db, now, deps.storage)
+      // R12 (relecture juridique, point 2) : la décision part aux visiteurs dont le signalement
+      // devient « sans objet » cette nuit ; avec EMAIL_JOBS=off, leurs adresses sont effacées sans
+      // e-mail, comme pour toute tâche d'e-mail coupée.
+      const visitorMail = emailJobs ? { mailer: deps.mailer, appUrl: deps.appUrl } : null
+      return nightlyPurge(deps.db, now, deps.storage, visitorMail)
     },
   },
   {
@@ -203,7 +208,7 @@ const planTasks = async (boss: PgBoss, deps: JobDeps, emailJobs: boolean) => {
     await boss.work(task.name, async () => {
       try {
         // L'heure de la tâche est prise ici, une fois, et passée à la tâche.
-        return await task.run(deps, new Date())
+        return await task.run(deps, new Date(), emailJobs)
       } catch (error) {
         console.error(
           `Job ${task.name} failed`,

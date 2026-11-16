@@ -17,13 +17,17 @@ import {
 } from '@ruche/contracts'
 
 /**
- * Qui peut voir le projet. L'API garde les codes `public` / `hive` / `private` ; l'appli dit
- * « Membres de Waiggle » (les seuls à voir un projet « public », jamais le web ouvert), « Une
- * ruche » (R10 : les seuls membres de la ruche choisie, `hiveId`) ou « Privé ».
+ * Qui peut voir le projet. L'API garde les codes `public` / `hive` / `web` / `private` ; l'appli
+ * dit « Membres de Waiggle » (code `public`, les seuls membres, jamais le web ouvert), « Une
+ * ruche » (R10 : les seuls membres de la ruche choisie, `hiveId`), « Public » (R12 : tout le monde,
+ * même sans compte, code `web`) ou « Privé ».
  */
-export type ProjectAudience = 'members' | 'hive' | 'private'
+export type ProjectAudience = 'members' | 'hive' | 'web' | 'private'
 
-/** Le code de l'API pour chaque audience : « Membres de Waiggle » s'appelle `public`. */
+/**
+ * Le code de l'API pour chaque audience : « Membres de Waiggle » s'appelle `public` (plan R12,
+ * décision 11 : le code `public` garde son sens d'avant), « Public » s'appelle `web`.
+ */
 export const visibilityOf = (audience: ProjectAudience): ProjectVisibility =>
   audience === 'members' ? 'public' : audience
 

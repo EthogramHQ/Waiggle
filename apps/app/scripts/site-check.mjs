@@ -52,8 +52,35 @@ for (const viewport of [
       }
     })
     page.on('pageerror', (error) => problems.push(`${where()} : ${error.message}`))
+    // Les requêtes en cours (envoyées, pas encore finies ni échouées) et les dernières envoyées :
+    // si une page n'atteint jamais « réseau au repos », on sait laquelle la tient ouverte (R12).
+    const pending = new Set()
+    const recent = []
+    // Le statut de chaque réponse reçue : une requête « en cours » avec un statut a reçu ses
+    // en-têtes mais pas la fin de son corps ; sans statut, le serveur n'a jamais répondu.
+    const statuses = new Map()
+    page.on('request', (request) => {
+      pending.add(request)
+      recent.push(`${request.method()} ${request.url()}`)
+      if (recent.length > 40) recent.shift()
+    })
+    page.on('response', (response) => statuses.set(response.request(), response.status()))
+    page.on('requestfinished', (request) => pending.delete(request))
+    page.on('requestfailed', (request) => pending.delete(request))
     for (const path of paths) {
-      await page.goto(base + path, { waitUntil: 'networkidle' })
+      try {
+        await page.goto(base + path, { waitUntil: 'networkidle' })
+      } catch (error) {
+        console.error(`${path} (${viewport.width} px, ${colorScheme}) : ${error.message}`)
+        console.error(`  adresse atteinte : ${page.url()}`)
+        const described = [...pending].map(
+          (r) =>
+            `${r.url()} (${statuses.has(r) ? `réponse ${statuses.get(r)}, corps pas fini` : 'aucune réponse'})`,
+        )
+        console.error(`  en cours : ${described.join(', ') || 'aucune'}`)
+        console.error(`  dernières envoyées :\n    ${recent.join('\n    ')}`)
+        throw error
+      }
       await page.waitForTimeout(800) // le temps de l'hydratation et des animations
     }
     await context.close()

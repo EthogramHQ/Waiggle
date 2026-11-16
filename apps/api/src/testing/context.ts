@@ -19,6 +19,13 @@ export const TEST_API_URL = 'http://localhost:3000'
 export const TEST_AUTH_SECRET = 'test-secret-that-is-long-enough-for-tests'
 
 /**
+ * R12 : l'adresse IP du visiteur sans compte des tests (`ctx.visitor`), prise dans un bloc réservé
+ * à la documentation (198.51.100.0/24), comme celle des membres (203.0.113.7) : elle ne désigne
+ * personne.
+ */
+export const TEST_VISITOR_IP = '198.51.100.23'
+
+/**
  * Un hachage de mot de passe rapide, pour les tests seulement. scrypt, celui de la production,
  * prend ~120 ms par inscription ou connexion, exprès (voir auth.ts) : multiplié par des centaines
  * de tests, cela coûtait des dizaines de secondes. Ici, le même scrypt, mais avec un coût
@@ -149,6 +156,64 @@ export const createTestContext = async ({
     return cookiesFrom(await request(url.pathname + url.search))
   }
 
+  /**
+   * R12 : une demande d'un visiteur sans compte : jamais de cookie (un test qui en passe un dans
+   * `init` le voit retiré), et sa propre adresse IP (`x-real-ip`, posée par Caddy en production),
+   * distincte de celle des membres : ses quotas par IP (5 signalements par jour, limite de lecture)
+   * ne se mêlent pas aux leurs. Un autre `ip` simule un autre visiteur, ou un autre réseau.
+   */
+  const visitor = (path: string, init: RequestInit = {}, ip: string = TEST_VISITOR_IP) => {
+    const headers = new Headers(init.headers)
+    headers.delete('cookie')
+    headers.set('x-real-ip', ip)
+    return request(path, { ...init, headers })
+  }
+
+  /** R12 : un envoi JSON d'un visiteur sans compte (le signalement), depuis l'appli web (Origin). */
+  const visitorPostJson = (path: string, body: unknown, ip: string = TEST_VISITOR_IP) =>
+    visitor(
+      path,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      ip,
+    )
+
+  /**
+   * R12 : publie, par l'API comme dans l'appli, un projet « Public » (`visibility: 'web'`, lisible
+   * sans compte) du membre au `cookie`, et rend son identifiant. `fields` complète ou remplace le
+   * titre, le pitch et la catégorie par défaut. Un refus dit son statut, au lieu de laisser le test
+   * échouer plus loin sans qu'on sache pourquoi.
+   */
+  const webProject = async (cookie: string, fields: Record<string, unknown> = {}) => {
+    const body = {
+      title: 'Décollage !',
+      pitch: 'Un compte à rebours pour la fusée du jardin.',
+      primaryCategory: 'home-garden',
+      ...fields,
+      visibility: 'web',
+    }
+    const res = await postJson('/v1/projects', body, { cookie })
+    if (res.status !== 201) throw new Error(`POST /v1/projects (web) → ${res.status}`)
+    const { id } = (await res.json()) as { id: string }
+    return id
+  }
+
+  /**
+   * R12 : ouvre la page publique du membre au `cookie` (PATCH /v1/me/public-page), avec les cases
+   * par défaut ou celles de `settings` (`showBio: false`…). Un refus dit son statut.
+   */
+  const openPublicPage = async (cookie: string, settings: Record<string, boolean> = {}) => {
+    const res = await request('/v1/me/public-page', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ ...settings, publicPage: true }),
+    })
+    if (res.status !== 200) throw new Error(`PATCH /v1/me/public-page → ${res.status}`)
+  }
+
   return {
     app,
     db,
@@ -162,6 +227,10 @@ export const createTestContext = async ({
       postJson('/api/auth/sign-in/email', { email, password }),
     cookiesFrom,
     verifiedMember,
+    visitor,
+    visitorPostJson,
+    webProject,
+    openPublicPage,
   }
 }
 

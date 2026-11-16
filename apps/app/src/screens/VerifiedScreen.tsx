@@ -35,7 +35,9 @@ export function VerifiedScreen() {
       <Text tone="secondary" align="center">
         {t(($) => $.auth.verified.body)}
       </Text>
-      <Button label={t(($) => $.auth.verified.continue)} onPress={() => router.replace('/')} />
+      {/* « Continuer » mène au Fil (`/feed`, plan R12, décision 9) : l'adresse vérifiée, le membre
+          entre dans l'appli, pas sur l'accueil des visiteurs. */}
+      <Button label={t(($) => $.auth.verified.continue)} onPress={() => router.replace('/feed')} />
     </Screen>
   )
 }

@@ -42,7 +42,23 @@ export const en: Translation = {
     signIn: 'Sign in',
     haveAccount: 'I already have an account',
     publish: 'Publish a project',
-    membersOnly: 'Projects and profiles are only visible with an account.',
+    membersOnly: 'Nothing is public without your consent.',
+    showcase: 'Projects to discover',
+    showcaseNote: 'Their makers chose to make these projects public.',
+  },
+  visitor: {
+    signIn: 'Sign in',
+    signUp: 'Create an account',
+    commentsMembersOnly: 'Comments are for members only.',
+    react: 'React',
+    reactions_one: '{{count}} reaction from a member',
+    reactions_other: '{{count}} reactions from members',
+    noProjects: 'No public project yet.',
+    accountRequired: {
+      title: 'Create your account to react',
+      follow: 'Follow its updates',
+      inviteOnly: '{{appName}} is invitation-only.',
+    },
   },
   legal: {
     version: 'Version of {{date}}',
@@ -56,6 +72,7 @@ export const en: Translation = {
       legal: 'Legal notice',
       accessibility: 'Accessibility',
       sourceCode: 'The source code',
+      report: 'Report content',
       contact: 'Contact us: {{contactEmail}}',
     },
     pages: {
@@ -73,6 +90,7 @@ export const en: Translation = {
           inactive:
             'An account with no visit for 3 years is deleted, after an email sent one month before.',
           yours: 'What you post remains yours. You can download everything or delete everything.',
+          public: 'Nothing is public without your consent.',
         },
         sections: {
           purpose: {
@@ -85,7 +103,11 @@ export const en: Translation = {
           },
           content: {
             title: 'What you post',
-            body: 'What you post remains yours. You allow {{appName}} to show it to the people you choose: all signed-in members, the members of a hive, or only you when the project is private.\n\nA published prompt can be copied and reused by the members who see it.\n\nA photo of someone, or information about them, only with their consent. Your screenshots don’t show other people’s data.\n\nReactions and followers are counted: nobody sees who reacted or who follows whom.',
+            body: 'What you post remains yours. You allow {{appName}} to show it to the people you choose: all signed-in members, the members of a hive, only you when the project is private, or everyone, search engines included, when it is public.\n\nA published prompt can be copied and reused by the people who see it.\n\nGoing back, or deleting, does not remove copies already made elsewhere: search engines, screenshots, messaging apps.\n\nA photo of someone, or information about them, only with their consent; for a public project, their consent to be seen by everyone. Your screenshots don’t show other people’s data.\n\nReactions and followers are counted: nobody sees who reacted or who follows whom.',
+          },
+          visitors: {
+            title: 'What a visitor sees',
+            body: 'Without an account, people see:\n\n- **a public project**: everything its author wrote (texts, photos, tools, prompt, updates), their name and photo, the number of reactions;\n- **a public page**: the name, the photo, and what the person chose to show there.\n\nNever the comments, who reacted, followers, hives, testers, the handle, or a project that is not public. Reacting, commenting and following need an account.',
           },
           forbidden: {
             title: 'What is forbidden',
@@ -101,11 +123,11 @@ export const en: Translation = {
           },
           feed: {
             title: 'The feed, Explore, suggestions and search',
-            body: 'No ranking depends on a member’s popularity or on advertising.\n\n- **The feed, “Following”**: new projects from the people you follow, and updates to their projects and to the projects you follow. Each project appears only once, at its latest event, newest first.\n- **The feed, a hive**: new projects and updates from the members of that hive, in the same order.\n- **Explore**: the projects of all members. “Recent” shows the latest published projects, newest first, and can be filtered by category; “Looking for testers”, the projects open to testers; “Popular tools”, the tools cited by the most projects.\n- **Tools**: the catalogue of AI, development and digital project tools, described by {{appName}} with no link to their makers, and the members’ projects that use them.\n- **People to follow**: the members of your hives first, then members who published recently, by the date of their latest project. Never someone you follow, dismissed or blocked, nor a member who chose “Don’t suggest me to others”.\n- **Search**: the projects, members and tools that contain every word typed, ignoring accents. Projects whose title contains the word come first. Under 3 letters, only the members you follow are found. What you search for is not kept.\n\nYou can adjust what you see: follow or unfollow, dismiss a suggestion, block a member. And what others see of you: “Don’t suggest me to others”, in your settings.',
+            body: 'No ranking depends on a member’s popularity or on advertising.\n\n- **The feed, “Following”**: new projects from the people you follow, and updates to their projects and to the projects you follow. Each project appears only once, at its latest event, newest first.\n- **The feed, a hive**: new projects and updates from the members of that hive, in the same order.\n- **Explore**: the projects of all members. “Recent” shows the latest published projects, newest first, and can be filtered by category; “Looking for testers”, the projects open to testers; “Popular tools”, the tools cited by the most projects.\n- **Tools**: the catalogue of AI, development and digital project tools, described by {{appName}} with no link to their makers, and the members’ projects that use them.\n- **People to follow**: the members of your hives first, then members who published recently, by the date of their latest project. Never someone you follow, dismissed or blocked, nor a member who chose “Don’t suggest me to others”.\n- **Search**: the projects, members and tools that contain every word typed, ignoring accents. Projects whose title contains the word come first. Under 3 letters, only the members you follow are found. What you search for is not kept.\n- **The home showcase and “Featured” in Explore**: up to 4 public projects, chosen by the publisher, with nothing in return. The author is told and can remove their project, which then stays off it.\n\nYou can adjust what you see: follow or unfollow, dismiss a suggestion, block a member. And what others see of you: “Don’t suggest me to others”, in your settings.',
           },
           moderation: {
             title: 'Moderation',
-            body: 'Any member can report content or a profile. Reports are read by moderation, the administrators of {{appName}}, helped by the coding assistant (see Privacy). Moderation never says who reported.\n\nFrom lightest to heaviest, moderation can:\n\n- remove part of a content (a photo, a title…);\n- remove the whole content;\n- suspend an account for a time, or indefinitely.\n\nEach decision is explained: the person concerned receives the facts and the rule or law applied. A suspension is also announced by email. While suspended, you can read everything, remove your content, export your data or delete your account, but no longer post.\n\nDisagree with a decision? Write to {{contactEmail}}: a person will review it and reply. You can also go to court.',
+            body: 'Any member can report content or a profile, and anyone, even without an account, public content. Reports are read by moderation, the administrators of {{appName}}, helped by the coding assistant (see Privacy). Moderation never says who reported.\n\nFrom lightest to heaviest, moderation can:\n\n- remove part of a content (a photo, a title…);\n- remove the whole content;\n- suspend an account for a time, or indefinitely.\n\nEach decision is explained: the person concerned receives the facts and the rule or law applied. A suspension is also announced by email. While suspended, you can read everything, remove your content, export your data or delete your account, but no longer post.\n\nDisagree with a decision? Write to {{contactEmail}}: a person will review it and reply. You can also go to court.',
           },
           authors: {
             title: 'What a project’s author can do',
@@ -113,7 +135,7 @@ export const en: Translation = {
           },
           leaving: {
             title: 'Leaving {{appName}}',
-            body: 'At any time you can download your data, then delete your account, from your settings. Deletion is immediate and final.\n\nWhat stays with others:\n\n- the replies to your comments, under “Comment deleted”, without your text or your name;\n- the name of the hives you created, as long as they have members, and the invitations you sent, without your name;\n- your reports, without your name, until one year after they were handled;\n- what members already copied, such as a prompt, and the emails they already received.',
+            body: 'At any time you can download your data, then delete your account, from your settings. Deletion is immediate and final.\n\nWhat stays with others:\n\n- the replies to your comments, under “Comment deleted”, without your text or your name;\n- the name of the hives you created, as long as they have members, and the invitations you sent, without your name;\n- your reports, without your name, until one year after they were handled;\n- what members already copied, such as a prompt, and the emails they already received;\n- what search engines copied from your public projects and page, until they read them again.',
           },
           changes: {
             title: 'Changes to the rules',
@@ -131,7 +153,7 @@ export const en: Translation = {
           noAds: 'No advertising, no tracking cookie.',
           email: 'No member sees your email address.',
           where:
-            'The server and the emails are in Paris. Only the coding assistant may read extracts outside the European Union.',
+            'The server and the emails are in Paris. Outside the European Union, the coding assistant may read extracts; what you make public can be read anywhere.',
           control: 'You can download everything or delete everything.',
         },
         sections: {
@@ -141,15 +163,15 @@ export const en: Translation = {
           },
           data: {
             title: 'What is kept, and why',
-            body: 'Unless stated otherwise, the basis is the contract: the rules you accept to use {{appName}}.\n\n- **Your account**: your display name, your email address, your language, your password (only its fingerprint, never the password itself). To sign you in and write to you. Signed-in members see your name; nobody sees your address.\n- **Your profile**: your handle, your bio, your photo and your favourite tools. Seen by signed-in members. The photo is cropped and cleaned of its hidden information.\n- **Your projects and their updates**: texts, prompts, photos, demo links, categories. Seen by the people you choose: all signed-in members, a hive, or only you.\n- **Reactions and follows**: who reacts to or follows what. Others only see numbers.\n- **Comments and mentions**: the text, the date, who is mentioned. Seen by those who see the project; the mention, by the person mentioned.\n- **The feed and suggestions**: the date you last read the feed, the suggestions you dismissed, your “Don’t suggest me to others” choice. Seen only by you.\n- **Search**: nothing you search for is kept.\n- **Testers**: your sign-up as a tester, your feedback, your messages and their screenshots. Seen by the project’s author and you; in the project’s comments, a “Tester” badge shows next to your name. A reported message, and its screenshot, is read by moderation, never the rest of the thread.\n- **Hives**: the hives you belong to, who invited you, the invitations. Seen by the members of each hive.\n- **Notifications and emails**: what happened to you, your email choices, the sending dates. Seen only by you.\n- **Reports and moderation**: who reports, the reason, a copy of the reported texts, the decisions and suspensions. Seen by administrators; the person concerned receives the decision, never the name of who reported. Basis: the legitimate interest of protecting members, and the law for illegal content.\n- **Blocking**: the members you blocked. The blocked person is not notified.\n- **Account security**: your sign-in sessions (with the IP address and browser of their creation), the links sent by email, counters against abuse. Seen by no one. Basis: the legitimate interest of protecting accounts.\n- **The accepted rules**: the version, the date, and your statement that you are 15 or older, never your date of birth. To prove your agreement.\n- **The date of your last visit**: to delete an account inactive for 3 years.',
+            body: 'Unless stated otherwise, the basis is the contract: the rules you accept to use {{appName}}.\n\n- **Your account**: your display name, your email address, your language, your password (only its fingerprint, never the password itself). To sign you in and write to you. Signed-in members see your name; everyone does, on your public projects and page. Nobody sees your address.\n- **Your profile**: your handle, your bio, your photo and your favourite tools. Seen by signed-in members. Your public page, by everyone, with what you tick there; your name and photo also come with your public projects. The photo is cropped and cleaned of its hidden information.\n- **Your projects and their updates**: texts, prompts, photos, demo links, categories. Seen by the people you choose: all signed-in members, a hive, only you, or everyone when it is public.\n- **What is public**: a public project or page is read and copied by search engines, including those of AI assistants, which may quote or summarise it. After you go back, they show it until their next visit; you can also ask them to remove their copy. {{appName}} asks robots that collect data to train AI not to read the site; some do not respect this request. Basis: your choice, which you can withdraw at any time.\n- **Reactions and follows**: who reacts to or follows what. Others only see numbers.\n- **Comments and mentions**: the text, the date, who is mentioned. Seen by those who see the project; the mention, by the person mentioned.\n- **The feed and suggestions**: the date you last read the feed, the suggestions you dismissed, your “Don’t suggest me to others” choice. Seen only by you.\n- **Search**: nothing you search for is kept.\n- **Testers**: your sign-up as a tester, your feedback, your messages and their screenshots. Seen by the project’s author and you; in the project’s comments, a “Tester” badge shows next to your name. A reported message, and its screenshot, is read by moderation, never the rest of the thread.\n- **Hives**: the hives you belong to, who invited you, the invitations. Seen by the members of each hive.\n- **Notifications and emails**: what happened to you, your email choices, the sending dates. Seen only by you.\n- **Reports and moderation**: who reports, the reason, a copy of the reported texts, the decisions and suspensions. Seen by administrators; the person concerned receives the decision, never the name of who reported. Basis: the legitimate interest of protecting members, and the law for illegal content.\n- **Reports without an account**: the target, the reason, the details, the email address if given, for the acknowledgement and the decision, and the IP address for the limit of 5 a day. Seen by administrators. Basis: the law (Digital Services Act).\n- **Blocking**: the members you blocked. The blocked person is not notified.\n- **Account security**: your sign-in sessions (with the IP address and browser of their creation), the links sent by email, counters against abuse. Seen by no one. Basis: the legitimate interest of protecting accounts.\n- **Visits without an account**: to read public pages, a counter per network (IP address), kept in the server’s memory, never written; for a report, a counter per IP address and one per fingerprint of the email address. Seen by no one. Basis: the legitimate interest of protecting the service.\n- **The accepted rules**: the version, the date, and your statement that you are 15 or older, never your date of birth. To prove your agreement.\n- **The date of your last visit**: to delete an account inactive for 3 years.',
           },
           retention: {
             title: 'How long',
-            body: '- **Your account and what you post**: as long as your account exists, or until you delete them.\n- **An account with no visit**: deleted after 3 years, with an email one month before.\n- **A sign-up whose address is never verified**: 30 days.\n- **A sign-in session**: 7 days after its last use, erased within 8 days. A session used every day keeps the IP address of its creation.\n- **Links sent by email** (verification, password, address): valid 1 hour, erased within 25 hours.\n- **Counters against abuse**: less than 49 hours. Some keep an IP address.\n- **Your former handle**: reserved for 30 days.\n- **A photo added but never published**: 24 hours, erased within 48 hours.\n- **An invitation to a hive**: 30 days, declined or not.\n- **The app’s notices about your tools and your hives**: 90 days.\n- **A dismissed “Other” tool, and the catalogue log**: 1 year.\n- **A report**: until the decision; 30 days if it has no object; 1 year after the decision if it was handled.\n- **A moderation decision**: 1 year after the last decision on the same content, and as long as the content stays removed.\n- **A suspension**: 1 year after it ends; if indefinite, as long as the account exists.\n- **Server backups**: 14 days; 30 days at most for a backup made before an operation.\n- **The host’s weekly copy**: [duration of the host’s copy].\n- **The app and database logs**: 50 MB at most, the oldest erased first; the app’s also go with each update. They keep no address or name.\n- **The server’s system log** (administrators’ sign-ins): 6 months.\n- **An email sent to {{contactEmail}}**: 1 year after the reply.\n- **Extracts read by the coding assistant**: 30 days at Anthropic, except for the exceptions in its policy.',
+            body: '- **Your account and what you post**: as long as your account exists, or until you delete them.\n- **An account with no visit**: deleted after 3 years, with an email one month before.\n- **A sign-up whose address is never verified**: 30 days.\n- **A sign-in session**: 7 days after its last use, erased within 8 days. A session used every day keeps the IP address of its creation.\n- **Links sent by email** (verification, password, address): valid 1 hour, erased within 25 hours.\n- **Counters against abuse**: less than 49 hours. Some keep an IP address. Those for reading public pages, in memory only: 10 minutes.\n- **Your former handle**: reserved for 30 days.\n- **A photo added but never published**: 24 hours, erased within 48 hours.\n- **An invitation to a hive**: 30 days, declined or not.\n- **The app’s notices about your tools, your hives and the showcase**: 90 days.\n- **A dismissed “Other” tool, and the catalogue log**: 1 year.\n- **A report**: until the decision; 30 days if it has no object; 1 year after the decision if it was handled.\n- **The email address given with a report without an account**: until the report is closed, decided or without object.\n- **A project’s place in the showcase**: as long as the project stays public and neither you nor the publisher removes it.\n- **A moderation decision**: 1 year after the last decision on the same content, and as long as the content stays removed.\n- **A suspension**: 1 year after it ends; if indefinite, as long as the account exists.\n- **Server backups**: 14 days; 30 days at most for a backup made before an operation.\n- **The host’s weekly copy**: [duration of the host’s copy].\n- **The app and database logs**: 50 MB at most, the oldest erased first; the app’s also go with each update. They keep no address or name.\n- **The server’s system log** (administrators’ sign-ins): 6 months.\n- **An email sent to {{contactEmail}}**: 1 year after the reply.\n- **Extracts read by the coding assistant**: 30 days at Anthropic, except for the exceptions in its policy.',
           },
           device: {
             title: 'On your device',
-            body: '{{appName}} uses no audience-measurement or advertising cookie, and loads no tool from another site.\n\nStored on your device:\n\n- your sign-in session (a cookie on the web), 7 days after your last visit;\n- the chosen theme;\n- the help already seen;\n- the dates of the last suspension seen, if there was one;\n- the address waiting for verification, erased when you sign in or close the tab.\n\nThe ambient light follows the mouse and the tilt of the device, but neither is ever kept.',
+            body: '{{appName}} uses no audience-measurement or advertising cookie, and loads no tool from another site.\n\nStored on your device:\n\n- your sign-in session (a cookie on the web), 7 days after your last visit;\n- on the web, a marker with no identifier that says you are signed in, to open the Feed for you; 7 days after your last visit, erased when you sign out;\n- the chosen theme;\n- the help already seen;\n- the dates of the last suspension seen, if there was one;\n- the address waiting for verification, erased when you sign in or close the tab.\n\nWithout an account, no cookie is set.\n\nThe ambient light follows the mouse and the tilt of the device, but neither is ever kept.',
           },
           servers: {
             title: 'Backups and logs',
@@ -161,11 +183,11 @@ export const en: Translation = {
           },
           assistant: {
             title: 'The coding assistant',
-            body: '{{appName}} is built and run with the help of Claude, Anthropic’s coding assistant. It is not a processor: it is a separate recipient.\n\nTo fix an outage or handle a report, it may read extracts of the logs and the database, for example the text of reported content.\n\n- The plan used today is a plan for individuals. Under it, Anthropic decides for itself how these extracts are used, and is responsible for them under [its privacy policy](https://www.anthropic.com/legal/privacy).\n- These extracts may leave the European Union.\n- They are not used to train its models: this setting has been off since 15 November 2026.\n- They are kept 30 days at Anthropic, except for the exceptions in its policy.\n\nAt the latest when {{appName}} opens to the public, {{appName}} will move to a business plan, under which Anthropic becomes its processor. This page will change then.',
+            body: '{{appName}} is built and run with the help of Claude, Anthropic’s coding assistant. It is not a processor: it is a separate recipient.\n\nTo fix an outage or handle a report, it may read extracts of the logs and the database, for example the text of reported content.\n\n- The plan used today is a plan for individuals. Under it, Anthropic decides for itself how these extracts are used, and is responsible for them under [its privacy policy](https://www.anthropic.com/legal/privacy).\n- These extracts may leave the European Union.\n- They are not used to train its models: this setting has been off since 15 November 2026.\n- They are kept 30 days at Anthropic, except for the exceptions in its policy.\n\nAt the latest when {{appName}} becomes commercial or opens sign-ups, {{appName}} will move to a business plan, under which Anthropic becomes its processor. This page will change then.',
           },
           rights: {
             title: 'Your rights',
-            body: 'You have the right to access your data, correct it, erase it, object to a processing, ask for it to be restricted, and take it with you.\n\nFrom the app:\n\n- **download your data**: Settings, “My data”;\n- **correct it**: “My profile”, and your address in Settings, “Account”;\n- **erase it**: each content from its page, your comments from “My comments”, your tester feedback from “My sent feedback”, or your whole account;\n- **object**: “Don’t suggest me to others”, and your email choices in Settings, “Notifications”.\n\nBy email, at {{contactEmail}}: write from your account’s address, so we know it is really you. We reply within one month; if the request is complex, this can go up to three months, and we tell you.\n\nYou can also complain to the CNIL, the French data protection authority: [cnil.fr](https://www.cnil.fr/fr/plaintes).',
+            body: 'You have the right to access your data, correct it, erase it, object to a processing, ask for it to be restricted, and take it with you.\n\nFrom the app:\n\n- **download your data**: Settings, “My data”;\n- **correct it**: “My profile”, and your address in Settings, “Account”;\n- **erase it**: each content from its page, your comments from “My comments”, your tester feedback from “My sent feedback”, or your whole account;\n- **object**: “Don’t suggest me to others”, and your email choices in Settings, “Notifications”.\n\nBy email, at {{contactEmail}}: write from your account’s address, so we know it is really you. Without an account, after a report: from the address you gave. We reply within one month; if the request is complex, this can go up to three months, and we tell you.\n\nYou can also complain to the CNIL, the French data protection authority: [cnil.fr](https://www.cnil.fr/fr/plaintes).',
           },
         },
       },
@@ -353,7 +375,13 @@ export const en: Translation = {
       both: 'Two things are missing: your agreement to the rules and your age.',
     },
     changesTitle: 'What changes',
-    changes: {},
+    changes: {
+      public:
+        'A project can become public, if you choose: everyone sees it then, search engines included.',
+      visitors: 'Without an account, people can see public projects and pages, and report them.',
+      showcase:
+        'The publisher picks public projects for the home showcase and “Featured”; the author can remove theirs.',
+    },
     suspended:
       'Accepting the rules does not lift your suspension: you can read everything, but not post, until it ends.',
     error: 'Your agreement could not be saved. Try again.',
@@ -479,6 +507,8 @@ export const en: Translation = {
         reportCopies:
           'If your content or your profile was reported, the copy of its text stays 30 days (a year if it was removed)',
         hiveInvitations: 'The invitations you sent stay valid, without your name',
+        searchCopies:
+          'The copies search engines might have kept of your public projects or your public page',
       },
     },
   },
@@ -524,7 +554,7 @@ export const en: Translation = {
         'It does not change with your name. {{min}} to {{max}} characters: letters without accents, digits and “_”.',
       bio: 'Bio',
       tools: 'Favorite tools',
-      toolsHint: 'Visible to all members on your page.',
+      toolsHint: 'Visible on your page.',
     },
     save: 'Save',
     saved: 'Profile saved.',
@@ -560,8 +590,28 @@ export const en: Translation = {
       bannerHandle: 'Your temporary handle is @{{handle}}. Choose another one.',
       bannerName: 'Your temporary name is “{{name}}”. Choose another one.',
     },
+    publicPage: {
+      title: 'My public profile',
+      toggle: 'Make my page public',
+      toggleHint: 'Visible to everyone, and findable on Google',
+      visitorSees: 'What a visitor sees',
+      nameAndPhoto: 'My name and photo',
+      nameAndPhotoHint: 'Always, if the page is public',
+      bio: 'My bio',
+      tools: 'My favourite tools',
+      projects: 'My public projects',
+      projectsCount: '{{count}} of {{total}}: the others stay between members',
+      projectsAll: '{{count}} of {{total}}',
+      projectsNone: 'No public project yet',
+      followerCount: 'My follower count',
+      never: 'Never shown: your hives, who follows you, your comments and your reactions.',
+      preview: 'See my page as a visitor',
+      suspended: 'While suspended, you can only close your public page.',
+      error: 'The change couldn’t be saved. Try again.',
+    },
   },
   project: {
+    webBadge: 'Public',
     form: {
       newTitle: 'New project',
       editTitle: 'Edit the project',
@@ -683,6 +733,10 @@ export const en: Translation = {
       audienceHiveEdit: 'Only members of {{hive}} see this project.',
       private: 'Private',
       privateHint: 'A draft: no other member can see it.',
+      web: 'Public',
+      webHint: 'Visible to everyone, and findable on Google',
+      audienceWeb:
+        'Anyone will be able to see it, even without an account. If you change your mind, search engines may keep showing it for a while.',
       audienceMembers:
         '{{appName}} members will see this project; your followers will find it in their feed and in their email recap, which stays in their inbox.',
       audienceMembersEdit:
@@ -792,6 +846,8 @@ export const en: Translation = {
       beforeAfterSwitch: 'Before / after',
       hintPublic:
         'Every member will be able to read it. This project’s followers and testers will be notified.',
+      hintWeb:
+        'Anyone will be able to read it, even without an account. This project’s followers and testers will be notified.',
       hintPrivate:
         'This project is private: no other member sees this update, and nobody is notified. If it becomes visible to members again, they will all see it, and its followers and testers will be able to find it in Activity.',
       statusPrefill: 'The project is now “{{status}}”.',
@@ -1185,6 +1241,7 @@ export const en: Translation = {
         'The project, its description, photos, prompts, updates and testers’ corner disappear right away, along with the other members’ comments, reactions and feedback. This can’t be undone.',
       deleteConfirmRemoved:
         'The project, its description, photos, prompts, updates and testers’ corner disappear right away, along with the other members’ comments, reactions and feedback. The moderation decision and the copy of the report are kept for up to a year after the decision. This can’t be undone.',
+      deleteConfirmWeb: 'Search engines may keep showing it for a while.',
       deleteConfirmButton: 'Delete',
       notFoundTitle: 'This project cannot be found',
       notFound: 'It may have been deleted, it may not be visible to you, or the link is wrong.',
@@ -1346,6 +1403,16 @@ export const en: Translation = {
     alreadyReportedPart: 'You’ve already reported this part. Moderation will look at it.',
     limitedLead:
       'You’ve reached the limit of {{max}} reports in 24 hours. For something urgent, write to us:',
+    visitor: {
+      email: 'Your email address, optional',
+      emailHint: 'To hear what happens to your report',
+      emailPlaceholder: 'name@example.com',
+      moderationReads: 'Moderation reads every report.',
+      sentBody: 'Moderation will look at it.',
+      sentBodyEmail: 'Moderation will look at it. An email will tell you once it has been handled.',
+      limited:
+        'Too many reports from this connection. Try again tomorrow, or write to us: {{contactEmail}}',
+    },
   },
   actionMenu: {
     label: 'More actions',
@@ -1397,6 +1464,8 @@ export const en: Translation = {
       follows: 'Your follows of each other are removed.',
       notTold: 'No message is sent to them.',
       moderation: 'The moderation isn’t told.',
+      publicProjects:
+        'Your public projects and your public page, if you have them, stay visible to everyone, even without an account.',
     },
     fullText: 'What blocking changes',
     alsoReport: 'Also report their profile',
@@ -1407,6 +1476,33 @@ export const en: Translation = {
     removed: 'Removed',
     empty: 'No reports pending.',
     emptyRemoved: 'No removed content.',
+    showcase: {
+      tab: 'Home showcase',
+      reportsTab: 'Reports',
+      title: 'On the home page',
+      count: '{{count}} of {{max}}',
+      freeSlot: 'A free spot',
+      remove: 'Remove',
+      removeNamed: 'Remove {{title}} from the home page',
+      candidates: 'Public projects',
+      search: 'Search a public project',
+      feature: 'Feature',
+      featureNamed: 'Feature {{title}}',
+      limit:
+        '{{max}} projects at most. Each maker is told in Activity and can take their project off the home page.',
+      full: 'The home page is full: remove one to feature another.',
+      empty: 'No public project yet.',
+      searchEmpty: 'No public project matches.',
+      changed: 'Edited since it was featured',
+      errorTitle: 'The showcase couldn’t load',
+      error: 'The change couldn’t be saved. Try again.',
+      // R12, R12-Vitrine board: the line of a public project, under its title.
+      byline: '{{name}} · public since {{date}}',
+      // The name of the group of the two top tabs, its own and not the page's.
+      sections: 'Moderation sections',
+      // R12 design review, point 1: the place of a removed project stays until the view changes.
+      removed: 'Off the home page',
+    },
     more: 'Show more',
     errorTitle: 'Moderation couldn’t load',
     kinds: {
@@ -1859,7 +1955,7 @@ export const en: Translation = {
     makePrivate: 'Make private',
     makePrivateTitle: 'Make “{{title}}” private?',
     makePrivateBody:
-      'Only you will see it. While suspended, you won’t be able to make it public again.',
+      'Only you will see it. While suspended, you won’t be able to make it visible again.',
     madePrivate: 'Project made private.',
     makePrivateError: 'The project couldn’t be made private. Try again.',
   },
@@ -1988,6 +2084,9 @@ export const en: Translation = {
     allCategories: 'All',
     categoryEmpty: 'No project in “{{name}}” for now.',
     seeAllProjects: 'See all projects',
+    featured: 'Featured',
+    featuredPrevious: 'Previous featured projects',
+    featuredNext: 'Next featured projects',
     categoriesError: 'The categories could not load.',
   },
   search: {
@@ -2405,11 +2504,13 @@ export const en: Translation = {
     membersOnly: 'Only {{appName}} members will be able to open it.',
     hiveOnly: 'Only members of {{hive}} will be able to open it.',
     privateOnly: 'This project is private: the link will only open for you.',
+    everyone: 'Anyone will be able to open it.',
     system: 'Share…',
     copy: 'Copy link',
     copiedMembers: 'Link copied: only {{appName}} members will be able to open it.',
     copiedHive: 'Link copied: only members of {{hive}} will be able to open it.',
     copiedPrivate: 'Link copied: it will only open for you.',
+    copiedEveryone: 'Link copied: anyone will be able to open it.',
     copyFailed: 'Could not copy the link. Try again.',
     systemFailed: 'Could not open sharing. Copy the link instead.',
   },
@@ -2674,6 +2775,51 @@ export const en: Translation = {
       reason:
         'You are receiving this email because your {{appName}} account has not been used for almost 3 years. It is a service email: it is sent even if you turned off the others, only once before the deletion.',
     },
+    visitorReport: {
+      greeting: 'Hello,',
+      kind: 'Content: {{kind}}',
+      reason: 'Reason: {{reason}}',
+      sentAt: 'Sent on {{date}} at {{time}}',
+      kinds: {
+        project: 'a project',
+        update: 'an update',
+        member: 'a profile',
+      },
+      ignore: 'If you didn’t report anything, ignore this email.',
+      reasonWhy:
+        'You are receiving this email because this address was given when reporting content on {{appName}}.',
+      received: {
+        subject: 'We received your report',
+        heading: 'We received your report',
+        body: 'Thank you. The {{appName}} moderation will look at what you reported.',
+        next: 'A second email will tell you what was decided. Your address will then be erased.',
+      },
+      decided: {
+        subject: 'Your report has been handled',
+        heading: 'Your report has been handled',
+        outcome: {
+          project: {
+            removed: 'The project you reported has been removed.',
+            dismissed: 'After review, the project you reported has not been removed.',
+          },
+          update: {
+            removed: 'The update you reported has been removed.',
+            dismissed: 'After review, the update you reported has not been removed.',
+          },
+          member: {
+            removed: 'Moderation took action on the profile you reported.',
+            dismissed: 'After review, nothing was changed on the profile you reported.',
+          },
+          part: {
+            removed: 'The part you reported has been removed.',
+            dismissed: 'After review, the part you reported has not been removed.',
+          },
+        },
+        contest: 'Disagree? Write to {{contactEmail}}; you can also go to court.',
+        erased:
+          'Your address is now erased: this is the last email from {{appName}} about this report.',
+      },
+    },
     privacy: 'Privacy: {{url}}',
   },
   notificationSettings: {
@@ -2710,7 +2856,7 @@ export const en: Translation = {
     nobodyTitle: 'You don’t follow anyone yet',
     nobodyBody: 'Follow members from their page: their new projects will show up here.',
     nobodyAction: 'Explore projects',
-    discoverEmpty: 'No public project yet.',
+    discoverEmpty: 'No project published yet.',
     testersEmpty: 'No project is looking for testers yet.',
     testersCaption: 'Projects to try: their makers are waiting for your feedback.',
     more: 'Show more',
@@ -2813,6 +2959,11 @@ export const en: Translation = {
     hiveAnimator: 'You now host the <b>{{hive}}</b> hive.',
     hiveDeleted: 'The <b>{{hive}}</b> hive has been deleted.',
     hivePrivateAgain: 'Your projects kept for the hive are private again.',
+    showcaseAdded: '<b>{{title}}</b> is on the {{appName}} home page',
+    showcaseWas: '<b>{{title}}</b> was on the {{appName}} home page',
+    showcaseLeave: 'Remove from the home page',
+    showcaseLeft: 'Your project left the home page. It stays public.',
+    showcaseLeaveError: 'The project couldn’t leave the home page. Try again.',
     emailColumn: {
       title: 'What you get by email',
       settings: 'Notification settings',
@@ -3043,5 +3194,8 @@ export const en: Translation = {
       'Accept the rules of {{appName}} first: this action is waiting for your agreement.',
     rulesNotAccepted: 'Accept the rules of {{appName}} to create your account.',
     ageNotDeclared: '{{appName}} is open from age 15.',
+    visitorReportQuota:
+      'Too many reports from this connection. Try again tomorrow, or write to us: {{contactEmail}}',
+    authorDeclined: 'The maker has taken this project off the home page.',
   },
 }

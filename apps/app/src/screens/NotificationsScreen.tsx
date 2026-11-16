@@ -18,7 +18,7 @@
 // d'une décision de la modération, qui reste absolue et visible sans survol (jur-J2).
 import type { Notification } from '@ruche/contracts'
 import { type Href, useRouter } from 'expo-router'
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { type ComponentProps, useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
@@ -33,10 +33,12 @@ import { useMarkSeen, useNotifications } from '../notifications/api'
 import { groupByDay } from '../notifications/days'
 import { type Presented, presentNotification } from '../notifications/present'
 import { shortDate } from '../projects/format'
+import { useLeaveShowcase } from '../showcase/leave'
 import { Button } from '../ui/Button'
 import { Columns } from '../ui/Columns'
 import { EmailSummary } from '../ui/EmailSummary'
 import { FeedEnd, type FirstArrived, useFirstArrived } from '../ui/FeedEnd'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
 import { LiveStatus } from '../ui/LiveStatus'
 import {
@@ -101,7 +103,8 @@ function useVisitHoney(items: readonly Notification[]) {
 function MemberNotifications() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
-  const back = useGoBack('/')
+  // Sans page d'avant (lien direct), le retour mène au Fil (`/feed`, plan R12, décision 9).
+  const back = useGoBack('/feed')
   const list = useNotifications()
   const { markSeen } = useMarkSeen()
   const suspended = useSuspension().suspended
@@ -146,26 +149,34 @@ function MemberNotifications() {
       categories,
     })
     const target = shown.target
-    return (
-      <NotificationCard
-        key={notification.id}
-        ref={ref}
-        leading={leadingOf(shown, toSource)}
-        parts={shown.parts}
-        quote={shown.quote}
-        reactions={shown.reactions}
-        detail={shown.detail}
-        thumb={thumbOf(shown, toSource)}
-        when={
-          MODERATION_KINDS.has(notification.kind)
-            ? shortDate(notification.at, i18n.language)
-            : { date: notification.at }
-        }
-        isNew={honey.isNew(notification.id)}
-        onPress={target ? () => router.push(target) : null}
-        action={actionOf(shown.action, (href) => router.push(href))}
-      />
-    )
+    const card: CardProps = {
+      ref,
+      leading: leadingOf(shown, toSource),
+      parts: shown.parts,
+      quote: shown.quote,
+      reactions: shown.reactions,
+      detail: shown.detail,
+      thumb: thumbOf(shown, toSource),
+      when: MODERATION_KINDS.has(notification.kind)
+        ? shortDate(notification.at, i18n.language)
+        : { date: notification.at },
+      isNew: honey.isNew(notification.id),
+      onPress: target ? () => router.push(target) : null,
+      action: actionOf(shown.action, (href) => router.push(href)),
+    }
+    // R12 : « Décollage ! est sur l'accueil » porte un geste qui écrit sur place, « Retirer de
+    // l'accueil » : une ligne à elle, qui garde l'état de cette écriture.
+    if (notification.kind === 'showcase_added') {
+      return (
+        <ShowcaseAddedCard
+          key={notification.id}
+          {...card}
+          projectId={notification.project.id}
+          onShowcase={notification.onShowcase}
+        />
+      )
+    }
+    return <NotificationCard key={notification.id} {...card} />
   }
 
   // Les sections, chacune une liste annoncée. Le rang de la première ligne arrivée est compté sur
@@ -309,6 +320,81 @@ function MemberNotifications() {
         content
       )}
     </Screen>
+  )
+}
+
+/** Ce que reçoit une ligne d'Activité (`ui/NotificationCard`), tel que l'écran le prépare. */
+type CardProps = ComponentProps<typeof NotificationCard>
+
+type ShowcaseAddedCardProps = Omit<CardProps, 'action' | 'actionNotice'> & {
+  projectId: string
+  /** Le projet est encore sur l'accueil (l'API le dit à la lecture) : le geste est proposé. */
+  onShowcase: boolean
+}
+
+/**
+ * La ligne « Décollage ! est sur l'accueil de Waiggle » (R12, planche R12-Vitrine, « Chez l'auteur,
+ * dans Activité » ; plan R12, décision 18). Tant que le projet y est, elle offre « Retirer de
+ * l'accueil », un bouton à part du lien de la ligne : le toucher n'ouvre pas le projet.
+ *
+ * - Un seul envoi (DELETE /v1/projects/<id>/showcase), même après une double tape.
+ * - Réussi : le message « Ton projet a quitté l'accueil. Il reste public. » prend la place du
+ *   bouton, et le focus y va (le bouton touché n'est plus là ; sans cela il tomberait sur la page).
+ *   Le message reste toute la visite : la liste, elle, ne bouge pas.
+ * - Échoué : le bouton reste, pour réessayer, et l'erreur s'affiche dessous, près de la ligne.
+ */
+function ShowcaseAddedCard({ projectId, onShowcase, ...card }: ShowcaseAddedCardProps) {
+  const { t } = useTranslation()
+  const leave = useLeaveShowcase(projectId)
+  const [left, setLeft] = useState(false)
+  // Un `ref` (une valeur qui survit aux rendus sans en déclencher) plutôt que `leave.isPending` :
+  // deux tapes dans la même image lisent toutes deux la valeur à jour, et une seule part.
+  const sending = useRef(false)
+  // Le message de réussite, où poser le focus quand le bouton s'en va.
+  const result = useRef<Focusable>(null)
+  useEffect(() => {
+    if (!left) return
+    focusWithoutScroll(result.current)
+    moveReaderTo(result.current)
+  }, [left])
+
+  const leaveHome = () => {
+    if (sending.current) return
+    sending.current = true
+    leave.mutate(undefined, {
+      onSuccess: () => setLeft(true),
+      onSettled: () => {
+        sending.current = false
+      },
+    })
+  }
+
+  if (left) {
+    return (
+      <NotificationCard
+        {...card}
+        actionNotice={{
+          message: t(($) => $.notifications.showcaseLeft),
+          tone: 'success',
+          ref: result,
+        }}
+      />
+    )
+  }
+  return (
+    <NotificationCard
+      {...card}
+      action={
+        onShowcase
+          ? { label: t(($) => $.notifications.showcaseLeave), onPress: leaveHome }
+          : undefined
+      }
+      actionNotice={
+        onShowcase && leave.isError
+          ? { message: t(($) => $.notifications.showcaseLeaveError), tone: 'error' }
+          : null
+      }
+    />
   )
 }
 

@@ -19,7 +19,13 @@
 //   copié » mensonger : ui-7) ;
 // - ui-9 : « Partager… » attend l'hydratation de la page web (le pré-rendu ne connaît pas le
 //   navigateur).
+//
+// R12 (scénario « Partager », Q18, planche R12-Partager-Public) : un projet public ou une page
+// publique disent « Tout le monde pourra l'ouvrir. », sous un globe, jamais « Seuls les membres… » ;
+// leur lien est l'adresse par langue (`/fr/projects/<id>`), celle de qui partage, la même pour
+// « Copier le lien » et pour le menu de l'appareil.
 import { radii } from '@ruche/brand'
+import { resolveLanguage } from '@ruche/i18n'
 import { Image } from 'expo-image'
 import { type ReactNode, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -49,9 +55,11 @@ type ContentProps = {
   /**
    * `public` (par défaut) : seuls les membres pourront l'ouvrir. `private` : un projet privé, que
    * le lien n'ouvrira que pour son auteur (jur-3). R10 : `hive`, un projet réservé à une ruche, que
-   * seuls ses membres pourront ouvrir (la ruche est dans `hive`).
+   * seuls ses membres pourront ouvrir (la ruche est dans `hive`). R12 : `web`, un projet public ou,
+   * pour un membre, une page publique (`Member.publicPage`) : tout le monde pourra l'ouvrir, et le
+   * lien est son adresse dans la langue de qui partage.
    */
-  visibility?: 'public' | 'hive' | 'private'
+  visibility?: ShareVisibility
   /**
    * R10 : la ruche d'un projet réservé (`Project.hive`), pour la nommer : « Seuls les membres de
    * Famille pourront l'ouvrir. ». Un nom `null` (retiré par la modération) se dit « Ruche sans nom ».
@@ -68,6 +76,70 @@ type ContentProps = {
 }
 
 type Props = ContentProps & { open: boolean }
+
+/** Qui pourra ouvrir la page partagée : le choix de son auteur (`Project.visibility`). */
+export type ShareVisibility = 'public' | 'hive' | 'private' | 'web'
+
+/** Qui pourra ouvrir le lien, tel que la feuille et son toast le disent. */
+type Audience = 'everyone' | 'members' | 'hive' | 'private'
+
+/**
+ * Hook : le lien d'une page et ce qu'on en dit, pour la feuille « Partager » et pour « Copier le
+ * lien » du menu « … » d'un projet (une seule règle pour les deux : le toast du menu ne peut pas
+ * dire autre chose que le bandeau de la feuille). Rend l'adresse (`null` si l'identifiant est
+ * douteux), le bandeau (« Tout le monde pourra l'ouvrir. »), son icône, et le toast d'une copie
+ * réussie, qui le redit (jur-5).
+ */
+export function useShareLink({
+  target,
+  visibility = 'public',
+  hive = null,
+}: Pick<ContentProps, 'target' | 'visibility' | 'hive'>) {
+  const { t, i18n } = useTranslation()
+  // Qui pourra ouvrir le lien : tout le monde (R12, un projet ou une page publics), les membres
+  // (par défaut), ceux d'une ruche (R10), ou l'auteur seul. Un projet réservé dont la ruche manque
+  // se dit privé : le moins promis des deux. Une page de membre est publique ou pour les membres.
+  const audience: Audience =
+    visibility === 'web'
+      ? 'everyone'
+      : target.kind !== 'project'
+        ? 'members'
+        : visibility === 'hive'
+          ? hive
+            ? 'hive'
+            : 'private'
+          : visibility === 'private'
+            ? 'private'
+            : 'members'
+  // L'adresse : par langue pour ce que tout le monde peut ouvrir, dans la langue de l'appli de qui
+  // partage (Q18) ; sur la page d'un visiteur, c'est la langue de la page, que son adresse règle.
+  const url = shareUrl(
+    target,
+    audience === 'everyone' ? resolveLanguage([i18n.language]) : undefined,
+  )
+  // Le nom de la ruche, dans une phrase qui ne dit pas « la ruche … » : « Ruche sans nom » s'il a
+  // été retiré (plan R10, « Une ruche sans nom dans une phrase »).
+  const hiveName = hive?.name ?? t(($) => $.hives.unnamed)
+  const banner =
+    audience === 'everyone'
+      ? t(($) => $.share.everyone)
+      : audience === 'hive'
+        ? t(($) => $.share.hiveOnly, { hive: hiveName })
+        : audience === 'private'
+          ? t(($) => $.share.privateOnly)
+          : t(($) => $.share.membersOnly)
+  const copied =
+    audience === 'everyone'
+      ? t(($) => $.share.copiedEveryone)
+      : audience === 'hive'
+        ? t(($) => $.share.copiedHive, { hive: hiveName })
+        : audience === 'private'
+          ? t(($) => $.share.copiedPrivate)
+          : t(($) => $.share.copiedMembers)
+  // Le globe pour ce qui est ouvert à tous (planche R12-Partager-Public), le cadenas sinon.
+  const icon = audience === 'everyone' ? ('globe-simple' as const) : ('lock-simple' as const)
+  return { url, banner, copied, icon }
+}
 
 /**
  * Le contenu de la feuille, commun à `ShareSheet` (dans sa couche modale) et à `ShareSheetPanel`
@@ -94,7 +166,7 @@ function useShareContent({
   const toast = useToast()
   const hydrated = useHydrated()
   const guard = useTapGuard()
-  const url = shareUrl(target)
+  const { url, banner, copied, icon } = useShareLink({ target, visibility, hive })
   // La copie en cours, et la fin de sa garde : la seconde tape d'une double tape arrive avant que
   // React ait redessiné, d'où des `ref` plutôt qu'un état (comme « Copier » d'un prompt).
   const copying = useRef(false)
@@ -113,34 +185,6 @@ function useShareContent({
 
   if (!url) return null
 
-  // Qui pourra ouvrir le lien : les membres (par défaut), ceux d'une ruche (R10), ou l'auteur seul.
-  // Un projet réservé dont la ruche manque se dit privé : le moins promis des deux.
-  const audience: 'members' | 'hive' | 'private' =
-    target.kind !== 'project'
-      ? 'members'
-      : visibility === 'hive'
-        ? hive
-          ? 'hive'
-          : 'private'
-        : visibility === 'private'
-          ? 'private'
-          : 'members'
-  // Le nom de la ruche, dans une phrase qui ne dit pas « la ruche … » : « Ruche sans nom » s'il a
-  // été retiré (plan R10, « Une ruche sans nom dans une phrase »).
-  const hiveName = hive?.name ?? t(($) => $.hives.unnamed)
-  const banner =
-    audience === 'hive'
-      ? t(($) => $.share.hiveOnly, { hive: hiveName })
-      : audience === 'private'
-        ? t(($) => $.share.privateOnly)
-        : t(($) => $.share.membersOnly)
-  // Le toast de « Copier le lien » redit la même chose (jur-5).
-  const copied =
-    audience === 'hive'
-      ? t(($) => $.share.copiedHive, { hive: hiveName })
-      : audience === 'private'
-        ? t(($) => $.share.copiedPrivate)
-        : t(($) => $.share.copiedMembers)
   // Le menu de l'appareil : seulement s'il existe, et (sur le web) une fois la page hydratée.
   const system = hydrated && (canShare ?? canShareNatively())
 
@@ -216,7 +260,7 @@ function useShareContent({
         <Text variant="code" tone="secondary" selectable breakAnywhere>
           {url}
         </Text>
-        <Callout tone="caution" icon="lock-simple" title={banner} />
+        <Callout tone="caution" icon={icon} title={banner} />
       </>
     ),
     footer: (

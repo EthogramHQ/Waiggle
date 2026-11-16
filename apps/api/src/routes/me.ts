@@ -9,7 +9,9 @@ import {
   HANDLE_CHANGES_PER_DAY,
   Me,
   ModerationDecisionExport,
+  MyPublicPage,
   ProfileUpdate,
+  PublicPageSettingsPatch,
   ReportOutcome,
   ReportPartField,
   ReportReason,
@@ -40,12 +42,19 @@ import {
 import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
 import { provisionalOf } from '../profile/provisional'
+import {
+  myPublicPage,
+  publicSettingsOf,
+  savePublicSettings,
+  suspendedPublicPageChange,
+} from '../profile/public-settings'
 import { loadProjectsOf } from '../projects/load'
 import { listedProjectFor, sharedProjectWith } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
 import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { rulesAcceptancesOf } from '../rules/acceptance'
+import { showcaseExportOf } from '../showcase/store'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isJsonObject, suspendedProfileChange } from '../suspension/guard'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
@@ -141,6 +150,35 @@ const exportRoute = createRoute({
     },
     401: errorResponse('Not signed in.'),
     429: errorResponse('Too many exports.'),
+  },
+})
+
+const publicPageResponse = {
+  description: 'My public page settings, and how many of my projects are public.',
+  content: { 'application/json': { schema: MyPublicPage } },
+}
+
+// R12 : « Mon profil public », la page publique et ses cinq cases.
+const publicPageRoute = createRoute({
+  method: 'get',
+  path: '/v1/me/public-page',
+  summary: 'My public page settings',
+  responses: { 200: publicPageResponse, 401: errorResponse('Not signed in.') },
+})
+
+const updatePublicPageRoute = createRoute({
+  method: 'patch',
+  path: '/v1/me/public-page',
+  summary: 'Open or close my public page, and choose what it shows',
+  request: {
+    body: { required: true, content: { 'application/json': { schema: PublicPageSettingsPatch } } },
+  },
+  responses: {
+    200: publicPageResponse,
+    400: errorResponse('Invalid settings, or none.'),
+    401: errorResponse('Not signed in.'),
+    403: errorResponse('A suspended account may only close its public page.'),
+    429: errorResponse('Too many changes.'),
   },
 })
 
@@ -327,6 +365,39 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
     return c.json(me, 200)
+  })
+
+  app.openapi(publicPageRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    return c.json(MyPublicPage.parse(await myPublicPage(db, user.id)), 200)
+  })
+
+  // R12 : le même ordre que PATCH /v1/me, avant le validateur : le quota du profil (chaque demande
+  // compte, même mal écrite), puis la suspension (Q6, plan choix 11) : un compte suspendu peut
+  // seulement fermer sa page ; tout le reste reçoit 403 `suspended`. La garde de la suspension
+  // (suspension/guard.ts) l'a laissé entrer pour cela. Le corps lu ici est celui que le validateur
+  // relit ensuite (Hono garde la lecture) : jugé et écrit sur la même valeur.
+  app.on('PATCH', '/v1/me/public-page', async (c, next) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    const decision = await limiter.hit(memberCounterKeys(user.id).profile, profileRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    if (await isSuspended(db, user.id, new Date())) {
+      const body: unknown = await c.req.json().catch(() => null)
+      if (!suspendedPublicPageChange(body)) {
+        return c.json(errorBody(languageOf(c), 'suspended'), 403)
+      }
+    }
+    await next()
+  })
+
+  app.openapi(updatePublicPageRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    // Seulement la page du membre connecté : la route ne prend aucun identifiant.
+    await savePublicSettings(db, user.id, c.req.valid('json'))
+    return c.json(MyPublicPage.parse(await myPublicPage(db, user.id)), 200)
   })
 
   // Avant même de lire le fichier : on coupe tout envoi plus gros que la limite (+ 64 Ko pour
@@ -664,6 +735,11 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         )
       ).get(partOwnerKey('member', user.id)) ?? []
 
+    // R12 : sa page publique et ses cinq cases (clé primaire de `profile`), puis ses projets dans la
+    // vitrine ou qu'il en a retirés (showcase/store.ts : jamais l'administrateur qui les a choisis).
+    const publicPage = await publicSettingsOf(db, user.id)
+    const showcase = await showcaseExportOf(db, user.id)
+
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
     c.header('Content-Disposition', `attachment; filename="${appName.toLowerCase()}-export.json"`)
@@ -693,6 +769,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         dismissedSuggestions,
         emailPreferences,
         rulesAcceptances,
+        publicPage,
+        showcase,
         lastActiveAt: activity.lastActiveAt.toISOString(),
         hives,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),

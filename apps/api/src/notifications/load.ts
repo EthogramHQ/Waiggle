@@ -106,7 +106,7 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  * « null::uuid » : une colonne vide, mais du bon type, pour les sources qui n'en ont pas l'usage.
  *
  * Règles communes : rien ne vient de ses propres gestes (« <> me ») ; un projet privé ne produit
- * rien venant des autres (« visibility = 'public' »). Chaque source part de ce qui appartient au
+ * rien venant des autres (« visibility in ('public', 'web') », R12 : `listedProject`). Chaque source part de ce qui appartient au
  * membre, et chacune a son index (voir le rapport d'EXPLAIN dans notifications.test.ts) :
  *   1. réactions à ses projets : project_author_created_idx (ses projets), puis la clé primaire de
  *      project_reaction (project_id, …) ;
@@ -148,8 +148,12 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  * maintenant, puisqu'il est après la date notée et repartirait au passage suivant. Cette borne
  * haute ne change pas l'index de chaque source : elle écarte des lignes déjà trouvées par lui (ou
  * resserre l'intervalle lu dans project_comment_root_created_idx, qui porte la date).
+ *
+ * `keepOnShowcase` (R12, la page d'Activité seulement) : la notice « sur l'accueil » d'un projet
+ * encore dans la vitrine reste montrée au-delà de `since` (voir catalogueSources). Ni la cloche ni
+ * les e-mails ne le demandent.
  */
-const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
+const sources = (me: string, since: Date, now: Date, until?: Date, keepOnShowcase = false): SQL => {
   const after = utc(since)
   const upTo = until ? utc(until) : null
   /**
@@ -459,7 +463,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
 
     ${hiveSources(me, during, now)}
 
-    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during)}`}
+    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during, keepOnShowcase)}`}
   `
 }
 
@@ -529,7 +533,11 @@ const hiveSources = (me: string, during: (column: string) => SQL, now: Date): SQ
  *       encore au catalogue. Les deux sortes de la base n'en font qu'une pour l'appli (`merged`).
  * Aucun filtre de blocage : la notification n'est le geste d'aucun membre (signée par l'équipe).
  */
-const catalogueSources = (me: string, during: (column: string) => SQL): SQL => sql`
+const catalogueSources = (
+  me: string,
+  during: (column: string) => SQL,
+  keepOnShowcase: boolean,
+): SQL => sql`
     select 'project_category', 'project_category:' || cn.id, cn.created_at,
       cn.project_id, null, null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, cn.id
@@ -546,7 +554,35 @@ const catalogueSources = (me: string, during: (column: string) => SQL): SQL => s
     from catalogue_notice cn
     join tool on tool.id = cn.tool_id
     where cn.member_id = ${me} and cn.kind in ('tool_added', 'tool_merged')
-      and ${during('cn.created_at')} and tool.status = 'catalogue'`
+      and ${during('cn.created_at')} and tool.status = 'catalogue'
+
+    union all
+
+    -- 20. (R12) Un de ses projets mis sur l'accueil (« showcase_added ») : la trace écrite par
+    --     showcase/store.ts dans la transaction de l'administrateur, signée par l'équipe comme celles
+    --     du catalogue (aucun nom, aucun filtre de blocage) et, comme elles, jamais dans un e-mail.
+    --     Montrée tant que le projet est encore à lui, public (« web ») et pas retiré : redevenu
+    --     « Membres » ou retiré, elle disparaît ; supprimé, la trace part avec lui (« cascade »).
+    --     Index showcase_notice_member_idx (member_id, created_at desc), puis la clé du projet.
+    --     Relecture juridique R12, point 1 : dans la page d'Activité (keepOnShowcase), la ligne
+    --     reste au-delà des 90 jours tant que le projet est encore dans la vitrine (par la clé
+    --     primaire de showcase) : c'est la voie vers « Retirer de l'accueil », et la mise en avant
+    --     n'a pas de fin. La purge de nuit la garde autant (jobs/nightly-purge.ts). Jamais dans la
+    --     cloche : un geste de plus de 90 jours n'y est plus nouveau. Le « or » ôte à l'index la
+    --     borne de date ; il lit encore les seules notices du membre (une par projet mis en avant).
+    select 'showcase_added', 'showcase_added:' || sn.id, sn.created_at,
+      sn.project_id, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, sn.id
+    from showcase_notice sn
+    join project on project.id = sn.project_id
+    where sn.member_id = ${me}
+      and ${
+        keepOnShowcase
+          ? sql`(${during('sn.created_at')}
+              or (select 1 from showcase s where s.project_id = sn.project_id limit 1) is not null)`
+          : during('sn.created_at')
+      }
+      and project.author_id = ${me} and project.visibility = 'web' and project.removed_at is null`
 
 /**
  * La source 11 (R7a) : une ligne par mise à jour d'un projet que `me` suit OU teste, avec les vingt
@@ -909,6 +945,8 @@ const ListRow = z.object({
     'hive_removed',
     'hive_animator',
     'hive_deleted',
+    // R12 : un projet mis sur l'accueil (source 20).
+    'showcase_added',
   ]),
   key: z.string(),
   at: z.string(),
@@ -986,6 +1024,9 @@ const ListRow = z.object({
   hive_renamable: z.boolean().nullable(),
   invitation_id: z.string().nullable(),
   hive_notice_id: z.string().nullable(),
+  // R12 : le projet d'une notification `showcase_added` est-il encore dans la vitrine ? Null pour
+  // toute autre sorte.
+  on_showcase: z.boolean().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -1149,6 +1190,11 @@ export const present = (
         toolSlug: row.tool_slug,
         toolName: row.tool_name,
       }
+    // R12 : signée par l'équipe, comme le catalogue ; « Retirer de l'accueil » tant que le projet y
+    // est encore (`onShowcase`).
+    case 'showcase_added':
+      if (!project || row.on_showcase === null) return null
+      return { ...common, kind: 'showcase_added', project, onShowcase: row.on_showcase }
     // R7b, le coin des testeurs. `author_id` est l'auteur du projet (un appel, un retour réglé) ou
     // l'expéditeur du message ; son compte supprimé entre-temps : rien n'est montré.
     case 'tester_call': {
@@ -1504,7 +1550,13 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
         is true as hive_renamable,
       coalesce(hive.icon, hv.icon) as hive_icon,
       hi.id as invitation_id,
-      hn.id as hive_notice_id
+      hn.id as hive_notice_id,
+      -- R12 : le projet d'une mise sur l'accueil y est-il encore ? Par la clé primaire de showcase
+      -- (project_id) ; « (select 1 … limit 1) is not null » plutôt qu'un « exists », qui peut lire
+      -- toute la table (charte de l'API, 7b). Seule cette sorte lance la sous-requête.
+      case when n.kind = 'showcase_added' then (
+        select 1 from showcase s where s.project_id = n.project_id limit 1
+      ) is not null end as on_showcase
     from (${chosen}) n
     left join hive hv on hv.id = n.item_id and n.target_kind = 'hive'
     left join project on project.id = n.project_id
@@ -1663,7 +1715,7 @@ export const loadNotificationPage = async (
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total, ${moderationColumns}
-      from (${sources(me, notificationCutoff(now), now)}) u
+      from (${sources(me, notificationCutoff(now), now, undefined, true)}) u
       ${cursor ? sql`where (date_trunc('milliseconds', at), key) < (${utc(cursor.at)}, ${cursor.key})` : sql``}
       order by at desc, key desc
       limit ${NOTIFICATION_PAGE_SIZE + 1}

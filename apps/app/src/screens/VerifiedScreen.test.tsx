@@ -2,17 +2,18 @@
 // Relecture de sécurité C1 : l'adresse qui attendait sa vérification n'a plus de raison d'être
 // gardée dans l'onglet ; sur un PC partagé, la personne suivante la lisait sur « Vérifie ta boîte
 // mail ». La page l'oublie dès qu'elle s'affiche.
-import { screen } from '@testing-library/react-native'
+import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { PENDING_EMAIL_KEY, setPendingEmail } from '../accounts/pendingVerification'
 import { renderWithProviders } from '../testing/render'
 import { VerifiedScreen } from './VerifiedScreen'
 
+const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
   usePathname: () => '/verified',
   useRouter: () => ({
     push: jest.fn(),
-    replace: jest.fn(),
+    replace: mockReplace,
     back: jest.fn(),
     canGoBack: () => false,
   }),
@@ -60,5 +61,16 @@ describe('VerifiedScreen', () => {
     } finally {
       platform.restore()
     }
+  })
+
+  // R12 (plan, décision 9) : « / » est devenu l'accueil et sa vitrine, pour tous ; le membre dont
+  // l'adresse vient d'être vérifiée (il est connecté dans la foulée) entre dans l'appli par le Fil.
+  it('goes to the feed at /feed with « Continuer »', async () => {
+    mockReplace.mockClear()
+    await renderWithProviders(<VerifiedScreen />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Continuer' }))
+
+    expect(mockReplace.mock.calls).toEqual([['/feed']])
   })
 })

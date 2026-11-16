@@ -7,6 +7,7 @@
 // ProjectScreen.testkit.tsx.
 import { NO_REACTIONS } from '@ruche/contracts'
 import { fireEvent, screen, within } from '@testing-library/react-native'
+import { webAppUrl } from '../config'
 import { useFollow } from '../follows/api'
 import { getProject } from '../projects/api'
 import { passTapGuard } from '../testing/dialog'
@@ -114,6 +115,25 @@ beforeEach(() => {
 })
 
 // --- Tranche R5a : la page projet redessinée (docs/scenarios/refonte.md, « R5a ») ---
+
+// R12 (« Sur la page du projet », Q19) : une pastille « Public » à côté du statut et de la
+// catégorie, pour tous, membres compris.
+describe('the « Public » badge (R12)', () => {
+  it('shows « Public » on a public project, to a member', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'web', hive: null })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: recipesProject.title })
+    expect(screen.getAllByText(fr.t(($) => $.project.webBadge)).length).toBeGreaterThan(0)
+  })
+
+  it('shows no « Public » on a project open to the members only', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: recipesProject.title })
+    expect(screen.queryAllByText(fr.t(($) => $.project.webBadge))).toHaveLength(0)
+  })
+})
 
 describe('the dates under the title', () => {
   it('says when the project was published, and nothing about a change within the minute', async () => {
@@ -277,6 +297,26 @@ describe('the « … » menu of the project page', () => {
     expect((await screen.findAllByText(fr.t(($) => $.share.copiedMembers))).length).toBeGreaterThan(
       0,
     )
+  })
+
+  // R12 (Q18, relecture du plan UI B4) : le lien d'un projet public s'ouvre pour tout le monde, à
+  // l'adresse de la langue de qui partage.
+  it('copies the French address of a public project, then says everyone can open it', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'web', hive: null })
+    await renderWithProviders(
+      <ToastProvider>
+        <ProjectScreen id={id} />
+      </ToastProvider>,
+    )
+
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Copier le lien' }))
+
+    expect(copyText).toHaveBeenCalledWith(new URL(`/fr/projects/${id}`, webAppUrl).href)
+    expect(
+      (await screen.findAllByText(fr.t(($) => $.share.copiedEveryone))).length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryAllByText(fr.t(($) => $.share.copiedMembers))).toHaveLength(0)
   })
 
   it('tells the author of a private project that the copied link opens only for her', async () => {

@@ -413,9 +413,12 @@ describe('what is reported', () => {
     expect(getReportTarget).not.toHaveBeenCalled()
   })
 
-  it('asks a visitor to sign in, without asking the API', async () => {
+  it('asks a visitor to sign in to report a comment, without asking the API', async () => {
+    // R12 : un visiteur signale un projet, une mise à jour ou une page publics sans compte
+    // (ReportSheet.visitor.test.tsx) ; un commentaire, réservé aux membres, demande toujours de se
+    // connecter.
     mockSession(null)
-    await renderWithProviders(<ReportSheet kind="project" id={projectId} />)
+    await renderWithProviders(<ReportSheet kind="comment" id={commentId} />)
 
     const signIn =
       (await screen.findAllByRole('link', { name: 'Me connecter' }).catch(() => null)) ??

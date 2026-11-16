@@ -55,10 +55,36 @@ export const fr = {
     signIn: 'Me connecter',
     haveAccount: 'J’ai déjà un compte',
     publish: 'Publier un projet',
-    // R11 (« Moins de mots », planche R11-Pied) : l'ancienne phrase disait que rien n'était trouvé
-    // par un moteur de recherche, ce qui est faux (l'accueil et les quatre pages le sont). Écriture
-    // neutre ; R12 dira « Rien n’est public sans ton accord. »
-    membersOnly: 'Les projets et les profils ne se voient qu’avec un compte.',
+    // R12 (A14) : la phrase de l'accueil, de la feuille « Compte requis » et du cadenas de la
+    // connexion et de l'inscription. La clé garde son nom d'avant R12, lu par les écrans et leurs
+    // tests ; l'ancienne phrase (« Les projets et les profils ne se voient qu’avec un compte. ») est
+    // devenue fausse.
+    membersOnly: 'Rien n’est public sans ton accord.',
+    // R12 (Q9, Q10) : la vitrine de l'accueil, choisie par la modération parmi les projets publics.
+    showcase: 'Des projets à voir',
+    showcaseNote: 'Ces projets sont publics : leurs auteurs l’ont choisi.',
+  },
+  // R12 : ce que voit un visiteur sans compte sur un projet ou une page publique (planches
+  // R12-Visiteur-*). Jamais les commentaires, ni qui a réagi, ni qui suit.
+  visitor: {
+    signIn: 'Se connecter',
+    signUp: 'Créer un compte',
+    // À la place des commentaires : ni leur nombre, ni un extrait (A14).
+    commentsMembersOnly: 'Les commentaires sont réservés aux membres.',
+    reactions_one: '{{count}} réaction de membre',
+    reactions_other: '{{count}} réactions de membres',
+    // Le bouton à côté du nombre de réactions : il ouvre la feuille « Compte requis ».
+    react: 'Réagir',
+    // La page publique d'un membre sans projet public à montrer.
+    noProjects: 'Pas encore de projet public.',
+    // La feuille « Compte requis » (planche R12-Compte-Requis) : le titre suffit (Q11), puis la
+    // limite (Q12) ; « Rien n’est public sans ton accord. » est home.membersOnly. Les deux autres
+    // pastilles reprennent project.reactions.bravo et project.comments.addShort.
+    accountRequired: {
+      title: 'Pour réagir, crée ton compte',
+      follow: 'Suivre ses mises à jour',
+      inviteOnly: '{{appName}} s’ouvre sur invitation.',
+    },
   },
   // R11 : les quatre pages publiques (/rules, /privacy, /legal, /accessibility), lisibles sans compte.
   // Chaque page a un titre, un « En bref » (des puces courtes : `summary`, l'icône de chaque puce est
@@ -87,14 +113,16 @@ export const fr = {
       legal: 'Mentions légales',
       accessibility: 'Accessibilité',
       sourceCode: 'Le code source',
+      // R12 (planche R12-Visiteur-Desktop) : le pied de l'accueil, qui mène à l'adresse de contact.
+      report: 'Signaler un contenu',
       /** Le nom lu du lien de contact (l'adresse seule est affichée). */
       contact: 'Nous écrire : {{contactEmail}}',
     },
     pages: {
       rules: {
         title: 'Les règles de {{appName}}',
-        // Une seule source pour /rules et l'écran « Accepter » (U2). « Rien n’est public sans ton
-        // accord » n'y entre pas : R12.
+        // Une seule source pour /rules et l'écran « Accepter » (U2). R12 (projets publics) : la
+        // puce `public`, la partie `visitors`, et les phrases de la relecture juridique du plan.
         summary: {
           respect:
             'Respecte les autres membres : ni harcèlement, ni haine, ni contenu sexuel ou violent.',
@@ -109,6 +137,7 @@ export const fr = {
           inactive:
             'Un compte sans visite pendant 3 ans est supprimé, après un e‑mail envoyé un mois avant.',
           yours: 'Ce que tu publies reste à toi. Tu peux tout télécharger ou tout supprimer.',
+          public: 'Rien n’est public sans ton accord.',
         },
         sections: {
           purpose: {
@@ -121,7 +150,12 @@ export const fr = {
           },
           content: {
             title: 'Ce que tu publies',
-            body: 'Ce que tu publies reste à toi. Tu autorises {{appName}} à l’afficher aux personnes que tu choisis : tous les membres connectés, les membres d’une ruche, ou toi seul quand le projet est privé.\n\nUn prompt publié peut être copié et réutilisé par les membres qui le voient.\n\nUne photo ou une information sur quelqu’un, seulement avec son accord. Tes captures ne montrent pas les données d’autres personnes.\n\nLes réactions et les abonnés se comptent : personne ne voit qui a réagi ni qui suit qui.',
+            body: 'Ce que tu publies reste à toi. Tu autorises {{appName}} à l’afficher aux personnes que tu choisis : tous les membres connectés, les membres d’une ruche, toi seul quand le projet est privé, ou tout le monde, moteurs de recherche compris, quand il est public.\n\nUn prompt publié peut être copié et réutilisé par les personnes qui le voient.\n\nRevenir en arrière, ou supprimer, ne retire pas les copies déjà faites ailleurs : moteurs de recherche, captures, messageries.\n\nUne photo ou une information sur quelqu’un, seulement avec son accord ; pour un projet public, son accord d’être vu de tous. Tes captures ne montrent pas les données d’autres personnes.\n\nLes réactions et les abonnés se comptent : personne ne voit qui a réagi ni qui suit qui.',
+          },
+          // R12 : ce qu'une personne sans compte voit d'un projet public et d'une page publique.
+          visitors: {
+            title: 'Ce que voit un visiteur',
+            body: 'Sans compte, on voit :\n\n- **un projet public** : tout ce que son auteur a écrit (textes, photos, outils, prompt, mises à jour), son nom et sa photo, le nombre de réactions ;\n- **une page publique** : le nom, la photo, et ce que la personne a choisi d’y montrer.\n\nJamais les commentaires, qui a réagi, les abonnés, les ruches, les testeurs, le pseudo, ni un projet qui n’est pas public. Réagir, commenter et suivre demandent un compte.',
           },
           forbidden: {
             title: 'Ce qui est interdit',
@@ -139,11 +173,11 @@ export const fr = {
           // à faire valider). Ce sont les phrases retirées par « Moins de mots ».
           feed: {
             title: 'Le fil, Explorer, les suggestions et la recherche',
-            body: 'Aucun classement ne dépend de la popularité d’un membre ni d’une publicité.\n\n- **Le fil, « Suivis »** : les nouveaux projets des personnes que tu suis, et les mises à jour de leurs projets et des projets que tu suis. Chaque projet n’y paraît qu’une fois, à son dernier événement, du plus récent au plus ancien.\n- **Le fil, une ruche** : les nouveaux projets et les mises à jour des membres de cette ruche, dans le même ordre.\n- **Explorer** : les projets de tous les membres. « Récents » montre les derniers projets publiés, du plus récent au plus ancien, et se filtre par catégorie ; « Ils cherchent des testeurs », les projets ouverts aux testeurs ; « Outils populaires », les outils cités par le plus de projets.\n- **Les outils** : le catalogue des outils d’IA, de développement et de projets numériques, décrits par {{appName}} sans lien avec leurs éditeurs, et les projets des membres qui s’en servent.\n- **Proches à suivre** : les membres de tes ruches d’abord, puis les membres qui ont publié récemment, selon la date de leur dernier projet. Jamais quelqu’un que tu suis, que tu as écarté ou bloqué, ni un membre qui a choisi « Ne pas me proposer aux autres ».\n- **La recherche** : les projets, les membres et les outils qui contiennent chaque mot tapé, sans tenir compte des accents. Les projets dont le titre contient le mot passent d’abord. En dessous de 3 lettres, seuls les membres que tu suis sont trouvés. Ce que tu cherches n’est pas gardé.\n\nTu peux régler ce que tu vois : suivre ou ne plus suivre, écarter une suggestion, bloquer un membre. Et ce que les autres voient de toi : « Ne pas me proposer aux autres », dans tes réglages.',
+            body: 'Aucun classement ne dépend de la popularité d’un membre ni d’une publicité.\n\n- **Le fil, « Suivis »** : les nouveaux projets des personnes que tu suis, et les mises à jour de leurs projets et des projets que tu suis. Chaque projet n’y paraît qu’une fois, à son dernier événement, du plus récent au plus ancien.\n- **Le fil, une ruche** : les nouveaux projets et les mises à jour des membres de cette ruche, dans le même ordre.\n- **Explorer** : les projets de tous les membres. « Récents » montre les derniers projets publiés, du plus récent au plus ancien, et se filtre par catégorie ; « Ils cherchent des testeurs », les projets ouverts aux testeurs ; « Outils populaires », les outils cités par le plus de projets.\n- **Les outils** : le catalogue des outils d’IA, de développement et de projets numériques, décrits par {{appName}} sans lien avec leurs éditeurs, et les projets des membres qui s’en servent.\n- **Proches à suivre** : les membres de tes ruches d’abord, puis les membres qui ont publié récemment, selon la date de leur dernier projet. Jamais quelqu’un que tu suis, que tu as écarté ou bloqué, ni un membre qui a choisi « Ne pas me proposer aux autres ».\n- **La recherche** : les projets, les membres et les outils qui contiennent chaque mot tapé, sans tenir compte des accents. Les projets dont le titre contient le mot passent d’abord. En dessous de 3 lettres, seuls les membres que tu suis sont trouvés. Ce que tu cherches n’est pas gardé.\n- **La vitrine de l’accueil et « À la une » d’Explorer** : jusqu’à 4 projets publics, choisis par l’éditeur, sans contrepartie. L’auteur est prévenu et peut en retirer son projet, qui n’y revient pas.\n\nTu peux régler ce que tu vois : suivre ou ne plus suivre, écarter une suggestion, bloquer un membre. Et ce que les autres voient de toi : « Ne pas me proposer aux autres », dans tes réglages.',
           },
           moderation: {
             title: 'La modération',
-            body: 'Tout membre peut signaler un contenu ou un profil. Les signalements sont lus par la modération, les administrateurs de {{appName}}, aidés de l’assistant de code (voir la Confidentialité). Elle ne dit jamais qui a signalé.\n\nDu plus léger au plus lourd, la modération peut :\n\n- retirer une partie d’un contenu (une photo, un titre…) ;\n- retirer tout le contenu ;\n- suspendre un compte pour un temps, ou sans fin.\n\nChaque décision est motivée : la personne visée reçoit les faits et la règle ou la loi appliquée. Une suspension est aussi annoncée par e‑mail. Pendant une suspension, on peut tout lire, retirer ses contenus, exporter ses données ou supprimer son compte, mais plus publier.\n\nPas d’accord avec une décision ? Écris à {{contactEmail}} : une personne la relira et te répondra. Tu peux aussi saisir la justice.',
+            body: 'Tout membre peut signaler un contenu ou un profil, et toute personne, même sans compte, un contenu public. Les signalements sont lus par la modération, les administrateurs de {{appName}}, aidés de l’assistant de code (voir la Confidentialité). Elle ne dit jamais qui a signalé.\n\nDu plus léger au plus lourd, la modération peut :\n\n- retirer une partie d’un contenu (une photo, un titre…) ;\n- retirer tout le contenu ;\n- suspendre un compte pour un temps, ou sans fin.\n\nChaque décision est motivée : la personne visée reçoit les faits et la règle ou la loi appliquée. Une suspension est aussi annoncée par e‑mail. Pendant une suspension, on peut tout lire, retirer ses contenus, exporter ses données ou supprimer son compte, mais plus publier.\n\nPas d’accord avec une décision ? Écris à {{contactEmail}} : une personne la relira et te répondra. Tu peux aussi saisir la justice.',
           },
           authors: {
             title: 'Ce que peut l’auteur d’un projet',
@@ -151,7 +185,7 @@ export const fr = {
           },
           leaving: {
             title: 'Quitter {{appName}}',
-            body: 'Tu peux à tout moment télécharger tes données, puis supprimer ton compte, depuis tes réglages. La suppression est immédiate et sans retour.\n\nCe qui reste chez les autres :\n\n- les réponses à tes commentaires, sous « Commentaire supprimé », sans ton texte ni ton nom ;\n- le nom des ruches que tu as créées, tant qu’elles ont des membres, et les invitations que tu as envoyées, sans ton nom ;\n- tes signalements, sans ton nom, jusqu’à un an après leur traitement ;\n- ce que les membres ont déjà copié, comme un prompt, et les e‑mails qu’ils ont déjà reçus.',
+            body: 'Tu peux à tout moment télécharger tes données, puis supprimer ton compte, depuis tes réglages. La suppression est immédiate et sans retour.\n\nCe qui reste chez les autres :\n\n- les réponses à tes commentaires, sous « Commentaire supprimé », sans ton texte ni ton nom ;\n- le nom des ruches que tu as créées, tant qu’elles ont des membres, et les invitations que tu as envoyées, sans ton nom ;\n- tes signalements, sans ton nom, jusqu’à un an après leur traitement ;\n- ce que les membres ont déjà copié, comme un prompt, et les e‑mails qu’ils ont déjà reçus ;\n- ce que les moteurs de recherche ont copié de tes projets et de ta page publics, le temps qu’ils les relisent.',
           },
           changes: {
             title: 'Les changements des règles',
@@ -168,9 +202,10 @@ export const fr = {
         summary: {
           noAds: 'Ni publicité, ni cookie de mesure.',
           email: 'Aucun membre ne voit ton adresse e‑mail.',
-          // Option 2 des planches R11 : l'assistant de code dès l'« En bref ».
+          // Option 2 des planches R11 : l'assistant de code dès l'« En bref ». R12 (relecture juridique
+          // du plan, point 2) : un projet public se lit de partout, et les moteurs le copient hors UE.
           where:
-            'Le serveur et les e‑mails sont à Paris. Seul l’assistant de code peut lire des extraits hors de l’Union européenne.',
+            'Le serveur et les e‑mails sont à Paris. Hors de l’Union européenne, l’assistant de code peut lire des extraits ; ce que tu rends public se lit partout.',
           control: 'Tu peux tout télécharger ou tout supprimer.',
         },
         sections: {
@@ -182,16 +217,16 @@ export const fr = {
           // « probables » : à faire valider par un professionnel.
           data: {
             title: 'Ce qui est gardé, et pourquoi',
-            body: 'Sauf mention contraire, la base est le contrat : les règles que tu acceptes pour utiliser {{appName}}.\n\n- **Ton compte** : ton nom affiché, ton adresse e‑mail, ta langue, ton mot de passe (seulement son empreinte, jamais le mot de passe lui-même). Pour te connecter et t’écrire. Les membres connectés voient ton nom ; personne ne voit ton adresse.\n- **Ton profil** : ton pseudo, ta bio, ta photo et tes outils favoris. Vus des membres connectés. La photo est recadrée et nettoyée de ses informations cachées.\n- **Tes projets et leurs mises à jour** : textes, prompts, photos, liens des démos, catégories. Vus des personnes que tu choisis : tous les membres connectés, une ruche, ou toi seul.\n- **Les réactions et les abonnements** : qui réagit ou suit quoi. Les autres ne voient que des nombres.\n- **Les commentaires et les mentions** : le texte, la date, qui est mentionné. Vus de ceux qui voient le projet ; la mention, de la personne mentionnée.\n- **Le fil et les suggestions** : la date de ta dernière lecture du fil, les suggestions que tu as écartées, ton choix « Ne pas me proposer aux autres ». Vus de toi seul.\n- **La recherche** : rien n’est gardé de ce que tu cherches.\n- **Les testeurs** : ton inscription comme testeur, tes retours, tes messages et leurs captures. Vus de l’auteur du projet et de toi ; dans les commentaires du projet, un badge « Testeur » s’affiche à côté de ton nom. Un message signalé, et sa capture, est lu par la modération, jamais le reste du fil.\n- **Les ruches** : les ruches dont tu fais partie, qui t’a invité, les invitations. Vues des membres de chaque ruche.\n- **Les notifications et les e‑mails** : ce qui t’est arrivé, tes choix d’e‑mails, les dates d’envoi. Vus de toi seul.\n- **Les signalements et la modération** : qui signale, le motif, une copie des textes signalés, les décisions et les suspensions. Vus des administrateurs ; la personne visée reçoit la décision, jamais le nom de qui a signalé. Base : l’intérêt légitime de protéger les membres, et la loi pour un contenu illicite.\n- **Le blocage** : les membres que tu as bloqués. La personne bloquée n’est pas prévenue.\n- **La sécurité du compte** : tes sessions de connexion (avec l’adresse IP et le navigateur de leur création), les liens envoyés par e‑mail, des compteurs contre les abus. Vus de personne. Base : l’intérêt légitime de protéger les comptes.\n- **Les règles acceptées** : la version, la date, et ta déclaration d’avoir 15 ans ou plus, jamais ta date de naissance. Pour prouver ton accord.\n- **La date de ta dernière visite** : pour supprimer un compte inactif depuis 3 ans.',
+            body: 'Sauf mention contraire, la base est le contrat : les règles que tu acceptes pour utiliser {{appName}}.\n\n- **Ton compte** : ton nom affiché, ton adresse e‑mail, ta langue, ton mot de passe (seulement son empreinte, jamais le mot de passe lui-même). Pour te connecter et t’écrire. Les membres connectés voient ton nom ; tout le monde, sur tes projets et ta page publics. Personne ne voit ton adresse.\n- **Ton profil** : ton pseudo, ta bio, ta photo et tes outils favoris. Vus des membres connectés. Ta page publique, de tout le monde, avec ce que tu y coches ; ton nom et ta photo accompagnent aussi tes projets publics. La photo est recadrée et nettoyée de ses informations cachées.\n- **Tes projets et leurs mises à jour** : textes, prompts, photos, liens des démos, catégories. Vus des personnes que tu choisis : tous les membres connectés, une ruche, toi seul, ou tout le monde quand il est public.\n- **Ce qui est public** : un projet ou une page publics sont lus et copiés par les moteurs de recherche, y compris ceux des assistants d’IA, qui peuvent les citer ou les résumer. Après un retour en arrière, ils les montrent jusqu’à leur prochain passage ; tu peux aussi leur demander de retirer leur copie. {{appName}} demande aux robots qui collectent pour entraîner des IA de ne pas lire le site ; certains ne respectent pas cette demande. Base : ton choix, que tu peux retirer à tout moment.\n- **Les réactions et les abonnements** : qui réagit ou suit quoi. Les autres ne voient que des nombres.\n- **Les commentaires et les mentions** : le texte, la date, qui est mentionné. Vus de ceux qui voient le projet ; la mention, de la personne mentionnée.\n- **Le fil et les suggestions** : la date de ta dernière lecture du fil, les suggestions que tu as écartées, ton choix « Ne pas me proposer aux autres ». Vus de toi seul.\n- **La recherche** : rien n’est gardé de ce que tu cherches.\n- **Les testeurs** : ton inscription comme testeur, tes retours, tes messages et leurs captures. Vus de l’auteur du projet et de toi ; dans les commentaires du projet, un badge « Testeur » s’affiche à côté de ton nom. Un message signalé, et sa capture, est lu par la modération, jamais le reste du fil.\n- **Les ruches** : les ruches dont tu fais partie, qui t’a invité, les invitations. Vues des membres de chaque ruche.\n- **Les notifications et les e‑mails** : ce qui t’est arrivé, tes choix d’e‑mails, les dates d’envoi. Vus de toi seul.\n- **Les signalements et la modération** : qui signale, le motif, une copie des textes signalés, les décisions et les suspensions. Vus des administrateurs ; la personne visée reçoit la décision, jamais le nom de qui a signalé. Base : l’intérêt légitime de protéger les membres, et la loi pour un contenu illicite.\n- **Les signalements sans compte** : la cible, le motif, la précision, l’adresse e‑mail si elle est donnée, pour l’accusé de réception et la décision, et l’adresse IP pour la limite de 5 par jour. Vus des administrateurs. Base : la loi (règlement sur les services numériques).\n- **Le blocage** : les membres que tu as bloqués. La personne bloquée n’est pas prévenue.\n- **La sécurité du compte** : tes sessions de connexion (avec l’adresse IP et le navigateur de leur création), les liens envoyés par e‑mail, des compteurs contre les abus. Vus de personne. Base : l’intérêt légitime de protéger les comptes.\n- **Les visites sans compte** : pour lire les pages publiques, un compteur par réseau (adresse IP), gardé en mémoire du serveur, jamais écrit ; pour un signalement, un compteur par adresse IP et un par empreinte de l’adresse e‑mail. Vus de personne. Base : l’intérêt légitime de protéger le service.\n- **Les règles acceptées** : la version, la date, et ta déclaration d’avoir 15 ans ou plus, jamais ta date de naissance. Pour prouver ton accord.\n- **La date de ta dernière visite** : pour supprimer un compte inactif depuis 3 ans.',
           },
           // Choix 9 du scénario : toutes les durées, en liste, telles que le code les applique.
           retention: {
             title: 'Combien de temps',
-            body: '- **Ton compte et ce que tu publies** : tant que ton compte existe, ou jusqu’à ce que tu les supprimes.\n- **Un compte sans visite** : supprimé après 3 ans, avec un e‑mail un mois avant.\n- **Une inscription dont l’adresse n’est jamais vérifiée** : 30 jours.\n- **Une session de connexion** : 7 jours après sa dernière utilisation, effacée sous 8 jours. Une session qui sert chaque jour garde l’adresse IP de sa création.\n- **Les liens envoyés par e‑mail** (vérification, mot de passe, adresse) : valables 1 heure, effacés sous 25 heures.\n- **Les compteurs contre les abus** : moins de 49 heures. Certains gardent une adresse IP.\n- **Ton ancien pseudo** : réservé 30 jours.\n- **Une photo ajoutée mais jamais publiée** : 24 heures, effacée sous 48 heures.\n- **Une invitation dans une ruche** : 30 jours, refusée ou non.\n- **Les avis de l’appli sur tes outils et tes ruches** : 90 jours.\n- **Un outil « Autre » écarté, et le journal du catalogue** : 1 an.\n- **Un signalement** : jusqu’à la décision ; 30 jours s’il est sans objet ; 1 an après la décision s’il est traité.\n- **Une décision de modération** : 1 an après la dernière décision sur le même contenu, et tant que le contenu reste retiré.\n- **Une suspension** : 1 an après sa fin ; sans fin, tant que le compte existe.\n- **Les sauvegardes du serveur** : 14 jours ; 30 jours au plus pour une sauvegarde faite avant une opération.\n- **La copie hebdomadaire de l’hébergeur** : [durée de la copie de l’hébergeur].\n- **Les journaux de l’appli et de la base** : 50 Mo au plus, les plus anciens effacés d’abord ; ceux de l’appli partent aussi à chaque mise à jour. Ils ne gardent ni adresse ni nom.\n- **Le journal du système du serveur** (connexions des administrateurs) : 6 mois.\n- **Un e‑mail envoyé à {{contactEmail}}** : 1 an après la réponse.\n- **Les extraits lus par l’assistant de code** : 30 jours chez Anthropic, sauf les exceptions de sa politique.',
+            body: '- **Ton compte et ce que tu publies** : tant que ton compte existe, ou jusqu’à ce que tu les supprimes.\n- **Un compte sans visite** : supprimé après 3 ans, avec un e‑mail un mois avant.\n- **Une inscription dont l’adresse n’est jamais vérifiée** : 30 jours.\n- **Une session de connexion** : 7 jours après sa dernière utilisation, effacée sous 8 jours. Une session qui sert chaque jour garde l’adresse IP de sa création.\n- **Les liens envoyés par e‑mail** (vérification, mot de passe, adresse) : valables 1 heure, effacés sous 25 heures.\n- **Les compteurs contre les abus** : moins de 49 heures. Certains gardent une adresse IP. Ceux de la lecture des pages publiques, en mémoire seulement : 10 minutes.\n- **Ton ancien pseudo** : réservé 30 jours.\n- **Une photo ajoutée mais jamais publiée** : 24 heures, effacée sous 48 heures.\n- **Une invitation dans une ruche** : 30 jours, refusée ou non.\n- **Les avis de l’appli sur tes outils, tes ruches et la vitrine** : 90 jours.\n- **Un outil « Autre » écarté, et le journal du catalogue** : 1 an.\n- **Un signalement** : jusqu’à la décision ; 30 jours s’il est sans objet ; 1 an après la décision s’il est traité.\n- **L’adresse e‑mail donnée avec un signalement sans compte** : jusqu’à la clôture du signalement, décidé ou sans objet.\n- **La place d’un projet dans la vitrine** : tant que le projet reste public et que ni toi ni l’éditeur ne l’en retirez.\n- **Une décision de modération** : 1 an après la dernière décision sur le même contenu, et tant que le contenu reste retiré.\n- **Une suspension** : 1 an après sa fin ; sans fin, tant que le compte existe.\n- **Les sauvegardes du serveur** : 14 jours ; 30 jours au plus pour une sauvegarde faite avant une opération.\n- **La copie hebdomadaire de l’hébergeur** : [durée de la copie de l’hébergeur].\n- **Les journaux de l’appli et de la base** : 50 Mo au plus, les plus anciens effacés d’abord ; ceux de l’appli partent aussi à chaque mise à jour. Ils ne gardent ni adresse ni nom.\n- **Le journal du système du serveur** (connexions des administrateurs) : 6 mois.\n- **Un e‑mail envoyé à {{contactEmail}}** : 1 an après la réponse.\n- **Les extraits lus par l’assistant de code** : 30 jours chez Anthropic, sauf les exceptions de sa politique.',
           },
           device: {
             title: 'Sur ton appareil',
-            body: '{{appName}} n’utilise aucun cookie de mesure d’audience ni de publicité, et ne charge aucun outil d’un autre site.\n\nSur ton appareil sont rangés :\n\n- ta session de connexion (un cookie sur le web), 7 jours après ta dernière visite ;\n- le thème choisi ;\n- les aides déjà vues ;\n- les dates de la dernière suspension vue, s’il y en a eu une ;\n- l’adresse en attente de vérification, effacée à la connexion ou à la fermeture de l’onglet.\n\nLa lumière d’ambiance suit la souris et l’inclinaison de l’appareil, mais ni l’une ni l’autre n’est jamais gardée.',
+            body: '{{appName}} n’utilise aucun cookie de mesure d’audience ni de publicité, et ne charge aucun outil d’un autre site.\n\nSur ton appareil sont rangés :\n\n- ta session de connexion (un cookie sur le web), 7 jours après ta dernière visite ;\n- sur le web, un repère sans identifiant qui dit que tu es connecté, pour t’ouvrir sur le Fil ; 7 jours après ta dernière visite, effacé à la déconnexion ;\n- le thème choisi ;\n- les aides déjà vues ;\n- les dates de la dernière suspension vue, s’il y en a eu une ;\n- l’adresse en attente de vérification, effacée à la connexion ou à la fermeture de l’onglet.\n\nSans compte, aucun cookie n’est posé.\n\nLa lumière d’ambiance suit la souris et l’inclinaison de l’appareil, mais ni l’une ni l’autre n’est jamais gardée.',
           },
           servers: {
             title: 'Les sauvegardes et les journaux',
@@ -204,13 +239,15 @@ export const fr = {
           // Décision de Louis du 15/11/2026 : l'assistant de code est nommé tel qu'il est
           // aujourd'hui (offre pour particuliers, responsable de son côté, hors UE possible, pas
           // d'entraînement, 30 jours). Seule exception écrite à la règle « aucune trace d'un outil ».
+          // R12 (scénario, Q1) : seule l'échéance change ; l'assistant ne lit jamais l'adresse d'un
+          // visiteur qui signale (docs/ops/moderation.md).
           assistant: {
             title: 'L’assistant de code',
-            body: '{{appName}} est construit et exploité avec l’aide de Claude, l’assistant de code d’Anthropic. Ce n’est pas un sous-traitant : c’est un destinataire à part.\n\nPour corriger une panne ou traiter un signalement, il peut lire des extraits des journaux et de la base de données, par exemple le texte d’un contenu signalé.\n\n- L’offre utilisée aujourd’hui est une offre pour les particuliers. Anthropic y décide lui-même de l’usage de ces extraits, et en est responsable selon [sa politique de confidentialité](https://www.anthropic.com/legal/privacy).\n- Ces extraits peuvent partir hors de l’Union européenne.\n- Ils ne servent pas à entraîner ses modèles : ce réglage est coupé depuis le 15 novembre 2026.\n- Ils sont gardés 30 jours chez Anthropic, sauf les exceptions de sa politique.\n\nAu plus tard à l’ouverture de {{appName}} au public, {{appName}} passera à une offre professionnelle, où Anthropic deviendra son sous-traitant. Cette page changera alors.',
+            body: '{{appName}} est construit et exploité avec l’aide de Claude, l’assistant de code d’Anthropic. Ce n’est pas un sous-traitant : c’est un destinataire à part.\n\nPour corriger une panne ou traiter un signalement, il peut lire des extraits des journaux et de la base de données, par exemple le texte d’un contenu signalé.\n\n- L’offre utilisée aujourd’hui est une offre pour les particuliers. Anthropic y décide lui-même de l’usage de ces extraits, et en est responsable selon [sa politique de confidentialité](https://www.anthropic.com/legal/privacy).\n- Ces extraits peuvent partir hors de l’Union européenne.\n- Ils ne servent pas à entraîner ses modèles : ce réglage est coupé depuis le 15 novembre 2026.\n- Ils sont gardés 30 jours chez Anthropic, sauf les exceptions de sa politique.\n\nAu plus tard quand {{appName}} deviendra commercial ou ouvrira les inscriptions, {{appName}} passera à une offre professionnelle, où Anthropic deviendra son sous-traitant. Cette page changera alors.',
           },
           rights: {
             title: 'Tes droits',
-            body: 'Tu as le droit d’accéder à tes données, de les corriger, de les effacer, de t’opposer à un traitement, d’en demander la limitation, et de les emporter.\n\nDepuis l’appli :\n\n- **télécharger tes données** : Réglages, « Mes données » ;\n- **les corriger** : « Mon profil », et ton adresse dans Réglages, « Compte » ;\n- **les effacer** : chaque contenu depuis sa page, tes commentaires depuis « Mes commentaires », tes retours de testeur depuis « Mes retours envoyés », ou tout ton compte ;\n- **t’opposer** : « Ne pas me proposer aux autres », et le choix de tes e‑mails dans Réglages, « Notifications ».\n\nPar e‑mail, à {{contactEmail}} : écris depuis l’adresse de ton compte, pour que nous sachions que c’est bien toi. Nous répondons sous un mois ; si la demande est complexe, ce délai peut passer à trois mois, et nous te le disons.\n\nTu peux aussi saisir la CNIL : [cnil.fr](https://www.cnil.fr/fr/plaintes).',
+            body: 'Tu as le droit d’accéder à tes données, de les corriger, de les effacer, de t’opposer à un traitement, d’en demander la limitation, et de les emporter.\n\nDepuis l’appli :\n\n- **télécharger tes données** : Réglages, « Mes données » ;\n- **les corriger** : « Mon profil », et ton adresse dans Réglages, « Compte » ;\n- **les effacer** : chaque contenu depuis sa page, tes commentaires depuis « Mes commentaires », tes retours de testeur depuis « Mes retours envoyés », ou tout ton compte ;\n- **t’opposer** : « Ne pas me proposer aux autres », et le choix de tes e‑mails dans Réglages, « Notifications ».\n\nPar e‑mail, à {{contactEmail}} : écris depuis l’adresse de ton compte, pour que nous sachions que c’est bien toi. Sans compte, après un signalement : depuis l’adresse donnée. Nous répondons sous un mois ; si la demande est complexe, ce délai peut passer à trois mois, et nous te le disons.\n\nTu peux aussi saisir la CNIL : [cnil.fr](https://www.cnil.fr/fr/plaintes).',
           },
         },
       },
@@ -438,8 +475,14 @@ export const fr = {
     /** Au-dessus de l'« En bref », quand la version a changé. */
     changesTitle: 'Ce qui change',
     // Les phrases de « Ce qui change », une clé par changement, citées par `RULES_CHANGES`
-    // (contracts/rules.ts). Vide pour la première version.
-    changes: {},
+    // (contracts/rules.ts). R12, la deuxième version : les projets publics.
+    changes: {
+      public:
+        'Un projet peut devenir public, si tu le choisis : tout le monde le voit alors, moteurs de recherche compris.',
+      visitors: 'Sans compte, on peut voir les projets et les pages publics, et les signaler.',
+      showcase:
+        'L’éditeur choisit des projets publics pour la vitrine de l’accueil et « À la une » ; l’auteur peut en retirer le sien.',
+    },
     // J2 (relecture du plan) : pour un membre suspendu, sous le rappel de la suspension
     // (`suspension.headline`, `suspension.contest`) : accepter ne rend pas l'écriture.
     suspended:
@@ -586,6 +629,9 @@ export const fr = {
           'Si tes contenus ou ton profil ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
         // R10, relecture juridique (C4) : une invitation envoyée garde sa ruche, sans inviteur.
         hiveInvitations: 'Les invitations que tu as envoyées restent valables, sans ton nom',
+        // R12 (relecture juridique du plan) : au conditionnel, l'écran s'affiche pour tous.
+        searchCopies:
+          'Les copies que les moteurs de recherche auraient gardées de tes projets publics ou de ta page publique',
       },
     },
   },
@@ -640,8 +686,9 @@ export const fr = {
         'Il ne change pas avec ton nom. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
       bio: 'Bio',
       tools: 'Outils favoris',
-      // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3).
-      toolsHint: 'Visibles de tous les membres sur ta page.',
+      // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3). R12 :
+      // « de tous les membres » est devenu faux pour une page publique.
+      toolsHint: 'Visibles sur ta page.',
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
@@ -682,8 +729,34 @@ export const fr = {
       bannerHandle: 'Ton pseudo provisoire est @{{handle}}. Choisis-en un autre.',
       bannerName: 'Ton nom provisoire est « {{name}} ». Choisis-en un autre.',
     },
+    // R12 (planche R12-Profil-Public) : la page publique, un choix à part de la visibilité des
+    // projets (A14). Le nom et la photo sont toujours montrés, le pseudo jamais (Q8).
+    publicPage: {
+      title: 'Mon profil public',
+      toggle: 'Rendre ma page publique',
+      toggleHint: 'Visible par tous, et trouvable sur Google',
+      visitorSees: 'Ce que voit un visiteur',
+      nameAndPhoto: 'Mon nom et ma photo',
+      // La case cochée et grisée ne dit pas pourquoi : l'aide le dit.
+      nameAndPhotoHint: 'Toujours, si la page est publique',
+      bio: 'Ma bio',
+      tools: 'Mes outils favoris',
+      projects: 'Mes projets publics',
+      // Sous « Mes projets publics » : combien de ses projets sont publics (planche).
+      projectsCount: '{{count}} sur {{total}} : les autres restent entre membres',
+      projectsAll: '{{count}} sur {{total}}',
+      projectsNone: 'Aucun projet public pour l’instant',
+      followerCount: 'Mon nombre d’abonnés',
+      never: 'Jamais montrés : tes ruches, qui te suit, tes commentaires et tes réactions.',
+      preview: 'Voir ma page comme un visiteur',
+      // Q6 : un membre suspendu peut fermer sa page, jamais l'ouvrir.
+      suspended: 'Pendant la suspension, tu peux seulement fermer ta page publique.',
+      error: 'Le changement n’a pas pu être enregistré. Réessaie.',
+    },
   },
   project: {
+    // R12 (Q19) : la pastille d'un projet public, à côté du statut et de la catégorie, pour tous.
+    webBadge: 'Public',
     // R6a : la feuille de publication et de modification (planches R6-*). Les textes marqués
     // « juridique » viennent de la relecture du plan (8/11/2026) et remplacent ceux des planches.
     // Les blocs `new`, `edit`, `fields`, `visuals` et `preview` disparaîtront avec l'ancien écran.
@@ -831,6 +904,13 @@ export const fr = {
       private: 'Privé',
       // juridique (jur-J6).
       privateHint: 'Un brouillon : aucun autre membre ne le voit.',
+      // R12 (F-Pub6, Q2 à Q4) : « Public », visible sans compte. L'API le garde sous `web`, car
+      // `public` y veut déjà dire « Membres de {{appName}} ». L'aide est celle de A14, mot pour mot ;
+      // la phrase du bas vaut pour un nouveau projet comme pour une modification.
+      web: 'Public',
+      webHint: 'Visible par tous, et trouvable sur Google',
+      audienceWeb:
+        'Tout le monde pourra le voir, même sans compte. Si tu changes d’avis, les moteurs de recherche peuvent le montrer encore quelque temps.',
       // R8 (juridique, relecture du plan) : le récap par e-mail en parle aussi.
       audienceMembers:
         'Les membres de {{appName}} verront ce projet ; tes abonnés le trouveront dans leur fil et dans leur récap par e‑mail, qui reste dans leur messagerie.',
@@ -955,6 +1035,9 @@ export const fr = {
       // juridique (P5), mot pour mot : qui la lira, qui est prévenu.
       hintPublic:
         'Tous les membres pourront la lire. Les abonnés et les testeurs de ce projet seront prévenus.',
+      // R12 (Q19) : la même aide pour un projet public, que tout le monde lit.
+      hintWeb:
+        'Tout le monde pourra la lire, même sans compte. Les abonnés et les testeurs de ce projet seront prévenus.',
       hintPrivate:
         'Ce projet est privé : aucun autre membre ne voit cette mise à jour, et personne n’est prévenu. S’il redevient visible des membres, tous la verront, et ses abonnés et testeurs pourront la retrouver dans Activité.',
       // Le statut changé dans « Modifier » préremplit la feuille (comme le Journal avant).
@@ -1418,6 +1501,8 @@ export const fr = {
       // Un projet retiré par la modération : la décision et la copie du signalement restent un an.
       deleteConfirmRemoved:
         'Le projet, sa description, ses photos, ses prompts, ses mises à jour et son coin des testeurs disparaissent tout de suite, avec les commentaires, les réactions et les retours des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
+      // R12 (relecture juridique du plan) : une phrase à part, pour un projet public seulement.
+      deleteConfirmWeb: 'Les moteurs de recherche peuvent le montrer encore quelque temps.',
       deleteConfirmButton: 'Supprimer',
       notFoundTitle: 'Ce projet est introuvable',
       // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
@@ -1607,6 +1692,23 @@ export const fr = {
     // Le quota, dès l'ouverture : la phrase, puis l'adresse en lien (ContactLink).
     limitedLead:
       'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous :',
+    // R12 (planches R12-Visiteur-Signaler, R12-Visiteur-Signale) : un visiteur sans compte signale
+    // un projet public, une de ses mises à jour ou une page publique ; pas de champ pour le nom
+    // (Q13). Le titre après l'envoi reste sentTitle (R9).
+    visitor: {
+      email: 'Ton adresse e‑mail, facultative',
+      emailHint: 'Pour recevoir la suite de ton signalement',
+      emailPlaceholder: 'prenom@exemple.fr',
+      // Dit qui lit, à la place de la phrase sur l'anonymat d'un membre (fausse pour un visiteur).
+      moderationReads: 'La modération lit chaque signalement.',
+      // Après l'envoi : avec une adresse, l'e-mail de la décision ; sans, la phrase de R9 sans la
+      // notification (choix b4 des planches).
+      sentBody: 'La modération va le regarder.',
+      sentBodyEmail: 'La modération va le regarder. Un e‑mail te dira quand il aura été traité.',
+      // Q14 : sans « tu » ciblé, l'adresse IP est partagée (même texte que errors.visitorReportQuota).
+      limited:
+        'Trop de signalements depuis cette connexion. Réessaie demain, ou écris-nous : {{contactEmail}}',
+    },
   },
   // Le menu « … » (tranche 7b) : les actions secondaires d'une page, au lieu d'un bouton chacune.
   actionMenu: {
@@ -1671,6 +1773,9 @@ export const fr = {
       follows: 'Vos abonnements de l’un à l’autre sont retirés.',
       notTold: 'Aucun message ne lui est envoyé.',
       moderation: 'La modération n’est pas prévenue.',
+      // R12 (Q19) : un projet public reste visible sans compte, donc aussi de la personne bloquée.
+      publicProjects:
+        'Tes projets publics et ta page publique, si tu en as, restent visibles de tous, même sans compte.',
     },
     fullText: 'Ce que change le blocage',
     alsoReport: 'Signaler aussi son profil',
@@ -1681,6 +1786,37 @@ export const fr = {
     removed: 'Retirés',
     empty: 'Aucun signalement en attente.',
     emptyRemoved: 'Aucun contenu retiré.',
+    // R12 (planche R12-Vitrine) : l'onglet qui choisit la vitrine de l'accueil et « À la une »
+    // parmi les projets publics (Q9). L'auteur est prévenu dans Activité et peut la quitter.
+    showcase: {
+      tab: 'Vitrine de l’accueil',
+      reportsTab: 'Signalements',
+      title: 'Sur l’accueil',
+      count: '{{count}} sur {{max}}',
+      freeSlot: 'Une place libre',
+      remove: 'Retirer',
+      removeNamed: 'Retirer {{title}} de l’accueil',
+      candidates: 'Projets publics',
+      search: 'Chercher un projet public',
+      feature: 'Mettre en avant',
+      featureNamed: 'Mettre en avant {{title}}',
+      limit:
+        '{{max}} projets au plus. Chaque auteur est prévenu dans Activité et peut retirer son projet de l’accueil.',
+      full: 'L’accueil est plein : retires-en un pour en mettre un autre.',
+      empty: 'Aucun projet public pour l’instant.',
+      searchEmpty: 'Aucun projet public ne correspond.',
+      changed: 'Modifié depuis la mise en avant',
+      errorTitle: 'La vitrine n’a pas pu se charger',
+      error: 'Le changement n’a pas pu être enregistré. Réessaie.',
+      // R12, planche R12-Vitrine : la ligne d'un projet public, sous son titre.
+      byline: '{{name}} · public depuis le {{date}}',
+      // Le nom du groupe des deux onglets du haut (« Signalements », « Vitrine de l'accueil ») : un
+      // nom à lui, pas celui de la page (relecture de 7a).
+      sections: 'Rubriques de la modération',
+      // Relecture de design R12, point 1 : la place d'un projet retiré reste jusqu'au changement de
+      // vue, avec ce résultat à la place de « Retirer » (rien ne glisse sous le doigt).
+      removed: 'Retiré de l’accueil',
+    },
     more: 'Afficher la suite',
     errorTitle: 'La modération n’a pas pu se charger',
     // R7a : « Note (ancien journal) » pour les décisions d'avant l'effacement des notes.
@@ -2202,7 +2338,7 @@ export const fr = {
     makePrivate: 'Rendre privé',
     makePrivateTitle: 'Rendre « {{title}} » privé ?',
     makePrivateBody:
-      'Il ne sera plus visible que de toi. Pendant la suspension, tu ne pourras pas le rendre de nouveau public.',
+      'Il ne sera plus visible que de toi. Pendant la suspension, tu ne pourras pas le rendre de nouveau visible.',
     madePrivate: 'Projet passé en privé.',
     // R9 : l'échec de « Rendre privé », lu dans sa fenêtre, qui reste ouverte.
     makePrivateError: 'Le projet n’a pas pu passer en privé. Réessaie.',
@@ -2372,6 +2508,11 @@ export const fr = {
     categoryEmpty: 'Aucun projet dans « {{name}} » pour l’instant.',
     /** Sous une catégorie vide : retire le filtre (des-C4). */
     seeAllProjects: 'Voir tous les projets',
+    // R12 (planche R12-A-La-Une) : en tête d'Explorer, les projets de la vitrine de l'accueil ; ni
+    // sous-titre ni aide. Sans projet mis en avant, la rangée n'apparaît pas.
+    featured: 'À la une',
+    featuredPrevious: 'Projets à la une précédents',
+    featuredNext: 'Projets à la une suivants',
     categoriesError: 'Les catégories n’ont pas pu se charger.',
   },
   // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
@@ -2882,11 +3023,14 @@ export const fr = {
     membersOnly: 'Seuls les membres de {{appName}} pourront l’ouvrir.',
     hiveOnly: 'Seuls les membres de {{hive}} pourront l’ouvrir.',
     privateOnly: 'Ce projet est privé : le lien ne s’ouvrira que pour toi.',
+    // R12 (Q18) : un projet public, ou une page publique.
+    everyone: 'Tout le monde pourra l’ouvrir.',
     system: 'Partager…',
     copy: 'Copier le lien',
     copiedMembers: 'Lien copié : seuls les membres de {{appName}} pourront l’ouvrir.',
     copiedHive: 'Lien copié : seuls les membres de {{hive}} pourront l’ouvrir.',
     copiedPrivate: 'Lien copié : il ne s’ouvrira que pour toi.',
+    copiedEveryone: 'Lien copié : tout le monde pourra l’ouvrir.',
     copyFailed: 'Impossible de copier le lien. Réessaie.',
     // Le menu de l'appareil a échoué (pas une annulation) : on propose l'autre chemin.
     systemFailed: 'Impossible d’ouvrir le partage. Copie le lien à la place.',
@@ -3216,6 +3360,60 @@ export const fr = {
       reason:
         'Tu reçois cet e‑mail parce que ton compte {{appName}} n’a pas servi depuis près de 3 ans. C’est un e‑mail de service : il part même si tu as coupé les autres, une seule fois avant la suppression.',
     },
+    // R12 (Q14, planche R12-Visiteur-Signale) : les deux e-mails d'un visiteur qui a donné son
+    // adresse en signalant : l'accusé de réception, puis la décision ; deux au plus. Aucun texte ni
+    // lien venu d'un membre : la nature du contenu, le motif, la date. Personne n'est nommé
+    // (« Bonjour, ») : l'adresse n'est rattachée à aucun compte.
+    visitorReport: {
+      greeting: 'Bonjour,',
+      // Le rappel du signalement : {{kind}} est l'une des natures de `kinds`, {{reason}} un motif de
+      // `report.reasons`, {{date}} et {{time}} l'envoi à l'heure de Paris.
+      kind: 'Contenu : {{kind}}',
+      reason: 'Motif : {{reason}}',
+      sentAt: 'Envoyé le {{date}} à {{time}}',
+      kinds: {
+        project: 'un projet',
+        update: 'une mise à jour',
+        member: 'un profil',
+      },
+      ignore: 'Si tu n’as rien signalé, ignore cet e‑mail.',
+      reasonWhy:
+        'Tu reçois cet e‑mail parce que cette adresse a été donnée en signalant un contenu sur {{appName}}.',
+      received: {
+        subject: 'Ton signalement est bien arrivé',
+        heading: 'Ton signalement est bien arrivé',
+        body: 'Merci. La modération de {{appName}} va regarder ce que tu nous as signalé.',
+        next: 'Un second e‑mail te dira ce qui a été décidé. Ensuite, ton adresse sera effacée.',
+      },
+      decided: {
+        subject: 'Ton signalement a été traité',
+        heading: 'Ton signalement a été traité',
+        // L'issue seulement, comme la notification d'un membre (notifications.reportHandled) ;
+        // `part` quand le signalement visait une partie du contenu.
+        outcome: {
+          project: {
+            removed: 'Le projet que tu as signalé a été retiré.',
+            dismissed: 'Après examen, le projet que tu as signalé n’a pas été retiré.',
+          },
+          update: {
+            removed: 'La mise à jour que tu as signalée a été retirée.',
+            dismissed: 'Après examen, la mise à jour que tu as signalée n’a pas été retirée.',
+          },
+          member: {
+            removed: 'La modération est intervenue sur le profil que tu as signalé.',
+            dismissed: 'Après examen, rien n’a changé sur le profil que tu as signalé.',
+          },
+          part: {
+            removed: 'La partie que tu as signalée a été retirée.',
+            dismissed: 'Après examen, la partie que tu as signalée n’a pas été retirée.',
+          },
+        },
+        contest: 'Pas d’accord ? Écris à {{contactEmail}} ; tu peux aussi saisir la justice.',
+        // Q14 : l'adresse est effacée une fois cet e-mail envoyé.
+        erased:
+          'Ton adresse est maintenant effacée : c’est le dernier e‑mail de {{appName}} sur ce signalement.',
+      },
+    },
     // R11 : le pied commun des e-mails ajoute l'adresse de la page Confidentialité, en texte.
     privacy: 'Confidentialité : {{url}}',
   },
@@ -3260,7 +3458,7 @@ export const fr = {
     nobodyBody: 'Suis des membres depuis leur page : leurs nouveaux projets arriveront ici.',
     // R3 : « Découvrir » est devenu l'onglet Explorer ; le fil vide y mène.
     nobodyAction: 'Explorer les projets',
-    discoverEmpty: 'Aucun projet public pour l’instant.',
+    discoverEmpty: 'Aucun projet publié pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
     testersCaption:
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
@@ -3403,6 +3601,15 @@ export const fr = {
     hiveDeleted: 'La ruche <b>{{hive}}</b> a été supprimée.',
     // Option 7 des planches : la seconde ligne du retrait et de la suppression.
     hivePrivateAgain: 'Tes projets réservés à la ruche sont redevenus privés.',
+    // R12 (planche R12-Vitrine, encart) : un projet mis sur l'accueil par la modération ; son auteur
+    // peut l'en retirer (Q9). Signé de {{appName}}, jamais de l'administrateur.
+    showcaseAdded: '<b>{{title}}</b> est sur l’accueil de {{appName}}',
+    // Relecture juridique R12, point 1 : la même ligne, au passé, quand le projet n'est plus sur
+    // l'accueil (refus de l'auteur, retrait, sortie de « Public ») : un texte d'état change avec lui.
+    showcaseWas: '<b>{{title}}</b> a été sur l’accueil de {{appName}}',
+    showcaseLeave: 'Retirer de l’accueil',
+    showcaseLeft: 'Ton projet a quitté l’accueil. Il reste public.',
+    showcaseLeaveError: 'Le projet n’a pas pu quitter l’accueil. Réessaie.',
     // R8 : la colonne de droite sur ordinateur.
     emailColumn: {
       title: 'Ce que tu reçois par e‑mail',
@@ -3667,6 +3874,13 @@ export const fr = {
     // que la version en cours des règles n'est pas acceptée (`rules_required`, comme `suspended`).
     rulesNotAccepted: 'Accepte les règles de {{appName}} pour créer ton compte.',
     ageNotDeclared: '{{appName}} est ouvert à partir de 15 ans.',
+    // Tranche R12 (Q14) : le quota des signalements d'un visiteur, par adresse IP
+    // (`visitor_report_quota`) ; sans « tu » ciblé, l'adresse est partagée.
+    visitorReportQuota:
+      'Trop de signalements depuis cette connexion. Réessaie demain, ou écris-nous : {{contactEmail}}',
+    // R12 (relecture juridique du plan) : la mise en avant d'un projet que son auteur a retiré de
+    // l'accueil (`author_declined`).
+    authorDeclined: 'L’auteur a retiré ce projet de l’accueil.',
     rulesRequired: 'Accepte d’abord les règles de {{appName}} : cette action attend ton accord.',
   },
 } as const

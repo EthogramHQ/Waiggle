@@ -33,6 +33,8 @@ const ALLOWED_METHODS = new Set(['GET', 'HEAD', 'DELETE'])
  */
 const PARTLY_ALLOWED_WRITES = new Set([
   'PATCH /v1/me',
+  // R12 : ses réglages de page publique, comme son profil.
+  'PATCH /v1/me/public-page',
   'PATCH /v1/projects/:id',
   'POST /v1/moderation/decisions',
 ])

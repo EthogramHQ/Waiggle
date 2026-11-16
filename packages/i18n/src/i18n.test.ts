@@ -77,9 +77,9 @@ describe('translations', () => {
   it('never calls a project visible to members « public » in the sentences about who sees it', () => {
     // R11 (« Moins de mots ») : « Toute personne qui a un compte. » (`project.form.membersHint`)
     // quitte l'écran et le fichier ; la partie des Règles qui dit à qui un projet se montre prend
-    // sa place dans la liste.
+    // sa place dans la liste. R12 : cette partie des Règles nomme le choix « Public » (tout le monde,
+    // moteurs de recherche compris) ; elle quitte donc la liste, comme prévu en R6a.
     const audienceKeys = [
-      'legal.pages.rules.sections.content.body',
       'project.form.privateHint',
       'project.form.audienceMembers',
       'project.form.audienceMembersEdit',

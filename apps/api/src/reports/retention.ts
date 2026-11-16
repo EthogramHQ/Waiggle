@@ -22,14 +22,28 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { utc } from '../notifications/load'
 import { voidReportsOfDepartedAuthors, voidReportsOfGoneTargets } from './queue'
 import { targetUuid } from './target'
+import { closeVisitorReports, type VisitorMail } from './visitor'
 
 const DAY = 24 * 60 * 60 * 1000
 const r = schema.contentReport
 const daysBefore = (now: Date, days: number) => new Date(now.getTime() - days * DAY)
 
-export const purgeModeration = async (db: Database, now: Date) => {
+/**
+ * `visitorMail` (R12) : la messagerie pour la décision aux visiteurs ; `null` (EMAIL_JOBS=off, ou
+ * un appel sans e-mail) efface leurs adresses sans rien envoyer.
+ */
+export const purgeModeration = async (
+  db: Database,
+  now: Date,
+  visitorMail: VisitorMail | null = null,
+) => {
   const voided =
     (await voidReportsOfGoneTargets(db, now)) + (await voidReportsOfDepartedAuthors(db, now))
+  // R12 : l'adresse d'un visiteur ne survit à aucune clôture. Celles que personne n'a lues depuis
+  // (une cible supprimée, un compte parti : le signalement vient d'être classé « sans objet »)
+  // passent par la même clôture que la modération : la décision part, puis l'adresse est effacée,
+  // même si l'envoi échoue (relecture juridique R12, point 2 : l'accusé l'a promise).
+  await closeVisitorReports(db, visitorMail)
 
   // Les signalements clos sont peu nombreux à la fois (une purge par nuit) : la table est lue en
   // entier, une fois par nuit. Un index sur decided_at le jour où elle grandira (à surveiller).

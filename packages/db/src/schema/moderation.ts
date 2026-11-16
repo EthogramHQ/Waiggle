@@ -206,6 +206,14 @@ export const contentReport = pgTable(
     // La copie (`snapshot`) ne garde alors que ce champ.
     partField: text('part_field'),
     partMediaId: uuid('part_media_id'),
+    // R12 : l'adresse e-mail facultative d'un visiteur sans compte qui signale (`reporter_id` est
+    // alors nul), pour l'accusé de réception et la décision. Effacée à toute clôture du signalement
+    // (décision, « sans objet »), que l'e-mail parte ou non ; aucune lecture de la file ne la
+    // sélectionne, et elle n'entre dans aucun export (elle n'appartient à aucun membre).
+    reporterEmail: text('reporter_email'),
+    // R12 : la langue de ce visiteur (« fr » ou « en », celle de son navigateur à l'envoi), pour que
+    // la décision lui arrive dans la même langue que l'accusé. Effacée avec l'adresse, jamais seule.
+    reporterLanguage: text('reporter_language'),
   },
   (t) => [
     // Un seul signalement ouvert par membre, par cible et par partie (le refaire répond « déjà
@@ -222,6 +230,21 @@ export const contentReport = pgTable(
         sql`coalesce(${t.partMediaId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
       )
       .where(sql`${t.status} = 'open'`),
+    // R12 : un même visiteur (la même adresse e-mail, sans tenir compte des majuscules : `lower`)
+    // n'a qu'un signalement ouvert par cible ; le refaire répond comme un premier signalement, sans
+    // nouvelle ligne (décision 2). Index unique partiel, sur les seuls signalements ouverts qui ont
+    // une adresse : ceux des membres n'y sont pas.
+    uniqueIndex('content_report_visitor_target_idx')
+      .on(t.targetKind, t.targetId, sql`lower(${t.reporterEmail})`)
+      .where(sql`${t.status} = 'open' and ${t.reporterEmail} is not null`),
+    // R12 : « les signalements clos qui ont encore une adresse de visiteur » (reports/visitor.ts :
+    // la décision, « sans objet » et la purge de nuit les cherchent pour envoyer la décision, puis
+    // effacer l'adresse). Index partiel : presque vide, car une adresse ne survit pas à la clôture ;
+    // la condition de la requête reprend mot pour mot celle de l'index, sans quoi PostgreSQL ne s'en
+    // sert pas.
+    index('content_report_visitor_closed_idx')
+      .on(t.id)
+      .where(sql`${t.reporterEmail} is not null and ${t.status} <> 'open'`),
     // La file : les signalements ouverts, du plus ancien au plus récent. Index partiel : les
     // signalements clos, bien plus nombreux avec le temps, n'y sont pas.
     index('content_report_open_idx').on(t.createdAt).where(sql`${t.status} = 'open'`),
@@ -235,6 +258,11 @@ export const contentReport = pgTable(
       'content_report_part_check',
       sql`(${t.partField} is null and ${t.partMediaId} is null)
         or (${t.partField} is not null and (${t.partField} in ('cover', 'photo', 'photoDescription')) = (${t.partMediaId} is not null))`,
+    ),
+    // R12 : une adresse e-mail n'est gardée que pour un visiteur, jamais à côté d'un membre.
+    check(
+      'content_report_visitor_email_check',
+      sql`${t.reporterEmail} is null or ${t.reporterId} is null`,
     ),
   ],
 )

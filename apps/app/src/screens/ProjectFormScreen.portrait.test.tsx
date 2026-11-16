@@ -193,7 +193,7 @@ describe('ProjectFormScreen, the vertical cover', () => {
       { uri: tall('debout').uri, slot: 'portrait' },
     ])
     expect(mockServer.received('POST', VISUALS)[1]?.path).toBe(`/v1/projects/${NEW_ID}/visuals`)
-    await waitFor(() => expect(destinations()).toContain(`/?published=${NEW_ID}`))
+    await waitFor(() => expect(destinations()).toContain(`/feed?published=${NEW_ID}`))
   })
 
   it('opens the edit sheet, without the dance, when the vertical cover fails after the creation', async () => {
@@ -232,7 +232,7 @@ describe('ProjectFormScreen, the vertical cover', () => {
     await fillIn()
     await chooseCategories('science')
     await fireEvent.press(screen.getByRole('button', { name: TEXT.publish }))
-    await waitFor(() => expect(destinations()).toContain(`/?published=${NEW_ID}`))
+    await waitFor(() => expect(destinations()).toContain(`/feed?published=${NEW_ID}`))
     expect(uploadedImages()).toHaveLength(0)
   })
 

@@ -7,7 +7,8 @@
 //   e-mails, sa langue (PATCH /v1/me,
 //   que la route restreint elle-même : S9 ; depuis R9, aussi vider sa bio ou ses outils, et choisir
 //   un nom ou un pseudo provisoire), passer son projet en privé (PATCH /v1/projects/:id, restreint
-//   par la route au seul `{ visibility: 'private' }`, R9), se désinscrire par le lien d'un e-mail, et
+//   par la route au seul `{ visibility: 'private' }`, R9 ; R12 : depuis « Public », aussi
+//   « Membres » ou une ruche), se désinscrire par le lien d'un e-mail, et
 //   la décision de modération (un administrateur suspendu n'en est plus un : la garde de la
 //   modération lui répond le même 404 qu'à tout membre, S16 et S19).
 // Tout le reste reçoit 403 `suspended`, avant le validateur et avant le quota de la route : elle
@@ -55,6 +56,8 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   // tout le reste (route-inventory.test.ts, colonne « partial »).
   'PATCH /v1/me',
   'PATCH /v1/projects/:id',
+  // R12 (Q6) : fermer sa page publique ; la route refuse tout le reste (`suspendedPublicPageChange`).
+  'PATCH /v1/me/public-page',
   'POST /v1/email/unsubscribe',
   'POST /v1/moderation/decisions',
   // R10 (relecture du plan, point 2) : rejoindre une ruche où l'on est invité reste permis (refuser
@@ -110,9 +113,35 @@ export const suspendedProfileChange = (
  * jamais en public, et rien d'autre dans la même demande. Le corps doit être exactement
  * `{ "visibility": "private" }`. Les droits sur le projet restent vérifiés par la route : le projet
  * d'une autre répond 403, comme à tout membre.
+ *
+ * R12 (décision du 16/11/2026, plan R12) : un suspendu peut aussi rendre MOINS visible un projet
+ * « Public » (`web`, lu sans compte) : vers « Membres » (`{ "visibility": "public" }`) ou vers une
+ * de ses ruches (`{ "visibility": "hive", "hiveId": … }`), jamais l'inverse. `current` : la
+ * visibilité enregistrée du projet, lue par la route (null s'il n'est pas à lui ou n'existe pas :
+ * seul « privé » passe alors, et la route répond ensuite 403 ou 404 comme à tout membre). La route
+ * relit cette visibilité sous le verrou de la transaction (`suspendedVisibilityAllowed`), au cas où elle
+ * change entre-temps.
  */
-export const suspendedProjectChange = (body: unknown) =>
-  isJsonObject(body) && Object.keys(body).length === 1 && body.visibility === 'private'
+export const suspendedProjectChange = (body: unknown, current: string | null) => {
+  if (!isJsonObject(body)) return false
+  const keys = Object.keys(body)
+  if (keys.length === 1 && body.visibility === 'private') return true
+  if (current !== 'web') return false
+  if (keys.length === 1 && body.visibility === 'public') return true
+  return (
+    keys.length === 2 &&
+    keys.includes('hiveId') &&
+    body.visibility === 'hive' &&
+    typeof body.hiveId === 'string'
+  )
+}
+
+/**
+ * Une visibilité qu'un suspendu peut écrire sur un projet dont la visibilité enregistrée est
+ * `current` (R12) : « privé » toujours ; « Membres » ou une ruche seulement depuis « Public ».
+ */
+export const suspendedVisibilityAllowed = (target: string, current: string) =>
+  target === 'private' || (current === 'web' && (target === 'public' || target === 'hive'))
 
 /**
  * Les routes que Hono a trouvées pour cette requête, sans les middlewares (méthode « ALL », comme

@@ -2,9 +2,10 @@
 // cette syntaxe qui ressemble à du HTML). React Native traduit ensuite ses éléments en vrais
 // éléments iOS, Android ou web.
 //
-// Deux visages : pour un visiteur, la constellation, le logo et l'invitation à créer un compte ;
-// pour un membre connecté, le Fil : les nouveaux projets des personnes suivies et les notes des
-// projets suivis (R3 : « Découvrir » est devenu l'onglet Explorer, et les raccourcis « Publier »,
+// R12 : le Fil a sa propre adresse (`/feed`), et l'accueil `/` est la vitrine (ShowcaseScreen.tsx).
+// Cet écran n'est plus que le Fil d'un membre connecté : les nouveaux projets des personnes suivies
+// et les notes des projets suivis. Sans session (ou pendant sa lecture), il montre l'accueil d'un
+// visiteur sans vitrine, celui de R11 (`VisitorHome`, rangé avec la vitrine, pas recopié ici) (R3 : « Découvrir » est devenu l'onglet Explorer, et les raccourcis « Publier »,
 // « Mes projets », « Réglages » sont passés dans la barre d'onglets et la barre du haut). Le fil se
 // lit 20 par 20, et un bouton annonce les nouveautés sans jamais faire bouger ce qu'on lit.
 //
@@ -54,17 +55,12 @@ import { TopNav } from '../navigation/TopNav'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { useMe } from '../profile/hooks'
 import { PublishTargetContext } from '../projects/SummaryCard'
-import { Button } from '../ui/Button'
 import { Columns } from '../ui/Columns'
-import { Constellation } from '../ui/Constellation'
 import type { Measurable } from '../ui/coverTransition'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HiddenHeading } from '../ui/HiddenHeading'
-import { Hint } from '../ui/Hint'
 import { HiveInvitation } from '../ui/HiveInvitation'
 import { ALL_HIVES, HivePills } from '../ui/HivePills'
-import { LanguageSwitcher } from '../ui/LanguageSwitcher'
-import { LegalLinks } from '../ui/LegalLinks'
 import { Logo } from '../ui/Logo'
 import { Notice } from '../ui/Notice'
 import { PublishDance } from '../ui/PublishDance'
@@ -74,12 +70,10 @@ import { Row, Stack } from '../ui/Stack'
 import { useScreenFocused } from '../ui/screenFocus'
 import { ScreenScrollContext } from '../ui/scrollLight'
 import { TabPanel } from '../ui/Tabs'
-import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast, useToastShown } from '../ui/theme/toast'
-import { WelcomeHero } from '../ui/WelcomeHero'
-import { Wordmark } from '../ui/Wordmark'
+import { VisitorHome } from './ShowcaseScreen'
 import { SessionErrorScreen } from './states'
 
 export function HomeScreen() {
@@ -90,64 +84,6 @@ export function HomeScreen() {
   // créer un compte (voir accounts/session.ts). Pas de « Retour » : il ramènerait ici.
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" withBack={false} />
   return session ? <MemberHome session={session} /> : <VisitorHome />
-}
-
-function VisitorHome() {
-  // Les « hooks » (fonctions qui commencent par use…) branchent l'écran sur une donnée qui change.
-  // useTranslation : donne t() pour traduire, et redessine l'écran quand la langue change.
-  const { t } = useTranslation()
-  const router = useRouter()
-  // La carte (scène à gauche) des écrans de marque, dès 1 000 points (R2).
-  const wide = useLayout().card
-
-  return (
-    // Le « miel vif » des moments de marque : sur téléphone, la constellation flotte sur le miel et
-    // tout le reste (le nom, l'accroche, les deux portes d'entrée) est posé sur la feuille claire.
-    // Sur ordinateur, la scène de gauche (`hero`) la montre déjà : l'ambiance ne la répète pas.
-    <Screen
-      ambiance="brand"
-      scene={<Constellation height={280} />}
-      // R2 (relecture de design de R1) : le choix de la langue sur le miel, pas en tête de la
-      // feuille ; à 320 × 568, « Créer un compte » remonte ainsi au-dessus du pli.
-      header={
-        <Row justify="end">
-          <LanguageSwitcher compact />
-        </Row>
-      }
-      // R11 : la scène ne porte plus la pastille du logiciel libre ; « Le code source » est dans le
-      // pied de la feuille, avec les quatre pages (planche R11-Pied).
-      hero={<WelcomeHero tagline={t(($) => $.home.tagline)} />}
-    >
-      {/* Sur ordinateur, la scène de gauche montre déjà la constellation et le grand logo ; la
-          feuille porte le nom, l'abeille devant le mot « waiggle » (R3, maquette
-          R2-Desktop-Connexion). Annoncé comme sur téléphone : « Bienvenue sur Waiggle », titre 1. */}
-      {wide ? (
-        <Wordmark size="large" logo header={t(($) => $.home.title)} />
-      ) : (
-        // Sur téléphone, la constellation flotte sur le miel (`scene`) ; la feuille porte le nom.
-        <Stack gap="sm">
-          <Wordmark size="huge" header={t(($) => $.home.title)} />
-          <Text variant="headline" tone="secondary" weight={400}>
-            {t(($) => $.home.tagline)}
-          </Text>
-        </Stack>
-      )}
-      <Stack gap="md">
-        <Button label={t(($) => $.home.signUp)} onPress={() => router.push('/sign-up')} />
-        <Button
-          label={t(($) => $.home.haveAccount)}
-          variant="secondary"
-          onPress={() => router.push('/sign-in')}
-        />
-      </Stack>
-      <Hint icon="lock-simple" text={t(($) => $.home.membersOnly)} />
-      {/* R11 (planche R11-Pied) : le pied des pages publiques, sur téléphone comme sur ordinateur :
-          Règles, Confidentialité, Mentions légales, Accessibilité et « Le code source » (la licence
-          AGPL demande d'offrir le code à ceux qui utilisent l'appli). « Moins de mots » : la phrase
-          « … est un logiciel libre » est partie, le lien suffit. */}
-      <LegalLinks variant="footer" />
-    </Screen>
-  )
 }
 
 function MemberHome({ session }: { session: SessionData }) {
@@ -411,7 +347,7 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
   const clean = useCallback(() => {
     // Sans le paramètre, l'adresse redevient celle du fil. `setParams` garde l'historique tel quel.
     if (router.setParams) router.setParams({ published: undefined })
-    else router.replace('/')
+    else router.replace('/feed')
   }, [router])
 
   useEffect(() => {
@@ -669,7 +605,7 @@ const hiveNewsOf = (
     : NO_NEWS
 
 /**
- * Hook (R10) : la pastille du Fil. Elle vit dans l'adresse (`/?hive=<id>`), lue après l'hydratation
+ * Hook (R10) : la pastille du Fil. Elle vit dans l'adresse (`/feed?hive=<id>`), lue après l'hydratation
  * (la page pré-rendue ne connaît pas l'adresse) ; une ruche dont le membre ne fait pas partie (plus
  * membre, adresse recopiée) vaut « Tout ». Choisir une pastille change le seul paramètre, sans
  * nouvelle entrée d'historique (`setParams`).
@@ -693,7 +629,7 @@ const useHiveChoice = () => {
     (value: string) => {
       const hive = value === ALL_HIVES ? undefined : value
       if (router.setParams) router.setParams({ hive })
-      else router.replace(hive ? `/?hive=${encodeURIComponent(hive)}` : '/')
+      else router.replace(hive ? `/feed?hive=${encodeURIComponent(hive)}` : '/feed')
     },
     [router],
   )

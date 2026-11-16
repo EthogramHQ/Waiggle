@@ -412,6 +412,8 @@ describe('the page of a blocked member', () => {
       removedParts: [],
       // Tranche 7c : réservé aux administrateurs.
       moderation: null,
+      // R12 : sa page est-elle publique (la feuille de partage le dit) ; celle d'Inès est fermée.
+      publicPage: false,
     })
   })
 

@@ -6,7 +6,7 @@
 // Il ne bouge jamais seul (relecture juridique de R3, jur-J7 : un carrousel qui défile seul attire
 // l'œil malgré soi) : ni minuteur, ni défilement au montage ; seulement le doigt, une flèche, Tab.
 // Il ressemble à Thumbnails, l'autre ScrollView horizontal de l'appli.
-import { space } from '@ruche/brand'
+import { type ShadowName, shadows, space } from '@ruche/brand'
 import {
   Children,
   isValidElement,
@@ -52,6 +52,25 @@ type Props = {
    * marges sont celles de `useLayout`).
    */
   bleed?: boolean
+  /**
+   * L'ombre que portent les cartes (un nom de `packages/brand/src/shadows.ts`, `card` pour la
+   * vitrine) : la bande lui garde sa place dessous, sinon elle la rogne d'un trait droit. Absente :
+   * les cartes n'ont pas d'ombre qui dépasse (« Ils cherchent des testeurs »), rien ne change.
+   */
+  cardShadow?: ShadowName
+}
+
+/**
+ * Jusqu'où une ombre déborde sous sa carte, en points : son décalage vertical plus son flou. Lu
+ * dans le jeton lui-même (format CSS : « x y flou couleur »), le plus grand du jour et de la nuit :
+ * une ombre changée dans `packages/brand` garde sa place sans autre retouche.
+ */
+export const shadowReachBelow = (name: ShadowName): number => {
+  const reach = (value: string) => {
+    const [, y = '0', blur = '0'] = value.trim().split(/\s+/)
+    return Math.max(0, Number.parseFloat(y) + Number.parseFloat(blur))
+  }
+  return Math.max(reach(shadows.day[name]), reach(shadows.night[name]))
 }
 
 /** Les styles du web que les types de React Native ne connaissent pas (aimantation CSS). */
@@ -66,6 +85,7 @@ export function Carousel({
   header,
   variant = 'cards',
   bleed = false,
+  cardShadow,
 }: Props) {
   const { sizeClass, padding } = useLayout()
   const calm = useCalmMotion()
@@ -83,6 +103,12 @@ export function Carousel({
   // clavier de la première carte ne soit pas rogné ; jusqu'au bord de l'écran avec `bleed`.
   const edge = bleed && sizeClass === 'compact' ? padding : space.xs
   const gap = variant === 'chips' ? space.sm : sizeClass === 'compact' ? space.md : space.xxl
+  // L'air sous les cartes (relecture de design R12, point 3) : de quoi tenir leur ombre entière.
+  // La bande s'allonge d'autant vers le bas, puis une marge négative la ramène : ce qui suit reste à
+  // sa place, et passe par-dessus cette marge vide (dessiné après, il reçoit aussi les touchers).
+  // Le haut et les côtés gardent `space.xs` et `edge` : l'ombre y est à peine visible, et une bande
+  // plus large déborderait de la colonne ou défilerait quand ses cartes tiennent.
+  const below = cardShadow ? Math.max(space.xs, shadowReachBelow(cardShadow)) : space.xs
 
   // Ce qu'on a mesuré : la largeur visible, celle de tout le contenu, la position de chaque carte,
   // et l'endroit où la bande est arrêtée. Des `ref`, lus seulement au moment d'une flèche ; seuls
@@ -234,7 +260,7 @@ export function Carousel({
           updateEnds()
         }}
         style={[
-          { marginHorizontal: -edge },
+          { marginHorizontal: -edge, marginBottom: space.xs - below },
           // L'aimantation sur le web : le navigateur arrête la bande au début d'une carte, à
           // `edge` du bord (scroll-padding), y compris quand Tab y amène une carte cachée.
           webOnly({ scrollSnapType: 'x mandatory', scrollPaddingInline: edge }),
@@ -242,8 +268,10 @@ export function Carousel({
         contentContainerStyle={{
           gap,
           paddingHorizontal: edge,
-          // De l'air au-dessus et au-dessous : la bande rogne ce qui dépasse (anneau du clavier).
-          paddingVertical: space.xs,
+          // De l'air au-dessus et au-dessous : la bande rogne ce qui dépasse (anneau du clavier,
+          // ombre des cartes).
+          paddingTop: space.xs,
+          paddingBottom: below,
           alignItems: 'flex-start',
         }}
       >

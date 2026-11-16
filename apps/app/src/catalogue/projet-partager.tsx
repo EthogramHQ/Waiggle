@@ -2,6 +2,8 @@
 // (ShareSheetPanel, la feuille sans sa couche modale), dans ses états :
 // - un projet public, avec « Partager… » (le menu de l'appareil existe) et sans (Firefox sur
 //   ordinateur) ;
+// - R12 : un projet ouvert à tous et une page publique de membre (« Tout le monde pourra
+//   l'ouvrir. », sous un globe, l'adresse dans la langue du catalogue) ;
 // - un projet privé : le bandeau dit que le lien ne s'ouvrira que pour son auteur ;
 // - R10 : un projet réservé à Famille (« Seuls les membres de Famille pourront l'ouvrir. »), et
 //   à une ruche dont le nom a été retiré (« Ruche sans nom ») ;
@@ -27,6 +29,8 @@ const fr = {
   intro:
     'La feuille qui s’ouvre par le bouton Partager d’un projet ou d’un membre : la vignette, « … sur Waiggle », l’adresse telle qu’elle sera copiée (rien d’autre), le bandeau qui dit qui pourra l’ouvrir, puis « Copier le lien » et « Partager… » (le menu de l’appareil, seulement s’il existe). « Copier le lien » ferme la feuille, puis le toast dit « Lien copié ».',
   project: 'Projet public, avec « Partager… »',
+  web: 'Projet ouvert à tous (R12) : globe, adresse par langue',
+  webMember: 'Page publique d’un membre (R12)',
   noSystem: 'Projet public, sans menu de l’appareil (Firefox sur ordinateur)',
   private: 'Projet privé',
   hive: 'Projet réservé à une ruche (R10)',
@@ -47,6 +51,8 @@ const en: typeof fr = {
   intro:
     'The sheet opened by the Share button of a project or a member: the thumbnail, “… on Waiggle”, the address as it will be copied (nothing else), the banner that says who will be able to open it, then “Copy link” and “Share…” (the device menu, only when it exists). “Copy link” closes the sheet, then the toast says “Link copied”.',
   project: 'Public project, with “Share…”',
+  web: 'Project open to everyone (R12): globe, address by language',
+  webMember: 'Public page of a member (R12)',
   noSystem: 'Public project, without a device menu (Firefox on a computer)',
   private: 'Private project',
   hive: 'Project reserved to a hive (R10)',
@@ -100,7 +106,7 @@ function Example({ caption, children }: { caption: string; children: ReactNode }
   )
 }
 
-/** Les sept feuilles d'un thème, sur téléphone. */
+/** Les feuilles d'un thème, sur téléphone. */
 function PhoneSheets({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] }) {
   const project = { kind: 'project' as const, id: PROJECT }
   return (
@@ -112,6 +118,29 @@ function PhoneSheets({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number
             title={l.projectTitle}
             target={project}
             image={photo}
+            canShare
+            closeLabel={l.close}
+            onClose={noop}
+          />
+        </Example>
+        <Example caption={`${l.web} — ${l[scheme]}`}>
+          <ShareSheetPanel
+            layout="phone"
+            title={l.projectTitle}
+            target={project}
+            visibility="web"
+            image={photo}
+            canShare
+            closeLabel={l.close}
+            onClose={noop}
+          />
+        </Example>
+        <Example caption={`${l.webMember} — ${l[scheme]}`}>
+          <ShareSheetPanel
+            layout="phone"
+            title={l.memberName}
+            target={{ kind: 'member', id: MEMBER }}
+            visibility="web"
             canShare
             closeLabel={l.close}
             onClose={noop}

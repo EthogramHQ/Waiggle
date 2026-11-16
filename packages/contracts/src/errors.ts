@@ -90,6 +90,11 @@ export const ErrorCode = z.enum([
   // règles en vigueur (403). Les lectures et les sorties (accepter, régler ses e-mails, se
   // désinscrire, supprimer un contenu à soi) restent ouvertes, comme pour `suspended`.
   'rules_required',
+  // Tranche R12 (les projets publics) : le 6e signalement d'un visiteur dans la journée depuis la
+  // même adresse IP (429 ; message sans « tu » ciblé, l'adresse est partagée) ; la mise en avant sur
+  // l'accueil d'un projet que son auteur en a retiré (409).
+  'visitor_report_quota',
+  'author_declined',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

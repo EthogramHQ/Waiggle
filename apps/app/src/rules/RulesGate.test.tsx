@@ -107,6 +107,11 @@ describe('RulesGate (R11)', () => {
     await expectGated('/settings')
   })
 
+  // R12 : le Fil a sa propre adresse ; `/` reste gardé aussi (l'accueil d'un membre).
+  it('opens the rules screen over the feed at its own address', async () => {
+    await expectGated('/feed')
+  })
+
   it('shows nothing to a member who has accepted the current rules', async () => {
     const view = await showAt('/', leaMe)
 
@@ -148,6 +153,20 @@ describe('RulesGate (R11)', () => {
   it('leaves /rules/ and /rules?from=sign-up open', async () => {
     await expectOpen('/rules/')
     await expectOpen('/rules?from=sign-up')
+  })
+
+  // R12 : les pages légales ont aussi une adresse par langue (`/fr/rules`, `/en/privacy`…).
+  it('leaves the four legal pages open at their address in each language', async () => {
+    for (const page of ['rules', 'privacy', 'legal', 'accessibility']) {
+      await expectOpen(`/fr/${page}`)
+      await expectOpen(`/en/${page}`)
+    }
+  })
+
+  it('gates the other public pages, and a language it does not know', async () => {
+    await expectGated('/fr/')
+    await expectGated('/en/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f')
+    await expectGated('/de/rules')
   })
 
   it('gates /rulesx and /settings/data', async () => {

@@ -10,13 +10,14 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import { I18nextProvider } from 'react-i18next'
 import { Platform } from 'react-native'
+import { useMemberMarkerSync } from '../src/accounts/memberMarker'
 import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
-import { AmbientHost, hostedNavigationTheme, hostedStackStyle } from '../src/ui/AmbientHost'
+import { AmbientHost, hostedNavigationTheme, usePageStackOptions } from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
@@ -68,6 +69,9 @@ export default function RootLayout() {
         <ThemeProvider>
           {/* Applique la langue enregistrée sur le compte du membre connecté */}
           <LanguageSync />
+          {/* R12 : sur le web, le marqueur `waiggle_member` suit la session (posé, effacé), pour
+              que le serveur envoie au Fil un membre qui arrive sur `/`. */}
+          <MemberMarkerSync />
           {/* R3 : la barre d'onglets du téléphone, posée une seule fois au-dessus de toutes les pages,
               pour que sa goutte glisse d'un onglet à l'autre. AppTabBar décide où elle se montre ;
               TabBarHost mesure sa hauteur et la donne aux écrans (la place à réserver en bas) et
@@ -99,19 +103,25 @@ export default function RootLayout() {
   )
 }
 
+/**
+ * Composant invisible : il ne fait que monter le hook du marqueur de membre. Un composant à part
+ * plutôt qu'un appel dans RootLayout : un changement de session redessine ce seul composant, pas
+ * toute l'appli.
+ */
+function MemberMarkerSync() {
+  useMemberMarkerSync()
+  return null
+}
+
 /** La barre d'état (heure, batterie) et la navigation, aux couleurs du thème en cours. */
 function ThemedChrome() {
-  const { scheme, colors } = useTheme()
+  const { scheme } = useTheme()
   // Stack : navigation en pile, chaque nouvelle page s'empile sur la précédente. Sur le web, les
   // pages sont transparentes : la lumière commune de l'hôte se voit derrière elles. Sur téléphone,
   // chaque page garde le fond de l'appli (et sa propre lumière, ui/Screen.tsx).
+  const screenOptions = usePageStackOptions()
   const stack = (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: isWeb ? hostedStackStyle : { backgroundColor: colors.background },
-      }}
-    >
+    <Stack screenOptions={screenOptions}>
       {/* R6a : publier et modifier sont des feuilles posées sur la page d'où l'on vient. Une
           fenêtre transparente (`transparentModal`) garde cette page dessinée dessous ; la feuille
           anime elle-même son entrée (`animation: 'none'`). Ouverte sans page d'avant, la feuille

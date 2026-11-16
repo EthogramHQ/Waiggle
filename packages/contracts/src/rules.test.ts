@@ -25,8 +25,13 @@ describe('RULES_VERSION', () => {
     expect(RulesVersion.safeParse('2026-11-16T00:00:00Z').success).toBe(false)
   })
 
-  it('has no change to show for the first version', () => {
-    expect(RULES_CHANGES).toEqual([])
+  // R12 : la deuxième version dit ce qui change (choix 13 du plan R12) ; la première n'avait rien.
+  it('lists what changes in the R12 version: public projects, visitors, the showcase', () => {
+    expect(RULES_CHANGES).toEqual(['public', 'visitors', 'showcase'])
+  })
+
+  it('differs from the R11 version, already accepted by the members', () => {
+    expect(RULES_VERSION).not.toBe('2026-11-16')
   })
 })
 

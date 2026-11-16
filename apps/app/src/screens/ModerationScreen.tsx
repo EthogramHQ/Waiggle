@@ -27,6 +27,10 @@
 // L'historique complet (7c) reste une vue de la page (`?tab=history`, filtrable sur un membre :
 // `&member=<id>`, depuis sa page ou « Voir ses décisions ») : « Voir tout l'historique » y mène.
 //
+// R12 (planche R12-Vitrine) : deux onglets en tête de la page, « Signalements » (tout ce qui
+// précède) et « Vitrine de l'accueil » (`moderation/ShowcaseTab`, à l'adresse `?tab=showcase`), où
+// la modération choisit les projets publics montrés sur l'accueil.
+//
 // Pour tout autre membre, la page n'existe pas (« Page introuvable ») : l'appli lit `me.isAdmin`,
 // et l'API, qui refait la vérification à chaque requête, répond 404 comme à une adresse inconnue.
 import type {
@@ -64,6 +68,7 @@ import {
 } from '../moderation/ModerationDetail'
 import { itemKey, partText, reasonTextKey, viewHref } from '../moderation/present'
 import { RemoveSheet } from '../moderation/RemoveSheet'
+import { ShowcaseTab } from '../moderation/ShowcaseTab'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -113,6 +118,9 @@ const RECENT_DECISIONS = 6
 const QUEUE_EXCERPT = 64
 
 type Tab = 'pending' | 'removed' | 'history'
+
+/** Les deux onglets en tête de la page (R12) : les signalements, et la vitrine de l'accueil. */
+type PageView = 'reports' | 'showcase'
 
 /** L'icône de chaque sorte de contenu, dans la tuile d'un élément de la file. */
 const kindIcon: Record<StoredReportTarget['kind'], IconName> = {
@@ -209,6 +217,13 @@ function AdminModeration() {
   )
   useEffect(() => {
     if (tabParam === 'history' || tabParam === 'removed') setTab(tabParam)
+  }, [tabParam])
+  // L'onglet du haut : la vitrine si l'adresse le dit (`?tab=showcase`), sinon les signalements.
+  const [view, setView] = useState<PageView>(() =>
+    tabParam === 'showcase' ? 'showcase' : 'reports',
+  )
+  useEffect(() => {
+    if (tabParam === 'showcase') setView('showcase')
   }, [tabParam])
   const queue = useModerationQueue()
   // Les retirés ne sont demandés qu'une fois leur onglet ouvert ; l'historique, quand il se voit
@@ -773,18 +788,49 @@ function AdminModeration() {
 
   // --- La page ---
 
+  /**
+   * Change l'onglet du haut (R12) : l'adresse le garde (`?tab=showcase`), et oublie l'élément choisi
+   * de la file. C'est un geste qui range les éléments décidés.
+   */
+  const changeView = (next: PageView) => {
+    router.setParams({ tab: next === 'showcase' ? 'showcase' : undefined, item: undefined })
+    setView(next)
+    forgetDecided()
+  }
+
+  // Les deux onglets du haut : « Signalements » et « Vitrine de l'accueil » (planche R12-Vitrine).
+  const viewSwitch = (
+    <Segmented<PageView>
+      label={t(($) => $.moderation.showcase.sections)}
+      options={[
+        { value: 'reports', label: t(($) => $.moderation.showcase.reportsTab) },
+        { value: 'showcase', label: t(($) => $.moderation.showcase.tab), icon: 'star' },
+      ]}
+      value={view}
+      onChange={changeView}
+    />
+  )
+
   // Sur téléphone, le détail ouvert (ou l'historique) occupe la page ; son « Retour » revient à
-  // la file.
+  // la file. Ils viennent des signalements : les onglets du haut n'y sont pas.
   const phoneDetail = !columns && tab !== 'history' && itemParam !== undefined
+  const showcaseView = view === 'showcase' && tab !== 'history'
   const body =
     tab === 'history' ? (
       historyView
-    ) : columns ? (
-      <Columns sideFirst side={queueColumn} main={detailColumn} aside={recentColumn} />
     ) : phoneDetail ? (
       detailColumn
     ) : (
-      queueColumn
+      <Stack gap="lg">
+        {viewSwitch}
+        {showcaseView ? (
+          <ShowcaseTab />
+        ) : columns ? (
+          <Columns sideFirst side={queueColumn} main={detailColumn} aside={recentColumn} />
+        ) : (
+          queueColumn
+        )}
+      </Stack>
     )
 
   return (
@@ -796,7 +842,7 @@ function AdminModeration() {
       width="page"
       titleAside={<StatusPill label={t(($) => $.moderation.adminOnly)} />}
       // Sur téléphone, l'historique a son bouton en haut de la file (planche R9-Moderation-Telephone).
-      {...(!columns && tab !== 'history' && !phoneDetail
+      {...(!columns && tab !== 'history' && !phoneDetail && !showcaseView
         ? {
             topAction: (
               <Button

@@ -72,11 +72,13 @@ describe('HomeScreen', () => {
     expect(screen.getByRole('header', { name: `Bienvenue sur ${appName}` })).toBeTruthy()
     expect(screen.getByText('Montre à tes proches ce que tu construis avec l’IA.')).toBeTruthy()
     // R2, décision D2 (jur-B4) : la phrase de confidentialité dit ce qui est vrai aujourd'hui ;
-    // R12 la remplacera quand le public existera. R11 (planche R11-Pied) : l'accueil et les quatre
-    // pages sont trouvés par les moteurs de recherche, l'ancienne phrase ne le disait pas.
+    // R11 (planche R11-Pied) : l'accueil et les quatre pages sont trouvés par les moteurs de
+    // recherche. R12 (A14) : les projets publics existent, la phrase devient « Rien n’est public sans
+    // ton accord. » ; celle de R11 (« …ne se voient qu’avec un compte. ») serait fausse.
+    expect(screen.getByText('Rien n’est public sans ton accord.')).toBeTruthy()
     expect(
-      screen.getByText('Les projets et les profils ne se voient qu’avec un compte.'),
-    ).toBeTruthy()
+      screen.queryByText('Les projets et les profils ne se voient qu’avec un compte.'),
+    ).toBeNull()
     expect(
       screen.queryByText('Rien n’est visible sans compte, ni trouvé par un moteur de recherche.'),
     ).toBeNull()

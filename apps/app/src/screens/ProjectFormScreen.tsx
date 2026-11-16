@@ -106,7 +106,8 @@ function ProjectFormSheet({
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
-  const sheet = useRouteSheet('/')
+  // Sans page d'avant, le Fil est posé sous la feuille (ProjectFormScreen) : la fermer y mène (`/feed`).
+  const sheet = useRouteSheet('/feed')
   const { state, session, retry } = useMemberSession()
   // Le profil (sa suspension) d'abord : rien à taper tant qu'on ne sait pas si l'on peut publier.
   const me = useMe(Boolean(session))
@@ -542,6 +543,9 @@ function ProjectFormView({
             title: project.title,
             cover,
             removed: Boolean(project.removal),
+            // R12 : public tel qu'enregistré (pas le choix en cours du formulaire), les moteurs de
+            // recherche ont pu le copier ; la fenêtre le dit, comme depuis la page du projet.
+            web: project.visibility === 'web',
           }}
           visible={deleting}
           onCancel={cancelDelete}

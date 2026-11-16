@@ -273,6 +273,32 @@ describe('ProjectScreen', () => {
     expect(deleteProject).not.toHaveBeenCalled() // il faut d'abord confirmer
   })
 
+  // R12 (relecture juridique 3) : un projet public a pu être copié par les moteurs de recherche ;
+  // la fenêtre le dit, et seulement pour lui.
+  it('says that search engines may still show a public project, when asking to delete it', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'web', hive: null })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await askToDelete()
+
+    expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
+    expect(
+      deleteWindow().getByText(new RegExp(shown(fr.t(($) => $.project.page.deleteConfirmWeb)))),
+    ).toBeTruthy()
+  })
+
+  it('does not say it for a project open to the members only', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await askToDelete()
+
+    // Témoin : la fenêtre est ouverte, avec ce qui disparaît.
+    expect(screen.getByText(fr.t(($) => $.project.page.deleteConfirm))).toBeTruthy()
+    expect(
+      screen.queryByText(new RegExp(shown(fr.t(($) => $.project.page.deleteConfirmWeb)))),
+    ).toBeNull()
+  })
+
   // Choix 7 du scénario et relecture du plan ui-M3 : après la suppression, « Mes projets », jamais
   // un retour vers la page supprimée.
   it('deletes the project once the author confirms, then goes to « Mes projets »', async () => {
@@ -328,7 +354,8 @@ describe('ProjectScreen', () => {
     expect(screen.queryByRole('button', { name: fr.t(($) => $.states.home) })).toBeNull()
     await fireEvent.press(toFeed)
 
-    expect(visited(mockPush, mockReplace)).toContain('/')
+    // R12 : le Fil a sa propre adresse, `/feed` ; « / » est l'accueil et sa vitrine.
+    expect(visited(mockPush, mockReplace)).toContain('/feed')
   })
 })
 

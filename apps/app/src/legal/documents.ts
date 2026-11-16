@@ -40,7 +40,8 @@ export type LegalDocumentContent = {
  */
 export const LEGAL_VERSIONS: Record<LegalPage, string> = {
   rules: RULES_VERSION,
-  privacy: '2026-11-16',
+  // R12 (relecture juridique, point 5) : sept parties réécrites, le jour des nouvelles Règles.
+  privacy: '2026-11-17',
   legal: '2026-11-16',
   accessibility: '2026-11-16',
 }
@@ -97,6 +98,7 @@ const rulesPoints: Record<SummaryKey<'rules'>, IconName> = {
   report: 'flag',
   inactive: 'clock',
   yours: 'download-simple',
+  public: 'lock-simple',
 }
 const privacyPoints: Record<SummaryKey<'privacy'>, IconName> = {
   noAds: 'prohibit',
@@ -124,6 +126,7 @@ export const rulesParts: readonly SectionKey<'rules'>[] = [
   'purpose',
   'account',
   'content',
+  'visitors',
   'forbidden',
   'hives',
   'testers',

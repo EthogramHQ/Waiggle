@@ -154,6 +154,8 @@ import { ProjectTilesCatalogue } from './ruches-tuiles'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
+import { VisitorCatalogue } from './visiteur'
+import { ShowcaseCatalogue } from './vitrine'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -493,6 +495,8 @@ export function CatalogueScreen() {
           summary={t(($) => $.block.summary, { name: 'Max Durand' })}
           points={[
             { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
+            // R12 (Q19) : un projet public se voit sans compte, donc aussi de la personne bloquée.
+            { icon: 'globe-simple', text: t(($) => $.block.bullets.publicProjects) },
             { icon: 'users', text: t(($) => $.block.bullets.follows) },
           ]}
         />
@@ -833,6 +837,10 @@ export function CatalogueScreen() {
       <SuspensionCatalogue />
       {/* Tranche R11 : le corps d'une page légale et les liens vers les quatre pages (pages-legales.tsx). */}
       <LegalPagesCatalogue />
+      {/* Tranche R12 : la barre d'un visiteur, les réactions et les commentaires réservés (visiteur.tsx). */}
+      <VisitorCatalogue />
+      {/* Tranche R12 : la carte de la vitrine de l'accueil et de « À la une » (vitrine.tsx). */}
+      <ShowcaseCatalogue />
       {/* Tranche R11 : la ligne de « Mes commentaires » (mes-commentaires.tsx). */}
       <MyCommentsCatalogue />
       {/* Tranche R11 : « Mes retours envoyés », la carte d'un projet et ses messages (mes-retours.tsx). */}

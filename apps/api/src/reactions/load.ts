@@ -40,7 +40,7 @@ const reactorStillMember = isNotNull(schema.hiveMember.userId)
  *   left join hive_member on hive_member.hive_id = project.hive_id
  *     and hive_member.user_id = project_reaction.member_id
  *   where project_id in (…) and project.removed_at is null
- *     and (project.visibility = 'public'
+ *     and (project.visibility in ('public', 'web')
  *       or (project.visibility = 'hive' and project.hive_id in (ruches de $viewer)
  *           and hive_member.user_id is not null))
  *   group by project_id, kind
@@ -105,7 +105,7 @@ export const reactionStatesOf = async (
  *   left join hive_member on hive_member.hive_id = project.hive_id
  *     and hive_member.user_id = project_reaction.member_id
  *   where project_id in (…) and project.removed_at is null
- *     and (project.visibility = 'public'
+ *     and (project.visibility in ('public', 'web')
  *       or (project.visibility = 'hive' and hive_member.user_id is not null))
  *   group by project_id
  *

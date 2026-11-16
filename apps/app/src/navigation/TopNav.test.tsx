@@ -198,13 +198,13 @@ describe('the links of the top bar', () => {
   it('offers Fil, Explorer and Ruches, each with its address', async () => {
     await renderWithProviders(<TopNav />)
 
-    expect(navLink(t(($) => $.nav.feed)).props.href).toBe('/')
+    expect(navLink(t(($) => $.nav.feed)).props.href).toBe('/feed')
     expect(navLink(t(($) => $.nav.explore)).props.href).toBe('/explore')
     expect(navLink(t(($) => $.nav.hives)).props.href).toBe('/hives')
   })
 
   it.each([
-    ['/', 'feed'],
+    ['/feed', 'feed'],
     ['/explore', 'explore'],
     ['/search', 'explore'],
     ['/tools', 'explore'],
@@ -222,6 +222,15 @@ describe('the links of the top bar', () => {
     expect(navLink(labels[key]).props['aria-current']).toBe('page')
     for (const other of (Object.keys(labels) as (keyof typeof labels)[]).filter((k) => k !== key)) {
       expect(navLink(labels[other]).props['aria-current']).not.toBe('page')
+    }
+  })
+
+  it('marks no link on the home page (/, the showcase since R12)', async () => {
+    mockPathname = '/'
+    await renderWithProviders(<TopNav />)
+
+    for (const label of [t(($) => $.nav.feed), t(($) => $.nav.explore), t(($) => $.nav.hives)]) {
+      expect(navLink(label).props['aria-current']).not.toBe('page')
     }
   })
 

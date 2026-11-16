@@ -13,7 +13,7 @@ import { ProvisionalNameGate } from './ProvisionalNameGate'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 jest.mock('./api', () => ({ getMe: jest.fn(), updateProfile: jest.fn() }))
-let mockPathname = '/'
+let mockPathname = '/feed'
 jest.mock('expo-router', () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({
@@ -35,7 +35,7 @@ const title = fr.t(($) => $.profile.provisional.handleTitle)
 const titleShown = () => screen.queryByRole('header', { name: title }) !== null
 
 beforeEach(() => {
-  mockPathname = '/'
+  mockPathname = '/feed'
   mockSession({ user: { id: leaMe.id, name: leaMe.name } })
   jest.mocked(getMe).mockReset().mockResolvedValue(handleRemoved)
 })
@@ -54,7 +54,7 @@ describe('ProvisionalNameGate (R9)', () => {
     await waitFor(() => expect(getMe).toHaveBeenCalled())
     expect(titleShown()).toBe(false)
 
-    mockPathname = '/'
+    mockPathname = '/feed'
     await rerender(<ProvisionalNameGate />)
 
     expect(await screen.findByRole('header', { name: title })).toBeTruthy()

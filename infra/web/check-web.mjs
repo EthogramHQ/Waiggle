@@ -1,11 +1,14 @@
 // Vérifie que le Caddyfile convient à l'appli web construite, avant de la mettre en ligne.
 // Lancé à chaque construction de l'image « web » (infra/web/Dockerfile) et par la CI.
 //
-// Deux oublis possibles, qu'aucun test de l'appli ne verrait :
+// Des oublis possibles, qu'aucun test de l'appli ne verrait :
 // 1. Un script écrit directement dans une page (« en ligne ») que la CSP n'autorise pas : en
 //    production, le navigateur refuserait de l'exécuter et l'appli ne démarrerait pas.
 // 2. Une page à paramètre (projects/[id].html) sans règle de réécriture : son adresse
 //    (/projects/0192abcd) afficherait « introuvable ».
+// 3. Un outil de développement servi en ligne.
+// 4. Une page publique sans sa copie française ou anglaise, la copie générique [lang]/ servie, ou
+//    le marqueur de la tête absent (R12).
 //
 // Usage : node infra/web/check-web.mjs <dossier de l'appli construite> <Caddyfile>
 import { createHash } from 'node:crypto'
@@ -58,9 +61,14 @@ for (const [hash, { code, pages: where }] of refused) {
   )
 }
 
+// R12 : la copie générique des pages par langue (app/[lang]/…), que le serveur ne sert jamais
+// (règle 4) : elle n'a pas de règle de réécriture.
+const GENERIC = '[lang]/'
+const isGeneric = (page) => page.startsWith(GENERIC)
+
 // 2. Les pages à paramètre : leur nom contient des crochets. Le Caddyfile doit réécrire une
 //    adresse vers chacune d'elles (« rewrite @… /projects/[id].html »).
-for (const page of pages.filter((p) => p.includes('['))) {
+for (const page of pages.filter((p) => p.includes('[') && !isGeneric(p))) {
   const rule = new RegExp(
     `^\\s*rewrite\\s+@\\S+\\s+/${page.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
     'm',
@@ -89,6 +97,46 @@ for (const tool of DEV_TOOLS.filter((name) => pages.includes(`${name}.html`))) {
   }
 }
 
+// 4. Les pages par langue (R12, plan, décision 8 de la relecture). Expo Router prépare chaque page
+//    de app/[lang]/ en français (fr/…) et en anglais (en/…), plus une copie générique ([lang]/…).
+//    a. Chaque page générique a ses deux copies : sinon, une langue afficherait « introuvable ».
+//    b. La copie générique n'est jamais servie : la règle « @generic_lang » du Caddyfile, suivie
+//       de « error @generic_lang 404 », et aucune réécriture qui y mène.
+//    c. Chaque page fr/ et en/ porte le marqueur de la tête (apps/app/app/+html.tsx), écrit avec
+//       les délimiteurs que le Caddyfile déclare (« between [[waiggle ]] ») : sinon, Caddy n'y
+//       écrirait ni titre, ni aperçu des liens, ni « noindex ».
+const LANGUAGES = ['fr', 'en']
+const generic = pages.filter(isGeneric)
+for (const lang of LANGUAGES) {
+  if (!pages.includes(`${lang}/index.html`)) {
+    problems.push(`${lang}/index.html manque : l'accueil n'est pas préparé dans cette langue.`)
+  }
+  for (const page of generic) {
+    const copy = `${lang}/${page.slice(GENERIC.length)}`
+    if (!pages.includes(copy)) problems.push(`${copy} manque : ${page} n'a pas sa copie ${lang}.`)
+  }
+}
+const genericClosed =
+  /^\s*@generic_lang\s+path_regexp\s+\^\/\\\[lang\\\]\(\/\|\$\)\s*$/m.test(caddyfile) &&
+  /^\s*error\s+@generic_lang\s+404\s*$/m.test(caddyfile)
+if (!genericClosed) {
+  problems.push(
+    `la copie générique ${GENERIC} n'est pas fermée : il faut « @generic_lang path_regexp ^/\\[lang\\](/|$) » et « error @generic_lang 404 » dans infra/Caddyfile.`,
+  )
+}
+if (/^\s*rewrite\s+\S+\s+\/\[lang\]/m.test(caddyfile)) {
+  problems.push('une règle « rewrite » du Caddyfile mène à la copie générique [lang]/ : à retirer.')
+}
+const [open, close] = caddyfile.match(/^\s*between\s+(\S+)\s+(\S+)\s*$/m)?.slice(1) ?? []
+if (open !== '[[waiggle' || close !== ']]') {
+  problems.push('infra/Caddyfile : les gabarits doivent déclarer « between [[waiggle ]] ».')
+}
+for (const page of pages.filter((p) => LANGUAGES.some((lang) => p.startsWith(`${lang}/`)))) {
+  if (!readFileSync(join(dist, page), 'utf8').includes(`${open ?? '[[waiggle'} httpInclude`)) {
+    problems.push(`${page} : sans le marqueur de la tête (apps/app/app/+html.tsx).`)
+  }
+}
+
 if (problems.length > 0) {
   console.error(
     `L'appli construite et infra/Caddyfile ne vont pas ensemble :\n- ${problems.join('\n- ')}`,
@@ -96,5 +144,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log(
-  `Caddyfile vérifié : ${pages.length} pages, scripts en ligne autorisés, pages à paramètre réécrites.`,
+  `Caddyfile vérifié : ${pages.length} pages, scripts en ligne autorisés, pages à paramètre réécrites, pages par langue complètes et marquées, copie générique fermée.`,
 )

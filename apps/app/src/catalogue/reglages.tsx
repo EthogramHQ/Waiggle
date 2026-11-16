@@ -9,6 +9,7 @@ import { SettingsColumns } from '../ui/SettingsColumns'
 import { SettingsNav } from '../ui/SettingsNav'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
+import { useLayout } from '../ui/theme/layout'
 
 const edit = { label: 'Modifier', onPress: () => {} }
 const card = { loadingLabel: 'Chargement…', avatar: null, avatarLabel: 'Photo de profil', edit }
@@ -36,6 +37,7 @@ const hints = {
 const itemsWithHints = items.map((item) => ({ ...item, hint: hints[item.key] }))
 
 export function SettingsCatalogue() {
+  const { sizeClass } = useLayout()
   return (
     <Stack gap="md">
       <Text variant="heading" heading={2}>
@@ -60,15 +62,23 @@ export function SettingsCatalogue() {
       <Text tone="secondary">
         La mise en page d’ordinateur : la colonne à gauche, la rubrique ouverte à droite.
       </Text>
-      <SettingsColumns
-        nav={<SettingsNav label="Rubriques (ordinateur)" items={items} current="language" />}
-        title="Langue"
-      >
-        <ListGroup footer="Tes e-mails te sont aussi envoyés dans cette langue." radio>
-          <ListRow label="Français" selected onPress={() => {}} />
-          <ListRow label="English" selected={false} onPress={() => {}} />
-        </ListGroup>
-      </SettingsColumns>
+      {/* Les deux colonnes ne tiennent pas sur un téléphone : à 320 points, la rubrique n'avait plus
+          que 8 points de large (relevé de mise en page, R12). */}
+      {sizeClass === 'wide' ? (
+        <SettingsColumns
+          nav={<SettingsNav label="Rubriques (ordinateur)" items={items} current="language" />}
+          title="Langue"
+        >
+          <ListGroup footer="Tes e-mails te sont aussi envoyés dans cette langue." radio>
+            <ListRow label="Français" selected onPress={() => {}} />
+            <ListRow label="English" selected={false} onPress={() => {}} />
+          </ListGroup>
+        </SettingsColumns>
+      ) : (
+        <Text variant="caption" tone="muted">
+          Se montre dans une fenêtre d’ordinateur.
+        </Text>
+      )}
     </Stack>
   )
 }

@@ -124,6 +124,19 @@ describe('request', () => {
     expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'alreadyExamined' })
   })
 
+  it('reads the whole body of a refusal, so that the browser can close the request (R12)', async () => {
+    // Derrière Caddy, Chromium gardait ouverte la lecture d'un projet inconnu (404) tant que l'appli
+    // n'en lisait pas le corps : la page n'était jamais « au repos » (pile de production de la CI).
+    const notFound = json({ error: { code: 'not_found', message: '…' } }, 404)
+    fetchMock.mockResolvedValue(notFound)
+
+    expect(await request('/v1/public/projects/p', {}, Me)).toEqual({
+      ok: false,
+      error: 'notFound',
+    })
+    expect(notFound.bodyUsed).toBe(true)
+  })
+
   it('says so when the server cannot be reached', async () => {
     fetchMock.mockRejectedValue(new TypeError('Network request failed'))
 

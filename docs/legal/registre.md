@@ -15,7 +15,7 @@ données (relecture juridique complète du 15/11/2026, tranche R11), et suit le 
   même pull request. La page « Confidentialité » de l'appli (`packages/i18n`) dit la même chose aux
   membres : les deux changent ensemble.
 
-Dernière mise à jour : 15/11/2026 (tranche R11).
+Dernière mise à jour : 16/11/2026 (tranche R12, les projets publics).
 
 ## 1. Le responsable du traitement
 
@@ -75,22 +75,32 @@ selon les règles de visibilité de l'appli.
 
 ### 2.3 Le profil
 
-- **Finalité** : se présenter aux proches.
-- **Base** : 6.1.b.
-- **Données** : `profile`, `profile_tool` (bio, photo, outils favoris, « Ne pas me proposer »).
-- **Destinataires** : les membres.
+- **Finalité** : se présenter aux proches ; depuis R12, à tout internaute par une page publique.
+- **Base** : 6.1.b ; la diffusion publique, le choix du membre (6.1.a ou 6.1.b, à vérifier), qu'il
+  retire à tout moment.
+- **Données** : `profile`, `profile_tool` (bio, photo, outils favoris, « Ne pas me proposer ») ;
+  la page publique et ses cases : `profile.public_page`, `public_bio`, `public_tools`,
+  `public_projects`, `public_follower_count`.
+- **Destinataires** : les membres ; pour une page publique, tout internaute et les moteurs de
+  recherche (nom, photo, cases cochées) ; le nom et la photo de l'auteur d'un projet public, même
+  sans page publique. Le pseudo n'est jamais montré sans compte.
 - **Durée** : la vie du compte, jusqu'au changement ; la photo est effacée avec le compte.
 - **Sécurité** : la photo est ré-encodée, sans ses métadonnées.
 
 ### 2.4 Les projets et leurs mises à jour
 
-- **Finalité** : publier un projet, le décrire, le faire évoluer.
-- **Base** : 6.1.b.
+- **Finalité** : publier un projet, le décrire, le faire évoluer ; depuis R12, le montrer à tout
+  internaute si l'auteur choisit « Public ».
+- **Base** : 6.1.b ; la diffusion publique, le choix du membre (6.1.a ou 6.1.b, à vérifier), qu'il
+  retire à tout moment.
 - **Données** : `project`, `project_tool`, `project_media` et ses fichiers, `project_update`.
-- **Destinataires** : un projet public, les membres ; d'une ruche, ses membres ; privé ou retiré,
-  son auteur et la modération.
+- **Destinataires** : un projet `public` (« Membres »), les membres ; un projet `web`
+  (« Public »), tout internaute, et les moteurs de recherche, qui en gardent une copie sous leur
+  propre responsabilité ; d'une ruche, ses membres ; privé ou retiré, son auteur et la modération.
 - **Durées** : jusqu'à la suppression du projet ou du compte ; une photo de mise à jour restée « en
-  attente », 24 heures (48 au plus, `nightly-purge.ts`).
+  attente », 24 heures (48 au plus, `nightly-purge.ts`). Hors de Waiggle, les copies des moteurs
+  restent jusqu'à leur nouvelle lecture (`noindex`, 404 et sortie du plan du site, à l'instant du
+  retour en arrière ou de la suppression).
 - **Sécurité** : images ré-encodées ; liens externes par une page d'avertissement.
 
 ### 2.5 Les échanges entre membres
@@ -156,28 +166,43 @@ selon les règles de visibilité de l'appli.
   compte.
 - **Base** : l'obligation légale (6.1.c : règlement sur les services numériques, art. 16 et 17) ;
   l'historique et la lutte contre les abus, 6.1.f. À vérifier.
+- **Personnes** : les membres ; depuis R12, toute personne sans compte qui signale un contenu
+  public (projet, mise à jour, page publique).
 - **Données** : `content_report` (signaleur, motif, précision, copie des textes),
-  `moderation_decision`, `account_suspension`, `content_part_removal`, `admin_member`.
+  `moderation_decision`, `account_suspension`, `content_part_removal`, `admin_member`. Le
+  signalement sans compte : `reporter_id` nul, et `content_report.reporter_email`, facultative ;
+  son adresse IP sert seulement au quota (2.11).
 - **Destinataires** : les administrateurs ; l'auteur, pour la motivation ; le signaleur n'est jamais
   montré ; les autorités sur réquisition, ou par un signalement à Pharos (`docs/ops/moderation.md`).
+  L'adresse d'un signalement sans compte : Scaleway, pour deux e-mails au plus (accusé de réception,
+  décision) ; jamais l'assistant de code (§ 4) ; elle n'entre dans aucun export.
+- **Base du signalement sans compte** : 6.1.c (règlement sur les services numériques, art. 16.4 et
+  16.5), à vérifier.
 - **Durées** (`apps/api/src/reports/retention.ts`, lancé par `nightly-purge.ts`) : un signalement
   ouvert, jusqu'à la décision ; classé ou suivi d'un retrait, 1 an après la décision ; sans objet,
   30 jours ; une décision, 1 an après la dernière décision sur la même cible, et tant que le contenu
   reste retiré ; une suspension, 1 an après sa fin (sans fin : la vie du compte, puis 1 an après le
   départ) ; une partie retirée, tant que le retrait dure ; un rôle révoqué, la vie du compte.
-  Détail : `docs/ops/moderation.md`, § 7.
+  L'adresse d'un signalement sans compte est effacée à la clôture, quelle qu'elle soit (décision,
+  que l'e-mail parte ou non ; sans objet). Détail : `docs/ops/moderation.md`, § 7.
 
 ### 2.11 La sécurité et l'anti-abus
 
-- **Finalité** : limiter les essais de mot de passe, les inscriptions et les envois en rafale.
+- **Finalité** : limiter les essais de mot de passe, les inscriptions et les envois en rafale ;
+  depuis R12, les lectures et les signalements sans compte.
 - **Base** : l'intérêt légitime (6.1.f) et la sécurité (art. 32).
 - **Données** : `rate_limit` (adresse IP et route, en clair), `api_rate_limit` (identifiant,
-  empreinte d'adresse, ou adresse IP en clair pour deux compteurs).
+  empreinte d'adresse, ou adresse IP en clair pour trois compteurs, dont le signalement sans compte :
+  5 par jour et par adresse IP ; et, pour ce signalement, un compteur par empreinte de l'adresse
+  e-mail donnée : un accusé de réception par adresse et par jour au plus). Les lectures sans compte
+  des pages publiques : un compteur par réseau (adresse IP, /64), tenu **en mémoire** de l'API,
+  jamais écrit en base.
 - **Destinataires** : personne.
 - **Durées** : `rate_limit`, 25 heures au plus après la dernière demande ; `api_rate_limit`,
   49 heures au plus après le début de la fenêtre, adresses IP comprises
   (`nightly-purge.ts`, `apps/api/src/rate-limit.ts`). Un compteur repris sans arrêt reste tant
-  qu'on s'en sert.
+  qu'on s'en sert. Le compteur des lectures sans compte : oublié au bout de 10 minutes, et perdu à
+  chaque redémarrage de l'API.
 
 ### 2.12 Les comptes inactifs (R11)
 
@@ -203,6 +228,20 @@ selon les règles de visibilité de l'appli.
   Un signalement reçu par e-mail suit les durées de la modération (2.10). Ce qu'on garde d'une
   demande sur les données : `docs/ops/donnees.md`. Aucune purge automatique : l'éditeur fait le tri
   à la main, chaque trimestre. Durée proposée, à valider par l'éditeur et un professionnel.
+
+### 2.14 La vitrine de l'accueil et « À la une » (R12)
+
+- **Finalité** : montrer des projets publics sur l'accueil, à tout internaute, et en tête
+  d'Explorer (« À la une ») pour les membres.
+- **Critère** : le choix de l'éditeur, parmi les projets `web` visibles, sans contrepartie ; 4 au
+  plus. L'auteur est prévenu (Activité) et peut en retirer son projet.
+- **Base** : l'intérêt légitime (6.1.f), à vérifier.
+- **Données** : `showcase` (projet, position, date, `added_by`), `showcase_notice` (l'avis à
+  l'auteur).
+- **Destinataires** : tout internaute (l'accueil) ; les membres (« À la une », selon les blocages).
+- **Durées** : tant que le projet reste `web`, non retiré, et que ni l'auteur ni l'éditeur ne l'en
+  retirent (un projet qui quitte `web` quitte la vitrine dans la même transaction) ; l'avis,
+  90 jours (`nightly-purge.ts`).
 
 ## 3. Les sous-traitants
 
@@ -246,10 +285,11 @@ page « Confidentialité ».
 - **Base de la transmission** : l'intérêt légitime de l'éditeur à maintenir le service (6.1.f) :
   à vérifier.
 - **Minimisation** : les commandes rendent des nombres et des identifiants plutôt que des textes ;
-  une adresse ou un nom, l'éditeur le lit lui-même.
+  une adresse ou un nom, l'éditeur le lit lui-même. Aucune requête sur `content_report` ne
+  sélectionne `reporter_email` (`docs/ops/moderation.md`).
 - **Échéance** : le passage à une offre professionnelle, où Anthropic devient sous-traitant sous
-  contrat (art. 28), viendra **au plus tard à l'ouverture au public**. Ce paragraphe et la page
-  « Confidentialité » changeront alors.
+  contrat (art. 28), viendra **au plus tard quand Waiggle deviendra commercial ou ouvrira les
+  inscriptions**. Ce paragraphe et la page « Confidentialité » changeront alors.
 
 ## 5. Hors de la base
 
@@ -263,6 +303,7 @@ page « Confidentialité ».
 | Journal du système (journald) | connexions SSH, `sudo`, attributions du rôle d'administrateur (identifiant seul), le minuteur des sauvegardes | 6 mois | `infra/server/bootstrap.sh` (`MaxRetentionSec`) |
 | Caddy (le serveur web) | aucun journal d'accès | — | `infra/Caddyfile` |
 | Fichiers des membres (volume `media`) | photos, avatars, captures | effacés avec leurs lignes ; un fichier peut rester orphelin après une panne | `apps/api/src/media/storage.ts` |
+| Copies des moteurs de recherche | les projets et les pages publics, tels que les moteurs les ont lus | hors du contrôle de l'éditeur ; jusqu'à leur nouvelle lecture | `noindex`, 404 et sortie du plan du site dès le retour en arrière (`/v1/public/head`, `/v1/public/sitemap`) |
 | Le PC de l'éditeur | les conversations de l'assistant de code et ses rapports, qui peuvent contenir des extraits lus sur le serveur ; jamais les sauvegardes | **à régler** (nettoyage de l'outil et du dossier des rapports), puis à écrire ici | — |
 
 **Sur l'appareil du membre** :
@@ -270,6 +311,7 @@ page « Confidentialité ».
 | Clé | Contenu | Durée |
 | --- | --- | --- |
 | Cookie `ruche.session_token` (web) ; SecureStore (iOS, Android) | le jeton de session, strictement nécessaire | 7 jours glissants |
+| Cookie `waiggle_member=1` (web, domaine de l'appli) | un repère sans identifiant : une session existe ; il sert seulement à ouvrir le Fil (`/` → `/feed`) et ne donne aucun droit | 7 jours, reposé à chaque visite d'un membre connecté ; effacé à la déconnexion et sur un refus de session (`apps/app/src/account/memberMarker.ts`) |
 | `appearance` | le thème choisi | jusqu'au changement |
 | `once:reaction-fan-help` | une aide vue | sans fin |
 | `suspension-seen` | les dates de la dernière suspension vue | sans fin, gardée à la déconnexion ; rien qui identifie |
@@ -277,7 +319,8 @@ page « Confidentialité ».
 | sessionStorage : `newVersion` | la version de l'appli | l'onglet |
 
 Aucun outil de mesure d'audience, aucun cookie de publicité, aucun script ni police chargé d'un
-tiers. La position de la souris et l'inclinaison de l'appareil (lumière d'ambiance) ne sont jamais
+tiers. **Sans compte, aucun cookie n'est posé** (l'appli peut garder le thème et la version dans le
+navigateur, sans identifiant). La position de la souris et l'inclinaison de l'appareil (lumière d'ambiance) ne sont jamais
 gardées.
 
 ## 6. La sécurité commune (art. 32)

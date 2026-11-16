@@ -2,9 +2,10 @@
 // favoris, chacun menant à la page de son étiquette (un « Autre », hors du catalogue, en texte
 // simple : R6b).
 import { readableWidth } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
+import type { Focusable } from './focus'
 import type { ImageSource } from './image'
 import { Stack } from './Stack'
 import { Tag } from './Tag'
@@ -33,6 +34,12 @@ type Props = {
    * niveau 2 (« Aperçu de ta page », dans la feuille « Mon profil », tranche R2).
    */
   heading?: 1 | 2 | 3
+  /**
+   * Pour poser le focus sur le nom (le titre) : l'aperçu « comme un visiteur » le lui donne à son
+   * ouverture, le bouton touché ayant disparu (relecture de design R12, point 2). Sans elle, le nom
+   * n'est pas une étape du focus.
+   */
+  nameRef?: Ref<Focusable> | undefined
 }
 
 export function MemberHeader({
@@ -44,6 +51,7 @@ export function MemberHeader({
   tools,
   action,
   heading = 1,
+  nameRef,
 }: Props) {
   return (
     <Stack gap="lg" align="center">
@@ -54,7 +62,13 @@ export function MemberHeader({
         {/* Le pseudo colle au nom (écart minimal) : il le précise, comme un second nom. */}
         <Stack gap="xxs" align="stretch">
           {/* Le nom du membre est le titre de sa page (niveau 1), ou celui de l'aperçu (2). */}
-          <Text variant="title1" align="center" heading={heading} breakAnywhere>
+          <Text
+            variant="title1"
+            align="center"
+            heading={heading}
+            breakAnywhere
+            {...(nameRef ? { focusRef: nameRef } : null)}
+          >
             {name}
           </Text>
           {/* En discret (gris, plus petit) : le nom reste ce qu'on lit d'abord. Un pseudo n'a

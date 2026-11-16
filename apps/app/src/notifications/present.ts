@@ -479,6 +479,32 @@ export const presentNotification = (
         target: projectRoute(project.id),
       }
     }
+    case 'showcase_added': {
+      // R12 : la modération a mis un de ses projets publics sur l'accueil (la vitrine). La phrase
+      // est signée par l'équipe, jamais par l'administrateur ; au toucher, la page du projet.
+      // « Retirer de l'accueil » n'est pas un lien vers une page mais une écriture (plan R12,
+      // décision 18) : l'écran la pose lui-même sous la ligne, tant que `onShowcase` est vrai, car
+      // elle demande un hook et un état que ce fichier de fonctions pures ne peut pas porter.
+      // Le temps suit l'état (relecture juridique R12, point 1) : « est sur l'accueil » tant que le
+      // projet y est, « a été sur l'accueil » dès qu'il n'y est plus (refus de l'auteur, retrait par
+      // la modération, sortie de « Public »). Sinon l'auteur qui a refusé croirait son refus perdu.
+      const { project, onShowcase } = notification
+      const said = say({ title: project.title }, (params) =>
+        t(
+          ($) => (onShowcase ? $.notifications.showcaseAdded : $.notifications.showcaseWas),
+          params as { title: string },
+        ),
+      )
+      return {
+        ...plain,
+        ...said,
+        // L'étoile dans le miel, comme sur la planche R12-Vitrine (« Chez l'auteur, dans Activité »).
+        icon: 'star',
+        leading: iconLeading('star', 'honey'),
+        thumb: projectThumb(project),
+        target: projectRoute(project.id),
+      }
+    }
     case 'tool_added': {
       // R8 : l'outil qu'il avait écrit en « Autre » est au catalogue (`merged` faux), ou s'affiche
       // maintenant sous le nom d'un outil existant (`merged` vrai). Au toucher, la page de l'outil.

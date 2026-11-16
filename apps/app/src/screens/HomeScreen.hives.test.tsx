@@ -12,8 +12,8 @@
 // - les pastilles sont `ui/HivePills` : un `tablist` nommé `hives.pills.label`, un `tab` par
 //   ruche après « Tout », `aria-controls` vers le panneau du Fil (`panelId`) que porte l'écran ;
 //   sur téléphone, l'écran les donne à `Screen` par la prop `sticky` ;
-// - la pastille vit dans l'adresse (`/?hive=<id>`), lue après `useHydrated()` : la toucher change
-//   le paramètre `hive` (`router.setParams`, ou `replace`/`navigate` vers `/?hive=<id>`) ;
+// - la pastille vit dans l'adresse (`/feed?hive=<id>`), lue après `useHydrated()` : la toucher
+//   change le paramètre `hive` (`router.setParams`, ou `replace`/`navigate` vers `/feed?hive=<id>`) ;
 // - le Fil d'une pastille : GET /v1/feed/following?hive=<id> (`useHiveFeed`), même forme que
 //   « Tout » ; `lastReadAt` y est la dernière visite de la ruche, qui pose « Tu es à jour » ;
 // - au premier lancement (`followsAnyone` faux), les invitations (`ui/HiveInvitation`) passent en
@@ -51,7 +51,7 @@ import { fiveSuggested } from './HomeScreen.testkit'
 const mockScreenProps: Record<string, unknown>[] = []
 
 /**
- * L'adresse du Fil (`/?hive=<id>`), comme Expo Router la tient : changer un paramètre redessine
+ * L'adresse du Fil (`/feed?hive=<id>`), comme Expo Router la tient : changer un paramètre redessine
  * l'écran qui le lit (`useSyncExternalStore`). Les gestes du routeur sont notés (`mockRoute.calls`).
  */
 const mockRoute = {
@@ -88,16 +88,16 @@ jest.mock('../ui/Screen', () => {
 })
 jest.mock('expo-router', () => {
   const { useSyncExternalStore } = require('react') as typeof import('react')
-  /** Une adresse vers le Fil (`/?hive=…`, ou `{ pathname: '/', params }`) change les paramètres. */
+  /** Une adresse vers le Fil (`/feed?hive=…`, ou `{ pathname: '/feed', params }`) change les paramètres. */
   const go = (method: string) => (href: unknown) => {
     mockRoute.calls.push({ method, href })
     if (typeof href === 'string') {
       const url = new URL(href, 'https://app.example')
-      if (url.pathname === '/') mockRoute.set(Object.fromEntries(url.searchParams))
+      if (url.pathname === '/feed') mockRoute.set(Object.fromEntries(url.searchParams))
       return
     }
     const { pathname, params = {} } = href as { pathname: string; params?: Record<string, string> }
-    if (pathname === '/') mockRoute.set({ ...params })
+    if (pathname === '/feed') mockRoute.set({ ...params })
   }
   const router = {
     push: go('push'),
@@ -118,7 +118,7 @@ jest.mock('expo-router', () => {
   const useParams = () => useSyncExternalStore(subscribe, () => mockRoute.params)
   return {
     useRouter: () => router,
-    usePathname: () => '/',
+    usePathname: () => '/feed',
     useLocalSearchParams: useParams,
     useGlobalSearchParams: useParams,
     useSegments: () => [],
@@ -317,7 +317,7 @@ describe('the hive pills of the feed (R10)', () => {
     await waitFor(() => expect(mockRoute.params.hive).toBe(hiveId))
     // Jamais une autre page : l'adresse reste celle du Fil.
     for (const { method, href } of mockRoute.calls) {
-      if (method !== 'setParams') expect(pathOf(href).split('?')[0]).toBe('/')
+      if (method !== 'setParams') expect(pathOf(href).split('?')[0]).toBe('/feed')
     }
   })
 

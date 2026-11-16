@@ -9,6 +9,8 @@
 // - la capsule des réactions et son éventail (ui/ReactionCapsule.tsx, ui/ReactionFan.tsx) ; l'auteur
 //   voit seulement ses nombres (ui/OwnReactions.tsx) ;
 // - le prompt de départ (ui/PromptBlock.tsx) et la feuille « Partager » (ui/ShareSheet.tsx).
+// R12 : la mise en page, la recette et la description vivent dans projects/ProjectPage.tsx,
+// partagées avec la page d'un projet public vue par un visiteur (plan R12, décision 12).
 // Trois mises en page :
 // - téléphone : la galerie bord à bord, avec Retour, Partager et « … » posés dessus, puis une
 //   feuille qui remonte sur le bas de la photo et porte toute la page ; la capsule flotte en bas de
@@ -36,7 +38,7 @@ import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
-import { useOpenDemo, useOpenOutside } from '../navigation/links'
+import { useOpenDemo } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
@@ -44,9 +46,14 @@ import { useGoBack } from '../navigation/useGoBack'
 import { DeleteProjectDialog } from '../projects/DeleteProjectDialog'
 import { useProject } from '../projects/hooks'
 import { MakePrivateDialog } from '../projects/MakePrivateDialog'
-import { startedMonth } from '../projects/month'
 import { ProjectActions } from '../projects/ProjectActions'
 import { ProjectHeader } from '../projects/ProjectHeader'
+import {
+  hasRecipe,
+  ProjectDescription,
+  ProjectPageLayout,
+  ProjectRecipe,
+} from '../projects/ProjectPage'
 import {
   isDeletablePhoto,
   isProjectPart,
@@ -60,29 +67,20 @@ import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
 import { QuitTestersDialog } from '../testers/QuitTestersDialog'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
-import { Columns } from '../ui/Columns'
 import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
-import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
-import { Markdown } from '../ui/Markdown'
 import { OwnReactions } from '../ui/OwnReactions'
 import { PhotoGallery } from '../ui/PhotoGallery'
-import { CoverControls, CoverSheet, CoverStraddle } from '../ui/ProjectCover'
+import { CoverControls, CoverStraddle } from '../ui/ProjectCover'
 import { PromptBlock } from '../ui/PromptBlock'
 import { ReactionCapsule } from '../ui/ReactionCapsule'
 import { ReactionFan } from '../ui/ReactionFan'
-import { RecipeFact } from '../ui/RecipeFact'
 import { RemovalNotice } from '../ui/RemovalNotice'
-import { Screen } from '../ui/Screen'
-import { ShareSheet } from '../ui/ShareSheet'
+import { ShareSheet, useShareLink } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
-import { Surface } from '../ui/Surface'
 import { useScreenFocused } from '../ui/screenFocus'
-import { shareUrl } from '../ui/share'
-import { Tag } from '../ui/Tag'
-import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
@@ -149,7 +147,7 @@ const useCommentParam = (): string | undefined => {
 }
 
 function ProjectView({ project }: { project: Project }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const router = useRouter()
   // L'adresse n'est connue que dans le navigateur : on attend l'hydratation (sinon écart de rendu).
   const hydrated = useHydrated()
@@ -174,13 +172,12 @@ function ProjectView({ project }: { project: Project }) {
   useEffect(() => {
     if (!shownNow) setArriving(false)
   }, [shownNow])
-  const openOutside = useOpenOutside()
   // « Tester la démo » passe par la page de sortie, qui apprend de quel projet vient le lien (R5a).
   const openDemo = useOpenDemo()
   const toSource = useMediaSources()
-  const { sizeClass, columns } = useLayout()
-  // large : tablette et ordinateur (barre du haut, Retour hors de la photo) ; columns : les deux
-  // colonnes tiennent côte à côte. Entre les deux (tablette), une seule colonne.
+  const { sizeClass } = useLayout()
+  // large : tablette et ordinateur (Retour hors de la photo, la capsule à cheval sur la galerie).
+  // Le reste de la mise en page est décidé par `ProjectPageLayout` (projects/ProjectPage.tsx).
   const large = sizeClass !== 'compact'
   // La photo montrée par la galerie : la lumière d'ambiance prend sa couleur.
   const [photoIndex, setPhotoIndex] = useState(0)
@@ -191,9 +188,9 @@ function ProjectView({ project }: { project: Project }) {
   const [confirming, setConfirming] = useState(false)
   const menuRef = useRef<Focusable>(null)
 
-  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil. La
-  // page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
-  const goBack = useGoBack('/')
+  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène au Fil (`/feed`
+  // depuis R12). La page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
+  const goBack = useGoBack('/feed')
   const back = () => coverTarget.leave(goBack)
   const reaction = useReaction(project.id)
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
@@ -260,11 +257,18 @@ function ProjectView({ project }: { project: Project }) {
     router.push({ pathname: '/report', params: { kind: 'project', id: project.id } })
 
   // « Copier le lien » du menu « … » : l'adresse publique du projet, rien d'autre (ui/share.ts),
-  // puis un toast qui dit qui pourra l'ouvrir (jur-3, jur-5). Le menu s'est déjà refermé.
+  // puis un toast qui dit qui pourra l'ouvrir (jur-3, jur-5). Le menu s'est déjà refermé. La même
+  // règle que la feuille « Partager » (`useShareLink`) : un projet public se copie à son adresse
+  // dans la langue du membre (`/fr/projects/<id>`), et le toast dit que tout le monde pourra
+  // l'ouvrir (R12, Q18) ; un projet d'une ruche nomme la ruche (R10).
+  const link = useShareLink({
+    target: { kind: 'project', id: project.id },
+    visibility: project.visibility,
+    hive: project.hive,
+  })
   const copyLink = async () => {
-    const url = shareUrl({ kind: 'project', id: project.id })
-    if (!url) return
-    const done = await copyText(url)
+    if (!link.url) return
+    const done = await copyText(link.url)
     if (!done) {
       toast.show(
         t(($) => $.share.copyFailed),
@@ -272,12 +276,7 @@ function ProjectView({ project }: { project: Project }) {
       )
       return
     }
-    toast.show(
-      project.visibility === 'private'
-        ? t(($) => $.share.copiedPrivate)
-        : t(($) => $.share.copiedMembers),
-      { icon: 'check-circle' },
-    )
+    toast.show(link.copied, { icon: 'check-circle' })
   }
   // Un projet retiré par la modération ne s'ouvre plus que pour son auteur : l'API répond 404 à
   // tous les autres. Ni « Partager » ni « Copier le lien », qui promettraient le contraire
@@ -291,8 +290,13 @@ function ProjectView({ project }: { project: Project }) {
   // R9 (J14, décision L6 de Louis) : « Rendre privé », le seul changement permis à un auteur
   // suspendu, sur un projet public qui n'a pas été retiré (un projet retiré ne se modifie plus).
   // Une fenêtre le confirme d'abord : pendant la suspension, il ne pourra pas revenir en arrière.
+  // R12 (plan, décision 11 ; Q6) : un projet ouvert à tous (`web`) se rend aussi privé, au même
+  // titre qu'un projet ouvert aux membres.
   const canMakePrivate =
-    project.isMine && suspended && !project.removal && project.visibility === 'public'
+    project.isMine &&
+    suspended &&
+    !project.removal &&
+    (project.visibility === 'public' || project.visibility === 'web')
   const [makingPrivate, setMakingPrivate] = useState(false)
   const onMadePrivate = () => {
     setMakingPrivate(false)
@@ -543,72 +547,22 @@ function ProjectView({ project }: { project: Project }) {
   const removedDescription = partsOf(['description'])
   const removedPrompt = partsOf(['prompt'])
 
-  // La recette (R6a) : quand l'auteur les a donnés, le mois où il a commencé (« Commencé en
-  // septembre 2026 », écrit par Intl dans la langue de l'appli) et la difficulté (« Facile à
-  // refaire : À la portée de tous », avec le rond de couleur de la feuille de publication) ; puis
-  // les outils. Le temps passé a disparu. Elle se montre dès qu'une de ces trois choses est là,
-  // même sans outils. Les prompts ont leur propre bloc.
-  const started = project.startedOn ? startedMonth(project.startedOn, i18n.language) : null
-  const difficulty = project.difficulty
-  const recipe =
-    started || difficulty || project.tools.length > 0 ? (
-      <Surface variant="grouped" padding="xl" gap="lg">
-        <Text variant="heading" heading={2}>
-          {t(($) => $.project.page.recipe)}
-        </Text>
-        {started || difficulty ? (
-          <Stack gap="sm">
-            {started ? (
-              <RecipeFact
-                icon="calendar-blank"
-                label={t(($) => $.project.page.startedOn, { month: started })}
-              />
-            ) : null}
-            {difficulty ? (
-              <RecipeFact
-                dot={DIFFICULTY_DOTS[difficulty]}
-                label={t(($) => $.project.page.difficulty, {
-                  level: t(($) => $.project.difficulty[difficulty]),
-                })}
-              />
-            ) : null}
-          </Stack>
-        ) : null}
-        {project.tools.length > 0 ? (
-          <Stack gap="sm">
-            <Text variant="caption" weight={600} tone="muted">
-              {t(($) => $.project.page.tools)}
-            </Text>
-            <Stack direction="row" gap="sm" wrap>
-              {project.tools.map((tool) => (
-                <Tag
-                  key={tool.slug}
-                  label={tool.label}
-                  // R6b : un « Autre » n'a pas de page ; `Tag` l'affiche en texte simple, sans lien.
-                  inCatalogue={tool.inCatalogue}
-                  onPress={() =>
-                    router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } })
-                  }
-                />
-              ))}
-            </Stack>
-          </Stack>
-        ) : null}
-      </Surface>
-    ) : null
+  // La recette (R6a ; projects/ProjectPage.tsx, partagée avec la page d'un visiteur) : le mois de
+  // début, la difficulté, puis les outils, chacun menant à sa page. Rien s'il n'y a rien à dire :
+  // décidé ici, comme pour le journal plus bas (`faded` envelopperait sinon une place vide).
+  const recipe = hasRecipe(project) ? (
+    <ProjectRecipe
+      startedOn={project.startedOn}
+      difficulty={project.difficulty}
+      tools={project.tools}
+      onOpenTool={(slug) => router.push({ pathname: '/tags/[slug]', params: { slug } })}
+    />
+  ) : null
 
   // R9 : une description retirée garde sa section, avec son encadré (l'auteur seul).
   const description =
     project.description || removedDescription ? (
-      <Stack gap="md">
-        <Text variant="heading" heading={2}>
-          {t(($) => $.project.page.description)}
-        </Text>
-        {project.description ? (
-          <Markdown text={project.description} onLinkPress={openOutside} />
-        ) : null}
-        {removedDescription}
-      </Stack>
+      <ProjectDescription text={project.description} removed={removedDescription} />
     ) : null
 
   // Le prompt de départ et les autres (repliés). Sans prompt, rien : pas même une place vide. R9 :
@@ -659,6 +613,8 @@ function ProjectView({ project }: { project: Project }) {
             }
           : null,
         removed: Boolean(project.removal),
+        // R12 : un projet public a pu être copié par les moteurs de recherche ; la fenêtre le dit.
+        web: project.visibility === 'web',
       }}
       visible={confirming}
       onCancel={() => setConfirming(false)}
@@ -726,125 +682,38 @@ function ProjectView({ project }: { project: Project }) {
   // La lumière d'ambiance prend la couleur de la photo montrée (sans photo : la lumière miel).
   const thumbhash = project.visuals[photoIndex]?.thumbhash ?? null
 
-  if (large) {
-    return (
-      <Screen
-        width="page"
-        header={<TopNav />}
-        fade={!arriving}
-        onBack={back}
-        // « Retour » écrit en toutes lettres, d'où qu'on arrive (ui-11).
-        backLabel={t(($) => $.project.page.back)}
-        topAction={
-          <Row gap="sm" align="center">
-            {pageActions}
-          </Row>
-        }
-        thumbhash={thumbhash}
-        pageTitle={project.title}
-      >
-        {faded(removal)}
-        {columns ? (
-          // Deux rangées, dans l'ordre de lecture : la galerie (et la capsule) | l'en-tête, les
-          // actions, la recette ; un trait ; puis ce qui se lit longtemps | la conversation. Enfin
-          // « Signaler ce projet », en bas à gauche : dans une rangée à lui, il vient après les
-          // commentaires, au clavier comme sur téléphone (décision de Louis du 2/11/2026).
-          // `sideWidth="wide"` : la colonne de droite grandit jusqu'à environ 450 points (planche
-          // R5a-Projet-Desktop ; à 320, un titre long prenait six lignes). Décision du 2/11/2026.
-          <Columns
-            divided
-            sideWidth="wide"
-            rows={[
-              {
-                main: (
-                  <>
-                    {gallery}
-                    {faded(removedPhotos)}
-                    {faded(ownReactions)}
-                  </>
-                ),
-                side: (
-                  <>
-                    {faded(header)}
-                    {faded(actions)}
-                    {faded(removedDemo)}
-                    {faded(recipe)}
-                    {faded(removedTools)}
-                  </>
-                ),
-              },
-              {
-                main: (
-                  <>
-                    {faded(description)}
-                    {faded(prompt)}
-                    {faded(journal)}
-                  </>
-                ),
-                side: <>{faded(comments)}</>,
-              },
-              ...(reportLink ? [{ main: faded(reportLink), side: null, continues: true }] : []),
-            ]}
-          />
-        ) : (
-          // Tablette : une seule colonne, dans l'ordre du téléphone.
-          <>
-            {gallery}
-            {faded(removedPhotos)}
-            {faded(header)}
-            {faded(actions)}
-            {faded(removedDemo)}
-            {faded(ownReactions)}
-            {faded(recipe)}
-            {faded(removedTools)}
-            {faded(description)}
-            {faded(prompt)}
-            {faded(journal)}
-            {faded(comments)}
-            {faded(reportLink)}
-          </>
-        )}
-        {layers}
-      </Screen>
-    )
-  }
-
-  const page = (
-    <>
-      {faded(removal)}
-      {/* R9 : la photo retirée est juste au-dessus, dans la galerie : son encadré ouvre la page. */}
-      {faded(removedPhotos)}
-      {faded(header)}
-      {faded(actions)}
-      {faded(removedDemo)}
-      {faded(ownReactions)}
-      {faded(recipe)}
-      {faded(removedTools)}
-      {faded(description)}
-      {faded(prompt)}
-      {faded(journal)}
-      {/* La conversation vient après le projet ; « Signaler » ferme la page. */}
-      {faded(comments)}
-      {faded(reportLink)}
-    </>
-  )
+  // La mise en page (téléphone, tablette, ordinateur) est partagée avec la page d'un visiteur
+  // (projects/ProjectPage.tsx, plan R12, décision 12) : chaque morceau à sa place, dans le même
+  // ordre de lecture. Sur téléphone, la barre du haut ne montre que le bandeau d'un compte suspendu
+  // (tranche 7c), au-dessus de la galerie ; sinon elle ne dessine rien.
   return (
-    <Screen
-      thumbhash={thumbhash}
+    <ProjectPageLayout
+      topBar={<TopNav />}
+      topAction={pageActions}
+      onBack={back}
       pageTitle={project.title}
+      thumbhash={thumbhash}
       fade={!arriving}
-      // La capsule flotte en bas de l'écran, hors du défilement : lue après tout le contenu
-      // (décision de Louis du 2/11/2026). Screen réserve sa hauteur sous la page.
+      // La capsule flotte en bas de l'écran du téléphone, hors du défilement : lue après tout le
+      // contenu (décision de Louis du 2/11/2026). Ailleurs, elle est à cheval sur la galerie.
       floating={capsule}
-    >
-      {/* Sur téléphone, la barre du haut ne montre que le bandeau d'un compte suspendu (tranche
-          7c), au-dessus de la galerie ; sinon elle ne dessine rien. */}
-      <TopNav />
-      {gallery}
-      {/* La feuille qui remonte sur le bas de la photo bord à bord ; sous le bandeau d'un compte
-          suspendu, la galerie garde ses marges et la page suit simplement. */}
-      {bleed ? <CoverSheet>{page}</CoverSheet> : page}
-      {layers}
-    </Screen>
+      bleed={bleed}
+      wrap={faded}
+      banner={removal}
+      gallery={gallery}
+      galleryNotes={removedPhotos}
+      header={header}
+      actions={actions}
+      actionNotes={removedDemo}
+      reactions={ownReactions}
+      recipe={recipe}
+      recipeNotes={removedTools}
+      description={description}
+      prompt={prompt}
+      journal={journal}
+      conversation={comments}
+      report={reportLink}
+      layers={layers}
+    />
   )
 }

@@ -206,6 +206,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         handle: schema.memberHandle.handle,
         bio: schema.profile.bio,
         avatarKey: schema.profile.avatarKey,
+        // R12 : sa page est-elle publique ? (la feuille de partage le dit : « Tout le monde pourra
+        // l’ouvrir. »). Sans ligne de profil, elle est fermée.
+        publicPage: schema.profile.publicPage,
         // Tranche 7b : le visiteur l'a-t-il bloqué ? `exists` sur la clé primaire de member_block.
         isBlocked: sql<boolean>`exists (select 1 from ${schema.memberBlock}
           where ${schema.memberBlock.blockerId} = ${viewer.id}
@@ -231,6 +234,7 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       // elle ; elle la relit dans `removedParts`.
       avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey),
       isMe: row.id === viewer.id,
+      publicPage: row.publicPage ?? false,
     }
 
     // Un membre que j'ai bloqué (précision 2 et règle 6) : l'en-tête seul, pour le reconnaître, le

@@ -166,7 +166,15 @@ order by classes desc;
 SQL
 ```
 
-Le quota de l'API (20 signalements par jour et par membre) limite déjà les rafales. Un abus
+**Jamais l'adresse d'un visiteur.** Depuis R12, une personne sans compte peut signaler un contenu
+public et laisser son adresse (`content_report.reporter_email`). Aucune requête sur
+`content_report` ne sélectionne cette colonne, ni `select *` : ce qui sort d'une requête peut être
+lu par l'assistant de code (registre, § 4). Pour savoir si une adresse est donnée, compter
+(`count(reporter_email)`) ; une adresse, c'est l'éditeur qui la lit, dans l'appli. Elle est
+effacée à la clôture du signalement.
+
+Le quota de l'API (20 signalements par jour et par membre ; 5 par jour et par adresse IP sans
+compte) limite déjà les rafales. Un abus
 manifeste se traite comme un contenu : un rappel, puis la suppression du compte en dernier
 recours.
 
@@ -179,6 +187,7 @@ La purge de nuit (`apps/api/src/reports/retention.ts`) applique ces durées :
 | Signalement ouvert | jusqu'à la décision |
 | Signalement classé ou suivi d'un retrait | un an après la décision |
 | Signalement « sans objet » (cible disparue, compte de l'auteur supprimé) | 30 jours |
+| Adresse e-mail d'un signalement sans compte (`reporter_email`) | jusqu'à la clôture (décision, que l'e-mail parte ou non ; sans objet) |
 | Décision | un an après la dernière décision sur la même cible, et tant que le contenu reste retiré |
 | Signalements faits par un compte supprimé | gardés, sans son nom, jusqu'à leur terme |
 | Rôle d'administrateur révoqué | gardé (historique), effacé avec le compte |

@@ -1,5 +1,5 @@
 // L'en-tête de la page d'un projet (R5a, planche « Projet ») : le statut et, à côté, la catégorie
-// (R6a : « Cuisine · Famille et enfants »), le titre, la ligne de dates
+// (R6a : « Cuisine · Famille et enfants ») et « Public » (R12), le titre, la ligne de dates
 // (« Publié le 3 oct. · Mis à jour hier » ; « Créé le … » pour un projet privé), l'auteur et sa
 // pastille « Suivre », puis le pitch. La page (ProjectScreen) le pose dans sa feuille sur téléphone,
 // dans la colonne de droite sur ordinateur.
@@ -207,6 +207,12 @@ export function ProjectHeaderView({
         />
         {category ? (
           <CategoryLine {...category} onPress={onOpenCategory} href={categoryHref} />
+        ) : null}
+        {/* R12 (Q19, planche R12-Visiteur-Projet) : « Public » à côté du statut et de la catégorie,
+            pour tous, membres compris, sur un projet que tout le monde peut lire. Le même dessin
+            discret que la catégorie (l'icône du globe, puis le mot), sans lien : il dit un état. */}
+        {project.visibility === 'web' ? (
+          <CategoryLine icon="globe-simple" label={t(($) => $.project.webBadge)} />
         ) : null}
       </Stack>
       <Stack gap="xs">

@@ -418,7 +418,10 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
           <Text variant="callout" tone="secondary">
             {isPrivate
               ? t(($) => $.project.updates.hintPrivate)
-              : t(($) => $.project.updates.hintPublic)}
+              : // R12 : sur un projet public (`web`), la mise à jour se lit sans compte.
+                project.visibility === 'web'
+                ? t(($) => $.project.updates.hintWeb)
+                : t(($) => $.project.updates.hintPublic)}
           </Text>
         }
       >

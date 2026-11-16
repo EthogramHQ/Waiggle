@@ -400,6 +400,27 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     updated_at: 'date',
     // R10 : « Ne pas me proposer aux autres ».
     hide_from_suggestions: 'booléen',
+    // R12 : la page publique et ses cases (« Mon profil public ») : des choix, pas une saisie ;
+    // exportés (`publicPage` de l'export), jamais montrés à un autre.
+    public_page: 'booléen, exporté',
+    public_bio: 'booléen, exporté',
+    public_tools: 'booléen, exporté',
+    public_projects: 'booléen, exporté',
+    public_follower_count: 'booléen, exporté',
+  },
+  // R12 : la vitrine de l'accueil, rangée par un administrateur (projet, place, date, qui l'a choisi).
+  showcase: {
+    project_id: 'identifiant',
+    position: 'nombre (1 à 4), écrit par l’API',
+    added_at: 'date',
+    added_by: 'identifiant (jamais montré à l’auteur ni exporté)',
+  },
+  // R12 : les lignes d'Activité « ton projet est sur l'accueil », écrites par l'API, 90 jours.
+  showcase_notice: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    project_id: 'identifiant',
+    created_at: 'date',
   },
   member_handle: {
     user_id: 'identifiant',
@@ -412,7 +433,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     id: 'identifiant',
     author_id: 'identifiant',
     status: 'une étape choisie dans une liste fermée par Zod (idée, en cours, testable…)',
-    visibility: 'public, réservé à une ruche (R10) ou privé, une liste fermée par Zod',
+    visibility:
+      'public, réservé à une ruche (R10), privé ou public sur le web (R12), une liste fermée par Zod et par un check',
     primary_category:
       'un code de la table category, vérifié par la base et par l’API (clé étrangère)',
     secondary_category:
@@ -426,6 +448,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     removal_id: 'identifiant',
     // R10 : la ruche d'un projet réservé (null sinon), vérifiée par la base (clé étrangère).
     hive_id: 'identifiant',
+    // R12 : « Retirer de l'accueil » par l'auteur ; exportée avec son projet.
+    showcase_declined_at: 'date, exportée',
   },
   project_media: {
     id: 'identifiant',
@@ -694,6 +718,12 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     part_field:
       'la partie signalée (la 2e photo, la bio…), une liste fermée par Zod (ReportPartField)',
     part_media_id: 'identifiant',
+    // R12 : saisie par un visiteur sans compte, pas par un membre : elle n'est copiée dans aucun
+    // signalement, n'entre dans aucun export (elle n'appartient à aucun membre) et aucune lecture de
+    // la file ne la sélectionne ; seuls l'accusé et la décision la lisent, puis la clôture l'efface.
+    reporter_email:
+      'l’adresse e-mail facultative d’un visiteur (z.email, 254 caractères), jamais montrée ni exportée, effacée à la clôture',
+    reporter_language: 'la langue du visiteur, fr ou en (liste fermée), effacée avec son adresse',
   },
   // R9 (7d) : les parties retirées en cours, écrites par l'API sur la décision d'un administrateur.
   // Pas « * » : `hidden_value` est du JSON, qui demande sa raison écrite (B7).

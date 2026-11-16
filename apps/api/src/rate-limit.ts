@@ -4,6 +4,7 @@
 import { createHmac } from 'node:crypto'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, gt, inArray, sql } from 'drizzle-orm'
+import { ipCounterId } from './security/ip'
 
 export type RateRule = { windowMs: number; max: number }
 
@@ -220,6 +221,31 @@ export const projectCallKey = (projectId: string) => `call:${projectId.toLowerCa
  */
 export const normalizeAddress = (email: string) => email.trim().toLowerCase()
 
+/** Les domaines de Gmail : les deux noms mènent aux mêmes boîtes, qui ignorent les points du nom. */
+const GMAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com'])
+
+/**
+ * La boîte qui reçoit une adresse, pour un plafond « par adresse » (relecture de sécurité R12, A1).
+ * Plusieurs écritures arrivent dans la même boîte : « voisine+1@… » et « voisine+2@… » (la partie
+ * après « + », une sous-adresse que la plupart des fournisseurs ignorent), et, chez Gmail,
+ * « v.oisine@gmail.com » (les points du nom ne comptent pas) ou « …@googlemail.com ». Compter
+ * l'écriture laisserait une seule boîte recevoir un e-mail par variante ; on compte donc la boîte.
+ * Ce n'est qu'une clé de compteur : l'adresse rangée et celle de l'envoi restent celles tapées.
+ * Un nom réduit à rien (« +x@… ») garde son écriture plutôt que de devenir une boîte vide commune.
+ */
+export const mailboxOf = (email: string) => {
+  const address = normalizeAddress(email)
+  // Le dernier « @ » sépare le nom du domaine (un nom entre guillemets peut en contenir un).
+  const at = address.lastIndexOf('@')
+  if (at <= 0) return address
+  const domain = address.slice(at + 1)
+  const gmail = GMAIL_DOMAINS.has(domain)
+  let name = address.slice(0, at).split('+')[0] ?? ''
+  if (gmail) name = name.replaceAll('.', '')
+  if (name === '') return address
+  return `${name}@${gmail ? 'gmail.com' : domain}`
+}
+
 /**
  * L'empreinte d'une adresse e-mail pour la clé d'un compteur « par adresse » (tranche R2,
  * relectures de sécurité S2 et juridique jur-6). Un HMAC est une empreinte calculée avec une clé
@@ -251,7 +277,18 @@ export const ADDRESS_COUNTER_PURPOSES = {
   // (routes/unverified-email.ts).
   unverified: 'unverified',
   unverifiedTo: 'unverified-to',
+  // L'accusé de réception d'un signalement de visiteur (R12) : au plus un par adresse et par jour,
+  // d'où qu'elle vienne (routes/public-reports.ts). Sans lui, on pourrait inonder une adresse.
+  visitorReportAck: 'visitor-report-ack',
 } as const
+
+/**
+ * Le compteur des signalements d'un visiteur (R12) : 5 par jour et par réseau, mal formés compris.
+ * Le réseau est l'adresse IPv4, ou le /64 d'une adresse IPv6 (security/ip.ts) ; `ipCounterId` rend
+ * un texte sans danger, borné. La clé ne porte aucune donnée d'un membre : elle part avec la purge
+ * de nuit, à la fin de sa fenêtre.
+ */
+export const visitorReportKey = (ip: string | undefined) => `visitor-report:${ipCounterId(ip)}`
 
 /** L'un des parcours ci-dessus : `(typeof X)[keyof typeof X]` est l'union de ses valeurs. */
 export type AddressCounterPurpose =
@@ -265,6 +302,14 @@ export const addressCounterKey = (secret: string, purpose: AddressCounterPurpose
   `${purpose}:${addressDigest(secret, email)}`
 
 /**
+ * Le compteur des accusés de réception d'un signalement de visiteur (R12, I2) : un par jour et par
+ * boîte, pas par écriture de l'adresse (`mailboxOf`, relecture de sécurité R12, A1). Sinon un
+ * harceleur qui change de réseau ferait arriver dans une même boîte un accusé par sous-adresse.
+ */
+export const visitorReportAckKey = (secret: string, email: string) =>
+  addressCounterKey(secret, ADDRESS_COUNTER_PURPOSES.visitorReportAck, mailboxOf(email))
+
+/**
  * Efface tous les compteurs d'une adresse, à la suppression du compte qui l'a (jur-6) : ce sont des
  * empreintes, mais elles désignent toujours cette adresse. Une clé par parcours, lues par la clé
  * primaire de la table (inArray). Les compteurs d'une adresse que le compte n'a plus (corrigée
@@ -273,12 +318,13 @@ export const addressCounterKey = (secret: string, purpose: AddressCounterPurpose
  */
 export const deleteAddressCounters = (db: Database, secret: string, email: string) =>
   db.delete(schema.apiRateLimit).where(
-    inArray(
-      schema.apiRateLimit.key,
-      Object.values(ADDRESS_COUNTER_PURPOSES).map((purpose) =>
+    inArray(schema.apiRateLimit.key, [
+      ...Object.values(ADDRESS_COUNTER_PURPOSES).map((purpose) =>
         addressCounterKey(secret, purpose, email),
       ),
-    ),
+      // Celui des accusés se compte par boîte (A1) : sa clé est calculée sur la boîte de l'adresse.
+      visitorReportAckKey(secret, email),
+    ]),
   )
 
 /**

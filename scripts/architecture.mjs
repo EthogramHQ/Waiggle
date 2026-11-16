@@ -178,6 +178,8 @@ const rules = [
 const allowed = new Set([
   // Le choix de la langue enregistre aussi la langue sur le compte du membre connecté.
   'apps/app/src/ui/LanguageSwitcher.tsx -> apps/app/src/profile/useChooseLanguage.ts',
+  // R12 : les adresses par langue (`src/publicPath.ts`) sont à la racine de l'appli, comme
+  // `config.ts` : une fonction pure que les composants lisent sans exception (relecture R12).
 ])
 
 const problems = []

@@ -149,7 +149,7 @@ export function BlockDialog({
       }
       // Débloquer : ce qui revient et ce qui ne revient pas (J10, R7).
       message={blocking ? undefined : t(($) => $.block.unblockMessage)}
-      // Bloquer (R9) : un résumé en gras, quatre puces courtes, puis le texte complet d'avant R9,
+      // Bloquer (R9) : un résumé en gras, des puces courtes (cinq depuis R12), puis le texte complet d'avant R9,
       // visible sans rien déplier : ce qu'on ne verra plus, ce qui reste visible (R1), les
       // abonnements, que @x n'est pas prévenu, et que la modération non plus (J9).
       body={
@@ -158,6 +158,9 @@ export function BlockDialog({
             summary={t(($) => $.block.summary, { name })}
             points={[
               { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
+              // R12 (Q19) : un projet public se voit sans compte, donc aussi de la personne
+              // bloquée, déconnectée ; la puce le dit, juste après « Vous ne verrez plus… ».
+              { icon: 'globe-simple', text: t(($) => $.block.bullets.publicProjects) },
               { icon: 'users', text: t(($) => $.block.bullets.follows) },
               { icon: 'bell-slash', text: t(($) => $.block.bullets.notTold) },
               { icon: 'flag', text: t(($) => $.block.bullets.moderation) },

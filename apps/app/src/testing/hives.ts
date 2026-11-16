@@ -534,6 +534,8 @@ export const odileMemberPage: Member = {
   ],
   isMe: false,
   isBlocked: false,
+  // R12 : sa page n'est pas publique (le réglage par défaut).
+  publicPage: false,
   isFollowed: true,
   followerCount: 5,
   projects: [biscotte, recettesMamie, herbier, tricot],
