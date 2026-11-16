@@ -523,6 +523,26 @@ grep -q '<meta property="og:title"' <<<"$page" || die "projet public : pas d'ape
 if grep -q '<meta name="robots" content="noindex">' <<<"$page"; then die "projet public marqué « noindex »"; fi
 echo "ok : $shown"
 
+step "Le compte d'exemples (infra/mark-example.sh, R12b)"
+# Le membre restauré (avant@example.com) devient un compte d'exemples : l'auteur de son projet public
+# porte alors `example: true` dans la réponse de l'API ; --revoke efface la ligne, et le champ
+# disparaît (absent, jamais `false`). Une adresse avec une apostrophe est refusée avant toute
+# requête, une adresse inconnue échoue. GITHUB_ACTIONS vide : ces refus sont attendus.
+example_of() { # le champ `example` de l'auteur du projet public, tel qu'un visiteur le lit
+  web -f -H "Origin: https://$APP_HOST" "https://$API_HOST/v1/public/projects/$project" |
+    node -e 'process.stdin.on("data", (d) => console.log(String(JSON.parse(d).author.example)))'
+}
+if GITHUB_ACTIONS="" infra/mark-example.sh "a'@b.io" 2>/dev/null; then die "une adresse avec une apostrophe a été acceptée"; fi
+if GITHUB_ACTIONS="" infra/mark-example.sh personne@example.com 2>/dev/null; then die "une adresse inconnue a été acceptée"; fi
+expect "auteur ordinaire" "$(example_of)" undefined
+infra/mark-example.sh AVANT@example.com
+expect "auteur d'exemples" "$(example_of)" true
+infra/mark-example.sh avant@example.com --revoke
+expect "auteur après --revoke" "$(example_of)" undefined
+expect "lignes après --revoke" "$(echo 'select count(*) from example_account;' | db_query)" 0
+if GITHUB_ACTIONS="" infra/mark-example.sh avant@example.com --revoke 2>/dev/null; then die "un second retrait a été accepté"; fi
+echo "ok"
+
 step "L'API arrêtée : les pages publiques restent lisibles, avec leurs en-têtes de sécurité (R12)"
 # Relecture de sécurité du plan, I1 : sans tête (l'instruction échoue), Caddy sert le fichier tel
 # qu'il est dans l'image (repli « handle_errors 500 502 503 »), avec le code 200 et la CSP. Le
