@@ -3529,3 +3529,420 @@ la suspension, « Ne pas me proposer aux autres ».
 - `R11-Mes-Commentaires` et `R11-Mes-Retours` : les deux listes, avec un projet qui n'est plus
   visible (téléphone) ;
 - `R11-Pied` : le pied de l'accueil des visiteurs, et « À propos » des réglages (téléphone).
+
+## R12 — Les projets publics
+
+Statut : **à valider par Louis**. Écrit le 16/11/2026 à partir de ses réponses aux vingt questions du
+brouillon (toutes les recommandations, sauf Q1, Q9, Q16 et Q20, changées par lui) et des deux
+précisions qu'il a validées le même jour.
+
+R12 est la dernière tranche de la refonte. Elle change la règle « un visiteur ne voit rien » (A14) :
+un membre peut rendre un projet public, visible par tous et trouvable sur Google ; il peut aussi, par
+un choix à part, rendre sa page publique. Un visiteur sans compte voit alors ces projets et ces
+pages, une vitrine qui devient l'accueil du site, et peut signaler un contenu (A14 : « comme le DSA
+l'impose »). Les moteurs de recherche et les aperçus de lien lisent ces pages et seulement elles, en
+français et en anglais, chacune à son adresse. La phrase « Rien n'est public sans ton accord. »
+remplace celle de R11. Les Règles, la Confidentialité et le registre disent la nouvelle situation.
+
+Décisions de Louis (16/11/2026) :
+- **R12 entière, « Public » ouvert dès le déploiement**, sans interrupteur : le site devient plus
+  public **sans devenir commercial** ; la validation des textes par un professionnel et l'offre
+  professionnelle de l'assistant de code attendent encore ; **l'inscription reste sur code
+  d'invitation** ;
+- **la vitrine devient l'accueil (`/`) pour tout le monde**, mais un membre connecté arrive
+  directement sur le Fil ; un membre l'atteint par « À la une », en tête d'Explorer ;
+- **une adresse par langue** (`/fr/…`, `/en/…`) et les liens `hreflang`, **dans R12**, sur les pages
+  publiques seulement ;
+- **inviter dans une ruche quelqu'un qui n'a pas de compte : on n'en veut pas.**
+
+Planches : `R12-Visiteur-Accueil`, `R12-Visiteur-Projet`, `R12-Compte-Requis`,
+`R12-Visiteur-Signaler`, `R12-Profil-Public`, `R12-Visiteur-Desktop` (dessinées le 28/10) ;
+`R6-Modifier` pour le choix « Public » ; les planches à dessiner et à retoucher sont nommées en fin de
+section.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme :
+- aucun projet ne devient public sans un geste de son auteur ; aucun contenu d'un membre n'est montré
+  sans son accord (A14) ; la visibilité par défaut reste « Membres de {{appName}} » ;
+- un visiteur ne voit **jamais** les commentaires, les abonnés, ni les ruches (A14) ; ni qui a réagi,
+  qui suit, qui a signalé ;
+- réagir, commenter ou suivre demande un compte (A14) ;
+- la recherche, Explorer, le fil, les pages d'outils et les ruches restent réservés aux membres, même
+  avec un profil public (liste de conformité, « R12 : la recherche reste réservée aux membres ») ;
+- un projet privé, réservé à une ruche, retiré par la modération, ou d'un membre bloqué, n'apparaît
+  nulle part ; « Tester » passe toujours par la page de sortie (A14) ; le serveur n'ouvre jamais un
+  lien de démo (décision du 8/11/2026) ;
+- un e-mail ne contient aucun lien ni domaine venu d'un membre ; la modération ne montre jamais qui
+  a signalé.
+
+Hors de R12, et où ça va :
+- inviter dans une ruche quelqu'un qui n'a pas de compte : **non** (Louis, 16/11/2026) ; ouvrir les
+  inscriptions sans code : plus tard ;
+- la validation des textes par un professionnel, et le passage de l'assistant de code à une offre
+  professionnelle : Louis, quand {{appName}} deviendra commercial ou ouvrira les inscriptions ;
+- la montée à Expo SDK 58 : une PR à part, après R12 ;
+- la traduction des contenus des membres : phase 3 (CONTRIBUTING, « Langues ») ;
+- des adresses par langue pour les pages des membres (Fil, Explorer, réglages…) : non, elles ne sont
+  pas lues par les moteurs ;
+- le serveur MCP : plus tard.
+
+### L'ouverture (Q1)
+
+- Étant donné le serveur de production, dès le déploiement de R12
+- Alors « Public » est proposé à tous les auteurs, et « Rendre ma page publique » à tous les membres
+- Et l'inscription demande toujours un code d'invitation (`SIGNUP_INVITE_CODE`, exigé en production)
+- Et les Mentions légales sont complètes avant ce déploiement : des contenus deviennent visibles de
+  tous, la loi (LCEN, art. 6) demande l'éditeur, son adresse et son directeur de la publication ;
+  **proposition, à trancher par Louis** : le garde `scripts/legal-placeholders.mjs` refuse le
+  déploiement tant qu'un emplacement reste, invitation ou non (aujourd'hui, il avertit seulement
+  tant que l'invitation est exigée, décision du 16/11/2026)
+
+### Rendre un projet public (F-Pub6, planche `R6-Modifier` ; à dessiner `R12-Qui-Peut-Voir`)
+
+**Le choisir**
+- Étant donné Léa, qui publie ou modifie « Décollage ! »
+- Alors « Qui peut le voir ? » propose, dans cet ordre, « Membres de {{appName}} », « Une ruche » (si
+  elle est dans une ruche), « Public » et « Privé » (F-Pub6 ; planche `R6-Modifier`) (Q2)
+- Et sous « Public », l'aide « Visible par tous, et trouvable sur Google » (A14, mot pour mot) : elle
+  dit qui voit, elle reste selon « Moins de mots »
+- Quand elle choisit « Public »
+- Alors la phrase du bas du formulaire dit : « Tout le monde pourra le voir, même sans compte. Si tu
+  changes d'avis, les moteurs de recherche peuvent le montrer encore quelque temps. » (Q4)
+- Et aucune fenêtre de confirmation en plus (Q4)
+- Et l'API garde la valeur sous un code stable nouveau, `web` : `public` veut déjà dire « Membres de
+  {{appName}} » (`packages/contracts/src/projects.ts`) ; aucun projet existant ne change (Q3)
+
+**Qui peut le choisir**
+- Tout auteur, sauf un membre suspendu : il peut rendre un projet public moins visible, jamais plus
+  (« Pendant la suspension, tu ne pourras pas le rendre de nouveau public. ») (Q6)
+- Un membre de 15 à 17 ans a le même choix, rien n'est coché d'avance ; le point entre dans la liste
+  du professionnel (RGPD art. 8, protection des mineurs) (Q7)
+- Un projet retiré par la modération ne se rend pas public (il n'est visible que de son auteur)
+
+**Revenir en arrière**
+- Étant donné « Décollage ! », public
+- Quand Léa choisit « Membres de {{appName}} », « Une ruche » ou « Privé »
+- Alors, à l'instant, un visiteur qui ouvre son adresse arrive sur « Se connecter », comme pour une
+  adresse inconnue (« une adresse ne révèle rien »)
+- Et le projet quitte la vitrine et le plan du site ; sa page dit aux moteurs de ne plus l'indexer
+  (`noindex`), ses images ne s'ouvrent plus sans compte
+- Et ce qui est déjà copié ailleurs (moteurs de recherche, captures, messageries) n'est pas effacé
+  par {{appName}} : la phrase du formulaire et la Confidentialité le disent (Q4)
+- Et la même chose arrive quand le projet est supprimé, retiré par la modération, quand le compte est
+  supprimé ou supprimé pour inactivité
+
+**Sur la page du projet** (planche `R12-Visiteur-Projet`)
+- Une pastille « Public » à côté du statut et de la catégorie, pour tous, membres compris (Q19)
+
+### Ce que voit un visiteur sans compte
+
+**Un projet public** (A14 ; planche `R12-Visiteur-Projet` ; à dessiner `R12-Visiteur-Projet-Desktop`,
+`R12-Visiteur-Projet-Nuit`)
+- Étant donné un visiteur sans compte qui ouvre l'adresse de « Décollage ! », public
+- Alors la page s'ouvre sans demander de compte, à l'adresse de sa langue (`/fr/projects/<id>` ou
+  `/en/projects/<id>`, voir « Les adresses par langue »)
+- Et il voit la couverture, le titre, l'accroche, le statut, « Les mises à jour », « Tester la démo »
+  par la page de sortie et le nombre de réactions (A14), avec « de membres » (planche)
+- Et aussi tout ce que l'auteur a écrit : la description, la galerie et sa description des photos,
+  les catégories, les outils (sans lien vers leur page, réservée aux membres), « Facile à refaire ? »,
+  « Commencé en », « Le prompt de départ » avec « Copier » (Q5)
+- Et le nom et la photo de l'auteur ; son nom mène à sa page seulement si elle est publique ; le
+  pseudo ne se montre nulle part aux visiteurs (Q8)
+- Et jamais : les commentaires, les abonnés, qui a réagi, les ruches, le coin des testeurs ni les
+  appels à testeurs, « Suivre », le menu de l'auteur (A14)
+- Et en haut, « {{appName}} » (vers l'accueil) et « Se connecter » ; ni barre d'onglets ni « + »
+- Et en bas, « Signaler ce projet » (F-Pr12 ; planche)
+- Et la page suit le thème du navigateur après `useHydrated()` (CONTRIBUTING, « Web ») ; sa langue
+  est celle de son adresse
+
+**Les commentaires**
+- Étant donné le même visiteur
+- Alors, à la place des commentaires, une phrase : « Les commentaires sont réservés aux membres. » et
+  « Créer un compte » (planche `R12-Visiteur-Projet`)
+- Et ni leur nombre, ni un extrait (A14 : « jamais les commentaires »)
+- Et l'aide de la feuille des commentaires reste vraie (« Tous les membres connectés liront ton
+  commentaire. »)
+
+**Réagir, commenter, suivre** (planche `R12-Compte-Requis`, à retoucher)
+- Quand le visiteur touche « Réagir », « Créer un compte » ou « Suivre ses mises à jour »
+- Alors une feuille « Pour réagir, crée ton compte » propose « Créer un compte » et « Se connecter »,
+  avec « Rien n'est public sans ton accord. » (planche)
+- Et la phrase « Réagir, commenter et suivre un projet demandent un compte. » est retirée (« Moins de
+  mots » : le titre le dit) ; « Ta réaction sera posée juste après » aussi (Q11)
+- Et la feuille dit la limite : « {{appName}} s'ouvre sur invitation. » (Q12)
+- Et une fois connecté, il revient sur le projet, comme pour un lien partagé ; rien n'est fait à sa
+  place (Q11)
+
+**Un projet qui n'est pas public**
+- Étant donné un visiteur qui ouvre l'adresse d'un projet « Membres », réservé, privé, retiré,
+  supprimé, ou une adresse fausse
+- Alors la même suite qu'aujourd'hui : « Se connecter », puis le projet s'il le voit ; la page reçue
+  ne dit rien du projet (ni titre, ni image) et porte `noindex`
+
+**Une page publique** (planche `R12-Profil-Public` ; à dessiner `R12-Visiteur-Profil`)
+- Étant donné Inès, dont la page est publique, et un visiteur qui ouvre `/fr/members/<id>`
+- Alors il voit son nom et sa photo, puis ce qu'elle a coché : sa bio, ses outils favoris, ses
+  projets publics, son nombre d'abonnés
+- Et jamais ses ruches, qui elle suit, ses commentaires ni ses réactions, ni ses projets « Membres »,
+  réservés ou privés, ni son pseudo (Q8)
+- Et « Signaler ce profil » en bas
+- Et une page qui n'est pas publique répond comme un projet qui ne l'est pas : « Se connecter »
+
+### L'accueil : la vitrine, pour tout le monde (A14, Q9 ; planches `R12-Visiteur-Accueil`, `R12-Visiteur-Desktop`)
+
+**Qui arrive où**
+- Étant donné un visiteur sans compte qui ouvre {{appName}} (`/`, ou `/fr/`, `/en/`)
+- Alors il arrive sur l'accueil : l'accroche, la vitrine, « Créer un compte » et « Se connecter »
+- Étant donné un membre connecté qui ouvre {{appName}}, ou qui vient de se connecter sans lien à
+  suivre
+- Alors il arrive directement sur le Fil, comme aujourd'hui ; l'accueil ne s'affiche pas avant
+- Et un membre connecté qui ouvre un lien vers l'accueil (`/`, `/fr/`, `/en/`) arrive aussi sur le
+  Fil ; il voit la vitrine par « À la une » (ci-dessous)
+
+**La vitrine**
+- Sous l'accroche, « Des projets à voir » : 3 projets publics sur téléphone, 4 sur ordinateur
+  (planche `R12-Visiteur-Desktop`) (Q9)
+- Et sous la vitrine, « Ces projets sont publics : leurs auteurs l'ont choisi. » (Q10)
+- Et chaque carte ouvre la page du projet
+- Et la vitrine est **choisie par Louis** parmi les projets publics (A14 : « mis en avant par
+  Louis »), dans la modération (à dessiner `R12-Vitrine`) ; l'auteur est prévenu dans Activité et peut
+  la quitter par « Retirer de l'accueil » (Q9)
+- Et un projet qui cesse d'être public, est supprimé ou retiré quitte la vitrine à l'instant
+- Et sans projet mis en avant, l'accueil reste celui de R11 (images d'exemple de la marque, A14)
+- Et la phrase de l'accueil devient « Rien n'est public sans ton accord. »
+- Et sur ordinateur, la phrase sous l'accroche de la planche (« Publie tes projets, fais-les
+  tester… ») et « {{appName}} est un logiciel libre. » ne reviennent pas (« Moins de mots ») ; le
+  pied de R11 reste
+
+**« À la une », pour les membres** (à dessiner `R12-A-La-Une`)
+- Étant donné Léa, connectée, sur Explorer
+- Alors, en tête, une rangée « À la une » : les projets de la vitrine, en cartes qu'on fait défiler
+  de côté ; chaque carte ouvre le projet
+- Et un projet de la vitrine que Léa ne voit pas (l'auteur l'a bloquée, ou elle l'a bloqué) n'y est
+  pas ; la rangée suit les mêmes règles de visibilité qu'Explorer
+- Et sans projet mis en avant, la rangée n'apparaît pas (aucune place réservée vide)
+- Et elle ne porte ni sous-titre ni phrase d'aide (« Moins de mots »)
+
+### Rendre sa page publique (planche `R12-Profil-Public`, à retoucher)
+
+- Étant donné Inès, dans Réglages, « Mon profil », puis « Mon profil public »
+- Alors « Rendre ma page publique », non coché, avec l'aide « Visible par tous, et trouvable sur
+  Google » (A14 : « le profil public est un choix à part »)
+- Et le sous-titre de la planche (« Un choix à part de la visibilité de tes projets… ») est retiré
+  (« Moins de mots »)
+- Quand elle l'active
+- Alors « Ce que voit un visiteur » : « Mon nom et ma photo » (toujours, non décochable), « Ma bio »,
+  « Mes outils favoris », « Mes projets publics » (cochés), « Mon nombre d'abonnés » (décoché) ; sous
+  « Mes projets publics », le compte (« 2 sur 4 : les autres restent entre membres », planche)
+- Et « Jamais montrés : tes ruches, qui te suit, tes commentaires et tes réactions. » (dit qui voit
+  quoi, il reste)
+- Et « Voir ma page comme un visiteur » ouvre sa page telle qu'un visiteur la voit
+- Et le pseudo n'est pas montré (Q8)
+- Et un membre suspendu ne rend pas sa page publique ; il peut la refermer (Q6)
+- Et la désactiver a le même effet immédiat que pour un projet (« Revenir en arrière »)
+- Et rendre un projet public ne rend pas la page publique, ni l'inverse (A14)
+
+### Le signalement par un visiteur (planche `R12-Visiteur-Signaler`, à retoucher ; à dessiner `R12-Visiteur-Signale`)
+
+- Étant donné un visiteur sur un projet public
+- Quand il touche « Signaler ce projet »
+- Alors la feuille de R9, en deux étapes : la partie visée, puis le motif ; les 8 motifs de R9, dont
+  « Contenu illégal » avec le 112 et la précision obligatoire (`ReportReason`)
+- Et un champ « Ton adresse e-mail, facultative », avec l'aide « Pour recevoir la suite de ton
+  signalement » ; pas de champ pour le nom (Q13 ; question au professionnel : le DSA, art. 16.2.c,
+  cite le nom et l'adresse de qui signale)
+- Et la phrase « Tu n'as pas besoin de compte pour signaler. » est retirée ; « La modération lit
+  chaque signalement. » reste (elle dit qui lit)
+- Quand il envoie
+- Alors « Signalement envoyé » (comme R9), et, s'il a donné une adresse, un e-mail d'accusé de
+  réception, puis un autre à la décision : deux au plus par signalement ; ni l'un ni l'autre ne
+  contient de texte d'un membre (Q14)
+- Et l'adresse est effacée une fois la décision envoyée (Q14)
+- Et ce qu'il peut signaler : un projet public, une de ses mises à jour, une page publique
+  (`ReportTargetKind` : `project`, `update`, `member`)
+- Et la modération le reçoit dans la même file, sans dire qui l'a envoyé, ni s'il avait un compte
+- Et au plus 5 signalements par adresse IP et par jour (20 pour un membre) ; au-delà, « Trop de
+  signalements depuis cette connexion. Réessaie demain. » (pas de « tu » ciblé : l'adresse IP est
+  partagée) (Q14)
+- Et le pied de l'accueil sur ordinateur garde « Signaler un contenu » (planche
+  `R12-Visiteur-Desktop`), qui mène à l'adresse de contact de R11 (Q13)
+
+### Les adresses par langue (Q16, décision de Louis du 16/11/2026)
+
+**Quelles pages**
+- Les pages publiques, et seulement elles, ont une adresse par langue, `/fr/…` et `/en/…` :
+  l'accueil (`/fr/`, `/en/`), un projet public (`/fr/projects/<id>`), une page publique
+  (`/fr/members/<id>`), et les quatre pages de R11 (Règles, Confidentialité, Mentions légales,
+  Accessibilité), aux mêmes chemins qu'aujourd'hui précédés de la langue
+- Et les pages des membres (Fil, Explorer, Activité, réglages, publication, modération, ruches,
+  recherche, outils) gardent leurs adresses d'aujourd'hui : les moteurs ne les lisent pas
+
+**Les anciennes adresses**
+- Étant donné un lien d'avant R12 (`/projects/<id>`, `/members/<id>`, `/privacy`…), partagé ou dans
+  un e-mail déjà envoyé
+- Alors il redirige (301) vers la même page dans la langue du navigateur (`Accept-Language`), le
+  français s'il n'en dit rien
+- Et un membre connecté qui ouvre une page publique y garde ce qu'il voit aujourd'hui (commentaires,
+  « Suivre »…), à n'importe laquelle des deux adresses
+
+**La langue de la page**
+- Une page publique s'affiche dans la langue de son adresse, pour un visiteur ; un membre connecté
+  la voit dans la langue de son appli
+- Et le choix de la langue d'une page publique (pied de page) mène à l'autre adresse de la même page
+- Et le contenu des membres (titre, accroche, description) n'est pas traduit : la page anglaise d'un
+  projet écrit en français montre le texte en français, autour de libellés anglais
+- Et les liens de partage portent la langue de qui partage
+
+**Ce que lisent les moteurs**
+- Chaque page publique dit son adresse canonique (elle-même), et ses deux langues par des liens
+  `hreflang` (`fr`, `en`), plus `x-default` vers l'adresse sans langue
+- Et `<html lang>` vaut la langue de l'adresse, dans le HTML reçu
+- Et le plan du site liste les deux adresses de chaque page publique
+
+### Le référencement, les liens de partage et les aperçus
+
+**Ce que lisent les moteurs** (R11 ; rapport « Tendances design UX SEO GEO 2026 »)
+- Le `robots.txt` de R11 s'ouvre : les adresses publiques (`/fr/`, `/en/` et ce qui suit) ne sont
+  plus refusées (sinon un moteur ne lit pas leur `noindex`) ; les réglages, la publication, Activité,
+  la modération, les ruches et la recherche restent refusés
+- Et chaque page de projet ou de membre arrive avec, **dans le HTML reçu** (un `noindex` ajouté par
+  JavaScript n'est pas fiable) :
+  - public : le titre, l'accroche en description, l'adresse canonique et les `hreflang`, les balises
+    de partage (Open Graph) avec la couverture ;
+  - pas public, ou inconnu : un titre neutre (« {{appName}} »), aucune image, et `noindex`, le même
+    HTML dans les deux cas (aucune fuite d'existence)
+- Et ces balises sont écrites par une petite route du serveur, qui sert la page pré-rendue de l'appli
+  avec ses métadonnées ; `web.output` reste `static` (Q15)
+- Et un plan du site (`/sitemap.xml`) liste l'accueil, les quatre pages, les projets publics et les
+  pages publiques, dans les deux langues ; un projet qui cesse d'être public en sort tout de suite
+- Et les robots des moteurs de recherche, y compris ceux des assistants d'IA qui cherchent, peuvent
+  lire les pages publiques ; les robots qui collectent pour **entraîner** des modèles sont refusés sur
+  toutes les pages publiques (Q17)
+
+**Partager** (F-Pr1, planche `R5a-Partager` ; à dessiner `R12-Partager-Public`)
+- Étant donné Léa qui partage « Décollage ! », public
+- Alors le bandeau dit « Tout le monde pourra l'ouvrir. » à la place de « Seuls les membres de
+  {{appName}} pourront l'ouvrir. » (Q18)
+- Et le lien est l'adresse du projet dans la langue de Léa, sans rien sur le membre qui partage
+- Et une page publique se partage de même
+
+**L'aperçu d'un lien** (à dessiner `R12-Apercu-Lien`)
+- Étant donné le lien de « Décollage ! », public, collé dans une messagerie
+- Alors l'aperçu montre la couverture, le titre, l'accroche et « {{appName}} »
+- Étant donné le lien d'un projet « Membres », réservé ou privé
+- Alors l'aperçu reste celui de {{appName}} (logo, nom), **jamais** le titre ni une image du projet :
+  c'est la règle d'aujourd'hui, qui devient une règle testée
+- Et l'image de l'aperçu s'ouvre sans compte, seulement pour un projet public ; elle est déjà
+  ré-encodée sans métadonnées (CONTRIBUTING, « Sécurité »)
+
+### « Rien n'est public sans ton accord. » (A14)
+
+- Elle s'écrit sur l'accueil (planches `R2-Accueil`, `R12-Visiteur-Accueil`), dans la feuille
+  « Compte requis », sous le cadenas de la connexion et de l'inscription, à la place de « Les projets
+  et les profils ne se voient qu'avec un compte. », devenue fausse
+- Et elle entre dans « En bref » des Règles
+
+### Les textes qui deviennent faux (Q19)
+
+- Le mot « public » qui veut dire « visible des membres » est réécrit : l'aide d'une mise à jour
+  (« Tous les membres pourront la lire » : reste vraie pour un projet « Membres », à compléter pour un
+  projet public), « rendre de nouveau public », « Aucun projet public pour l'instant. »
+- Le blocage : « Vous ne verrez plus les projets… l'un de l'autre » n'est plus vrai pour un projet
+  public vu sans être connecté ; la fenêtre ajoute « Tes projets publics restent visibles de tous,
+  même sans compte. »
+- `libelles.mjs` et un `git grep` des textes de `fr.ts` et `en.ts` trouvent les autres
+
+### Les Règles, la Confidentialité, le registre
+
+**Les Règles**
+- « Ce que tu publies » : tu autorises {{appName}} à l'afficher aux personnes que tu choisis, **et à
+  tous, moteurs de recherche compris, si tu choisis « Public »** ; un prompt d'un projet public peut
+  être copié par toute personne qui le voit (Q5) ; revenir en arrière n'efface pas les copies faites
+  ailleurs
+- Une partie « Ce que voit un visiteur » : la liste de « Ce que voit un visiteur sans compte »
+- « Comment se font le fil, Explorer… » : la vitrine de l'accueil et « À la une » sont choisies par
+  l'éditeur parmi les projets publics ; l'auteur peut la quitter (Q9)
+- « La modération » : toute personne, avec ou sans compte, peut signaler un contenu public
+- « En bref » : « Rien n'est public sans ton accord. »
+- Une nouvelle version des règles, donc l'écran « Accepter » pour tous (R11)
+
+**La Confidentialité**
+- « Projets » et « Profil » : le choix « Public », ce qu'il montre, à qui, l'indexation par les
+  moteurs, les copies qu'ils gardent, le refus des robots d'entraînement (Q17)
+- « Signalements » : le visiteur qui signale (adresse facultative, effacée à la décision ; adresse
+  IP pour le quota ; durées) (Q14)
+- « Sécurité » : les compteurs par adresse IP des visiteurs (lecture des pages, signalements), à leur
+  durée réelle
+- Ce qu'un visiteur laisse : aucun cookie, aucune mesure d'audience ; les journaux du serveur
+- La ligne du fournisseur de l'assistant de code (« au plus tard à l'ouverture au public ») devient
+  « au plus tard quand {{appName}} deviendra commercial ou ouvrira les inscriptions » (Q1) ; la
+  relecture juridique dit si l'ouverture de contenus publics change ce que cette ligne doit dire
+
+**Le registre** (`docs/legal/registre.md`)
+- Profil et projets : la diffusion publique, base légale (le choix du membre), personnes (tout
+  internaute), destinataires (moteurs de recherche)
+- Signalements : ceux des visiteurs, leur adresse et sa durée
+- Anti-abus : les compteurs par adresse IP des visiteurs
+- Un traitement « Vitrine de l'accueil et À la une » (finalité, critère, l'éditeur qui choisit)
+
+### Mes données
+
+- L'export ajoute la visibilité « Public » de chaque projet, le choix « page publique » et ses cases,
+  et la présence dans la vitrine
+
+### Accessibilité
+
+- La page d'un visiteur se lit par titres comme celle d'un membre ; « Public » est lu dans le nom du
+  projet ou à côté du statut
+- La feuille « Compte requis » met le focus sur son titre et se ferme au clavier
+- Le signalement d'un visiteur : le champ d'adresse a son nom lu et son type (`email`)
+- « À la une » se parcourt au clavier, carte par carte, et a un titre lu
+- Le choix de la langue d'une page publique dit la langue de destination dans sa langue (« English »,
+  « Français ») avec `lang`
+- Zones à toucher de 44 au moins ; textes à 200 % sans coupure au milieu d'un mot à 320
+
+### Le parcours d'un membre (`journey`)
+
+- Léa publie « Décollage ! » en « Public » et lit la phrase du bas ; un visiteur (sans session)
+  ouvre son ancienne adresse, arrive sur `/fr/projects/<id>`, voit le titre et « Les commentaires
+  sont réservés aux membres. », touche « Réagir » et voit la feuille « Compte requis » ; il signale
+  le projet avec une adresse
+- Louis met « Décollage ! » dans la vitrine ; le visiteur la voit sur l'accueil ; Léa voit la ligne
+  dans Activité ; Inès, connectée, ouvre {{appName}}, arrive sur le Fil, puis voit le projet dans « À
+  la une » d'Explorer
+- Inès rend sa page publique, décoche « Ma bio » ; « Voir ma page comme un visiteur » ne la montre
+  pas
+- Léa repasse le projet en « Membres de {{appName}} » ; le visiteur rouvre l'adresse et arrive sur
+  « Se connecter » ; la vitrine ne le montre plus
+- Les métadonnées (titre, `noindex`, `hreflang`, redirections) se vérifient par les tests
+  d'intégration de la route qui les écrit, et par `infra/stack-test.sh` pour Caddy : le parcours
+  tourne sans Caddy (PGlite)
+
+### Les planches à dessiner et à retoucher (les visuels d'abord)
+
+À dessiner :
+- `R12-Qui-Peut-Voir` (téléphone) : « Qui peut le voir ? » avec les quatre choix, « Public » choisi,
+  la phrase du bas ; en encart, le retour à « Membres de {{appName}} » d'un projet public ;
+- `R12-Visiteur-Projet-Desktop` (ordinateur) : un projet public vu par un visiteur, la colonne de
+  droite sans commentaires, avec la phrase et « Créer un compte » ;
+- `R12-Visiteur-Projet-Nuit` (téléphone, nuit) : la page visiteur de nuit ;
+- `R12-Visiteur-Profil` (téléphone) : la page publique d'Inès vue par un visiteur, et « Signaler ce
+  profil » ;
+- `R12-Visiteur-Signale` (téléphone) : « Signalement envoyé », l'état « Trop de signalements », et
+  l'e-mail d'accusé de réception (640 de large) ;
+- `R12-Apercu-Lien` (téléphone) : l'aperçu d'un lien public dans une messagerie, et celui, neutre,
+  d'un projet « Membres » ;
+- `R12-Partager-Public` (téléphone) : la feuille de partage avec « Tout le monde pourra l'ouvrir. » ;
+- `R12-Vitrine` (ordinateur) : dans la modération, mettre un projet public en avant et l'en retirer ;
+  en encart, la ligne d'Activité de l'auteur et « Retirer de l'accueil » ;
+- `R12-A-La-Une` (téléphone, et un encart ordinateur) : Explorer avec la rangée « À la une » en tête.
+
+À retoucher, selon « Moins de mots » et les décisions ci-dessus :
+- `R12-Profil-Public` : sans le sous-titre ;
+- `R12-Visiteur-Desktop` : sans la phrase sous l'accroche ni « {{appName}} est un logiciel libre. »,
+  avec le pied de R11 (`R11-Pied`) et le choix de la langue ;
+- `R12-Compte-Requis` : sans la phrase sous le titre ni « Ta réaction sera posée juste après », avec
+  « {{appName}} s'ouvre sur invitation. » ;
+- `R12-Visiteur-Signaler` : sans « Tu n'as pas besoin de compte pour signaler. », les deux étapes de
+  R9 (partie, puis motif) ;
+- `R12-Visiteur-Projet` : la description, la galerie, le prompt ; le nom de l'auteur sans lien ; la
+  pastille « Public ».
