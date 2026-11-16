@@ -101,7 +101,8 @@ function useVisitHoney(items: readonly Notification[]) {
 function MemberNotifications() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
-  const back = useGoBack('/')
+  // Sans page d'avant (lien direct), le retour mène au Fil (`/feed`, plan R12, décision 9).
+  const back = useGoBack('/feed')
   const list = useNotifications()
   const { markSeen } = useMarkSeen()
   const suspended = useSuspension().suspended

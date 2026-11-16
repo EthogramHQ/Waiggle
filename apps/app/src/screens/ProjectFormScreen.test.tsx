@@ -10,7 +10,7 @@
 //   POST …/visuals par photo dans l'ordre des tuiles, puis PATCH …/visuals/{id} pour une description ;
 // - les photos se choisissent par `pickVisuals` de `media/pick` (« Ajouter des photos ») ;
 // - fermer la feuille sans rien perdre : `router.back()` ou `dismiss` ; publier pour les membres :
-//   `router.dismissTo` vers « /?published=<id> » ; un brouillon privé : la page du projet, et le
+//   `router.dismissTo` vers « /feed?published=<id> » ; un brouillon privé : la page du projet, et le
 //   toast `draftSaved` (`useToast`, montré par la feuille avant de partir) ;
 // - le retour du navigateur : un écouteur `beforeRemove` de `useNavigation()` (Expo Router), qui
 //   appelle `preventDefault()` quand il y a des changements, puis `navigation.dispatch(action)`
@@ -329,7 +329,7 @@ describe('ProjectFormScreen, publishing', () => {
     )
     // Plus de temps passé (F-Pr14).
     expect(createdBodies()[0]).not.toHaveProperty('timeSpent')
-    await waitFor(() => expect(destinations()).toContain(`/?published=${NEW_ID}`))
+    await waitFor(() => expect(destinations()).toContain(`/feed?published=${NEW_ID}`))
     expect(mockNav.router.dismissTo).toHaveBeenCalled()
   })
 
@@ -429,7 +429,7 @@ describe('ProjectFormScreen, photos of a new project', () => {
           .map((one) => one.body),
       ).toEqual([{ description: 'La Lune au-dessus du toit' }]),
     )
-    await waitFor(() => expect(destinations()).toContain(`/?published=${NEW_ID}`))
+    await waitFor(() => expect(destinations()).toContain(`/feed?published=${NEW_ID}`))
   })
 
   it('opens the edit sheet, without the dance, when a photo fails after the creation', async () => {

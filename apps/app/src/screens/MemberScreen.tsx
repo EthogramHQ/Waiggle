@@ -199,8 +199,8 @@ function MemberView({ member }: { member: Member }) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
-  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
-  const back = useGoBack('/')
+  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène au Fil (`/feed`).
+  const back = useGoBack('/feed')
   // « Moi » (/me, R3) est la première page d'un onglet, comme le Fil ou Explorer : pas de
   // « Retour » (on change de page par la barre d'onglets). Sa page ouverte par /members/<id> en a un.
   const pathname = usePathname()

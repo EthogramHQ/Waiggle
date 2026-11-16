@@ -191,9 +191,9 @@ function ProjectView({ project }: { project: Project }) {
   const [confirming, setConfirming] = useState(false)
   const menuRef = useRef<Focusable>(null)
 
-  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil. La
-  // page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
-  const goBack = useGoBack('/')
+  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène au Fil (`/feed`
+  // depuis R12). La page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
+  const goBack = useGoBack('/feed')
   const back = () => coverTarget.leave(goBack)
   const reaction = useReaction(project.id)
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).

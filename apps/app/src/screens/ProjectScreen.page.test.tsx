@@ -354,7 +354,8 @@ describe('ProjectScreen', () => {
     expect(screen.queryByRole('button', { name: fr.t(($) => $.states.home) })).toBeNull()
     await fireEvent.press(toFeed)
 
-    expect(visited(mockPush, mockReplace)).toContain('/')
+    // R12 : le Fil a sa propre adresse, `/feed` ; « / » est l'accueil et sa vitrine.
+    expect(visited(mockPush, mockReplace)).toContain('/feed')
   })
 })
 

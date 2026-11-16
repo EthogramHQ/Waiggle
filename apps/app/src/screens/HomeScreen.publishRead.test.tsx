@@ -5,7 +5,7 @@
 //
 // 1. le fil est affiché sous la feuille de publication (l'accueil n'est pas la page affichée) ;
 // 2. « Publier » : la feuille demande au cache de relire les fils (`invalidateQueries`), puis se
-//    ferme sur `/?published=<id>` ;
+//    ferme sur `/feed?published=<id>` ;
 // 3. l'accueil redevient la page affichée, pendant que la lecture du fil est en route.
 //
 // La relecture vit dans le navigateur : l'avis « Projet publié » manquait une fois sur deux, que
@@ -84,7 +84,7 @@ const mockReplace = jest.fn()
 jest.mock('expo-router', () => {
   const { useEffect } = require('react')
   return {
-    usePathname: () => '/',
+    usePathname: () => '/feed',
     useRouter: () => ({
       push: jest.fn(),
       replace: mockReplace,
@@ -166,7 +166,7 @@ const renderUnderSheet = async () => {
 
 /**
  * « Publier », comme le fait la feuille (ProjectFormScreen) : le projet existe, le cache relit les
- * fils, puis la feuille se ferme sur `/?published=<id>` et l'accueil redevient la page affichée.
+ * fils, puis la feuille se ferme sur `/feed?published=<id>` et l'accueil redevient la page affichée.
  */
 const publish = async (
   view: Awaited<ReturnType<typeof renderUnderSheet>>,
@@ -189,7 +189,7 @@ const finishDance = async () => {
 const cleaned = () =>
   mockSetParams.mock.calls.some(
     ([params]) => typeof params === 'object' && params !== null && params.published === undefined,
-  ) || mockReplace.mock.calls.some(([href]) => href === '/')
+  ) || mockReplace.mock.calls.some(([href]) => href === '/feed')
 
 describe('the feed after publishing, with the feed read again by the cache (R6a, C2)', () => {
   it('dances and says « Projet publié » when the API answers at once', async () => {

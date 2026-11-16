@@ -117,7 +117,8 @@ describe('NotFoundState', () => {
     expect(screen.getByText(fr.t(($) => $.project.page.notFound))).toBeTruthy()
     await fireEvent.press(toFeed())
 
-    expect(visited(mockPush, mockReplace)).toContain('/')
+    // R12 : le Fil a sa propre adresse, `/feed` ; « / » est l'accueil et sa vitrine.
+    expect(visited(mockPush, mockReplace)).toContain('/feed')
   })
 
   it('offers « Retour » at the top, which leads back to the page left', async () => {

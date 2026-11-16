@@ -87,8 +87,9 @@ export function useSubmitProject({
         )
         router.replace({ pathname: '/projects/[id]', params: { id } })
       } else {
-        // Le fil, au-dessus duquel la feuille était ouverte : il danse (HomeScreen, `published`).
-        router.dismissTo({ pathname: '/', params: { published: id } })
+        // Le fil (`/feed` depuis R12), au-dessus duquel la feuille était ouverte : il danse
+        // (HomeScreen, `published`).
+        router.dismissTo({ pathname: '/feed', params: { published: id } })
       }
       return null
     }

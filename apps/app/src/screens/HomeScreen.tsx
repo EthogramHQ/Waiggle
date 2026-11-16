@@ -411,7 +411,7 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
   const clean = useCallback(() => {
     // Sans le paramètre, l'adresse redevient celle du fil. `setParams` garde l'historique tel quel.
     if (router.setParams) router.setParams({ published: undefined })
-    else router.replace('/')
+    else router.replace('/feed')
   }, [router])
 
   useEffect(() => {
@@ -669,7 +669,7 @@ const hiveNewsOf = (
     : NO_NEWS
 
 /**
- * Hook (R10) : la pastille du Fil. Elle vit dans l'adresse (`/?hive=<id>`), lue après l'hydratation
+ * Hook (R10) : la pastille du Fil. Elle vit dans l'adresse (`/feed?hive=<id>`), lue après l'hydratation
  * (la page pré-rendue ne connaît pas l'adresse) ; une ruche dont le membre ne fait pas partie (plus
  * membre, adresse recopiée) vaut « Tout ». Choisir une pastille change le seul paramètre, sans
  * nouvelle entrée d'historique (`setParams`).
@@ -693,7 +693,7 @@ const useHiveChoice = () => {
     (value: string) => {
       const hive = value === ALL_HIVES ? undefined : value
       if (router.setParams) router.setParams({ hive })
-      else router.replace(hive ? `/?hive=${encodeURIComponent(hive)}` : '/')
+      else router.replace(hive ? `/feed?hive=${encodeURIComponent(hive)}` : '/feed')
     },
     [router],
   )

@@ -148,7 +148,7 @@ function PageFrame({
                   <NavLinks
                     label={t(($) => $.nav.label)}
                     links={[
-                      { key: 'feed', label: t(($) => $.nav.feed), href: '/' },
+                      { key: 'feed', label: t(($) => $.nav.feed), href: '/feed' },
                       { key: 'explore', label: t(($) => $.nav.explore), href: '/explore' },
                     ]}
                     active="feed"
@@ -192,7 +192,7 @@ function DropExample() {
   const { t } = useTranslation()
   const [active, setActive] = useState<Key>('feed')
   const links = [
-    { key: 'feed' as const, label: t(($) => $.nav.feed), href: '/' },
+    { key: 'feed' as const, label: t(($) => $.nav.feed), href: '/feed' },
     { key: 'explore' as const, label: t(($) => $.nav.explore), href: '/explore' },
     { key: 'hives' as const, label: t(($) => $.nav.hives), href: '/hives' },
   ]

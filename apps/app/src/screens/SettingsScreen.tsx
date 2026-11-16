@@ -71,8 +71,8 @@ export function SettingsScreen({ section }: Props) {
     await me.refetch()
     setRetryingMe(false)
   }
-  // Le retour : de la liste vers l'accueil ; d'une rubrique (téléphone) vers la liste.
-  const back = useGoBack(section && !wide ? '/settings' : '/')
+  // Le retour : de la liste vers le Fil (`/feed`) ; d'une rubrique (téléphone) vers la liste.
+  const back = useGoBack(section && !wide ? '/settings' : '/feed')
 
   // Mon profil et Modération ont leur propre page : une adresse qui les nomme y mène.
   if (section === 'profile' || section === 'moderation')

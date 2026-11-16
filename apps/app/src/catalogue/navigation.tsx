@@ -15,7 +15,7 @@ import { TabBar, type TabBarProps, type TabKey } from '../ui/TabBar'
 import { Text } from '../ui/Text'
 
 const tabs: TabBarProps['tabs'] = [
-  { key: 'feed', label: 'Fil', href: '/' },
+  { key: 'feed', label: 'Fil', href: '/feed' },
   { key: 'explore', label: 'Explorer', href: '/explore' },
   { key: 'hives', label: 'Ruches', href: '/hives' },
   { key: 'me', label: 'Moi', href: '/me' },

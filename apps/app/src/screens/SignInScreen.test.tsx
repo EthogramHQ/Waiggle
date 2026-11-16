@@ -76,7 +76,7 @@ beforeEach(() => {
 })
 
 describe('SignInScreen', () => {
-  it('goes back home once signed in', async () => {
+  it('goes to the feed once signed in', async () => {
     signInMock.mockResolvedValue({ ok: true })
     await renderWithI18n(<SignInScreen />)
 
@@ -86,7 +86,7 @@ describe('SignInScreen', () => {
       email: 'lea@example.com',
       password: 'correct-horse-battery',
     })
-    expect(mockReplace).toHaveBeenCalledWith('/')
+    expect(mockReplace).toHaveBeenCalledWith('/feed')
   })
 
   it('returns to the page that asked for a sign-in', async () => {
@@ -114,7 +114,7 @@ describe('SignInScreen', () => {
 
       await submit()
 
-      expect(mockReplace).toHaveBeenCalledWith('/')
+      expect(mockReplace).toHaveBeenCalledWith('/feed')
       await unmount()
     }
   })

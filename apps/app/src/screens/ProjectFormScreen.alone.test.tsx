@@ -76,7 +76,7 @@ describe('ProjectFormScreen, opened without a page before it', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: TEXT.cancel }))
 
-    expect(destinations()).toEqual(['/'])
+    expect(destinations()).toEqual(['/feed'])
     expect(mockNav.router.back).not.toHaveBeenCalled()
   })
 })

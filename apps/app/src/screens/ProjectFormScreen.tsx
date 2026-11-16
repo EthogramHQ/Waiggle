@@ -106,7 +106,8 @@ function ProjectFormSheet({
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
-  const sheet = useRouteSheet('/')
+  // Sans page d'avant, le Fil est posé sous la feuille (ProjectFormScreen) : la fermer y mène (`/feed`).
+  const sheet = useRouteSheet('/feed')
   const { state, session, retry } = useMemberSession()
   // Le profil (sa suspension) d'abord : rien à taper tant qu'on ne sait pas si l'on peut publier.
   const me = useMe(Boolean(session))

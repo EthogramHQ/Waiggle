@@ -90,13 +90,16 @@ const targetOf = (kind: string, id: string): ReportTarget | null => {
   return parsed.success ? parsed.data : null
 }
 
-/** Où revenir sans page précédente (lien ouvert directement) : le projet, le profil, ou l'accueil. */
+/**
+ * Où revenir sans page précédente (lien ouvert directement) : le projet, le profil, ou le Fil
+ * (`/feed`), celui que app/report.tsx pose sous la feuille.
+ */
 const fallbackOf = (target: ReportTarget | null, projectId: string | null): Href =>
   projectId
     ? { pathname: '/projects/[id]', params: { id: projectId } }
     : target?.kind === 'member'
       ? { pathname: '/members/[id]', params: { id: target.id } }
-      : '/'
+      : '/feed'
 
 export function ReportSheet({ kind, id }: { kind: string; id: string }) {
   const { t } = useTranslation()

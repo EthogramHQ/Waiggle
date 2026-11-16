@@ -57,7 +57,9 @@ type Props = {
 
 export function LeavingScreen({ url, project }: Props) {
   const { t } = useTranslation()
-  // Sans page précédente (lien ouvert dans un nouvel onglet), « Rester » et « Retour » mènent au fil.
+  // Sans page précédente (lien ouvert dans un nouvel onglet), « Rester » et « Retour » mènent à
+  // l'accueil (`/`) : depuis R12, la page sert aussi aux visiteurs (la démo d'un projet public),
+  // pour qui le Fil serait « Réservé aux membres ». Un membre y retrouve sa barre.
   const back = useGoBack('/')
   const target = safeTarget(url)
   // Sur le web, la page est préparée sans connaître l'adresse (elle est dans l'URL du visiteur) :
