@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ShowcaseCard } from '../ui/ShowcaseCard'
+import { ShowcaseFreeSlot, ShowcaseSlot } from '../ui/ShowcaseSlot'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -28,6 +29,12 @@ const fr = {
   building: 'En construction',
   day: 'jour',
   night: 'nuit',
+  slots:
+    'Dans la Modération (ShowcaseSlot, ShowcaseFreeSlot) : sans note, modifié depuis la mise en avant, titre long, place libre',
+  remove: 'Retirer',
+  removeNamed: 'Retirer de l’accueil',
+  changed: 'Modifié depuis la mise en avant',
+  free: 'Une place libre',
 }
 
 const en: typeof fr = {
@@ -40,6 +47,12 @@ const en: typeof fr = {
   building: 'In progress',
   day: 'day',
   night: 'night',
+  slots:
+    'In Moderation (ShowcaseSlot, ShowcaseFreeSlot): no note, edited since featured, long title, free spot',
+  remove: 'Remove',
+  removeNamed: 'Remove from the home page',
+  changed: 'Edited since it was featured',
+  free: 'A free spot',
 }
 
 // Des résumés flous de photos (ThumbHash), ceux des autres cartes du catalogue.
@@ -115,6 +128,26 @@ export function ShowcaseCatalogue() {
                   {cards('fill')}
                 </Row>
               </View>
+            </Example>
+            <Example caption={`${l.slots} — ${l[scheme]}`}>
+              {/* R12 : l'onglet « Vitrine de l'accueil » de la Modération, ses trois états de place. */}
+              <Row gap="md" align="start" wrap>
+                {cards('carousel')
+                  .slice(0, 3)
+                  .map((card, index) => (
+                    <ShowcaseSlot
+                      key={card.key}
+                      card={card}
+                      note={index === 1 ? l.changed : undefined}
+                      remove={{
+                        label: l.remove,
+                        spokenLabel: `${l.removeNamed} (${index + 1})`,
+                        onPress: noop,
+                      }}
+                    />
+                  ))}
+                <ShowcaseFreeSlot label={l.free} />
+              </Row>
             </Example>
           </Stack>
         </ThemeProvider>

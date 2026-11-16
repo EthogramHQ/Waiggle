@@ -1807,6 +1807,11 @@ export const fr = {
       changed: 'Modifié depuis la mise en avant',
       errorTitle: 'La vitrine n’a pas pu se charger',
       error: 'Le changement n’a pas pu être enregistré. Réessaie.',
+      // R12, planche R12-Vitrine : la ligne d'un projet public, sous son titre.
+      byline: '{{name}} · public depuis le {{date}}',
+      // Le nom du groupe des deux onglets du haut (« Signalements », « Vitrine de l'accueil ») : un
+      // nom à lui, pas celui de la page (relecture de 7a).
+      sections: 'Rubriques de la modération',
     },
     more: 'Afficher la suite',
     errorTitle: 'La modération n’a pas pu se charger',

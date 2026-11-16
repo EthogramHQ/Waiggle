@@ -1495,6 +1495,10 @@ export const en: Translation = {
       changed: 'Edited since it was featured',
       errorTitle: 'The showcase couldn’t load',
       error: 'The change couldn’t be saved. Try again.',
+      // R12, R12-Vitrine board: the line of a public project, under its title.
+      byline: '{{name}} · public since {{date}}',
+      // The name of the group of the two top tabs, its own and not the page's.
+      sections: 'Moderation sections',
     },
     more: 'Show more',
     errorTitle: 'Moderation couldn’t load',
