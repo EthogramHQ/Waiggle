@@ -163,6 +163,8 @@ export function SummaryCard({
           : undefined
       }
       reactionTotal={project.reactionTotal}
+      // R12b : « Exemple » sur un projet du compte d'exemples de l'équipe (contrat, `author.example`).
+      example={project.author.example === true}
       // La photo est mesurée avant d'ouvrir la page, qui la fait grandir depuis ce cadre (R4).
       onPress={() =>
         cover.capture(() => router.push({ pathname: '/projects/[id]', params: { id: project.id } }))
