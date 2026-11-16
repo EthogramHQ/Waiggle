@@ -97,6 +97,7 @@ const rulesPoints: Record<SummaryKey<'rules'>, IconName> = {
   report: 'flag',
   inactive: 'clock',
   yours: 'download-simple',
+  public: 'lock-simple',
 }
 const privacyPoints: Record<SummaryKey<'privacy'>, IconName> = {
   noAds: 'prohibit',
@@ -124,6 +125,7 @@ export const rulesParts: readonly SectionKey<'rules'>[] = [
   'purpose',
   'account',
   'content',
+  'visitors',
   'forbidden',
   'hives',
   'testers',
