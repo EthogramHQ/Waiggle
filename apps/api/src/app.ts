@@ -36,6 +36,7 @@ import { moderationRoutes } from './routes/moderation'
 import { moderationCatalogueRoutes } from './routes/moderation-catalogue'
 import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
+import { publicRoutes } from './routes/public'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { rulesRoutes } from './routes/rules'
@@ -52,6 +53,7 @@ import { updateRoutes } from './routes/updates'
 import { visualRoutes } from './routes/visuals'
 import { rulesGuard } from './rules/guard'
 import { sameOriginWrites } from './security/same-origin'
+import { createVisitorLimit, visitorReadLimit } from './security/visitor-limit'
 import { suspensionGuard } from './suspension/guard'
 import type { AppEnv } from './types'
 
@@ -102,6 +104,12 @@ const codeByStatus: Partial<Record<number, ErrorCode>> = {
   429: 'rate_limited',
 }
 const codeForStatus = (status: number): ErrorCode => codeByStatus[status] ?? 'validation'
+
+/**
+ * Les routes lues sans compte (R12) : tout `/v1/public/…`. `startsWith` sur « /v1/public/ », barre
+ * comprise : « /v1/publicity » n'en est pas.
+ */
+const isPublicPath = (path: string) => path.startsWith('/v1/public/')
 
 /** La seule route du mot de passe oublié que l'appli appelle (POST, le jeton dans le corps). */
 const RESET_PASSWORD_PATH = '/api/auth/reset-password'
@@ -327,10 +335,22 @@ export const createApp = ({
   const readSession = sessionMiddleware(auth)
   app.use(
     '/v1/*',
-    outsideSession((c, next) =>
-      c.req.path === UNVERIFIED_EMAIL_PATH ? next() : readSession(c, next),
-    ),
+    outsideSession((c, next) => {
+      if (c.req.path === UNVERIFIED_EMAIL_PATH) return next()
+      // R12 (relecture de sécurité du plan, I3) : les lectures sans compte, `/v1/public/*`, ne
+      // sautent QUE la lecture de la session ; le contrôle d'origine, juste au-dessus, reste. Un
+      // membre connecté y reçoit donc exactement ce que reçoit un visiteur : personne n'est connu.
+      if (isPublicPath(c.req.path)) {
+        c.set('user', null)
+        c.set('session', null)
+        return next()
+      }
+      return readSession(c, next)
+    }),
   )
+  // R12 (décision 6) : la limite de lecture d'un réseau sur `/v1/public/*`, en mémoire. Créée ici,
+  // avec l'API : chaque instance (chaque test) a son propre compteur.
+  app.use('/v1/public/*', visitorReadLimit(createVisitorLimit()))
   // R11 : la visite d'un membre connecté est notée (au plus une fois par jour), et un avertissement
   // d'inactivité déjà parti est effacé (account/activity.ts). Juste après la session, avant les
   // gardes de la suspension et de l'accord : une requête qu'elles refusent compte quand même.
@@ -339,8 +359,14 @@ export const createApp = ({
   app.use('/media/*', sessionMiddleware(auth))
   // Les réponses de /v1/… sont personnelles (profil, export…) : aucun cache intermédiaire
   // (navigateur, proxy d'entreprise) ne doit les garder.
+  // R12 : une lecture sans compte réussie garde l'en-tête que sa route a posé (routes/public.ts :
+  // `private, max-age=60`, jamais `public`, décision 3 de la relecture du plan) ; ses refus, comme
+  // toute autre réponse, reçoivent `no-store`.
   app.use('/v1/*', async (c, next) => {
     await next()
+    if (isPublicPath(c.req.path) && c.res.status === 200 && c.res.headers.has('Cache-Control')) {
+      return
+    }
     c.header('Cache-Control', 'no-store')
   })
   // Un compte suspendu (tranche 7c) passe en lecture seule : la garde refuse ses écritures avant
@@ -402,6 +428,9 @@ export const createApp = ({
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter }))
   app.route('/', mediaRoutes({ db, storage }))
+  // Les lectures sans compte (R12) : un projet public, ses mises à jour, une page publique, la
+  // vitrine de l'accueil.
+  app.route('/', publicRoutes({ db, publicApiUrl }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.
   app.doc31('/openapi.json', {

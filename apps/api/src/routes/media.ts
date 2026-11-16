@@ -12,13 +12,21 @@
 // retirée aussi, à son ancienne adresse comme à sa nouvelle, /media/withheld/<id>.webp (l'id de la
 // ligne de retrait, removals/parts.ts). Pour tout autre membre : le même 404, statut et corps, qu'un
 // fichier inconnu.
+//
+// R12 (plan, choix 4 ; relecture de sécurité B3) : sans session, un fichier s'ouvre seulement s'il
+// est montré par une page publique : une photo d'un projet `web` visible d'un visiteur (galerie,
+// couverture verticale, photo d'une mise à jour publiée), jamais en attente, retirée ou d'une mise
+// à jour retirée ; l'avatar d'un membre à page publique ou de l'auteur d'un projet `web`. Jamais
+// une image du coin des testeurs, ni une photo de profil retirée. Tout le reste : le même 404.
 import { type Database, schema } from '@ruche/db'
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { errorBody, languageOf } from '../errors'
 import { type FileStorage, isValidKey } from '../media/storage'
-import { isVisualVisibleTo } from '../projects/load'
+import { publicPageOpen } from '../profile/public-page'
+import { isVisualVisibleTo, isVisualVisibleToVisitor } from '../projects/load'
 import { mediaShownTo } from '../projects/media-visibility'
+import { visitorVisibleProject } from '../projects/visibility'
 import { isActiveAdmin } from '../reports/admin'
 import { cornerAccess } from '../testers/access'
 import type { AppEnv } from '../types'
@@ -153,6 +161,49 @@ const withheldAvatarKey = async (db: Database, file: string, viewerId: string) =
   return row.hidden.storageKey
 }
 
+/**
+ * R12 : cette photo de profil (`avatars/<nom>.webp`) se montre-t-elle à un visiteur sans compte ?
+ * Oui si c'est la photo actuelle d'un membre dont la page est ouverte (`publicPageOpen`, la règle de
+ * profile/public-page.ts), ou qui est l'auteur d'au moins un projet visible d'un visiteur
+ * (`visitorVisibleProject`, la règle de projects/visibility.ts). Une photo retirée par la
+ * modération n'est plus celle du profil (sa clé y devient `withheld/<id>`) : elle ne répond rien.
+ *
+ * En SQL : select 1 from profile inner join "user" on "user".id = profile.user_id
+ *   where profile.avatar_key = $1 and ((public_page and email_verified) is true
+ *     or (select 1 from project where project.author_id = profile.user_id and <visible d'un
+ *         visiteur> limit 1) is not null) limit 1
+ * `(select … limit 1) is not null` plutôt qu'un `exists` dans un `or` : PostgreSQL pourrait en
+ * faire un « hashed SubPlan » qui lit toute la table des projets (charte de l'API, 7b) ; ici, la
+ * sous-requête ne lit que les projets de ce membre, par project_author_created_idx (author_id en
+ * tête). `profile.avatar_key` n'a pas d'index : la table a une ligne par membre, et la clé entre
+ * comme paramètre lié. La colonne du profil est écrite en toutes lettres (sql.raw, du texte fixe) :
+ * dans la sous-requête, Drizzle pourrait l'écrire sans le nom de sa table (charte de l'API, 6b).
+ */
+const isAvatarShownToVisitor = async (db: Database, storageKey: string) => {
+  const [row] = await db
+    .select({ id: schema.profile.userId })
+    .from(schema.profile)
+    .innerJoin(schema.user, eq(schema.user.id, schema.profile.userId))
+    .where(
+      and(
+        eq(schema.profile.avatarKey, storageKey),
+        sql`(${publicPageOpen()} or (select 1 from ${schema.project}
+          where ${schema.project.authorId} = ${sql.raw('"profile"."user_id"')}
+          and ${visitorVisibleProject()} limit 1) is not null)`,
+      ),
+    )
+    .limit(1)
+  return row !== undefined
+}
+
+/**
+ * Un fichier ouvert par un visiteur (R12, décision 3 de la relecture du plan) : jamais dans un cache
+ * partagé (`private`), et pas plus de 60 secondes dans son navigateur : quand le projet ou la page
+ * cesse d'être public, l'accès cesse pour tout nouveau visiteur à l'instant, et en une minute au plus
+ * pour celui qui l'a déjà ouvert.
+ */
+const VISITOR_CACHE = 'private, max-age=60'
+
 export const mediaRoutes = ({ db, storage }: Deps) => {
   const app = new Hono<AppEnv>()
 
@@ -161,7 +212,25 @@ export const mediaRoutes = ({ db, storage }: Deps) => {
     const notFound = () => c.json(errorBody(languageOf(c), 'not_found'), 404)
     // c.get('user') : le membre connecté, retrouvé par le middleware de session (voir app.ts).
     const user = c.get('user')
-    if (!user) return notFound()
+    if (!user) {
+      // R12 : un visiteur sans compte, seulement pour les photos de projet et les photos de profil
+      // montrées par une page publique. Ni `withheld`, ni `testers` : toujours le 404 d'un inconnu.
+      const folder = c.req.param('folder')
+      const key = `${folder}/${c.req.param('file')}`
+      if (!['avatars', 'visuals'].includes(folder) || !isValidKey(key)) return notFound()
+      const shown =
+        folder === 'visuals'
+          ? await isVisualVisibleToVisitor(db, key)
+          : await isAvatarShownToVisitor(db, key)
+      if (!shown) return notFound()
+      const data = await storage.get(key)
+      if (!data) return notFound()
+      return c.body(new Uint8Array(data), 200, {
+        'Content-Type': 'image/webp',
+        'Cache-Control': VISITOR_CACHE,
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+      })
+    }
 
     const folder = c.req.param('folder')
     // R9 : une photo de profil retirée, pour son auteur seul ; elle est rangée sous son ancienne
