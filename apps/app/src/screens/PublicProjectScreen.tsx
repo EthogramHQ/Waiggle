@@ -164,6 +164,9 @@ function PublicProjectView({ project }: { project: PublicProject }) {
       id: project.author.id,
       name: project.author.name,
       avatarUrl: project.author.avatarUrl,
+      // R12b : le compte d'exemples, repris tel quel (champ absent pour tout autre auteur) ;
+      // l'en-tête y pose « Exemple » et la phrase qui dit le projet fictif.
+      ...(project.author.example ? { example: true as const } : null),
     },
     title: project.title,
     pitch: project.pitch,

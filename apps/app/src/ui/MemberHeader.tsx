@@ -1,10 +1,12 @@
 // L'en-tête de la page d'un membre : son avatar, son nom et son pseudo, sa bio et ses outils
 // favoris, chacun menant à la page de son étiquette (un « Autre », hors du catalogue, en texte
-// simple : R6b).
+// simple : R6b). Le compte d'exemples de l'équipe (R12b) : « Exemple » à côté du nom, et dessous la
+// phrase qui dit ses projets fictifs.
 import { readableWidth } from '@ruche/brand'
 import type { ReactNode, Ref } from 'react'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
+import { ExampleBadge } from './ExampleBadge'
 import type { Focusable } from './focus'
 import type { ImageSource } from './image'
 import { Stack } from './Stack'
@@ -40,6 +42,12 @@ type Props = {
    * n'est pas une étape du focus.
    */
   nameRef?: Ref<Focusable> | undefined
+  /**
+   * R12b, le compte d'exemples de l'équipe : la phrase dite sous le nom (« Les projets de ce compte
+   * sont fictifs… », déjà traduite par l'écran). Donnée, la pastille « Exemple » se pose aussi à
+   * côté du nom ; absente (tout autre membre), ni l'une ni l'autre.
+   */
+  exampleNote?: string | undefined
 }
 
 export function MemberHeader({
@@ -52,7 +60,20 @@ export function MemberHeader({
   action,
   heading = 1,
   nameRef,
+  exampleNote,
 }: Props) {
+  // Le nom du membre est le titre de sa page (niveau 1), ou celui de l'aperçu (2).
+  const title = (
+    <Text
+      variant="title1"
+      align="center"
+      heading={heading}
+      breakAnywhere
+      {...(nameRef ? { focusRef: nameRef } : null)}
+    >
+      {name}
+    </Text>
+  )
   return (
     <Stack gap="lg" align="center">
       <Avatar name={name} source={avatar} label={name} size={96} />
@@ -61,16 +82,20 @@ export function MemberHeader({
       <Stack gap="sm" align="stretch">
         {/* Le pseudo colle au nom (écart minimal) : il le précise, comme un second nom. */}
         <Stack gap="xxs" align="stretch">
-          {/* Le nom du membre est le titre de sa page (niveau 1), ou celui de l'aperçu (2). */}
-          <Text
-            variant="title1"
-            align="center"
-            heading={heading}
-            breakAnywhere
-            {...(nameRef ? { focusRef: nameRef } : null)}
-          >
-            {name}
-          </Text>
+          {/* R12b : le compte d'exemples, « Exemple » à côté du nom, sur une rangée centrée qui
+              passe à la ligne. Le nom garde toute la largeur s'il est long (`maxWidth`, il se
+              replie) et la pastille descend dessous ; une vue sans réglage l'entoure, pour que la
+              rangée la centre en hauteur sur le nom (elle-même se range en haut, `alignSelf`). */}
+          {exampleNote ? (
+            <Stack direction="row" wrap justify="center" align="center" gap="sm">
+              <View style={{ flexShrink: 1, maxWidth: '100%' }}>{title}</View>
+              <View>
+                <ExampleBadge />
+              </View>
+            </Stack>
+          ) : (
+            title
+          )}
           {/* En discret (gris, plus petit) : le nom reste ce qu'on lit d'abord. Un pseudo n'a
               pas d'espace : breakAnywhere le coupe s'il dépasse, à texte agrandi. */}
           {handle ? (
@@ -79,6 +104,15 @@ export function MemberHeader({
             </Text>
           ) : null}
         </Stack>
+        {/* R12b : sous le nom, en discret (petit, gris), ce que la pastille ne dit pas : les
+            projets du compte sont fictifs. Avant la bio, à la même largeur de lecture. */}
+        {exampleNote ? (
+          <View style={{ maxWidth: readableWidth, alignSelf: 'center' }}>
+            <Text variant="caption" tone="muted" align="center">
+              {exampleNote}
+            </Text>
+          </View>
+        ) : null}
         {/* La bio garde une longueur de ligne confortable (readableWidth), centrée sous le nom. */}
         {bio ? (
           <View style={{ maxWidth: readableWidth, alignSelf: 'center' }}>

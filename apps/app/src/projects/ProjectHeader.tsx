@@ -1,7 +1,8 @@
 // L'en-tête de la page d'un projet (R5a, planche « Projet ») : le statut et, à côté, la catégorie
 // (R6a : « Cuisine · Famille et enfants ») et « Public » (R12), le titre, la ligne de dates
 // (« Publié le 3 oct. · Mis à jour hier » ; « Créé le … » pour un projet privé), l'auteur et sa
-// pastille « Suivre », puis le pitch. La page (ProjectScreen) le pose dans sa feuille sur téléphone,
+// pastille « Suivre », puis le pitch. R12b : pour un projet du compte d'exemples, « Exemple » après le
+// statut et, sous le pitch, la phrase qui dit le projet fictif. La page (ProjectScreen) le pose dans sa feuille sur téléphone,
 // dans la colonne de droite sur ordinateur.
 //
 // Trois exports :
@@ -20,6 +21,7 @@ import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { AuthorLine, type AuthorLineProps } from '../ui/AuthorLine'
 import { CategoryLine } from '../ui/CategoryLine'
+import { ExampleBadge } from '../ui/ExampleBadge'
 import type { Focusable } from '../ui/focus'
 import type { IconName } from '../ui/Icon'
 import { ProjectDatesLine } from '../ui/ProjectDatesLine'
@@ -196,6 +198,8 @@ export function ProjectHeaderView({
   const { t } = useTranslation()
   // Sans `categories`, pas d'étiquette : jamais un nom inventé.
   const category = categoryLine(t, categories?.primary, categories?.secondary)
+  // R12b : l'auteur est le compte d'exemples de l'équipe (`true`, sinon le champ est absent).
+  const example = project.author.example === true
   return (
     <Stack gap="md">
       {/* Le statut, puis la catégorie sur la même rangée (elle passe dessous si la place manque) :
@@ -205,6 +209,10 @@ export function ProjectHeaderView({
           label={t(($) => $.project.status[project.status])}
           strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
         />
+        {/* R12b : un projet du compte d'exemples porte « Exemple » juste après son statut, pour
+            membres et visiteurs. Le champ n'existe que sur l'auteur d'un tel compte (contrat
+            `ExampleFlag`) : tout autre projet ne montre rien de plus. */}
+        {example ? <ExampleBadge /> : null}
         {category ? (
           <CategoryLine {...category} onPress={onOpenCategory} href={categoryHref} />
         ) : null}
@@ -235,6 +243,14 @@ export function ProjectHeaderView({
       <Text variant="headline" tone="secondary" weight={400} readable>
         {project.pitch}
       </Text>
+      {/* R12b : sous l'en-tête, en discret (petit, gris), ce que la pastille ne dit pas : le
+          projet est fictif, créé par l'équipe pour montrer à quoi ressemble un projet. Une phrase
+          seule, sans icône : l'en-tête ne porte aucune autre note. */}
+      {example ? (
+        <Text variant="caption" tone="muted" readable>
+          {t(($) => $.project.page.exampleNote)}
+        </Text>
+      ) : null}
     </Stack>
   )
 }
