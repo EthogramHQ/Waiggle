@@ -185,6 +185,9 @@ function PublicMemberView({
         avatar={toSource(member.avatarUrl)}
         bio={member.bio ?? ''}
         nameRef={preview ? nameRef : undefined}
+        // R12b : le compte d'exemples de l'équipe, comme sur la page d'un membre : « Exemple » à
+        // côté du nom, et dessous la phrase qui dit ses projets fictifs.
+        exampleNote={member.example ? t(($) => $.member.exampleNote) : undefined}
         toolsTitle={t(($) => $.member.favoriteTools)}
         // Des pastilles sans `onPress` : la page d'un outil est réservée aux membres. Un « autre
         // outil », hors du catalogue, reste marqué comme tel (`inCatalogue`).

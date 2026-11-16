@@ -18,6 +18,7 @@ import {
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL } from 'drizzle-orm'
+import { isExampleAccountSql, withExampleFlag } from '../accounts/example'
 import { commentCountsOf } from '../comments/load'
 import { projectFollowStates } from '../follows/load'
 import { avatarUrlOf } from '../profile/me'
@@ -100,12 +101,16 @@ export const toolsOfProjects = async (
 // sort que pour un lecteur qui voit déjà le projet : chaque lecture choisit ses lignes par la règle
 // commune (projects/visibility.ts), et seuls l'auteur et les membres de la ruche voient un projet
 // réservé.
+// R12b : et si son auteur est un compte d'exemples (pastille « Exemple ») : un `exists` sur la clé
+// primaire d'`example_account`, dans la même requête (accounts/example.ts) ; toutes les cartes et
+// pages de projets d'un membre passent par ici, et le reçoivent sans requête de plus.
 export const selectProjects = (db: Database) =>
   db
     .select({
       project: schema.project,
       authorName: schema.user.name,
       authorAvatarKey: schema.profile.avatarKey,
+      authorExample: isExampleAccountSql(schema.project.authorId),
       hiveName: schema.hive.name,
       hiveNameRemovalId: schema.hive.nameRemovalId,
     })
@@ -172,7 +177,7 @@ const toProjectBase = (
   publicApiUrl: string,
   photosFor: string | null,
 ): ProjectBase => {
-  const { project, authorName, authorAvatarKey } = row
+  const { project, authorName, authorAvatarKey, authorExample } = row
   const media = allMedia.filter(
     (m) =>
       m.projectId === project.id &&
@@ -183,11 +188,15 @@ const toProjectBase = (
   )
   return {
     id: project.id,
-    author: {
-      id: project.authorId,
-      name: authorName,
-      avatarUrl: avatarUrlOf(publicApiUrl, authorAvatarKey),
-    },
+    // R12b : `example: true` pour un compte d'exemples seulement ; absent pour tout autre auteur.
+    author: withExampleFlag(
+      {
+        id: project.authorId,
+        name: authorName,
+        avatarUrl: avatarUrlOf(publicApiUrl, authorAvatarKey),
+      },
+      authorExample,
+    ),
     title: project.title,
     pitch: project.pitch,
     description: project.description,

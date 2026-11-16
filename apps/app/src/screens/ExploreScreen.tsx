@@ -318,6 +318,8 @@ function Featured() {
           }}
           onPress={() => router.push({ pathname: '/projects/[id]', params: { id: item.id } })}
           size="carousel"
+          // R12b : « Exemple » sur le projet d'un compte d'exemples, mis à la une comme un autre.
+          example={item.author.example === true}
         />
       ))}
     </Carousel>
@@ -385,6 +387,8 @@ function Testers() {
           key={project.id}
           title={project.title}
           author={project.author.name}
+          // R12b : « Exemple » sur un projet du compte d'exemples de l'équipe.
+          example={project.author.example === true}
           image={
             project.cover
               ? {

@@ -4,6 +4,7 @@
 // quitter la vitrine (« Retirer de l'accueil ») : une nouvelle mise en avant de ce projet est alors
 // refusée (409 `author_declined`, relecture juridique du plan, décision 18).
 import { z } from 'zod'
+import { ExampleFlag } from './example'
 import { ProjectId, ProjectStatus, PublicVisual } from './projects'
 
 /** Au plus quatre projets dans la vitrine : trois se montrent sur téléphone, quatre sur ordinateur. */
@@ -22,7 +23,12 @@ export const ShowcaseItem = z
     status: ProjectStatus,
     /** La première photo de la galerie ; null : pas de photo, l'appli montre sa tuile. */
     cover: PublicVisual.nullable(),
-    author: z.strictObject({ name: z.string(), avatarUrl: z.url().nullable() }),
+    /** `example` (R12b) : `true` pour un compte d'exemples, absent sinon. */
+    author: z.strictObject({
+      name: z.string(),
+      avatarUrl: z.url().nullable(),
+      example: ExampleFlag,
+    }),
   })
   .meta({ id: 'ShowcaseItem' })
 export type ShowcaseItem = z.infer<typeof ShowcaseItem>

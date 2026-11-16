@@ -109,6 +109,57 @@ export const showcase: ShowcaseItem[] = [
   card(cafesId, 'Carnet de cafés', 'Léa Moreau'),
 ]
 
+// --- R12b : le compte d'exemples, vu par un visiteur ---
+
+export const exampleId = 'u-example'
+export const exampleProjectId = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60789'
+/** Le nom du compte de l'équipe (scénario R12b). */
+export const exampleName = 'WaiggleBot'
+
+/** Un projet d'exemple public : `example: true` sur son auteur, le seul changement. */
+export const examplePublicProject: PublicProject = {
+  ...decollage,
+  id: exampleProjectId,
+  author: { id: exampleId, name: exampleName, avatarUrl: null, publicPage: true, example: true },
+  title: 'Le carnet des plantes',
+  pitch: 'Une photo d’une feuille, et l’appli dit quelle plante arroser.',
+  description: 'On photographie une feuille ; l’agent reconnaît la plante et dit quand l’arroser.',
+  visuals: [],
+  reactionCount: 7,
+  latestUpdate: null,
+  updateCount: 0,
+  latestUpdateAt: null,
+  version: null,
+}
+
+/** La carte de ce projet dans la vitrine. */
+export const exampleShowcaseItem: ShowcaseItem = {
+  id: exampleProjectId,
+  title: examplePublicProject.title,
+  pitch: examplePublicProject.pitch,
+  status: 'testable',
+  cover: null,
+  author: { name: exampleName, avatarUrl: null, example: true },
+}
+
+/** La page publique du compte d'exemples. */
+export const examplePublicMember: PublicMember = {
+  id: exampleId,
+  name: exampleName,
+  avatarUrl: null,
+  bio: 'Des projets pour montrer à quoi ressemble un projet.',
+  projects: [
+    {
+      id: exampleProjectId,
+      title: examplePublicProject.title,
+      pitch: examplePublicProject.pitch,
+      status: 'testable',
+      cover: null,
+    },
+  ],
+  example: true,
+}
+
 /** La page publique d'Inès, toutes cases cochées (abonnés compris). */
 export const inesPublic: PublicMember = {
   id: inesId,
@@ -208,9 +259,15 @@ export const publicServer = {
 
   reset() {
     this.sent = []
-    this.projects = new Map([[decollageId, decollage]])
+    this.projects = new Map([
+      [decollageId, decollage],
+      [exampleProjectId, examplePublicProject],
+    ])
     this.updates = new Map([[decollageId, [countdownUpdate]]])
-    this.members = new Map([[inesId, inesPublic]])
+    this.members = new Map([
+      [inesId, inesPublic],
+      [exampleId, examplePublicMember],
+    ])
     this.targets = new Map([
       [`project:${decollageId}`, decollageTarget],
       [`update:${updateId}`, updateTarget],

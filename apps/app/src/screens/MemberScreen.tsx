@@ -415,6 +415,9 @@ function MemberView({ member }: { member: Member }) {
         handle={t(($) => $.member.handle, { handle })}
         avatar={toSource(member.avatarUrl)}
         bio={member.bio}
+        // R12b : le compte d'exemples de l'équipe (`example`, absent pour tout autre membre) :
+        // « Exemple » à côté du nom, et dessous la phrase qui dit ses projets fictifs.
+        exampleNote={member.example ? t(($) => $.member.exampleNote) : undefined}
         toolsTitle={t(($) => $.member.favoriteTools)}
         tools={member.favoriteTools.map((tool) => ({
           label: tool.label,

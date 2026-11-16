@@ -83,6 +83,8 @@ import { CommentMentionsCatalogue } from './commentaires-mentions'
 import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
 import { EntryCatalogue } from './entrer'
+import { ExampleCardsCatalogue } from './exemples-cartes'
+import { ExamplePagesCatalogue } from './exemples-pages'
 import { ExploreCatalogue } from './explorer'
 import { UpdateSheetCatalogue } from './feuille-mise-a-jour'
 import { SheetsCatalogue } from './feuilles'
@@ -892,6 +894,12 @@ export function CatalogueScreen() {
       <ProjectFrameCatalogue />
       <GalleryCatalogue />
       <ProjectPartsCatalogue />
+      {/* Tranche R12b : les en-têtes d'un projet d'exemple et du compte d'exemples
+          (exemples-pages.tsx). */}
+      <ExamplePagesCatalogue />
+      {/* Tranche R12b : la pastille « Exemple » et les cartes d'un projet d'exemple
+          (exemples-cartes.tsx). */}
+      <ExampleCardsCatalogue />
       {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
           son issue (projet-categorie.tsx). */}
       <ProjectCategoryCatalogue />

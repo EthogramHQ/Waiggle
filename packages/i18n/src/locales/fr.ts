@@ -18,6 +18,8 @@ export const fr = {
     loading: 'Chargement…',
     crashed: 'Cette page n’a pas pu s’afficher.',
     retry: 'Réessayer',
+    /** R12b : la pastille d’un projet ou d’un compte d’exemples (fictifs). */
+    example: 'Exemple',
     back: 'Retour',
     cancel: 'Annuler',
     /** Le bouton qui ferme une feuille ou une fenêtre (R2). */
@@ -1465,6 +1467,9 @@ export const fr = {
       loading: 'Chargement des commentaires…',
     },
     page: {
+      /** R12b : sous l’en-tête d’un projet d’un compte d’exemples. */
+      exampleNote:
+        'Projet fictif, créé par l’équipe de {{appName}} pour montrer à quoi ressemble un projet.',
       published: 'publié le {{date}}',
       /** R4 : la date relative après le verbe (« publié hier », « publié le 12 oct. » : jur-J2). */
       publishedWhen: 'publié {{when}}',
@@ -2428,6 +2433,9 @@ export const fr = {
     provisionalNameValue: 'Membre',
   },
   member: {
+    /** R12b : sous le nom d’un compte d’exemples, sur sa page. */
+    exampleNote:
+      'Les projets de ce compte sont fictifs : l’équipe de {{appName}} les a créés pour montrer à quoi ressemble un projet.',
     // {{nameOf}} : « d’Inès », « de Léa » (nameOf de @ruche/i18n, tranche 6c).
     open: 'Voir la page {{nameOf}}',
     handle: '@{{handle}}',

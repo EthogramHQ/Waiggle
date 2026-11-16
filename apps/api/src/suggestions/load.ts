@@ -2,15 +2,16 @@
 // qui ont publié récemment, chacun avec son dernier projet public ; jamais lui-même, ni quelqu'un
 // qu'il suit, qu'il a écarté (« × »), qu'il a bloqué ou qui l'a bloqué. L'ordre ne dépend que de la
 // date du dernier projet, jamais de la popularité (relecture juridique jur-J5). R10 : les membres
-// des ruches du lecteur passent d'abord, et jamais un membre qui a choisi de ne pas être proposé. Les
-// routes sont dans routes/suggestions.ts.
+// des ruches du lecteur passent d'abord, et jamais un membre qui a choisi de ne pas être proposé.
+// R12b : jamais un compte d'exemples. Les routes sont dans routes/suggestions.ts.
 import {
   type DismissedSuggestionExport,
   SUGGESTION_MAX,
   type SuggestedMember,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, ne, not, sql } from 'drizzle-orm'
+import { isExampleAccountSql } from '../accounts/example'
 import { blockedWith } from '../blocks/visibility'
 import { currentHandleOf } from '../handles/load'
 import { describeError } from '../log'
@@ -117,6 +118,11 @@ const suggestedProjectIds = async (
           // un membre sans ligne de profil n'a rien choisi. Après la fenêtre, comme les autres
           // exclusions : elle ne fait pas lire plus de lignes d'index.
           sql`not exists (select 1 from ${schema.profile} where ${schema.profile.userId} = ${latest.authorId} and ${schema.profile.hideFromSuggestions})`,
+          // R12b : jamais un compte d'exemples, ni à personne (accounts/example.ts). Clé primaire
+          // d'example_account (user_id), une lecture par auteur gardé ; après la fenêtre, comme
+          // les autres exclusions. Ses projets récents occupent donc des places de la fenêtre : c'est
+          // le prix d'une fenêtre qui reste 200 lignes d'index, quel que soit le lecteur.
+          not(isExampleAccountSql(latest.authorId)),
           sql`not exists (select 1 from ${f} where ${f.followerId} = ${viewerId} and ${f.memberId} = ${latest.authorId})`,
           sql`not exists (select 1 from ${d} where ${d.memberId} = ${viewerId} and ${d.dismissedId} = ${latest.authorId})`,
         ),

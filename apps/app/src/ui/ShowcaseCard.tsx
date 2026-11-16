@@ -19,10 +19,17 @@
 // font grandir la carte au lieu de faire passer le panneau par-dessus le statut.
 //
 // Elle ne connaît pas l'API : l'écran lui donne des textes prêts (le statut traduit) et la photo.
+//
+// R12b (« Les exemples ») : le projet d'un compte d'exemples (`example`) porte la pastille
+// « Exemple » à côté de son statut ; elle décrit le lien elle aussi, entre le statut et l'auteur
+// (« Testable, Exemple, WaiggleBot »), pour qu'un lecteur d'écran ne prenne pas le projet pour un
+// vrai.
 import { layout, type ShadowName, space } from '@ruche/brand'
 import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
+import { ExampleBadge } from './ExampleBadge'
 import type { ImageSource } from './image'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
@@ -44,6 +51,11 @@ type Props = {
   onPress: () => void
   /** carousel : largeur fixe, dans une bande qui défile ; fill : une part égale de la rangée. */
   size?: 'carousel' | 'fill'
+  /**
+   * R12b : l'auteur est un compte d'exemples (`example: true` du contrat) ; la carte porte alors
+   * « Exemple » à côté du statut. Absent ou faux : rien.
+   */
+  example?: boolean
 }
 
 /**
@@ -71,11 +83,23 @@ export const SHOWCASE_CARD_SHADOW = 'card' as const satisfies ShadowName
 /** La photo de l'auteur, à la hauteur de la ligne de son nom (caption). */
 const AVATAR_SIZE = 18
 
-export function ShowcaseCard({ title, author, image, status, onPress, size = 'carousel' }: Props) {
-  // Les identifiants des deux textes qui décrivent le lien (le statut, puis l'auteur).
+export function ShowcaseCard({
+  title,
+  author,
+  image,
+  status,
+  onPress,
+  size = 'carousel',
+  example = false,
+}: Props) {
+  // Les identifiants des textes qui décrivent le lien : le statut, « Exemple » s'il est là, puis
+  // l'auteur, dans l'ordre où l'œil les lit.
+  const { t } = useTranslation()
   const unique = useId()
   const statusId = `showcase-status-${unique}`
+  const exampleId = `showcase-example-${unique}`
   const authorId = `showcase-author-${unique}`
+  const describedIds = [statusId, example ? exampleId : null, authorId].filter(Boolean).join(' ')
   const { width, height } = SIZES[size]
   return (
     <View
@@ -91,7 +115,10 @@ export function ShowcaseCard({ title, author, image, status, onPress, size = 'ca
         label={title}
         role="link"
         onPress={onPress}
-        describedBy={`${statusId} ${authorId}`}
+        describedBy={describedIds}
+        // Sur téléphone, `describedBy` ne vaut rien (aria.ts) : « Exemple » passe par l'indice du
+        // lien, comme dans TesterCard (relecture de l'interface de R12b).
+        {...(example ? { hint: t(($) => $.common.example) } : null)}
         radius="sheet"
       >
         <ProjectCover
@@ -110,7 +137,12 @@ export function ShowcaseCard({ title, author, image, status, onPress, size = 'ca
               gap: space.sm,
             }}
           >
-            <StatusPill label={status.label} strong={status.strong} nativeID={statusId} />
+            {/* Le statut et « Exemple » côte à côte ; sur une carte étroite ou à texte agrandi,
+                « Exemple » passe sous le statut plutôt que de déborder. */}
+            <Row gap="xs" align="start" wrap>
+              <StatusPill label={status.label} strong={status.strong} nativeID={statusId} />
+              {example ? <ExampleBadge nativeID={exampleId} /> : null}
+            </Row>
             <Surface variant="panel" radius="panel" padding="md" gap="xs">
               <Text variant="callout" weight={700} numberOfLines={2}>
                 {title}

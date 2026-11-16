@@ -37,6 +37,11 @@
 //   rebours… », relecture du plan, interface B4) ;
 // - `badge`, ailleurs (Découvrir, recherche, page d'un membre) : la pastille seule, dans la rangée
 //   du bas, à côté du statut ; la date de publication et l'accroche restent (décision du 10/11/2026).
+//
+// R12b (« Les exemples ») : le projet d'un compte d'exemples (`example`) porte la pastille
+// « Exemple » juste après son statut, dans la rangée du bas. Comme le statut, elle est hors du lien
+// de la carte : un lecteur d'écran la lit à son tour, sur le web comme sur téléphone (un lien de
+// téléphone ne se lit que par son nom et son indice, jamais par les textes qu'il contient).
 import { layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import { type ReactNode, type Ref, useId, useState } from 'react'
@@ -45,6 +50,7 @@ import { type LayoutChangeEvent, Platform, Pressable, View, type ViewStyle } fro
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Avatar } from './Avatar'
 import { describedBy } from './aria'
+import { ExampleBadge } from './ExampleBadge'
 import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
@@ -108,6 +114,11 @@ type Props = {
   tryIt?: { label: string; onPress?: (() => void) | undefined }
   /** Une pastille de plus, à côté du statut (« Privé »). */
   badge?: string
+  /**
+   * R12b : l'auteur est un compte d'exemples (`example: true` du contrat) ; « Exemple » suit alors
+   * le statut. Absent ou faux : rien.
+   */
+  example?: boolean
   /** Le total des réactions (« ✦ 49 », lu « 49 réactions ») ; rien à 0. */
   reactionTotal?: number
   /** Toute la carte devient un lien vers le projet ; son nom est le titre du projet. */
@@ -205,6 +216,7 @@ export function ProjectCard({
   status,
   tryIt,
   badge,
+  example = false,
   reactionTotal = 0,
   onPress,
   height = PROJECT_CARD_HEIGHT,
@@ -513,6 +525,12 @@ export function ProjectCard({
       <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
         <StatusPill label={status.label} strong={status.strong} />
       </View>
+      {/* R12b : « Exemple » juste après le statut, qu'il nuance (le projet est fictif). */}
+      {example ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <ExampleBadge />
+        </View>
+      ) : null}
       {badge ? (
         <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
           <StatusPill label={badge} />

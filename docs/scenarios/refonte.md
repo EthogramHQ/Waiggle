@@ -3952,3 +3952,55 @@ Hors de R12, et où ça va :
   R9 (partie, puis motif) ;
 - `R12-Visiteur-Projet` : la description, la galerie, le prompt ; le nom de l'auteur sans lien ; la
   pastille « Public ».
+
+## R12b — Les exemples
+
+La vitrine de l'accueil reste vide tant qu'aucun membre n'a rendu un projet public. L'équipe publie
+donc des projets d'exemple, fictifs mais crédibles, depuis un compte à elle. Personne ne doit les
+prendre pour de vrais projets (décision du 16/11/2026).
+
+### Un compte d'exemples
+
+- Étant donné un compte vérifié de l'équipe (« WaiggleBot »)
+  Quand un administrateur du serveur lance `infra/mark-example.sh <son e-mail>`
+  Alors ce compte devient un compte d'exemples ; `--revoke` le rend ordinaire.
+- Aucun écran de l'appli ne donne ni ne retire ce marquage.
+
+### Ce que voient les membres et les visiteurs
+
+- Étant donné un projet d'un compte d'exemples
+  Quand il s'affiche (vitrine de l'accueil, « À la une », Fil, Explorer, recherche, page d'un
+  membre, page du projet, pour un membre comme pour un visiteur)
+  Alors une pastille « Exemple » l'accompagne, à côté de son statut ou du nom de l'auteur.
+- Sur la page du projet, sous son en-tête : « Projet fictif, créé par l'équipe de {{appName}} pour
+  montrer à quoi ressemble un projet. »
+- Sur la page du compte d'exemples, la pastille « Exemple » à côté du nom, et dessous : « Les
+  projets de ce compte sont fictifs : l'équipe de {{appName}} les a créés pour montrer à quoi
+  ressemble un projet. »
+- Un lecteur d'écran lit « Exemple » comme le reste du texte.
+
+### Ce qui ne les montre pas
+
+- Les moteurs de recherche : la tête d'un projet ou d'une page d'un compte d'exemples dit
+  `noindex`, et le plan du site ne les contient pas.
+- Les e-mails « Découvertes » ne proposent pas les projets d'un compte d'exemples.
+- Les suggestions de personnes à suivre ne proposent pas un compte d'exemples.
+- Un membre qui suit le compte d'exemples voit ses projets dans son Fil, comme pour tout membre.
+
+### Le reste ne change pas
+
+Un projet d'exemple se signale, se modère et se met dans la vitrine comme les autres. Ses réactions
+et ses commentaires sont ceux de vrais membres.
+
+### Ce que l'équipe publie (relecture juridique de R12b)
+
+Des règles de contenu, sans code : l'équipe les suit en publiant.
+
+- Un projet d'exemple n'est jamais « Testable » et n'a pas de démo.
+- Il ne demande rien aux membres (ni conseil, ni astuce, ni test) : un vrai membre écrirait à
+  une personne qui n'existe pas.
+- Le compte d'exemples ne réagit pas, ne commente pas et ne suit personne. Si l'équipe répond à un
+  commentaire, c'est depuis son propre compte, au nom de l'équipe.
+- Ses projets comptent dans « Outils populaires » et dans le nombre de projets d'un outil, comme
+  ceux des membres : les outils d'un même éditeur n'apparaissent pas dans plus de 4 projets
+  d'exemple, pour ne pas faire le classement à la place des membres.

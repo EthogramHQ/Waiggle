@@ -6,7 +6,14 @@
 // contenu (une carte arrondie à 28) : sinon l'anneau restait carré autour d'une carte arrondie.
 import { layout, pressScale, type Radius, radii } from '@ruche/brand'
 import { isValidElement, type ReactNode, type Ref } from 'react'
-import { Pressable, type StyleProp, StyleSheet, type View, type ViewStyle } from 'react-native'
+import {
+  Platform,
+  Pressable,
+  type StyleProp,
+  StyleSheet,
+  type View,
+  type ViewStyle,
+} from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { enterActivates } from './keyboard'
@@ -25,6 +32,12 @@ type Props = {
   fill?: boolean
   /** Le `nativeID` d'un texte qui décrit l'élément, lu après son nom (voir aria.ts). */
   describedBy?: string
+  /**
+   * R12b : la même description sur téléphone, où `aria-describedby` n'existe pas : l'indice de
+   * l'élément (`accessibilityHint`), lu après son nom (« Exemple » sur une carte d'un compte
+   * d'exemples). Ignoré sur le web, où `describedBy` la donne déjà.
+   */
+  hint?: string
   /**
    * Le rayon du contenu, que l'anneau de focus doit suivre. Inutile si le contenu est une vue dont
    * le style porte déjà son rayon (`borderRadius`) : il y est lu.
@@ -56,6 +69,7 @@ export function Pressed({
   role = 'button',
   fill = false,
   describedBy,
+  hint,
   radius,
   ref,
   inset = false,
@@ -70,6 +84,7 @@ export function Pressed({
         accessibilityRole={role}
         accessibilityLabel={label}
         {...describedByProps(describedBy)}
+        {...(hint && Platform.OS !== 'web' ? { accessibilityHint: hint } : null)}
         // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
         {...(role === 'link' ? enterActivates(onPress) : null)}
         onPress={onPress}

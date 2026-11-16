@@ -116,6 +116,8 @@ function ShowcaseHome({ items, member }: ShowcaseHomeProps) {
       }}
       onPress={() => open(item.id)}
       size={compact ? 'carousel' : 'fill'}
+      // R12b : « Exemple » sur un projet fictif du compte d'exemples de l'équipe.
+      example={item.author.example === true}
     />
   ))
 

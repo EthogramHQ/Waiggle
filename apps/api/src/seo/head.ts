@@ -27,6 +27,7 @@ import {
 import { type Database, schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
 import { and, eq } from 'drizzle-orm'
+import { isExampleAccountSql } from '../accounts/example'
 import { visitorVisibleProject } from '../projects/visibility'
 import { loadPublicMember, toCards } from '../public/load'
 
@@ -81,6 +82,12 @@ type HeadContent = {
   image?: string
   ogType: 'website' | 'article' | 'profile'
   suffix: string
+  /**
+   * R12b : vrai pour un projet ou la page d'un compte d'exemples. La consigne aux moteurs devient
+   * `noindex` (ils ne gardent pas la page dans leurs résultats) ; le titre, l'aperçu et l'image
+   * restent ceux de la page, pour qu'un lien partagé s'affiche comme les autres.
+   */
+  noindex?: boolean
 }
 
 /** Une balise `<meta>` ; chaque valeur échappée. */
@@ -116,7 +123,8 @@ const pageHead = (content: HeadContent, lang: PublicLanguage, appUrl: string): s
   return [
     `<title>${escapeHead(content.title)}</title>`,
     ...(content.description ? [meta('name', 'description', content.description)] : []),
-    meta('name', 'robots', 'index, follow'),
+    // Une seule consigne aux moteurs : deux balises contradictoires les laisseraient choisir.
+    meta('name', 'robots', content.noindex ? 'noindex' : 'index, follow'),
     link({ rel: 'canonical', href: canonical }),
     ...LANGUAGES.map((other) =>
       link({ rel: 'alternate', hreflang: other, href: address(`/${other}`) }),
@@ -199,6 +207,9 @@ const projectContent = async (
       title: schema.project.title,
       pitch: schema.project.pitch,
       status: schema.project.status,
+      // R12b : l'auteur est-il un compte d'exemples ? Dans la même lecture (accounts/example.ts),
+      // par la clé primaire d'example_account : aucune requête de plus.
+      example: isExampleAccountSql(schema.project.authorId),
     })
     .from(schema.project)
     .where(and(eq(schema.project.id, id), visitorVisibleProject()))
@@ -214,6 +225,7 @@ const projectContent = async (
     ...(card?.cover && { image: card.cover.url }),
     ogType: 'article',
     suffix: `/projects/${row.id}${updates ? '/updates' : ''}`,
+    ...(row.example && { noindex: true }),
   }
 }
 
@@ -236,6 +248,8 @@ const memberContent = async (
     ...(member.avatarUrl && { image: member.avatarUrl }),
     ogType: 'profile',
     suffix: `/members/${member.id}`,
+    // R12b : la pastille lue par `loadPublicMember` (présente seulement pour un compte d'exemples).
+    ...(member.example && { noindex: true }),
   }
 }
 

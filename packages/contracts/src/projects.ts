@@ -2,6 +2,7 @@
 // Les règles de texte (longueurs, caractères interdits) viennent de text.ts, comme pour le profil.
 import { z } from 'zod'
 import { CategoryCode } from './categories'
+import { ExampleFlag } from './example'
 import { FollowState } from './follows'
 import { PublicLanguage } from './head'
 import { TOOL_MAX_LENGTH } from './profile'
@@ -282,6 +283,8 @@ export const ProjectAuthor = z.object({
   id: z.string(),
   name: z.string(),
   avatarUrl: z.url().nullable(),
+  /** R12b : `true` pour un compte d'exemples (pastille « Exemple »), absent sinon. */
+  example: ExampleFlag,
 })
 
 export const Project = z
@@ -492,6 +495,8 @@ export const PublicAuthor = z.strictObject({
   avatarUrl: z.url().nullable(),
   /** Vrai si sa page est publique : son nom mène alors à elle ; faux, il ne mène nulle part. */
   publicPage: z.boolean(),
+  /** R12b : `true` pour un compte d'exemples (pastille « Exemple »), absent sinon. */
+  example: ExampleFlag,
 })
 export type PublicAuthor = z.infer<typeof PublicAuthor>
 
