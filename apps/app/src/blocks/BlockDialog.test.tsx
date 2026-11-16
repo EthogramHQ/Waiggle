@@ -86,6 +86,16 @@ describe('BlockDialog (R9)', () => {
     expect(missingSentences(blockSentences(lea.handle), screen)).toEqual([])
   })
 
+  // R12 (« Les textes qui deviennent faux », Q19) : un projet public se voit sans compte, donc aussi
+  // de la personne bloquée ; la fenêtre le dit.
+  it('says that public projects stay visible to everyone, even without an account', async () => {
+    await renderDialog()
+
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.block.bullets.publicProjects))).length,
+    ).toBeGreaterThan(0)
+  })
+
   it('offers « Signaler aussi son profil », never checked beforehand', async () => {
     await renderDialog({ offerReport: true })
 

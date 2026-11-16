@@ -411,6 +411,14 @@ describe('the sheet « Nouvelle mise à jour »', () => {
     expect(shown(T.hintPrivate)).toBe(false)
   })
 
+  // R12 (Q19, relecture du plan UI B4) : la mise à jour d'un projet public se lit sans compte.
+  it('tells that everyone will read the update of a public project', async () => {
+    await openSheet({ ...recipesProject, visibility: 'web', hive: null })
+
+    expect(shown(fr.t(($) => $.project.updates.hintWeb))).toBe(true)
+    expect(shown(T.hintPublic)).toBe(false)
+  })
+
   it('tells that nobody else will see the update of a private project', async () => {
     await openSheet({ ...recipesProject, visibility: 'private' })
 
