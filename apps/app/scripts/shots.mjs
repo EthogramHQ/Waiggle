@@ -3475,7 +3475,16 @@ const withLeaPhoto = async (page) => {
   await page.reload({ waitUntil: 'networkidle' })
 }
 const pages = [
-  { name: 'catalogue', path: '/catalogue', signedIn: false, fullPage: true },
+  // `layoutWidths` : le relevé de mise en page (--layout) ne mesure le catalogue qu'aux largeurs d'un
+  // téléphone, où il trouve les composants trop serrés. Depuis R12, il est si long qu'à 768 px sa
+  // mesure dépasse la minute ; ses composants sont mesurés à toutes les largeurs dans leurs pages.
+  {
+    name: 'catalogue',
+    path: '/catalogue',
+    signedIn: false,
+    fullPage: true,
+    layoutWidths: [320, 360, 390, 430],
+  },
   // R12 (planches R12-Visiteur-Accueil et R12-Visiteur-Desktop) : l'accueil d'un visiteur est la
   // vitrine, à son adresse par langue : l'accroche, les boutons de compte, « Des projets à voir »
   // (trois cartes sur téléphone, quatre sur ordinateur), le pied avec « English ». Le Fil d'un
@@ -5458,7 +5467,7 @@ async function layoutReport() {
           `- **${width} px** : ${notes.length > 0 ? notes.join(' — ') : 'rien à signaler'}`,
         )
       }
-      for (const width of widths) {
+      for (const width of shot.layoutWidths ?? widths) {
         try {
           await withDeadline(measureWidth(width), PAGE_DEADLINE, `${shot.name} à ${width} px`)
         } catch (error) {
