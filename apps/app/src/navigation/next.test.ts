@@ -95,6 +95,45 @@ describe('safeNext', () => {
     expect(safeNext('/tags/node.js')).toBe('/tags/node.js')
   })
 
+  // R12 (relecture de l'interface du plan, C2) : « Se connecter » depuis la feuille « Compte requis »
+  // ramène au projet public, à l'adresse de sa langue (Q11), et le Fil a sa propre adresse.
+  it('returns to a public project address after signing in', () => {
+    for (const value of [
+      '/fr/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
+      '/en/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
+      '/fr/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f/updates',
+      '/fr/members/AbC123_xyz-9',
+      '/en/members/AbC123_xyz-9',
+    ]) {
+      expect(safeNext(value)).toBe(value)
+    }
+  })
+
+  it('returns to the feed, at its own address', () => {
+    expect(safeNext('/feed')).toBe('/feed')
+    expect(safeNext('/feed?hive=6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f')).toBe(
+      '/feed?hive=6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
+    )
+    expect(safeNext('/feedx')).toBeNull()
+  })
+
+  it('refuses a language address that is not a public project or page, however it is written', () => {
+    for (const value of [
+      '/de/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
+      '/fr/out?url=https://faux-waiggle.example',
+      '/fr/projects/../../out?url=https://faux-waiggle.example',
+      '/en/members/%2e%2e/%2e%2e/out',
+      '//fr/projects/x',
+      '/fr/sign-in',
+    ]) {
+      expect(safeNext(value)).toBeNull()
+    }
+    // Témoin : la même adresse, propre, est acceptée.
+    expect(safeNext('/fr/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f')).toBe(
+      '/fr/projects/6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
+    )
+  })
+
   it('refuses nothing and a very long path', () => {
     expect(safeNext(undefined)).toBeNull()
     expect(safeNext('')).toBeNull()

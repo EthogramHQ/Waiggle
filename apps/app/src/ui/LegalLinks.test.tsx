@@ -25,8 +25,10 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 const mockNavigate = jest.fn()
+// R12 : l'adresse de la page, que chaque test peut changer (`/fr/…` : une page publique à langue).
+let mockPathname = '/'
 jest.mock('expo-router', () => ({
-  usePathname: () => '/',
+  usePathname: () => mockPathname,
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
@@ -39,6 +41,7 @@ jest.mock('expo-router', () => ({
 
 let openURL: jest.SpyInstance
 beforeEach(() => {
+  mockPathname = '/'
   mockPush.mockReset()
   mockReplace.mockReset()
   mockNavigate.mockReset()
@@ -141,6 +144,32 @@ describe('LegalLinks (R11)', () => {
     }
     expect(paths()).toEqual(pages.map((page) => `/${page}`))
     expect(linkNamed(sourceCode)).toBeTruthy()
+  })
+
+  // R12 (relecture de l'interface du plan, C5) : au pied d'une page publique à langue (`/fr/…`,
+  // `/en/…`), les quatre pages ont l'adresse de cette langue (`publicPath`) ; ailleurs (pages des
+  // membres, réglages), leurs adresses d'aujourd'hui (le premier test de ce fichier).
+  it('links to the legal pages in the language of the page', async () => {
+    mockPathname = '/en/projects/d1e2c3a4-5b6c-4d7e-8f90-a1b2c3d4e5f6'
+    await renderWithProviders(<LegalLinks variant="footer" />, 'en')
+
+    const en = createI18n('en')
+    for (const page of pages) {
+      const link = screen.getByRole('link', { name: en.t(($) => $.legal.links[page]) })
+      expect(hrefOf(link.props.href)).toBe(`/en/${page}`)
+      await fireEvent.press(link)
+    }
+    expect(paths()).toEqual(pages.map((page) => `/en/${page}`))
+  })
+
+  it('on a French legal page, links to the three other pages in French', async () => {
+    mockPathname = '/fr/privacy'
+    await renderWithProviders(<LegalLinks variant="footer" current="privacy" />)
+
+    for (const page of pages.filter((one) => one !== 'privacy')) {
+      const link = screen.getByRole('link', { name: pageNames[page] })
+      expect(hrefOf(link.props.href)).toBe(`/fr/${page}`)
+    }
   })
 
   it('names the links in English for an English reader', async () => {
