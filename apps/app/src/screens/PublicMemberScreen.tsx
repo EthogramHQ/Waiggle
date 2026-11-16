@@ -73,7 +73,8 @@ const PREVIEW_FALLBACK: Href = '/settings/public-page'
 
 export function PublicMemberScreen({ id, preview = false, onClose }: Props) {
   const lang = usePageLanguage()
-  const member = usePublicMember(id)
+  // L'aperçu lit sa propre copie, toujours neuve (public/api.ts) : jamais la page d'avant un réglage.
+  const member = usePublicMember(id, true, preview)
   // Sans page d'avant, « Revenir » mène à l'accueil dans la langue de la page : le Fil d'un membre
   // serait « Réservé aux membres » pour un visiteur.
   const fallback = preview ? PREVIEW_FALLBACK : publicPath('home', lang)

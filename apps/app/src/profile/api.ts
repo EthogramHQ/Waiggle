@@ -127,10 +127,14 @@ export const usePublicPageChange = () => {
       })
     },
     onSettled: () => {
+      // Après **chaque** changement (relecture de sécurité R12) : la page publique lue n'est plus
+      // sûre. `resetQueries` la vide (aucun écran ne montre plus l'ancienne) et relit celle qu'un
+      // écran montre, l'aperçu ouvert pendant que le changement partait compris. `removeQueries`
+      // ne suffisait pas : il oublie la lecture sans prévenir l'écran qui la montre.
+      void queryClient.resetQueries({ queryKey: ['public', 'member'] })
       // « 1 » : le changement qui se termine est encore compté.
       if (queryClient.isMutating({ mutationKey }) > 1) return
       void queryClient.invalidateQueries({ queryKey: myPublicPageKey })
-      queryClient.removeQueries({ queryKey: ['public', 'member'] })
     },
   })
   const { mutate, reset } = mutation

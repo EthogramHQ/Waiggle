@@ -1774,7 +1774,8 @@ export const fr = {
       notTold: 'Aucun message ne lui est envoyé.',
       moderation: 'La modération n’est pas prévenue.',
       // R12 (Q19) : un projet public reste visible sans compte, donc aussi de la personne bloquée.
-      publicProjects: 'Tes projets publics restent visibles de tous, même sans compte.',
+      publicProjects:
+        'Tes projets publics et ta page publique, si tu en as, restent visibles de tous, même sans compte.',
     },
     fullText: 'Ce que change le blocage',
     alsoReport: 'Signaler aussi son profil',
@@ -3600,6 +3601,9 @@ export const fr = {
     // R12 (planche R12-Vitrine, encart) : un projet mis sur l'accueil par la modération ; son auteur
     // peut l'en retirer (Q9). Signé de {{appName}}, jamais de l'administrateur.
     showcaseAdded: '<b>{{title}}</b> est sur l’accueil de {{appName}}',
+    // Relecture juridique R12, point 1 : la même ligne, au passé, quand le projet n'est plus sur
+    // l'accueil (refus de l'auteur, retrait, sortie de « Public ») : un texte d'état change avec lui.
+    showcaseWas: '<b>{{title}}</b> a été sur l’accueil de {{appName}}',
     showcaseLeave: 'Retirer de l’accueil',
     showcaseLeft: 'Ton projet a quitté l’accueil. Il reste public.',
     showcaseLeaveError: 'Le projet n’a pas pu quitter l’accueil. Réessaie.',

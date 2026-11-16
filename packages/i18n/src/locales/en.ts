@@ -1464,7 +1464,8 @@ export const en: Translation = {
       follows: 'Your follows of each other are removed.',
       notTold: 'No message is sent to them.',
       moderation: 'The moderation isn’t told.',
-      publicProjects: 'Your public projects stay visible to everyone, even without an account.',
+      publicProjects:
+        'Your public projects and your public page, if you have them, stay visible to everyone, even without an account.',
     },
     fullText: 'What blocking changes',
     alsoReport: 'Also report their profile',
@@ -2957,6 +2958,7 @@ export const en: Translation = {
     hiveDeleted: 'The <b>{{hive}}</b> hive has been deleted.',
     hivePrivateAgain: 'Your projects kept for the hive are private again.',
     showcaseAdded: '<b>{{title}}</b> is on the {{appName}} home page',
+    showcaseWas: '<b>{{title}}</b> was on the {{appName}} home page',
     showcaseLeave: 'Remove from the home page',
     showcaseLeft: 'Your project left the home page. It stays public.',
     showcaseLeaveError: 'The project couldn’t leave the home page. Try again.',

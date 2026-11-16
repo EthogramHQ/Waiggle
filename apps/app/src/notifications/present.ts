@@ -485,9 +485,15 @@ export const presentNotification = (
       // « Retirer de l'accueil » n'est pas un lien vers une page mais une écriture (plan R12,
       // décision 18) : l'écran la pose lui-même sous la ligne, tant que `onShowcase` est vrai, car
       // elle demande un hook et un état que ce fichier de fonctions pures ne peut pas porter.
-      const { project } = notification
+      // Le temps suit l'état (relecture juridique R12, point 1) : « est sur l'accueil » tant que le
+      // projet y est, « a été sur l'accueil » dès qu'il n'y est plus (refus de l'auteur, retrait par
+      // la modération, sortie de « Public »). Sinon l'auteur qui a refusé croirait son refus perdu.
+      const { project, onShowcase } = notification
       const said = say({ title: project.title }, (params) =>
-        t(($) => $.notifications.showcaseAdded, params as { title: string }),
+        t(
+          ($) => (onShowcase ? $.notifications.showcaseAdded : $.notifications.showcaseWas),
+          params as { title: string },
+        ),
       )
       return {
         ...plain,
