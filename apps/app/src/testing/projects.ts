@@ -153,6 +153,46 @@ export const leaPage: Member = {
   moderation: null,
 }
 
+// --- R12b : un compte d'exemples ---
+
+/**
+ * L'auteur des projets d'exemple (tranche R12b) : le compte de l'équipe, marqué par
+ * `infra/mark-example.sh`. Le contrat dit `example: true` pour lui seul ; tout autre auteur n'a
+ * pas le champ (Léa, `recipesProject`).
+ */
+export const exampleAuthor: Project['author'] = {
+  id: 'u-example',
+  name: 'WaiggleBot',
+  avatarUrl: null,
+  example: true,
+}
+
+/** Un projet d'exemple, fictif mais crédible, vu par Léa (elle n'en est pas l'autrice). */
+export const exampleProject: Project = {
+  ...recipesProject,
+  id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60789',
+  author: exampleAuthor,
+  title: 'Le carnet des plantes',
+  pitch: 'Une photo d’une feuille, et l’appli dit quelle plante arroser.',
+  description: 'On photographie une feuille ; l’agent reconnaît la plante et dit quand l’arroser.',
+  primaryCategory: 'home-garden',
+  secondaryCategory: null,
+  isMine: false,
+}
+
+/** La page du compte d'exemples, vue par Léa : son nom, sa bio, ses projets fictifs. */
+export const examplePage: Member = {
+  ...leaPage,
+  id: exampleAuthor.id,
+  name: exampleAuthor.name,
+  handle: 'waigglebot',
+  bio: 'Des projets pour montrer à quoi ressemble un projet.',
+  favoriteTools: [],
+  followerCount: 0,
+  projects: [summaryOf(exampleProject)],
+  example: true,
+}
+
 /**
  * La page de Léa vue par un membre qui l'a bloquée (tranche 7b) : l'en-tête seul (nom, pseudo,
  * photo), pour la débloquer ou signaler son profil. L'API ne donne ni bio, ni outils, ni projets,
