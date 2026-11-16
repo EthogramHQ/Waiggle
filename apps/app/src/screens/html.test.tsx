@@ -53,10 +53,13 @@ describe('the HTML served for every page', () => {
 
   it('prepares no page per project in advance, which would write its title in the HTML', () => {
     // generateStaticParams demanderait à Expo Router une page HTML par projet, titre compris.
+    // Depuis R12 (relecture du plan, B1, décision 8), une seule exception : la mise en page des
+    // adresses par langue prépare chaque page en français et en anglais, rien de plus (ses valeurs
+    // sont vérifiées par src/i18n/pageLanguage.test.tsx : `fr` et `en`, jamais un identifiant).
     expect(appSources.map(nameOf)).toContain('app/projects/[id]/index.tsx') // témoin
     const prepared = appSources
       .filter((path) => read(path).includes('generateStaticParams'))
       .map(nameOf)
-    expect(prepared).toEqual([])
+    expect(prepared).toEqual(['app/[lang]/_layout.tsx'])
   })
 })

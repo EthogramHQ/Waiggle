@@ -10,7 +10,7 @@
 // Même idée que TabBarHost (ui/TabBar.tsx) : un cadre posé une fois, qui rend un service aux écrans
 // par un contexte, et un hook pour savoir s'il est là (useHasAmbientHost).
 import type { ReactNode } from 'react'
-import { type ColorValue, View } from 'react-native'
+import { type ColorValue, Platform, View } from 'react-native'
 import { AmbientLight } from './AmbientLight'
 import { AmbientHostProvider, useAmbientSource } from './theme/ambient'
 import { useTheme } from './theme/ThemeProvider'
@@ -21,6 +21,20 @@ import { useTheme } from './theme/ThemeProvider'
  * de l'appli (ui-15 : la mise en page n'écrit aucune couleur).
  */
 export const hostedStackStyle = { backgroundColor: 'transparent' } as const
+
+/**
+ * Les options de toute pile de pages (`screenOptions` d'un `Stack`) : sans en-tête (chaque écran
+ * pose sa barre, ui/Screen.tsx) ; sur le web, transparentes au-dessus de l'hôte ; sur téléphone, au
+ * fond de l'appli. La pile de la racine (app/_layout.tsx) et celle des pages à adresse par langue
+ * (app/[lang]/_layout.tsx, R12) les partagent : une page publique se dessine comme les autres.
+ */
+export const usePageStackOptions = () => {
+  const { colors } = useTheme()
+  return {
+    headerShown: false,
+    contentStyle: Platform.OS === 'web' ? hostedStackStyle : { backgroundColor: colors.background },
+  } as const
+}
 
 /**
  * Le thème de la navigation autour de l'hôte (RF, U4) : celui reçu (`DefaultTheme` d'expo-router),
