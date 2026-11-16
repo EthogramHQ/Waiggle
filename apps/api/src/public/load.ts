@@ -225,7 +225,7 @@ export const loadPublicUpdate = async (
  * est la première photo de la galerie qui n'est pas retirée. Une requête pour les photos de toute
  * la liste (selectMedia), quelle que soit sa longueur.
  */
-const toCards = async (
+export const toCards = async (
   db: Database,
   projects: { id: string; title: string; pitch: string; status: string }[],
   publicApiUrl: string,

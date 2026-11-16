@@ -56,6 +56,8 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   // tout le reste (route-inventory.test.ts, colonne « partial »).
   'PATCH /v1/me',
   'PATCH /v1/projects/:id',
+  // R12 (Q6) : fermer sa page publique ; la route refuse tout le reste (`suspendedPublicPageChange`).
+  'PATCH /v1/me/public-page',
   'POST /v1/email/unsubscribe',
   'POST /v1/moderation/decisions',
   // R10 (relecture du plan, point 2) : rejoindre une ruche où l'on est invité reste permis (refuser
