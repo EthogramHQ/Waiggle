@@ -14,6 +14,7 @@ import { contactEmail } from '@ruche/brand'
 import type { Me } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { downloadMyData, signOut } from '../accounts/api'
+import { ApiError } from '../api/errors'
 import { legalDocument } from '../legal/documents'
 import { getMe } from '../profile/api'
 import { useAcceptRules } from '../rules/api'
@@ -173,6 +174,45 @@ describe('AcceptRulesScreen (R11)', () => {
 
     expect(await screen.findByText(fr.t(($) => $.rules.error))).toBeTruthy()
     expect(screen.getByRole('header', { name: title })).toBeTruthy()
+  })
+
+  // Relecture de design de R11 : réessayer ne lève ni une session expirée (401) ni une ancienne
+  // version des règles (400 `validation` : l'API n'accepte que la version en vigueur, et l'onglet
+  // est resté ouvert sur la précédente). L'écran dit alors quoi faire, au lieu de « Réessaie ».
+  it('asks to sign in again when the session has expired', async () => {
+    accept.mockRejectedValue(new ApiError('unauthorized'))
+    await show()
+    await fireEvent.press(screen.getByRole('checkbox', { name: rulesBox }))
+    await fireEvent.press(screen.getByRole('checkbox', { name: ageBox }))
+
+    await fireEvent.press(screen.getByRole('button', { name: continueLabel }))
+
+    expect(await screen.findByText(fr.t(($) => $.errors.unauthorized))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.rules.error))).toBeNull()
+  })
+
+  it('asks to reload when the API refuses an outdated version of the rules', async () => {
+    accept.mockRejectedValue(new ApiError('validation'))
+    await show()
+    await fireEvent.press(screen.getByRole('checkbox', { name: rulesBox }))
+    await fireEvent.press(screen.getByRole('checkbox', { name: ageBox }))
+
+    await fireEvent.press(screen.getByRole('button', { name: continueLabel }))
+
+    expect(await screen.findByText(fr.t(($) => $.rules.outdated))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.rules.error))).toBeNull()
+  })
+
+  it('says the rules changed in the meantime when a change is unknown to this version of the app', async () => {
+    const first = await show({ ...ines, rulesChanges: [] })
+    // Témoin : sans changement, rien n'en parle.
+    expect(screen.queryByText(fr.t(($) => $.rules.outdated))).toBeNull()
+    await first.unmount()
+
+    // Une clé que cette version de l'appli n'a pas : la version des règles est plus récente qu'elle.
+    await show({ ...ines, rulesChanges: ['aChangeThisAppDoesNotKnow'] })
+
+    expect(screen.getByText(fr.t(($) => $.rules.outdated))).toBeTruthy()
   })
 
   it('shows Ce qui change above En bref only when the version changed', async () => {

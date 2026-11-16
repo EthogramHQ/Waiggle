@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { downloadMyData } from '../accounts/api'
+import { type ApiErrorKey, errorKey } from '../api/errors'
 import { legalDocument } from '../legal/documents'
 import { useAcceptRules } from '../rules/api'
 import { Button } from '../ui/Button'
@@ -50,6 +51,17 @@ const missingOf = (rules: boolean, age: boolean): Missing | null =>
   !rules && !age ? 'both' : !rules ? 'rules' : !age ? 'age' : null
 
 /**
+ * Pourquoi l'accord n'a pas pu s'enregistrer (relecture de design de R11). Réessayer ne lève que
+ * les pannes (`error`) : une session expirée (401) demande de se reconnecter, et une demande refusée
+ * (400) vient d'un onglet resté ouvert sur une ancienne version des règles, la seule que l'API
+ * refuse (`RULES_VERSION`) : il faut recharger la page pour lire la nouvelle.
+ */
+type Refusal = 'unauthorized' | 'outdated' | 'error'
+
+const refusalOf = (key: ApiErrorKey): Refusal =>
+  key === 'unauthorized' ? 'unauthorized' : key === 'validation' ? 'outdated' : 'error'
+
+/**
  * Le pied collé seulement s'il prend au plus la moitié de la fenêtre (relecture du plan, U1) : plus
  * haut (petit téléphone, texte agrandi), il suit le texte.
  */
@@ -67,7 +79,7 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
   const [ageChecked, setAgeChecked] = useState(false)
   // Le message posé au-dessus de « Continuer » : ce qui manque, ou l'accord refusé. Le dernier reste
   // jusqu'au toucher suivant (sinon « Continuer » remonterait sous le doigt à chaque case cochée).
-  const [message, setMessage] = useState<Missing | 'error' | null>(null)
+  const [message, setMessage] = useState<Missing | Refusal | null>(null)
   const { accept, busy } = useAcceptRules()
   // Une seule demande à la fois, lue au toucher même : à la seconde tape, un état React ne serait
   // pas encore à jour.
@@ -95,8 +107,8 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
     sending.current = true
     try {
       await accept()
-    } catch {
-      setMessage('error')
+    } catch (error) {
+      setMessage(refusalOf(errorKey(error)))
     } finally {
       sending.current = false
     }
@@ -120,7 +132,8 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
   const signOut = useSignOut()
 
   // « Ce qui change » : les phrases des clés connues de cette version de l'appli, dans l'ordre de
-  // l'API ; une clé inconnue (une version plus récente que l'appli) est passée, le titre reste.
+  // l'API. Une clé inconnue dit que les règles sont plus récentes que l'appli (un onglet resté
+  // ouvert) : ses textes sont anciens, et l'API refuserait l'accord ; l'écran dit de recharger.
   // `returnObjects` : la section entière (`{ clé: phrase }`), que le typage croit être un texte ;
   // vide, elle peut revenir sous la forme de son chemin : aucune clé n'y est alors trouvée.
   const phrases = t(($) => $.rules.changes, { returnObjects: true }) as unknown as Record<
@@ -131,6 +144,7 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
     const phrase = phrases[key]
     return typeof phrase === 'string' ? [phrase] : []
   })
+  const outdated = changes.length < me.rulesChanges.length
 
   const missingText =
     message === 'rules'
@@ -139,9 +153,13 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
         ? t(($) => $.rules.missing.age)
         : message === 'both'
           ? t(($) => $.rules.missing.both)
-          : message === 'error'
-            ? t(($) => $.rules.error)
-            : null
+          : message === 'unauthorized'
+            ? t(($) => $.errors.unauthorized)
+            : message === 'outdated'
+              ? t(($) => $.rules.outdated)
+              : message === 'error'
+                ? t(($) => $.rules.error)
+                : null
 
   const readFull = (
     <TextLink
@@ -152,7 +170,9 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
   )
 
   const text = (
-    <Stack gap="xl">
+    // Une colonne de lecture (`readable`) : sur ordinateur, l'« En bref » garde la largeur du texte
+    // des Règles, au lieu de s'étirer sur toute la colonne (relecture de design de R11).
+    <Stack gap="xl" readable>
       {me.suspension ? (
         // J2 : la suspension, dépliée (la mesure, sa fin à l'heure de Paris, le recours), puis ce
         // qu'accepter ne change pas.
@@ -170,12 +190,15 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
             <KeyPoints points={changes.map((phrase) => ({ icon: 'sparkle', text: phrase }))} />
           </ListBlock>
         </ListGroup>
-      ) : me.rulesChanges.length > 0 ? (
-        // Aucune phrase connue de cette version de l'appli : le titre seul dit que la version a
-        // changé, sans le cadre vide d'une liste (le texte complet, lui, est à jour).
+      ) : outdated ? (
+        // Aucune phrase connue de cette version de l'appli : le titre, sans le cadre vide d'une liste.
         <Text variant="headline" heading={2}>
           {t(($) => $.rules.changesTitle)}
         </Text>
+      ) : null}
+      {outdated ? (
+        // `polite` : présente dès l'arrivée, elle n'interrompt pas la lecture du titre.
+        <Notice tone="info" polite message={t(($) => $.rules.outdated)} />
       ) : null}
       <ListGroup title={t(($) => $.legal.summaryTitle)}>
         <ListBlock>

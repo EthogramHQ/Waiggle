@@ -14,11 +14,14 @@
 //   « Le texte complet » sont des titres de niveau 2, et chaque partie un titre de niveau 3 ;
 // - le corps d'une partie est du Markdown (ui/Markdown) : ses liens passent par `onLinkPress` ;
 // - `wide` (ordinateur) montre la navigation « Sommaire », une entrée par partie.
-import { fireEvent, screen } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
+import { createRef } from 'react'
+import { Dimensions, Text as NativeText, Platform } from 'react-native'
+import { labelOf } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { LegalDocument } from './LegalDocument'
+import { type ScreenScroll, ScreenScrollContext, type ScrollEvent } from './scrollLight'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -171,6 +174,95 @@ describe('LegalDocument (R11)', () => {
     // Une seule est la partie en cours : la première, à l'arrivée.
     expect(entries.filter(isCurrent)).toHaveLength(1)
     expect(isCurrent(entries[0] as (typeof entries)[number])).toBe(true)
+  })
+
+  // Relecture de design de R11 : la dernière partie, trop courte, n'atteint jamais le haut de
+  // l'écran ; le saut s'arrête au bas de la page, plus haut que la position demandée. Ce défilement
+  // est encore celui du saut : la partie touchée reste marquée, jusqu'à ce que la page bouge d'elle-même.
+  it('keeps the chosen part current when the jump stops at the bottom of the page', async () => {
+    // Jest ne place rien à l'écran : tous les textes natifs partagent un prototype (celui du texte
+    // témoin, les titres en sont), et l'on y prête un `measureInWindow` qui répond la position de
+    // chaque titre dans la fenêtre, d'après le défilement simulé.
+    const windowHeight = 1000
+    const bottom = 600 // la fin de la page : contenu de 1 600, fenêtre de 1 000
+    const tops: Record<string, number> = {
+      [sections[0]?.title ?? '']: 700,
+      [sections[1]?.title ?? '']: 1100,
+      [sections[2]?.title ?? '']: 1400,
+    }
+    let scrolled = 0
+    const listeners = new Set<(event: ScrollEvent) => void>()
+    const jumpTo = jest.fn()
+    const scroll: ScreenScroll = {
+      subscribe: (listener) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+        }
+      },
+      lightHeld: { current: false },
+      coveredTop: { current: 0 },
+      toTop: jest.fn(),
+      jumpTo,
+    }
+    const emit = async (y: number) => {
+      scrolled = y
+      const event = {
+        nativeEvent: {
+          contentOffset: { x: 0, y },
+          contentSize: { width: 1000, height: bottom + windowHeight },
+          layoutMeasurement: { width: 1000, height: windowHeight },
+        },
+      } as unknown as ScrollEvent
+      await act(async () => {
+        for (const listener of listeners) listener(event)
+        // La mesure attend l'image suivante.
+        await new Promise((done) => setTimeout(done, 50))
+      })
+    }
+    jest.spyOn(Dimensions, 'get').mockReturnValue({
+      width: 1440,
+      height: windowHeight,
+      scale: 1,
+      fontScale: 1,
+    })
+    const probe = createRef<NativeText>()
+    await renderWithProviders(
+      <ScreenScrollContext.Provider value={scroll}>
+        <NativeText ref={probe} />
+        <LegalDocument
+          version="2026-11-16"
+          summary={summary}
+          sections={sections}
+          wide
+          onLinkPress={onLinkPress}
+        />
+      </ScreenScrollContext.Provider>,
+    )
+    const proto = Object.getPrototypeOf(probe.current) as { measureInWindow?: unknown }
+    const had = Object.hasOwn(proto, 'measureInWindow')
+    const previous = proto.measureInWindow
+    proto.measureInWindow = function (this: unknown, done: (x: number, y: number) => void) {
+      done(0, (tops[labelOf(this) ?? ''] ?? 0) - scrolled)
+    }
+    try {
+      const last = sections[2]?.title ?? ''
+      await fireEvent.press(screen.getByRole('link', { name: last }))
+      // Le saut est demandé plus bas que la fin de la page ; il s'arrête au bas.
+      expect(jumpTo.mock.calls.at(-1)?.[0]).toBeGreaterThan(bottom)
+      await emit(bottom)
+
+      expect(isCurrent(screen.getByRole('link', { name: last }))).toBe(true)
+
+      // Témoin : la page remonte d'elle-même ; le sommaire suit de nouveau la lecture.
+      await emit(0)
+      expect(isCurrent(screen.getByRole('link', { name: sections[0]?.title ?? '' }))).toBe(true)
+      expect(isCurrent(screen.getByRole('link', { name: last }))).toBe(false)
+    } finally {
+      if (had) proto.measureInWindow = previous
+      else delete proto.measureInWindow
+      jest.restoreAllMocks()
+    }
   })
 
   it('has no Sommaire on a phone, and still shows every part', async () => {

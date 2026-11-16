@@ -11,7 +11,7 @@
 // Elle reste dans l'écran pendant qu'on lit (collée en haut, sur le web) et suit la partie lue ;
 // toucher une entrée amène sa partie en haut de l'écran et lui donne le focus, pour que le clavier
 // et le lecteur d'écran repartent de là, et non du sommaire.
-import { layout, radii, space } from '@ruche/brand'
+import { layout, radii, readableWidth, space } from '@ruche/brand'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dimensions, Platform, Pressable, View, type ViewStyle } from 'react-native'
@@ -97,10 +97,17 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
       })
     }
     const unsubscribe = scroll.subscribe((event) => {
-      const y = event.nativeEvent.contentOffset.y
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent
+      const y = contentOffset.y
       offset.current = y
-      // Le défilement du saut lui-même : la partie choisie reste en cours.
-      if (jumpedTo.current !== null && Math.abs(y - jumpedTo.current) < 2) return
+      // Le défilement du saut lui-même : la partie choisie reste en cours. Le saut vers une des
+      // dernières parties s'arrête au bas de la page, plus haut que la position demandée : on compare
+      // donc à la position que la page pouvait atteindre (relecture de design de R11, à 1440 px).
+      const end =
+        contentSize && layoutMeasurement
+          ? Math.max(0, contentSize.height - layoutMeasurement.height)
+          : Number.POSITIVE_INFINITY
+      if (jumpedTo.current !== null && Math.abs(y - Math.min(jumpedTo.current, end)) < 2) return
       jumpedTo.current = null
       // Une mesure par image au plus, quel que soit le nombre d'événements de défilement.
       if (!frame) frame = requestAnimationFrame(follow)
@@ -136,9 +143,12 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
     // Sur ordinateur, la colonne du texte prend la place que laisse le sommaire (une base nulle
     // dans une rangée). Jamais sur téléphone : en colonne, une base nulle qui rétrécit écrase la
     // hauteur du texte, qui déborde alors sur ce qui suit (vu au catalogue).
+    // Toute la colonne s'arrête à `readableWidth`, la borne des paragraphes du Markdown : le cadre
+    // de l'« En bref » s'aligne sur le texte complet, et ses puces gardent une ligne confortable
+    // (relecture de design de R11 : à 1440 px, un cadre de 988 px, des puces de 105 caractères).
     <View
       style={[
-        { gap: space.xxl },
+        { gap: space.xxl, maxWidth: readableWidth },
         wide ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } : { alignSelf: 'stretch' },
       ]}
     >
