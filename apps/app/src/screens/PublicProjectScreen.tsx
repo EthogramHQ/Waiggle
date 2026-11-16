@@ -46,12 +46,14 @@ import { usePageLanguage, usePublicProject } from '../public/api'
 import { Button } from '../ui/Button'
 import { Hint } from '../ui/Hint'
 import type { IconName } from '../ui/Icon'
+import { IconButton } from '../ui/IconButton'
 import { LegalLinks } from '../ui/LegalLinks'
 import { MembersOnlyNotice } from '../ui/MembersOnlyNotice'
 import { PhotoGallery } from '../ui/PhotoGallery'
 import { CoverControls } from '../ui/ProjectCover'
 import { PromptBlock } from '../ui/PromptBlock'
 import { ReactionSummary } from '../ui/ReactionSummary'
+import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -128,8 +130,28 @@ function PublicProjectView({ project }: { project: PublicProject }) {
   const [accountOpen, setAccountOpen] = useState(false)
   const askAccount = () => setAccountOpen(true)
 
+  // « Partager » (scénario R12 « Partager », planches R12-Visiteur-Projet) : un visiteur aussi peut
+  // passer le lien. La feuille dit « Tout le monde pourra l'ouvrir. », et le lien est l'adresse
+  // publique dans la langue de la page (`web`). Un bouton à icône seule : son nom est lu. Sur
+  // téléphone, dans la barre posée sur la photo ; ailleurs, en haut à droite, dans la rangée du
+  // « Retour » (`topAction`), comme sur la page d'un membre.
+  const [sharing, setSharing] = useState(false)
+  const shareButton = (
+    <IconButton
+      icon="share-network"
+      label={t(($) => $.share.action)}
+      onPress={() => setSharing(true)}
+    />
+  )
+
   // La barre d'un visiteur : « Se connecter » revient sur cette page (`next`), dans sa langue.
-  const visitorBar = <VisitorBar homeHref={home} next={publicPath('project', lang, project.id)} />
+  const visitorBar = (
+    <VisitorBar
+      homeHref={home}
+      next={publicPath('project', lang, project.id)}
+      action={large ? undefined : shareButton}
+    />
+  )
 
   const latest = project.latestUpdate ? asProjectUpdate(project.latestUpdate) : null
   // L'en-tête d'un membre, nourri du projet public. « Publié le » : `publishedAt` (un projet public
@@ -229,6 +251,7 @@ function PublicProjectView({ project }: { project: PublicProject }) {
   return (
     <ProjectPageLayout
       topBar={large ? visitorBar : null}
+      topAction={shareButton}
       onBack={back}
       pageTitle={project.title}
       thumbhash={project.visuals[photoIndex]?.thumbhash ?? null}
@@ -258,7 +281,20 @@ function PublicProjectView({ project }: { project: PublicProject }) {
           <LegalLinks variant="footer" otherLanguage />
         </Stack>
       }
-      layers={<AccountRequiredSheet open={accountOpen} onClose={() => setAccountOpen(false)} />}
+      layers={
+        <>
+          <AccountRequiredSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
+          {/* Montée dès l'arrivée, fermée : à la fermeture, le focus revient à « Partager ». */}
+          <ShareSheet
+            open={sharing}
+            onClose={() => setSharing(false)}
+            title={project.title}
+            target={{ kind: 'project', id: project.id }}
+            visibility="web"
+            image={project.visuals[0] ? toSource(project.visuals[0].url) : null}
+          />
+        </>
+      }
     />
   )
 }

@@ -182,6 +182,8 @@ const allowed = new Set([
   // par langue se fabriquent en un seul endroit, une fonction pure sans autre dépendance.
   'apps/app/src/ui/LegalLinks.tsx -> apps/app/src/navigation/publicPath.ts',
   'apps/app/src/ui/LanguageLink.tsx -> apps/app/src/navigation/publicPath.ts',
+  // R12 : le lien partagé d'un projet ou d'une page publics est leur adresse par langue.
+  'apps/app/src/ui/share.ts -> apps/app/src/navigation/publicPath.ts',
 ])
 
 const problems = []
