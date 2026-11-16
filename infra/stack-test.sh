@@ -418,6 +418,15 @@ step "Le réseau de la porte d'entrée parle IPv6 (sinon tous les visiteurs IPv6
 expect "IPv6 du réseau web" "$(docker network inspect ruche_web --format '{{.EnableIPv6}}')" true
 echo "ok"
 
+step "Les lectures d'un visiteur répondent par l'API, sans cookie (R12)"
+# Un projet inconnu : le 404 de tout projet caché, sans attendre. Comme l'appli web, avec l'origine
+# de l'appli et sans session.
+expect "projet public inconnu" "$(web -o /dev/null -w '%{http_code}' -H "Origin: https://$APP_HOST" \
+  "https://$API_HOST/v1/public/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6?lang=fr")" 404
+expect "vitrine" "$(web -o /dev/null -w '%{http_code}' -H "Origin: https://$APP_HOST" \
+  "https://$API_HOST/v1/public/showcase")" 200
+echo "ok"
+
 step "Dans un vrai navigateur : rien n'est bloqué par la CSP, aucune erreur dans les pages"
 # Demande l'installation des dépendances (pnpm install) et de Chromium (voir la CI).
 node apps/app/scripts/site-check.mjs "https://$APP_HOST"
