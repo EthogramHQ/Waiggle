@@ -424,7 +424,9 @@ try {
   // Le pied de l'accueil : une navigation nommée, dont « Règles » est un lien (sans compte).
   const footer = byRole(max.page, 'navigation', 'Les pages de Waiggle')
   await byRole(footer, 'link', 'Règles').click()
-  await max.page.waitForURL((url) => url.pathname === '/rules')
+  // R12 : derrière Caddy (la pile de production), le visiteur arrive sur l'accueil de sa langue,
+  // `/fr/`, et ses liens gardent la langue (`/fr/rules`) ; sans Caddy, les adresses n'en ont pas.
+  await max.page.waitForURL((url) => ['/rules', '/fr/rules'].includes(url.pathname))
   await byRole(max.page, 'heading', 'Les règles de Waiggle', { level: 1 }).waitFor()
   // La date de version, et l'« En bref » : de quoi lire ce qu'il va accepter.
   await max.page
@@ -434,7 +436,7 @@ try {
   await byRole(max.page, 'heading', 'En bref').first().waitFor()
   console.log('  ok : Max lit les règles sans compte, avec leur version et leur « En bref »')
   await max.page.goBack()
-  await max.page.waitForURL((url) => url.pathname === '/')
+  await max.page.waitForURL((url) => ['/', '/fr/'].includes(url.pathname))
   await byRole(max.page, 'button', 'Créer un compte').click()
   await max.page.waitForURL((url) => url.pathname === '/sign-up')
   console.log('  ok : Max revient à l’accueil, puis à « Créer un compte »')
