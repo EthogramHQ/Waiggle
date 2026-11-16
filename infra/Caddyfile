@@ -1,6 +1,8 @@
 # Caddy : la porte d'entrée du serveur. C'est le seul programme joignable depuis Internet.
 # - Il obtient et renouvelle tout seul les certificats HTTPS (le cadenas du navigateur).
-# - Sur le domaine de l'appli (waiggle.com), il sert les fichiers de l'appli web, déjà construite.
+# - Sur le domaine de l'appli (waiggle.com), il sert les fichiers de l'appli web, déjà construite ;
+#   depuis R12, il y écrit aussi la tête des pages publiques (titre, aperçu des liens), demandée
+#   à l'API, et choisit où envoyer qui arrive (l'accueil, le Fil, la page dans sa langue).
 # - Sur le domaine de l'API (api.waiggle.com), il transmet les requêtes à l'API.
 # - Sur les anciens domaines (waiggle.io, api.waiggle.io), il renvoie vers les nouveaux.
 # Les domaines viennent de infra/site.env. {$NOM:défaut} lit une variable d'environnement ;
@@ -52,6 +54,26 @@
 	}
 }
 
+# R12 : les pages à paramètre des adresses par langue, construites une fois par langue sous le nom
+# du paramètre (/fr/projects/0192abcd → fr/projects/[id].html), comme celles de l'étape 2 plus bas.
+# Une règle par langue, écrite en entier : infra/web/check-web.mjs retrouve ainsi chaque page
+# construite dans une règle « rewrite ». Dans un snippet, parce que deux endroits en ont besoin :
+# la recherche du fichier, et le repli qui sert une page publique sans sa tête (handle_errors 500).
+(lang_pages) {
+	@fr_project path_regexp ^/fr/projects/[^/.]+$
+	rewrite @fr_project /fr/projects/[id].html
+	@en_project path_regexp ^/en/projects/[^/.]+$
+	rewrite @en_project /en/projects/[id].html
+	@fr_project_updates path_regexp ^/fr/projects/[^/.]+/updates$
+	rewrite @fr_project_updates /fr/projects/[id]/updates.html
+	@en_project_updates path_regexp ^/en/projects/[^/.]+/updates$
+	rewrite @en_project_updates /en/projects/[id]/updates.html
+	@fr_member path_regexp ^/fr/members/[^/.]+$
+	rewrite @fr_member /fr/members/[id].html
+	@en_member path_regexp ^/en/members/[^/.]+$
+	rewrite @en_member /en/members/[id].html
+}
+
 # L'appli web.
 {$APP_DOMAIN:localhost} {
 	import app_security
@@ -68,11 +90,32 @@
 	@mutable not path /_expo/static/* /assets/*
 	header @mutable Cache-Control "no-cache"
 
-	# Moteurs de recherche (R11) : seuls l'accueil, la connexion, l'inscription et les quatre pages
-	# publiques peuvent être trouvés ; toute autre adresse reçoit « noindex », pour un moteur qui ne
-	# lirait pas robots.txt (apps/app/public/robots.txt). « path / » ne vaut que pour l'accueil exact.
-	@noindex not path / /sign-in /sign-up /rules /privacy /legal /accessibility
+	# Moteurs de recherche (R11, puis R12) : seules les pages publiques, à adresse par langue
+	# (/fr/…, /en/…), la connexion et l'inscription peuvent être trouvées ; toute autre adresse reçoit
+	# « noindex », pour un moteur qui ne lirait pas robots.txt (apps/app/public/robots.txt).
+	# « path / » ne vaut que pour l'accueil exact, qui ne fait que rediriger (plus bas). Une page
+	# publique qui n'existe pas, ou plus (projet redevenu privé), porte son propre « noindex » dans le
+	# HTML reçu, écrit par l'API (« La tête des pages publiques », plus bas).
+	@noindex not path / /sign-in /sign-up /fr/* /en/*
 	header @noindex X-Robots-Tag "noindex"
+
+	# R12 : la langue d'un visiteur, d'après l'en-tête Accept-Language que son navigateur envoie
+	# (« en-US,en;q=0.9,fr;q=0.8 » : les langues qu'il lit, de la préférée à la moins aimée). « map »
+	# range dans {visitor_lang} « en » si l'anglais y vient avant tout français, et « fr » sinon,
+	# français compris par défaut quand l'en-tête manque ou ne cite ni l'un ni l'autre (scénario R12,
+	# « Les anciennes adresses »). La règle, lue de gauche à droite :
+	# - « (?i) » : majuscules et minuscules se valent (EN-us) ;
+	# - « (?: … ,)* » : sauter des langues, une par une jusqu'à la virgule, pourvu qu'aucune ne soit
+	#   du français (« fr », « fr-FR », « fr;q=0.8 ») : une langue qui ne commence pas par « f », ou par
+	#   « f » suivi d'autre chose qu'un « r », ou « fr » suivi d'une lettre (« frr » est une autre langue) ;
+	# - puis « en », seul ou suivi de « - », « ; », une virgule, une espace ou la fin.
+	# Les poids « q= » ne sont pas relus : les navigateurs écrivent les langues dans l'ordre de leurs
+	# poids. Seules deux valeurs en sortent, « fr » et « en » : rien de ce que le visiteur envoie
+	# n'est recopié dans une adresse de redirection.
+	map {header.Accept-Language} {visitor_lang} {
+		~(?i)^(?:\s*(?:[^f,\s][^,]*|f(?:[^r,][^,]*)?|fr[a-z0-9][^,]*)?,)*\s*en(?:[-;,\s]|$) en
+		default fr
+	}
 
 	# Trouver le fichier d'une adresse. « route » garde l'ordre d'écriture des règles.
 	route {
@@ -84,12 +127,136 @@
 		#    répondait 308 vers /catalogue.html au lieu de 404, et /catalogue.html/./ en dépend.
 		@devtools path /_sitemap /_sitemap.html /catalogue /catalogue.html /_sitemap/* /_sitemap.html/* /catalogue/* /catalogue.html/*
 		error @devtools 404
+		#    R12 : la copie générique des pages par langue. Expo Router prépare chaque page publique
+		#    en français (fr/…) et en anglais (en/…), et garde en plus une copie sous le nom du
+		#    paramètre, [lang]/… (app/[lang]/_layout.tsx) : elle n'est la page d'aucune langue, elle
+		#    est « introuvable ». « path_regexp » et non « path » : pour « path », des crochets
+		#    voudraient dire « une de ces lettres ». Caddy compare l'adresse nettoyée (« /fr/../[lang] »
+		#    devient « /[lang] ») et décodée (« %5Blang%5D » devient « [lang] »).
+		#    infra/web/check-web.mjs vérifie que cette règle est là.
+		@generic_lang path_regexp ^/\[lang\](/|$)
+		error @generic_lang 404
+
+		# R12 : deux relais vers l'API, par le réseau interne de Docker (api:3000), chacun pour une
+		# seule adresse exacte, jamais un préfixe : rien d'autre de l'API n'est joignable par ce
+		# domaine (POST /v1/public/reports y reste « introuvable », relecture de sécurité du plan, I3).
+		# Comme pour le domaine de l'API, header_up REMPLACE l'adresse IP réelle annoncée à l'API
+		# (X-Real-IP) par celle de la connexion : un visiteur ne peut pas la falsifier. Le cookie du
+		# marqueur ne part pas vers l'API (header_up -Cookie) : elle n'en a pas l'usage.
+		# - Le plan du site, pour les moteurs : /sitemap.xml est écrit par GET /v1/public/sitemap.
+		@sitemap {
+			path /sitemap.xml
+			method GET HEAD
+		}
+		handle @sitemap {
+			rewrite * /v1/public/sitemap
+			reverse_proxy api:3000 {
+				header_up X-Real-IP {remote_host}
+				header_up -Cookie
+			}
+		}
+		# - La tête des pages publiques (titre, description, aperçu des liens, « noindex »), écrite par
+		#   GET /v1/public/head. Seul Caddy la demande, par une « demande virtuelle » (httpInclude,
+		#   plus bas) : une demande fabriquée en mémoire, sans connexion réseau, que Caddy fait passer
+		#   par ce même site et qu'il date toujours de l'adresse 127.0.0.1 (code source de Caddy 2.11,
+		#   modules/caddyhttp/templates/tplcontext.go). « remote_ip » lit l'adresse de la connexion
+		#   elle-même, jamais un en-tête : un visiteur venu d'Internet n'est jamais 127.0.0.1, et
+		#   reçoit « introuvable ». Si l'API ne répond pas en 5 secondes, la page part sans sa tête
+		#   (repli « handle_errors 500 502 503 », en bas) : une API lente ne bloque pas le site.
+		@head_include {
+			path /v1/public/head
+			method GET
+			remote_ip 127.0.0.1
+		}
+		handle @head_include {
+			reverse_proxy api:3000 {
+				header_up X-Real-IP {remote_host}
+				header_up -Cookie
+				transport http {
+					dial_timeout 2s
+					response_header_timeout 5s
+				}
+			}
+		}
+
+		# R12 : qui arrive où (scénario, « Qui arrive où » et « Les anciennes adresses »). Chaque
+		# destination est fixe, ou « /fr », « /en » suivi de l'adresse demandée : elle commence
+		# toujours par « / » et une langue, jamais par « // » ; aucune redirection ne mène ailleurs
+		# que chez nous. {uri} est l'adresse demandée telle qu'envoyée, encodée, avec ses paramètres.
+		# Le marqueur de membre : l'appli web pose le cookie « waiggle_member=1 » sur ce domaine quand
+		# une session existe, et l'efface à la déconnexion (apps/app/src/accounts/memberMarker.ts). Le
+		# cookie de session, lui, appartient au domaine de l'API : Caddy ne le voit jamais. Le marqueur
+		# n'ouvre aucun droit, l'API ne le lit pas : il ne fait que choisir la redirection. Un
+		# navigateur envoie tous ses cookies dans le même en-tête, séparés par « ; » : la règle
+		# « header_regexp Cookie » cherche celui-là, entier, parmi les autres.
+		# - L'accueil : un membre (le marqueur) va au Fil ; un visiteur, à l'accueil de sa langue. Une
+		#   redirection temporaire (302) : la destination dépend de qui demande, un navigateur ne doit
+		#   pas la retenir.
+		@home_member {
+			path /
+			header_regexp Cookie (^|;)\s*waiggle_member=1\s*(;|$)
+		}
+		redir @home_member /feed 302
+		redir / /{visitor_lang}/ 302
+		# - « /fr » et « /en » sans barre finale : la même page a une seule adresse, « /fr/ ». La
+		#   langue vient de la règle elle-même ({re.lang_root.1} ne peut valoir que fr ou en).
+		@lang_root path_regexp lang_root ^/(fr|en)$
+		redir @lang_root /{re.lang_root.1}/ 301
+		# - Les anciennes adresses publiques (avant R12) : un lien partagé, un e-mail déjà envoyé, un
+		#   moteur de recherche. Sans marqueur, redirection permanente (301) vers la même page dans la
+		#   langue du visiteur ; un membre y garde sa page de membre (ses commentaires, « Suivre »),
+		#   servie plus bas. /projects/new (la feuille « Nouveau projet ») n'est pas un projet.
+		@legacy_public {
+			path_regexp ^/(projects/[^/.]+(/updates)?|members/[^/.]+|rules|privacy|legal|accessibility)$
+			not path /projects/new
+			not header_regexp Cookie (^|;)\s*waiggle_member=1\s*(;|$)
+		}
+		redir @legacy_public /{visitor_lang}{uri} 301
+
+		# R12 : les gabarits (« templates ») des pages publiques. Caddy lit la page HTML préparée
+		# comme un modèle : ce qui est écrit entre « [[waiggle » et « ]] » est une instruction (Go
+		# text/template), remplacée par son résultat avant l'envoi. Ces délimiteurs sont propres à
+		# Waiggle : les « {{ }} » habituels se retrouvent dans le texte des pages (les textes à
+		# trous de l'appli). Les instructions sont dans apps/app/app/+html.tsx :
+		# - la langue de <html lang> ;
+		# - la tête de la page, demandée à l'API par httpInclude (voir « @head_include » plus haut).
+		# Seulement ici, sur les pages publiques (relecture de sécurité du plan, B1) : ailleurs, les
+		# instructions restent un commentaire HTML que le navigateur ignore. Ce que l'API renvoie est
+		# relu comme un gabarit à son tour : elle y échappe donc aussi « [ » et « ] », et le titre
+		# d'un projet ne peut jamais devenir une instruction.
+		# Une instruction qui échoue (l'API arrêtée, une réponse 400 ou plus) fait répondre 500 à
+		# toute la page : le repli « handle_errors 500 502 503 », en bas, sert alors le fichier tel
+		# quel, sans sa tête mais avec ses en-têtes de sécurité.
+		# Une page lue comme un gabarit n'a plus de date ni d'empreinte (ETag), car son contenu change
+		# sans que le fichier change. On retire aussi les questions « a-t-elle changé depuis… ? »
+		# (If-None-Match, If-Modified-Since) qu'un navigateur ou un moteur enverrait encore : la
+		# réponse serait « pas changé » (304), et un moteur garderait la tête d'hier, celle d'un projet
+		# redevenu privé depuis.
+		@public_page path_regexp ^/(fr|en)/
+		request_header @public_page -If-None-Match
+		request_header @public_page -If-Modified-Since
+		templates @public_page {
+			between [[waiggle ]]
+		}
+		# robots.txt aussi, pour une seule instruction : l'adresse complète du plan du site, que le
+		# protocole exige (« Sitemap: https://… »), avec le domaine de ce site, tiré de la variable
+		# app_domain ci-dessous, jamais de la demande.
+		vars /robots.txt app_domain {$APP_DOMAIN:localhost}
+		request_header /robots.txt -If-None-Match
+		request_header /robots.txt -If-Modified-Since
+		templates /robots.txt {
+			between [[waiggle ]]
+		}
+
 		# 1. Le fichier lui-même (/_expo/static/js/…), ou la page du même nom :
 		#    /sign-in → sign-in.html, /account/delete → account/delete.html.
 		#    R11 : les quatre pages publiques, sans paramètre, sont trouvées ici sans règle à elles :
 		#    /rules → rules.html, /privacy → privacy.html, /legal → legal.html,
-		#    /accessibility → accessibility.html.
+		#    /accessibility → accessibility.html. R12 : de même pour leur copie par langue
+		#    (/fr/rules → fr/rules.html) et l'accueil (/fr/ → fr/index.html).
 		try_files {path} {path}.html {path}/index.html
+		# R12 : les pages à paramètre des adresses par langue (snippet « lang_pages », en haut).
+		import lang_pages
 		# 2. Les pages à paramètre sont construites une seule fois, sous le nom du paramètre :
 		#    /projects/0192abcd → projects/[id].html. Les « [^/.]+ » n'acceptent ni barre ni point :
 		#    une page déjà trouvée à l'étape 1 (/projects/new.html) n'est pas réécrite.
@@ -143,6 +310,32 @@
 		header X-Robots-Tag "noindex"
 		rewrite * /+not-found.html
 		file_server
+	}
+
+	# R12 : le repli des pages publiques (relecture de sécurité du plan, I1). Une erreur de gabarit
+	# (l'API arrêtée pendant un déploiement, une tête qui répond 400 ou plus, une API trop lente)
+	# fait répondre 500 à la page ; une erreur d'un relais vers l'API, 502 ou 503. Une page publique
+	# est alors servie quand même, telle qu'elle est dans l'image, sans gabarit : ses instructions
+	# restent un commentaire HTML inerte, sa langue est le français (apps/app/app/+html.tsx), et
+	# l'appli s'affiche normalement une fois chargée. Les Mentions légales restent donc lisibles.
+	# Ici, Caddy repart de la demande d'origine, avant toute réécriture : il retrouve le fichier par
+	# les mêmes règles que plus haut. « status 200 » : sans lui, file_server répondrait avec le code
+	# de l'erreur. Le fichier servi tel quel garde la date et l'empreinte que file_server lui donne :
+	# on les retire, pour qu'un navigateur redemande la page entière la fois suivante, tête comprise.
+	# Ailleurs (le plan du site, l'API arrêtée), la réponse reste l'erreur, sans corps.
+	handle_errors 500 502 503 {
+		import app_security
+		header Cache-Control "no-cache"
+		header -ETag
+		header -Last-Modified
+		@public_page path_regexp ^/(fr|en)/
+		route @public_page {
+			try_files {path} {path}.html {path}/index.html
+			import lang_pages
+			file_server {
+				status 200
+			}
+		}
 	}
 }
 

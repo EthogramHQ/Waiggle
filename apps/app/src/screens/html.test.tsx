@@ -63,3 +63,54 @@ describe('the HTML served for every page', () => {
     expect(prepared).toEqual(['app/[lang]/_layout.tsx'])
   })
 })
+
+// R12 (plan, choix 5 ; relecture de sécurité du plan, B1) : les instructions que Caddy exécute sur
+// les pages publiques (infra/Caddyfile, « templates »). Sans Caddy, elles doivent rester sans effet.
+describe('the Caddy instructions of the HTML shell', () => {
+  const html = renderToStaticMarkup(<Root>{null}</Root>)
+  const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'))
+
+  it('keeps the head marker a single inert comment without Caddy, in a template element of the head', () => {
+    const start = head.indexOf('<template><!--')
+    expect(start).toBeGreaterThan(-1)
+    // Le commentaire se ferme une seule fois, à la fin du marqueur, avec l'élément : rien ne
+    // s'affiche ni ne s'applique en dehors.
+    const end = head.indexOf('-->', start)
+    expect(head.slice(end, end + '--></template>'.length)).toBe('--></template>')
+    expect(head.slice(start, end)).toContain('[[waiggle httpInclude (print "/v1/public/head?lang="')
+    expect(head.slice(start + '<template><!--'.length, end)).not.toContain('<!--')
+    // Aucune autre instruction dans la tête, et aucun script : le contenu d'un <script> ou d'un
+    // <noscript> se lit autrement qu'un commentaire.
+    expect(head.slice(0, start) + head.slice(end)).not.toContain('[[waiggle')
+    expect(head).not.toMatch(/<(no)?script/)
+  })
+
+  it('says French in <html lang> without Caddy, after the attribute Caddy fills on English pages', () => {
+    const tag = html.match(/<html[^>]*>/)?.[0] ?? ''
+    // Le premier « lang » est celui que lit le navigateur : sans Caddy, c'est « fr ».
+    expect(tag.match(/\slang="([^"]*)"/)?.[1]).toBe('fr')
+    expect(tag.indexOf('data-waiggle-lang="[[waiggle if hasPrefix `/en/`')).toBeGreaterThan(-1)
+    expect(tag.indexOf('data-waiggle-lang=')).toBeLessThan(tag.indexOf(' lang='))
+  })
+
+  it('writes no value of the request in the page: the address only chooses a text or goes encoded to the API', () => {
+    const instructions = [...html.matchAll(/\[\[waiggle ([^\]]*)\]\]/g)].map(
+      (match) => match[1] ?? '',
+    )
+    expect(instructions.length).toBeGreaterThan(4) // témoin : les instructions sont bien lues
+    // Les deux seules façons permises de lire l'adresse : un choix, ou un paramètre encodé.
+    const allowed = [
+      /hasPrefix (`\/en\/`|"\/en\/") \.OriginalReq\.URL\.Path/g,
+      /\(urlquery \.OriginalReq\.URL\.Path\)/g,
+    ]
+    const rest = instructions.map((text) =>
+      allowed.reduce((left, rule) => left.replace(rule, ''), text),
+    )
+    // Rien d'autre de la demande (.Req, .OriginalReq, .Host, .Cookie…), ni d'un réglage du serveur.
+    for (const text of rest) {
+      expect(text).not.toMatch(
+        /\.(Req|OriginalReq|Host|RemoteIP|Cookie|ClientIP)\b|placeholder|env\b/,
+      )
+    }
+  })
+})
