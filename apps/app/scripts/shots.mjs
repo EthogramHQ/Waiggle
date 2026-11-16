@@ -429,6 +429,8 @@ const leaMember = {
   name: leaMe.name,
   handle: leaMe.handle,
   isMe: true,
+  // R12 : sa page est publique (« Mon profil public », page `page-publique-reglages`).
+  publicPage: true,
   projects: [summaryOf(photosProject), summaryOf(draftProject), summaryOf(recipesProject)],
 }
 // Une image d'exemple par photo (le dépôt n'en contient aucune) : un dégradé SVG, d'une couleur
@@ -596,6 +598,8 @@ const inesMember = {
   handle: 'ines_haddad',
   bio: 'Je lance des petits outils pour l’association.',
   isMe: false,
+  // R12 : sa page est publique ; un visiteur la lit à /fr/members/ines-id (`visiteur-membre`).
+  publicPage: true,
   isFollowed: false,
   followerCount: 7,
   projects: [],
@@ -1497,6 +1501,23 @@ const goneCommentId = '5e6f7081-92a3-4b4c-8d5e-0000000000ff'
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
+  // R12, planche R12-Vitrine (page `activite-vitrine`) : « Le ciel de ce soir est sur l'accueil »,
+  // nouveau, avec « Retirer de l'accueil » (le projet y est encore), au-dessus des mises à jour.
+  if (choice === 'showcase') {
+    return [
+      [
+        {
+          kind: 'showcase_added',
+          id: `showcase_added:${webSkyProject.id}`,
+          at: hoursAgo(0.1),
+          isNew: true,
+          project: notified(webSkyProject),
+          onShowcase: true,
+        },
+        ...notificationPages('updates')[0],
+      ],
+    ]
+  }
   // R10 : les cinq lignes des ruches (testing/hives.ts), page `activite-ruches`.
   if (choice === 'hives') return [hiveNotifications]
   if (choice === 'moderation') {
@@ -1930,6 +1951,272 @@ const testedProject = {
 cardProjects.set(testedProject.id, testedProject)
 updatesOf.set(testedProject.id, [testedProject.latestUpdate])
 
+// R12, « Les projets publics » (plan R12, captures ; planches R12-*) : ce qu'un visiteur sans compte
+// lit (GET /v1/public/*), la vitrine de l'accueil et « À la une », l'onglet de la modération, et
+// « Mon profil public ». Les projets et les membres sont ceux des autres captures, pour qu'un geste
+// mène d'une page à l'autre sans « introuvable ».
+// « Décollage ! » d'Inès (le projet aux trois photos et trois prompts de la galerie), ouvert à tous
+// (`web`) sous son propre identifiant : `launchProject` garde « Membres de Waiggle » pour les
+// captures d'avant. Trois mises à jour, la plus récente en tête : « Voir les 3 mises à jour ».
+const launchUpdates = [
+  update(
+    41,
+    {
+      title: 'Le plan suit la météo',
+      version: 'v1.2',
+      lines: [
+        line('new', 'Une sortie déplacée quand il pleut fort'),
+        line('fixed', 'Les allures s’affichent en minutes par kilomètre'),
+      ],
+    },
+    17,
+  ),
+  update(
+    42,
+    { version: 'v1.1', lines: [line('polish', 'Un rappel la veille de chaque séance')] },
+    10,
+  ),
+  update(
+    43,
+    { title: 'Première version', lines: [line('new', 'Un plan de 4 semaines pour courir 10 km')] },
+    2,
+  ),
+]
+const webLaunchProject = {
+  ...launchProject,
+  id: '00000000-0000-4000-8000-0000000000f8',
+  visibility: 'web',
+  // Sa propre description : sans elle, il hériterait de celle de l'agent de recettes (le frigo).
+  description:
+    '## Comment ça marche\n\nTu donnes tes trois dernières sorties ; il propose **quatre semaines** de séances, puis les ajuste chaque dimanche.',
+  primaryCategory: 'health-sport',
+  secondaryCategory: 'learning',
+  tools: [
+    { label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true },
+    { label: 'Lovable', slug: 'lovable', inCatalogue: true },
+  ],
+  difficulty: 'easy',
+  startedOn: '2026-03',
+  latestUpdate: launchUpdates[0],
+  updateCount: launchUpdates.length,
+  version: 'v1.2',
+}
+// « Le ciel de ce soir », le projet de Léa (feuille de modification de R6a), ouvert à tous sous son
+// propre identifiant : il est dans la vitrine, et Activité dit à Léa qu'il est sur l'accueil.
+const webSkyProject = {
+  ...skyProject,
+  id: '00000000-0000-4000-8000-0000000000e2',
+  visibility: 'web',
+}
+for (const one of [webLaunchProject, webSkyProject]) cardProjects.set(one.id, one)
+updatesOf.set(webLaunchProject.id, launchUpdates)
+
+// Les projets publics que la vitrine et la modération connaissent, en carte : de quoi les montrer
+// (titre, pitch, statut, première photo, auteur) et leur date de passage en public. « Quel
+// papillon ? » de Max et « Biscotte au parc » de Tante Odile viennent d'Explorer et de la
+// recherche ; la seconde n'a pas de photo (la carte montre la lumière miel). « Le tri des photos de
+// vacances » : Max l'a retiré de l'accueil (`declinedAt`), la modération ne peut plus l'y remettre.
+const showcaseCard = (project, publishedAt, declinedAt = null) => ({
+  id: project.id,
+  title: project.title,
+  pitch: project.pitch,
+  status: project.status,
+  cover: project.cover !== undefined ? project.cover : (project.visuals?.[0] ?? null),
+  author: project.author,
+  publishedAt,
+  declinedAt,
+})
+const papillonCard = testerItems[0].project
+const croquettesCard = discoverItems[4].project
+const publicPool = [
+  showcaseCard(webLaunchProject, '2026-10-14T08:00:00.000Z'),
+  showcaseCard(papillonCard, '2026-10-12T09:15:00.000Z'),
+  showcaseCard(webSkyProject, '2026-10-09T18:30:00.000Z'),
+  showcaseCard({ ...biscotteProject, status: 'done', cover: null }, '2026-10-02T10:00:00.000Z'),
+  showcaseCard(coffeeProject, '2026-10-19T07:40:00.000Z'),
+  showcaseCard(croquettesCard, '2026-10-18T16:00:00.000Z'),
+  showcaseCard(fromOthers[0], '2026-10-06T12:00:00.000Z', '2026-10-13T18:40:00.000Z'),
+]
+const poolCard = (id) => publicPool.find((one) => one.id === id)
+// La vitrine choisie : quatre projets (trois se montrent sur téléphone). La page
+// `moderation-vitrine` (`moderation: 'showcase-room'`) n'en a que trois : « 3 sur 4 » et « Une
+// place libre », comme la planche R12-Vitrine.
+const showcaseIdsOf = (moderation) =>
+  publicPool.slice(0, moderation === 'showcase-room' ? 3 : 4).map((one) => one.id)
+/** Une carte de la vitrine (`ShowcaseItem`) : jamais l'identifiant de l'auteur. */
+const showcaseItemOf = ({ id, title, pitch, status, cover, author }) => ({
+  id,
+  title,
+  pitch,
+  status,
+  cover,
+  author: { name: author.name, avatarUrl: author.avatarUrl },
+})
+/** L'onglet « Vitrine de l'accueil » (`ModerationShowcase`) : la vitrine, puis les autres. */
+const moderationShowcaseOf = (ids) => {
+  const brief = ({ id, title, status, cover, author }) => ({
+    id,
+    title,
+    status,
+    cover,
+    author: { id: author.id, name: author.name },
+  })
+  return {
+    items: ids.map((id, index) => ({
+      project: brief(poolCard(id)),
+      position: index + 1,
+      addedAt: new Date(Date.UTC(2026, 9, 14 - index * 2, 8)).toISOString(),
+      // « Le ciel de ce soir » a été modifié depuis son entrée (relecture juridique, décision 18).
+      editedSinceAdded: id === webSkyProject.id,
+    })),
+    candidates: publicPool
+      .filter((one) => !ids.includes(one.id))
+      .map((one) => ({
+        project: brief(one),
+        publishedAt: one.publishedAt,
+        showcaseDeclinedAt: one.declinedAt,
+      })),
+  }
+}
+
+// Ce qu'un visiteur lit d'un projet public (`PublicProject`) : tout ce que l'auteur a écrit, les
+// catégories nommées dans la langue de la page (`?lang=`), la démo et son domaine, un nombre de
+// réactions ; jamais les commentaires, les abonnés ni la ruche. Les mises à jour perdent ce qui
+// ne regarde que l'auteur (`removal`, `removedParts`).
+const publicPageOwners = new Set([ines.id, leaMe.id])
+const publicUpdateOf = ({ removal, removedParts, ...shown }) => shown
+const categoryNameOf = (code, lang) =>
+  categoryList(lang).categories.find((one) => one.code === code)?.name ?? code
+const publicProjectOf = (project, lang, reactionCount) => ({
+  id: project.id,
+  author: { ...project.author, publicPage: publicPageOwners.has(project.author.id) },
+  title: project.title,
+  pitch: project.pitch,
+  description: project.description,
+  status: project.status,
+  categories: [project.primaryCategory, project.secondaryCategory]
+    .filter(Boolean)
+    .map((code) => ({ code, name: categoryNameOf(code, lang) })),
+  tools: project.tools,
+  difficulty: project.difficulty,
+  startedOn: project.startedOn,
+  prompts: project.prompts,
+  visuals: project.visuals,
+  portraitCover: project.portraitCover,
+  demo: project.demoUrl
+    ? { url: project.demoUrl, domain: new URL(project.demoUrl).hostname }
+    : null,
+  reactionCount,
+  latestUpdate: project.latestUpdate ? publicUpdateOf(project.latestUpdate) : null,
+  updateCount: project.updateCount,
+  latestUpdateAt: project.latestUpdate?.createdAt ?? null,
+  version: project.version,
+  publishedAt: project.createdAt,
+  updatedAt: project.updatedAt,
+})
+// Les projets publics qu'un visiteur peut ouvrir, et leur nombre de réactions (planche : 54).
+const publicReactionCounts = new Map([
+  [webLaunchProject.id, 54],
+  [webSkyProject.id, 12],
+])
+const publicProjectById = new Map([
+  [webLaunchProject.id, webLaunchProject],
+  [webSkyProject.id, webSkyProject],
+])
+/** Une carte de la page publique d'un membre (`PublicProjectCard`). */
+const publicCardOf = ({ id, title, pitch, status, cover }) => ({ id, title, pitch, status, cover })
+// « Mon profil public » de Léa, au départ : sa page ouverte, tout coché sauf le nombre d'abonnés
+// (le réglage par défaut). « 1 sur 4 » : un seul de ses projets est public.
+const leaPublicSettings = {
+  publicPage: true,
+  showBio: true,
+  showFavoriteTools: true,
+  showProjects: true,
+  showFollowerCount: false,
+}
+// La page publique d'un membre (`PublicMember`) : son nom et sa photo, puis ce qu'il a coché ; une
+// case décochée donne un champ absent. Inès montre tout, abonnés compris ; Léa suit ses réglages.
+const publicMemberOf = (id, leaSettings) => {
+  if (id === ines.id) {
+    return {
+      id: ines.id,
+      name: ines.name,
+      avatarUrl: ines.avatarUrl,
+      bio: inesMember.bio,
+      favoriteTools: webLaunchProject.tools,
+      projects: [publicCardOf(poolCard(webLaunchProject.id)), publicCardOf(croquettesCard)],
+      followerCount: inesMember.followerCount,
+    }
+  }
+  if (id === leaMe.id && leaSettings.publicPage) {
+    return {
+      id: leaMe.id,
+      name: leaMe.name,
+      avatarUrl: null,
+      ...(leaSettings.showBio ? { bio: leaPage.bio } : null),
+      ...(leaSettings.showFavoriteTools ? { favoriteTools: leaPage.favoriteTools } : null),
+      ...(leaSettings.showProjects
+        ? { projects: [publicCardOf(poolCard(webSkyProject.id))] }
+        : null),
+      ...(leaSettings.showFollowerCount ? { followerCount: leaPage.followerCount } : null),
+    }
+  }
+  return null
+}
+// Ce que la feuille « Signaler » d'un visiteur montre de la cible (`PublicReportTarget`) : le projet
+// d'Inès et ses parties (ses trois photos, avec leur miniature), une de ses mises à jour, ou sa
+// page. Ni pseudo, ni « déjà signalé ». Cinq signalements par jour et par connexion.
+const thumbOf = (visual) => ({ url: visual.url, thumbhash: visual.thumbhash })
+const noPart = (field) => ({ field, mediaId: null, position: null, thumb: null })
+const publicReportTargetOf = (kind, id) => {
+  const project = webLaunchProject
+  if (kind === 'project' && id === project.id) {
+    return {
+      target: { kind, id },
+      text: `${project.title} — ${project.pitch}`,
+      projectId: project.id,
+      head: {
+        title: project.title,
+        authorName: project.author.name,
+        image: thumbOf(project.visuals[0]),
+      },
+      parts: [
+        ...['title', 'pitch', 'description', 'category', 'tools', 'demoUrl'].map(noPart),
+        ...project.visuals.map((visual, index) => ({
+          field: 'photo',
+          mediaId: visual.id,
+          position: index + 1,
+          thumb: thumbOf(visual),
+        })),
+        noPart('prompt'),
+      ],
+      remainingToday: 5,
+    }
+  }
+  const shown = launchUpdates.find((one) => one.id === id)
+  if (kind === 'update' && shown) {
+    return {
+      target: { kind, id },
+      text: [shown.title, ...shown.lines.map((one) => one.text)].filter(Boolean).join(' — '),
+      projectId: project.id,
+      head: { title: shown.title, authorName: project.author.name, image: null },
+      parts: [noPart('text')],
+      remainingToday: 5,
+    }
+  }
+  if (kind === 'member' && id === ines.id) {
+    return {
+      target: { kind, id },
+      text: ines.name,
+      projectId: null,
+      head: { title: null, authorName: ines.name, image: null },
+      parts: ['name', 'bio', 'favoriteTools'].map(noPart),
+      remainingToday: 5,
+    }
+  }
+  return null
+}
+
 // R7b : le coin des testeurs. Trois coins : celui du projet de recettes de Léa (elle en est
 // l'autrice : 12 testeurs, la liste, deux appels, quatre fils), celui de « Décollage ! » de Max
 // (Léa y est testeuse : les appels, son fil avec Max), et celui d'« Avis express », retiré par la
@@ -2284,6 +2571,10 @@ const fakeApi = (
   const testers = new Map()
   // R7b : les coins des testeurs de cette capture, que ses gestes changent (appel, retour, retrait).
   const corners = structuredClone(testerCornersAtStart())
+  // R12 : la vitrine de cette capture (l'onglet de la modération la change, « Retirer de
+  // l'accueil » en sort un projet), et les réglages de « Mon profil public » de Léa.
+  let showcaseIds = showcaseIdsOf(moderation)
+  let publicSettings = structuredClone(leaPublicSettings)
   const withExtras = (project) => ({
     ...project,
     isTester: testers.has(project.id) ? testers.get(project.id) : project.isTester,
@@ -2336,7 +2627,68 @@ const fakeApi = (
       }
       return route.fulfill({ status: 204, body: '' })
     }
+    // R7b : les images (photos des projets, du coin des testeurs) : un dégradé par identifiant. R12 :
+    // avant la garde de session, car un visiteur voit les photos d'un projet public.
+    const media = pathname.match(/^\/media\/(?:visuals|testers)\/([0-9a-f-]+)\.webp$/)
+    if (media) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: sampleImage(media[1]),
+      })
+    }
+    // R12 : les lectures publiques, sans session (un membre les lit aussi : l'aperçu de sa page
+    // publique). Ce qui n'est pas public répond le même 404 qu'un identifiant inconnu.
+    const notFound = () => json(404, { error: { code: 'not_found', message: '' } })
+    if (pathname === '/v1/public/showcase') {
+      return json(200, { items: showcaseIds.map((id) => showcaseItemOf(poolCard(id))) })
+    }
+    const publicProjectRoute = pathname.match(
+      /^\/v1\/public\/projects\/([^/]+)(?:\/updates(?:\/([^/]+))?)?$/,
+    )
+    if (publicProjectRoute && method === 'GET') {
+      const shown = publicProjectById.get(decodeURIComponent(publicProjectRoute[1]))
+      if (!shown) return notFound()
+      const updates = (updatesOf.get(shown.id) ?? []).map(publicUpdateOf)
+      if (publicProjectRoute[2]) {
+        const one = updates.find((u) => u.id === publicProjectRoute[2])
+        return one ? json(200, one) : notFound()
+      }
+      if (pathname.endsWith('/updates')) return json(200, { items: updates, nextCursor: null })
+      const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'fr'
+      return json(200, publicProjectOf(shown, lang, publicReactionCounts.get(shown.id) ?? 0))
+    }
+    const publicMemberRoute = pathname.match(/^\/v1\/public\/members\/([^/]+)$/)
+    if (publicMemberRoute) {
+      const shown = publicMemberOf(decodeURIComponent(publicMemberRoute[1]), publicSettings)
+      return shown ? json(200, shown) : notFound()
+    }
+    if (pathname === '/v1/public/reports/target') {
+      const target = publicReportTargetOf(url.searchParams.get('kind'), url.searchParams.get('id'))
+      return target ? json(200, target) : notFound()
+    }
+    // Le signalement d'un visiteur : 204, la même réponse pour un premier signalement et un doublon.
+    if (pathname === '/v1/public/reports' && method === 'POST') {
+      return route.fulfill({ status: 204, body: '' })
+    }
     if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
+    // R12 : « À la une » d'Explorer et la vitrine vue par un membre ; « Retirer de l'accueil »
+    // (Activité) : le projet quitte la vitrine, 204.
+    if (pathname === '/v1/showcase') {
+      return json(200, { items: showcaseIds.map((id) => showcaseItemOf(poolCard(id))) })
+    }
+    const leaveShowcase = pathname.match(/^\/v1\/projects\/([^/]+)\/showcase$/)
+    if (leaveShowcase && method === 'DELETE') {
+      showcaseIds = showcaseIds.filter((id) => id !== leaveShowcase[1])
+      return route.fulfill({ status: 204, body: '' })
+    }
+    // R12, « Mon profil public » : les cinq cases ; seul le champ changé part, l'API rend le tout.
+    if (pathname === '/v1/me/public-page') {
+      if (method === 'PATCH') {
+        publicSettings = { ...publicSettings, ...JSON.parse(route.request().postData() ?? '{}') }
+      }
+      return json(200, { settings: publicSettings, webProjectCount: 1, projectCount: 4 })
+    }
     // R8, « Voir en contexte » : le fil entier d'un commentaire et son projet ; un commentaire
     // inconnu (supprimé, masqué, retiré, d'un projet qu'on ne voit pas) : le même 404 partout.
     const contextOf = pathname.match(/^\/v1\/comments\/([^/]+)\/context$/)
@@ -2989,6 +3341,19 @@ const fakeApi = (
     // R6b : l'administration du catalogue (pages « Outils » et « Catégories »), les données des
     // tests de ces pages (`testing/catalogue.ts`), chaque liste en une seule page.
     const onePage = (items) => json(200, { items, nextCursor: null })
+    // R12, l'onglet « Vitrine de l'accueil » : la vitrine dans l'ordre, puis les projets publics
+    // qui n'y sont pas. PUT la remplace en entier ; un projet dont l'auteur a quitté l'accueil est
+    // refusé (409 `author_declined`) et rien ne change, comme l'API.
+    if (pathname === '/v1/moderation/showcase') {
+      if (method === 'PUT') {
+        const { projectIds = [] } = JSON.parse(route.request().postData() ?? '{}')
+        if (projectIds.some((id) => poolCard(id)?.declinedAt)) {
+          return json(409, { error: { code: 'author_declined', message: '' } })
+        }
+        showcaseIds = projectIds.filter((id) => poolCard(id))
+      }
+      return json(200, moderationShowcaseOf(showcaseIds))
+    }
     // Depuis jur-J1 (décision de Louis du 9/11/2026 au soir), un « Autre » des seuls profils et un
     // « Autre » cité par des projets et des profils suivent ceux des tests d'écran.
     if (pathname === '/v1/moderation/tools/pending') {
@@ -3071,15 +3436,6 @@ const fakeApi = (
       return json(500, { error: { code: 'internal', message: '' } })
     const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
     if (tag) return json(200, { slug: tag[1], label: null, projects: [] })
-    // R7b : les images du coin des testeurs (photos d'appel, captures) ont leur propre dossier.
-    const media = pathname.match(/^\/media\/(?:visuals|testers)\/([0-9a-f-]+)\.webp$/)
-    if (media) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'image/svg+xml',
-        body: sampleImage(media[1]),
-      })
-    }
     return json(404, { error: { code: 'not_found', message: '' } })
   }
 }
@@ -3095,6 +3451,14 @@ const fillFeedback = async (page) => {
   await page
     .getByLabel(fr.project.testers.feedback.text)
     .fill('Le score repart à zéro au niveau 3.')
+}
+// R12 : la feuille « Signaler » d'un visiteur remplie (planche R12-Visiteur-Signaler) : tout le
+// projet, puis « Continuer », le motif, et l'adresse e-mail facultative.
+const fillVisitorReport = async (page) => {
+  await page.getByRole('radio', { name: /^Tout le projet/ }).click()
+  await page.getByRole('button', { name: 'Continuer' }).click()
+  await page.getByRole('radio', { name: /^Lien, démo ou prompt dangereux/ }).click()
+  await page.getByLabel(fr.report.visitor.email).fill('camille.carnot@exemple.fr')
 }
 // La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
 // servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
@@ -3112,7 +3476,11 @@ const withLeaPhoto = async (page) => {
 }
 const pages = [
   { name: 'catalogue', path: '/catalogue', signedIn: false, fullPage: true },
-  { name: 'accueil', path: '/', signedIn: false },
+  // R12 (planches R12-Visiteur-Accueil et R12-Visiteur-Desktop) : l'accueil d'un visiteur est la
+  // vitrine, à son adresse par langue : l'accroche, les boutons de compte, « Des projets à voir »
+  // (trois cartes sur téléphone, quatre sur ordinateur), le pied avec « English ». Le Fil d'un
+  // membre est à /feed (les pages fil-* plus bas).
+  { name: 'accueil', path: '/fr/', signedIn: false },
   { name: 'connexion', path: '/sign-in', signedIn: false },
   // R2 : arrivé du nouveau mot de passe, « Mot de passe changé. Connecte-toi avec le nouveau. »
   {
@@ -3213,12 +3581,12 @@ const pages = [
   // R4 : « fil » est lu jusqu'au 18/10, donc « Tu es à jour » coupe le fil en deux ; « fil-a-jour »
   // n'a rien de neuf (la sphère en tête) ; « fil-vide » est le premier lancement (« Ton fil
   // t'attend » et les proches à suivre).
-  { name: 'fil', path: '/', signedIn: true, feed: 'read-midway', fullPage: true },
+  { name: 'fil', path: '/feed', signedIn: true, feed: 'read-midway', fullPage: true },
   // RF : le Fil défilé de 700 points. Sur ordinateur, la barre du haut reste fixée et le contenu
   // passe dessous ; sur téléphone, rien ne change (pas de barre du haut).
   {
     name: 'fil-defile',
-    path: '/',
+    path: '/feed',
     signedIn: true,
     feed: 'read-midway',
     prepare: async (page) => {
@@ -3235,14 +3603,14 @@ const pages = [
       })
     },
   },
-  { name: 'fil-a-jour', path: '/', signedIn: true, feed: 'read-all', fullPage: true },
-  { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  { name: 'fil-a-jour', path: '/feed', signedIn: true, feed: 'read-all', fullPage: true },
+  { name: 'fil-vide', path: '/feed', signedIn: true, feed: 'nobody' },
   // R4 : le fil qui charge (la première page ne répond jamais : le squelette des cartes), puis le
   // fil en panne (500 : le message et « Réessayer »). La route de la page passe avant l'API
   // simulée ; la page est relue pour que la première requête la prenne.
   {
     name: 'fil-chargement',
-    path: '/',
+    path: '/feed',
     signedIn: true,
     prepare: async (page) => {
       await page.route(
@@ -3255,7 +3623,7 @@ const pages = [
   },
   {
     name: 'fil-erreur',
-    path: '/',
+    path: '/feed',
     signedIn: true,
     prepare: async (page) => {
       await page.route(
@@ -3289,7 +3657,7 @@ const pages = [
   // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
   { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
-  { name: 'fil-fini', path: '/', signedIn: true, feed: 'end', fullPage: true },
+  { name: 'fil-fini', path: '/feed', signedIn: true, feed: 'end', fullPage: true },
   // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
   { name: 'introuvable', path: '/nulle-part', signedIn: false },
   // Les notifications (tranche 6b) : la liste (avec sa suite), l'écran vide, et la cloche à « 9+ ».
@@ -3312,7 +3680,7 @@ const pages = [
     fullPage: true,
   },
   { name: 'notifications-vide', path: '/notifications', signedIn: true, notifications: 'none' },
-  { name: 'cloche-pleine', path: '/', signedIn: true, notifications: 'many' },
+  { name: 'cloche-pleine', path: '/feed', signedIn: true, notifications: 'many' },
   // La page d'un autre membre et son projet : les boutons « Suivre ».
   { name: 'membre-autre', path: '/members/max-id', signedIn: true, fullPage: true },
   { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
@@ -3335,7 +3703,7 @@ const pages = [
   { name: 'projet-section-maj', path: project, signedIn: true, fullPage: true },
   // R7a : le fil « Abonnements » (premier passage) : deux cartes de projets mis à jour (« Mis à jour
   // · v2 », la première ligne, « et 2 autres changements »), chaque projet une seule fois.
-  { name: 'fil-mise-a-jour', path: '/', signedIn: true, fullPage: true },
+  { name: 'fil-mise-a-jour', path: '/feed', signedIn: true, fullPage: true },
   // R7a : Activité, avec deux notifications « a publié une mise à jour de … » (une nouvelle, une lue).
   {
     name: 'activite-maj',
@@ -4102,7 +4470,7 @@ const pages = [
   // son projet, ni « Modifier » ni note à écrire ; sur celui de Max, ni suivre, ni réagir, ni
   // commenter ; le formulaire remplacé par l'état « suspendu » ; le profil fermé, les e-mails
   // réglables.
-  { name: 'suspendu-accueil', path: '/', signedIn: true, suspended: true },
+  { name: 'suspendu-accueil', path: '/feed', signedIn: true, suspended: true },
   { name: 'suspendu-projet', path: project, signedIn: true, suspended: true, fullPage: true },
   {
     name: 'suspendu-projet-autre',
@@ -4278,7 +4646,7 @@ const pages = [
   // téléphone (le web n'a pas de `fontScale`).
   {
     name: 'barre-320-texte-200',
-    path: '/',
+    path: '/feed',
     signedIn: true,
     phone: { width: 320, height: 640 },
     phoneOnly: true,
@@ -4287,8 +4655,9 @@ const pages = [
   { name: 'etiquette', path: '/tags/claude-code', signedIn: true, fullPage: true },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
   // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
-  // adresse qui ne mène nulle part.
-  { name: 'visiteur-projet', path: project, signedIn: false },
+  // adresse qui ne mène nulle part. R12 : la page réservée aux membres prend le nom
+  // `visiteur-projet-membres` ; `visiteur-projet` est désormais un projet public (plus bas).
+  { name: 'visiteur-projet-membres', path: project, signedIn: false },
   // wait : l'appli réessaie deux fois une lecture ratée (environ 3 s) avant d'afficher l'erreur.
   { name: 'erreur', path: '/members/erreur', signedIn: true, wait: 4500 },
   { name: 'adresse-inconnue', path: '/nulle-part', signedIn: false },
@@ -4379,8 +4748,8 @@ const pages = [
   // R11, planche R11-Accepter : Léa n'a pas encore accepté les règles (inscrite avant R11) ; à
   // l'ouverture de l'appli, l'écran « Accepter » passe au-dessus de l'accueil. Puis une nouvelle
   // version : « Ce qui change » au-dessus de « En bref » (une clé inventée, testing/legal.ts).
-  { name: 'accepter', path: '/', signedIn: true, rules: 'pending', fullPage: true },
-  { name: 'accepter-changements', path: '/', signedIn: true, rules: 'changed', fullPage: true },
+  { name: 'accepter', path: '/feed', signedIn: true, rules: 'pending', fullPage: true },
+  { name: 'accepter-changements', path: '/feed', signedIn: true, rules: 'changed', fullPage: true },
   // R11, planches R11-Mes-Commentaires et R11-Mes-Retours (Réglages, « Mes données ») : les deux
   // listes de testing/legal.ts, un projet qui n'est plus visible, un commentaire masqué par
   // l'autrice du projet, un retiré par la modération, un coin fermé ; la fenêtre de suppression
@@ -4529,10 +4898,10 @@ const pages = [
       await page.getByRole('dialog').waitFor()
     },
   },
-  { name: 'fil-ruche', path: `/?hive=${familleId}`, signedIn: true, fullPage: true },
+  { name: 'fil-ruche', path: `/feed?hive=${familleId}`, signedIn: true, fullPage: true },
   {
     name: 'fil-premier-invitation',
-    path: '/',
+    path: '/feed',
     signedIn: true,
     feed: 'nobody',
     hives: 'invited',
@@ -4584,6 +4953,108 @@ const pages = [
       await page.getByRole('button', { name: 'Partager', exact: true }).first().click()
       await page.getByRole('button', { name: 'Copier le lien' }).waitFor()
     },
+  },
+  // R12, « Les projets publics » (plan R12, captures). D'abord ce que voit un visiteur, sans
+  // session et à l'adresse par langue : « Décollage ! » d'Inès ouvert à tous (planches
+  // R12-Visiteur-Projet, -Desktop et -Nuit : la barre sur la photo, « Tester la démo », « 54
+  // réactions de membres », « Les commentaires sont réservés aux membres »), puis sa page publique
+  // (R12-Visiteur-Profil), et la feuille « Compte requis » ouverte par « Réagir ».
+  {
+    name: 'visiteur-projet',
+    path: `/fr/projects/${webLaunchProject.id}`,
+    signedIn: false,
+    fullPage: true,
+  },
+  { name: 'visiteur-membre', path: `/fr/members/${ines.id}`, signedIn: false, fullPage: true },
+  {
+    name: 'compte-requis',
+    path: `/fr/projects/${webLaunchProject.id}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.visitor.react, exact: true }).first().click()
+      await page.getByRole('heading', { name: fr.visitor.accountRequired.title }).waitFor()
+    },
+  },
+  // Signaler sans compte (planches R12-Visiteur-Signaler et -Signale) : tout le projet, le motif
+  // « Lien, démo ou prompt dangereux », l'adresse e-mail facultative remplie ; puis « Merci », qui
+  // promet un e-mail (une adresse a été donnée).
+  {
+    name: 'visiteur-signaler',
+    path: `/report?kind=project&id=${webLaunchProject.id}`,
+    signedIn: false,
+    fullPage: true,
+    prepare: (page) => fillVisitorReport(page),
+  },
+  {
+    name: 'visiteur-signale',
+    path: `/report?kind=project&id=${webLaunchProject.id}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await fillVisitorReport(page)
+      // « Envoyer » ignore les tapes juste après « Continuer » (600 ms).
+      await page.waitForTimeout(800)
+      await page.getByRole('button', { name: 'Envoyer le signalement' }).click()
+      await page.getByText(fr.report.visitor.sentBodyEmail).first().waitFor()
+    },
+  },
+  // Côté membre. « Qui peut le voir ? » avec « Public » choisi (planche R12-Qui-Peut-Voir : « Visible
+  // par tous, et trouvable sur Google ») ; la feuille « Partager » du même projet ouvert à tous
+  // (R12-Partager-Public : « Tout le monde pourra l'ouvrir. », l'adresse /fr/projects/…).
+  {
+    name: 'qui-peut-voir-public',
+    path: '/projects/new',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: fr.project.form.web, exact: true }).click()
+    },
+  },
+  {
+    name: 'partager-public',
+    path: `/projects/${webLaunchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Partager', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Copier le lien' }).waitFor()
+    },
+  },
+  // « Mon profil public » de Léa (planche R12-Profil-Public) : sa page ouverte, les cases cochées
+  // (sauf les abonnés), « 1 sur 4 : les autres restent entre membres ».
+  {
+    name: 'page-publique-reglages',
+    path: '/settings/public-page',
+    signedIn: true,
+    fullPage: true,
+  },
+  // « À la une » en tête d'Explorer (planche R12-A-La-Une) : la vitrine, pour les membres.
+  { name: 'explorer-a-la-une', path: '/explore', signedIn: true },
+  // L'onglet « Vitrine de l'accueil » de la modération (planche R12-Vitrine) : « 3 sur 4 », « Une
+  // place libre », « Modifié depuis la mise en avant », puis les projets publics, dont un que son
+  // auteur a retiré de l'accueil. L'onglet se choisit comme « Retirés » (un choix segmenté).
+  {
+    name: 'moderation-vitrine',
+    path: '/moderation',
+    signedIn: true,
+    admin: true,
+    moderation: 'showcase-room',
+    fullPage: true,
+    prepare: async (page) => {
+      const tab = new RegExp(`^${fr.moderation.showcase.tab}`)
+      await page
+        .getByRole('radio', { name: tab })
+        .or(page.getByRole('tab', { name: tab }))
+        .first()
+        .click()
+      await page.getByRole('heading', { name: fr.moderation.showcase.title }).waitFor()
+    },
+  },
+  // Activité : « Le ciel de ce soir est sur l'accueil de Waiggle », avec « Retirer de l'accueil ».
+  {
+    name: 'activite-vitrine',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'showcase',
+    fullPage: true,
   },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
