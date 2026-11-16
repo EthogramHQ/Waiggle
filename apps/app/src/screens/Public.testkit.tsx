@@ -31,7 +31,7 @@ import { photo } from '../testing/projects'
 // --- Les fausses données ---
 
 export const decollageId = 'd1e2c3a4-5b6c-4d7e-8f90-a1b2c3d4e5f6'
-export const papillonId = 'e2f3a4b5-6c7d-4e8f-9a01-b2c3d4e5f607'
+export const papillonId = 'e2f3a4b5-6c7d-4e8f-9a01-b2c3d4e5f607' // gitleaks:allow
 export const cielId = 'f3a4b5c6-7d8e-4f90-8b12-c3d4e5f60718'
 export const cafesId = 'a4b5c6d7-8e9f-4a01-9c23-d4e5f6071829'
 export const updateId = '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b'
