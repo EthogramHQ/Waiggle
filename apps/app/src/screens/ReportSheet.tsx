@@ -14,14 +14,28 @@
 //
 // Une seule feuille pour tous les états (chargement, introuvable, limite du jour, son propre
 // contenu, déjà signalé) : elle ne se referme pas pour se rouvrir, et le focus posé reste.
+//
+// R12, le mode visiteur (scénario « Le signalement par un visiteur », planches R12-Visiteur-Signaler
+// et R12-Visiteur-Signale ; plan R12, décisions 10, 12 et 17) : sans session, la même feuille
+// signale un projet public, une de ses mises à jour ou une page publique. Elle lit la cible à la
+// route d'un visiteur (reports/visitor.ts, sans cookie) et envoie à POST /v1/public/reports. Les
+// mêmes étapes, les mêmes huit motifs, la phrase de bonne foi (décision 17) ; en plus, un champ
+// d'adresse e-mail facultatif, pour recevoir la suite ; en moins, « Bloquer aussi » (il faut un
+// compte), le pseudo (Q8) et la phrase sur l'anonymat d'un membre, fausse pour un visiteur
+// (« La modération lit chaque signalement. » à sa place). Une sorte qu'un visiteur ne peut pas
+// signaler (un commentaire, réservé aux membres) : « Réservé aux membres », sans rien demander.
 import { contactEmail } from '@ruche/brand'
 import {
+  type PublicReportTarget,
   REPORT_DETAILS_MAX,
   REPORTS_PER_DAY,
   type ReportReason,
   ReportTarget,
   type ReportTargetKind,
   type ReportTargetPreview,
+  VISITOR_EMAIL_MAX,
+  VisitorReport,
+  VisitorReportTarget,
 } from '@ruche/contracts'
 import type { Translation } from '@ruche/i18n'
 import { type Href, usePathname, useRouter } from 'expo-router'
@@ -33,11 +47,14 @@ import { type ApiErrorKey, type ApiResult, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useBlock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
+import { publicPath } from '../navigation/publicPath'
 import { nextAfterSignIn, useSignInAgain } from '../navigation/signInAgain'
 import { type HeldAction, useLeaveGuard } from '../navigation/useLeaveGuard'
 import { useRouteSheet } from '../navigation/useRouteSheet'
+import { usePageLanguage } from '../public/api'
 import { sendReport, useReportTarget } from '../reports/api'
 import { type PartChoice, partChoices } from '../reports/parts'
+import { sendVisitorReport, usePublicReportTarget } from '../reports/visitor'
 import { Button } from '../ui/Button'
 import { Checkbox } from '../ui/Checkbox'
 import { ContactLink, contactMailto } from '../ui/ContactLink'
@@ -101,25 +118,84 @@ const fallbackOf = (target: ReportTarget | null, projectId: string | null): Href
       ? { pathname: '/members/[id]', params: { id: target.id } }
       : '/feed'
 
+/**
+ * R12 : la cible d'un visiteur décrite par l'adresse (un projet, une mise à jour, une page
+ * publique) ; null pour une sorte réservée aux membres (un commentaire) ou une adresse qui ne
+ * décrit rien de valable.
+ */
+const visitorTargetOf = (kind: string, id: string): VisitorReportTarget | null => {
+  const parsed = VisitorReportTarget.safeParse({ kind, id })
+  return parsed.success ? parsed.data : null
+}
+
+/**
+ * R12 : sans session, où revenir sans page précédente : la page publique du projet ou du membre,
+ * sinon l'accueil, dans la langue de la page. Le Fil d'un membre dirait « Réservé aux membres ».
+ */
+const visitorFallbackOf = (
+  target: VisitorReportTarget,
+  projectId: string | null,
+  lang: ReturnType<typeof usePageLanguage>,
+): Href =>
+  projectId
+    ? publicPath('project', lang, projectId)
+    : target.kind === 'member'
+      ? publicPath('member', lang, target.id)
+      : publicPath('home', lang)
+
+/**
+ * R12 : la cible lue par un visiteur, dans la forme que le formulaire lit pour un membre. Ce que la
+ * route d'un visiteur ne donne pas prend la valeur qui n'offre rien : pas de pseudo (donc jamais
+ * « Bloquer aussi »), jamais « déjà signalé ». `id` vide : l'auteur ne sert qu'à bloquer.
+ */
+const asPreview = (target: PublicReportTarget): ReportTargetPreview => ({
+  target: target.target,
+  text: target.text,
+  projectId: target.projectId,
+  author: { id: '', name: target.head.authorName, handle: null, isBlocked: false },
+  head: target.head,
+  parts: target.parts.map((part) => ({ ...part, reportedByMe: false })),
+  reportedByMe: false,
+  remainingToday: target.remainingToday,
+})
+
 export function ReportSheet({ kind, id }: { kind: string; id: string }) {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
+  const lang = usePageLanguage()
   const { state, session, retry } = useMemberSession()
   // L'adresse n'est connue que dans le navigateur : rien n'est demandé au pré-rendu.
   const hydrated = useHydrated()
   // useMemo : la même cible d'un dessin à l'autre, tant que l'adresse ne change pas.
   const target = useMemo(() => targetOf(kind, id), [kind, id])
-  // Pas de session, ou une adresse qui ne décrit rien : aucune requête.
-  const preview = useReportTarget(session && target && hydrated ? target : null)
-  const data = preview.data
+  const visitorTarget = useMemo(() => visitorTargetOf(kind, id), [kind, id])
+  // R12 : sans session, une cible qu'un visiteur peut signaler : le mode visiteur.
+  const visitor = state === 'signedOut' && visitorTarget !== null
+  // Pas de session, ou une adresse qui ne décrit rien : aucune requête à la route des membres.
+  const memberPreview = useReportTarget(session && target && hydrated ? target : null)
+  // Le mode visiteur lit sa route à lui, sans cookie ; jamais celle des membres.
+  const visitorPreview = usePublicReportTarget(visitor && hydrated ? visitorTarget : null)
+  const preview = visitor ? visitorPreview : memberPreview
+  const visitorData = visitorPreview.data
+  // useMemo : le même aperçu d'un dessin à l'autre, tant que la réponse ne change pas (les choix
+  // de partie en dépendent).
+  const visitorAsPreview = useMemo(
+    () => (visitorData ? asPreview(visitorData) : undefined),
+    [visitorData],
+  )
+  const data = visitor ? visitorAsPreview : memberPreview.data
   // Fermer revient à la page d'avant ; arrivé par un lien direct, au projet ou au profil.
-  const sheet = useRouteSheet(fallbackOf(target, data?.projectId ?? null))
+  const sheet = useRouteSheet(
+    visitor && visitorTarget
+      ? visitorFallbackOf(visitorTarget, data?.projectId ?? null, lang)
+      : fallbackOf(target, data?.projectId ?? null),
+  )
 
   // Le formulaire existe dès qu'une cible a été lue, et le reste : après « Bloquer aussi », la
   // cible devient invisible (404), et une relecture (retour sur l'onglet) ne doit pas remplacer
   // « Merci » par « introuvable » (relecture de l'interface, 7b).
-  const form = useReportForm({ preview: data ?? null, close: sheet.close })
+  const form = useReportForm({ preview: data ?? null, close: sheet.close, visitor })
 
   const title = target ? t(($) => $.report[target.kind]) : t(($) => $.report.title)
   const closeButton = (variant: 'primary' | 'secondary' = 'primary') => (
@@ -146,7 +222,9 @@ export function ReportSheet({ kind, id }: { kind: string; id: string }) {
   } else if (state === 'pending' || !hydrated) {
     // La session se lit encore (ou la page n'est pas hydratée) : le chargement.
     content = <StateMessage kind="loading" level={2} />
-  } else if (!session || failure === 'unauthorized') {
+  } else if ((!session && !visitor) || failure === 'unauthorized') {
+    // Sans session, une sorte qu'un visiteur ne peut pas signaler (un commentaire) : réservé aux
+    // membres, sans rien demander à l'API.
     content = (
       <StateMessage
         kind="signedOut"
@@ -226,20 +304,30 @@ export function ReportSheet({ kind, id }: { kind: string; id: string }) {
 
 type Step = 'part' | 'reason' | 'already' | 'sent'
 
-/** Ce que « Merci » rappelle : ce qui est parti, figé à l'envoi. */
-type SentRecap = { text: string; image: CoverImage | null; blocked: 'yes' | 'failed' | null }
+/**
+ * Ce que « Merci » rappelle : ce qui est parti, figé à l'envoi. `emailed` (R12, un visiteur) : une
+ * adresse est partie avec, un e-mail dira la suite.
+ */
+type SentRecap = {
+  text: string
+  image: CoverImage | null
+  blocked: 'yes' | 'failed' | null
+  emailed: boolean
+}
 
 /**
  * Hook : le formulaire, une fois la cible lue (`preview`) ; null avant. Il rend ce que la feuille
  * reçoit (`sheet` : pied, retour, garde de fermeture…), son contenu, et les fenêtres posées
- * par-dessus (abandon, blocage).
+ * par-dessus (abandon, blocage). `visitor` (R12) : le formulaire d'un visiteur sans compte.
  */
 function useReportForm({
   preview,
   close,
+  visitor,
 }: {
   preview: ReportTargetPreview | null
   close: () => void
+  visitor: boolean
 }) {
   const { t } = useTranslation()
   const nameOf = useNameOf()
@@ -251,6 +339,9 @@ function useReportForm({
   const [choiceKey, setChoiceKey] = useState('whole')
   const [reason, setReason] = useState<ReportReason | null>(null)
   const [details, setDetails] = useState('')
+  // R12 : l'adresse e-mail facultative d'un visiteur, et son erreur (une adresse mal formée).
+  const [email, setEmail] = useState('')
+  const [badEmail, setBadEmail] = useState(false)
   const [alsoBlock, setAlsoBlock] = useState(false)
   const [missingReason, setMissingReason] = useState(false)
   const [missingWhy, setMissingWhy] = useState(false)
@@ -276,6 +367,8 @@ function useReportForm({
   const sentRef = useRef<Focusable>(null)
   // La saisie de la précision : obligatoire pour un contenu dit illégal, le focus y va.
   const whyRef = useRef<TextFieldInput>(null)
+  // R12 : la saisie de l'adresse d'un visiteur, où va le focus si elle est mal formée.
+  const emailRef = useRef<TextFieldInput>(null)
   const calm = useCalmMotion()
   // Ce qui doit recevoir le focus au prochain dessin (après un geste seulement). `reveal` : il
   // vient aussi dans la zone qui défile (un envoi refusé avant de partir, voir `submit`).
@@ -306,7 +399,7 @@ function useReportForm({
 
   // Une précision écrite se perd en fermant : la feuille le demande d'abord. Pendant l'envoi, rien
   // ne la ferme (la réponse dira si c'est parti).
-  const dirty = details.trim() !== '' && current !== 'sent'
+  const dirty = (details.trim() !== '' || email.trim() !== '') && current !== 'sent'
   const held = useRef<HeldAction | null>(null)
   const guard = useLeaveGuard(dirty || sending, (action) => {
     // Pendant l'envoi : le retour est arrêté, sans question (rien à abandonner, ça part).
@@ -377,6 +470,11 @@ function useReportForm({
     setDetails(value)
     if (value.trim() !== '') setMissingWhy(false)
   }
+  // R12 : l'erreur de l'adresse part dès qu'on la corrige.
+  const changeEmail = (value: string) => {
+    setEmail(value)
+    setBadEmail(false)
+  }
 
   /** Ce que « Merci » rappelle : « La 2e photo de Météo, d'Inès Haddad · Arnaque ou spam ». */
   const recapOf = (sentReason: ReportReason): string => {
@@ -394,16 +492,35 @@ function useReportForm({
     })
   }
 
-  /** Envoie le signalement ; vrai s'il est parti. L'état d'envoi est tenu par l'appelant. */
-  const post = async (sentReason: ReportReason): Promise<boolean> => {
-    // Pour le contenu entier, aucune `part` ne part (le contrat refuse `part: null`). Une précision
-    // vide ne part pas : elle compte comme aucune.
-    const result = await sendReport({
-      target: preview.target,
+  /**
+   * R12 : ce qu'un visiteur envoie, ou null si sa cible n'est pas l'une des siennes (jamais : le
+   * mode visiteur n'existe que pour elles). L'adresse ne part que si elle est écrite.
+   */
+  const visitorReportOf = (sentReason: ReportReason): VisitorReport | null => {
+    const visitorTarget = VisitorReportTarget.safeParse(preview.target)
+    if (!visitorTarget.success) return null
+    return {
+      target: visitorTarget.data,
       ...(part ? { part } : null),
       reason: sentReason,
       ...(details.trim() === '' ? null : { details }),
-    })
+      ...(email.trim() === '' ? null : { email: email.trim() }),
+    }
+  }
+
+  /** Envoie le signalement ; vrai s'il est parti. L'état d'envoi est tenu par l'appelant. */
+  const post = async (sentReason: ReportReason): Promise<boolean> => {
+    const visitorReport = visitor ? visitorReportOf(sentReason) : null
+    // Pour le contenu entier, aucune `part` ne part (le contrat refuse `part: null`). Une précision
+    // vide ne part pas : elle compte comme aucune. Un visiteur envoie à sa route à lui (R12).
+    const result = visitorReport
+      ? await sendVisitorReport(visitorReport)
+      : await sendReport({
+          target: preview.target,
+          ...(part ? { part } : null),
+          reason: sentReason,
+          ...(details.trim() === '' ? null : { details }),
+        })
     if (!result.ok) {
       // Refusé : le message s'affiche, le motif et la précision restent pour réessayer.
       setFailure(result.error)
@@ -416,7 +533,7 @@ function useReportForm({
     const image = head.image
       ? { source: toSource(head.image.url), thumbhash: head.image.thumbhash, label: '' }
       : null
-    setRecap({ text: recapOf(sentReason), image, blocked })
+    setRecap({ text: recapOf(sentReason), image, blocked, emailed: email.trim() !== '' })
     setStep('sent')
     setFocusNext({ ref: sentRef })
   }
@@ -439,6 +556,17 @@ function useReportForm({
       setMissingWhy(true)
       setFocusNext({ ref: whyRef, reveal: true })
       return
+    }
+    // R12 : une adresse mal formée se dit avant de partir (le contrat la refuserait), sous son
+    // champ, où le focus va. Vérifiée par le schéma même de l'API : aucune règle recopiée ici.
+    if (visitor) {
+      const report = visitorReportOf(reason)
+      const checked = report ? VisitorReport.safeParse(report) : null
+      if (checked?.error?.issues.some((issue) => issue.path[0] === 'email')) {
+        setBadEmail(true)
+        setFocusNext({ ref: emailRef, reveal: true })
+        return
+      }
     }
     // « Bloquer aussi » : la fenêtre de blocage d'abord ; « Bloquer » y envoie, puis bloque.
     if (alsoBlock && blockable) {
@@ -478,27 +606,31 @@ function useReportForm({
   const notice: SheetNotice | null =
     failure === null || current !== 'reason'
       ? null
-      : failure === 'unauthorized'
-        ? { message: t(($) => $.states.expired), action: signInAgain() }
-        : failure === 'rateLimited'
-          ? {
-              message: t(($) => $.report.limitedLead, { max: REPORTS_PER_DAY }),
-              // L'adresse, en lien : pour un cas urgent, on peut encore écrire.
-              action: {
-                // L'adresse elle-même, nom du lien (une donnée, pas un texte à traduire).
-                label: contactEmail,
-                onPress: () => void Linking.openURL(contactMailto()),
-              },
-            }
-          : failure === 'notFound'
-            ? { message: t(($) => $.report.gone) }
-            : failure === 'alreadyReported'
-              ? {
-                  message: part
-                    ? t(($) => $.report.alreadyReportedPart)
-                    : t(($) => $.report.alreadyReportedWhole),
-                }
-              : { message: t(($) => $.errors[failure]) }
+      : visitor && (failure === 'rateLimited' || failure === 'visitorReportQuota')
+        ? // R12 : la limite de la connexion (5 par jour et par adresse IP, partagée) ; la phrase
+          // donne l'adresse de contact elle-même (relecture juridique, 4).
+          { message: t(($) => $.report.visitor.limited, { contactEmail }) }
+        : failure === 'unauthorized'
+          ? { message: t(($) => $.states.expired), action: signInAgain() }
+          : failure === 'rateLimited'
+            ? {
+                message: t(($) => $.report.limitedLead, { max: REPORTS_PER_DAY }),
+                // L'adresse, en lien : pour un cas urgent, on peut encore écrire.
+                action: {
+                  // L'adresse elle-même, nom du lien (une donnée, pas un texte à traduire).
+                  label: contactEmail,
+                  onPress: () => void Linking.openURL(contactMailto()),
+                },
+              }
+            : failure === 'notFound'
+              ? { message: t(($) => $.report.gone) }
+              : failure === 'alreadyReported'
+                ? {
+                    message: part
+                      ? t(($) => $.report.alreadyReportedPart)
+                      : t(($) => $.report.alreadyReportedWhole),
+                  }
+                : { message: t(($) => $.errors[failure]) }
 
   // --- Ce qui s'affiche ---
   const headLine = t(($) => $.report.head[kind], { nameOf: nameOf(head.authorName) })
@@ -536,7 +668,15 @@ function useReportForm({
         level={2}
         focusRef={sentRef}
         title={t(($) => $.report.sentTitle)}
-        message={t(($) => $.report.sentBody)}
+        // R12 : un visiteur n'a pas d'Activité où lire la suite ; avec une adresse, un e-mail la
+        // lui dira, sans adresse, seulement que la modération va regarder.
+        message={
+          visitor
+            ? recap.emailed
+              ? t(($) => $.report.visitor.sentBodyEmail)
+              : t(($) => $.report.visitor.sentBody)
+            : t(($) => $.report.sentBody)
+        }
       >
         <Stack gap="md">
           <Surface variant="grouped" padding="md">
@@ -561,8 +701,18 @@ function useReportForm({
     // et le 112.
     content = (
       <Surface variant="grouped" padding="md" gap="md">
-        <Text>{t(($) => $.report.limitedLead, { max: REPORTS_PER_DAY })}</Text>
-        <ContactLink />
+        {visitor ? (
+          // R12 : la limite de la connexion, l'adresse de contact dans la phrase même (à copier :
+          // `selectable` ; elle n'a pas d'espace, `breakAnywhere` la coupe à texte agrandi).
+          <Text selectable breakAnywhere>
+            {t(($) => $.report.visitor.limited, { contactEmail })}
+          </Text>
+        ) : (
+          <>
+            <Text>{t(($) => $.report.limitedLead, { max: REPORTS_PER_DAY })}</Text>
+            <ContactLink />
+          </>
+        )}
         {danger}
       </Surface>
     )
@@ -669,6 +819,25 @@ function useReportForm({
           showCount
           maxLength={REPORT_DETAILS_MAX}
         />
+        {visitor ? (
+          // R12 : l'adresse d'un visiteur, facultative, pour recevoir la suite (deux e-mails au
+          // plus, l'adresse effacée à la clôture, décision 17). Pas de champ pour le nom (Q13).
+          <TextField
+            label={t(($) => $.report.visitor.email)}
+            value={email}
+            onChangeText={changeEmail}
+            inputRef={emailRef}
+            error={badEmail ? t(($) => $.auth.errors.invalidEmail) : undefined}
+            keepHint
+            hint={t(($) => $.report.visitor.emailHint)}
+            placeholder={t(($) => $.report.visitor.emailPlaceholder)}
+            autoComplete="email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={VISITOR_EMAIL_MAX}
+          />
+        ) : null}
         {blockable ? (
           <Checkbox
             label={t(($) => $.report.alsoBlockNamed, { name: author.name, handle: blockable })}
@@ -683,9 +852,13 @@ function useReportForm({
         <Hint
           icon="shield-check"
           text={
-            kind === 'message'
-              ? t(($) => $.report.anonymityThread, { name: author.name })
-              : t(($) => $.report.anonymity)
+            // R12 : un visiteur n'a pas de compte que la modération verrait : elle lit chaque
+            // signalement, sans plus.
+            visitor
+              ? t(($) => $.report.visitor.moderationReads)
+              : kind === 'message'
+                ? t(($) => $.report.anonymityThread, { name: author.name })
+                : t(($) => $.report.anonymity)
           }
         />
       </Stack>

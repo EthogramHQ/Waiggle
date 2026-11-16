@@ -4,7 +4,8 @@
 //   projet réservé à une ruche), avec et sans photo, sur les trois teintes ;
 // - le menu « … » (`menu`), posé à côté du lien de la tuile, jamais dedans : « Épingler » sur les
 //   tuiles d'une ruche, pour l'animateur ; avec photo (le menu se pose sur elle) et sans (sa place
-//   est gardée au-dessus du titre), puis avec la pastille en plus.
+//   est gardée au-dessus du titre), puis avec la pastille en plus ;
+// - R12 : la tuile seulement dessinée, sans lien (`onPress` absent), d'un aperçu.
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés d'exemple (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais.
@@ -26,6 +27,8 @@ const fr = {
     'La pastille de visibilité au-dessus du titre (« Privé », « Réservé à Famille »), lue après le nom du lien ; le menu « … » en haut à droite, à côté du lien, jamais dedans (« Épingler », pour l’animateur d’une ruche). Le lien reste nommé par le titre.',
   badges: 'Pastilles',
   menus: 'Menu « … »',
+  drawn: 'Sans lien, dans un aperçu (R12)',
+  status: 'Testable',
   day: 'jour',
   night: 'nuit',
   private: 'Privé',
@@ -49,6 +52,8 @@ const en: typeof fr = {
     'The visibility pill above the title (“Private”, “Only for Family”), read after the name of the link; the “…” menu at the top right, next to the link, never inside it (“Pin”, for the animator of a hive). The link stays named by the title.',
   badges: 'Pills',
   menus: '“…” menu',
+  drawn: 'Without a link, in a preview (R12)',
+  status: 'Testable',
   day: 'day',
   night: 'night',
   private: 'Private',
@@ -139,6 +144,26 @@ function MenuTiles({ l }: { l: Labels }) {
   )
 }
 
+/**
+ * R12 : deux tuiles seulement dessinées, sans `onPress` (l'aperçu « Voir ma page comme un
+ * visiteur ») : avec et sans photo, la pastille du statut en plus. Le même cadre, rien à toucher.
+ */
+function DrawnTiles({ l }: { l: Labels }) {
+  return (
+    <TileMosaic columns={2}>
+      {l.titles.slice(0, 2).map((title, i) => (
+        <ProjectTile
+          key={title}
+          title={title}
+          author={l.author}
+          image={i === 0 ? { source: null, thumbhash: cafe, label: title } : null}
+          badge={l.status}
+        />
+      ))}
+    </TileMosaic>
+  )
+}
+
 export function ProjectTilesCatalogue() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -163,6 +188,10 @@ export function ProjectTilesCatalogue() {
                   {`${l.menus} — ${l[scheme]}`}
                 </Text>
                 <MenuTiles l={l} />
+                <Text variant="callout" weight={700}>
+                  {`${l.drawn} — ${l[scheme]}`}
+                </Text>
+                <DrawnTiles l={l} />
               </Stack>
             </Frame>
           </ThemeProvider>

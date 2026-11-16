@@ -60,7 +60,8 @@ function TileFrame({
 }: {
   label: string
   role: 'button' | 'link'
-  onPress: () => void
+  /** Sans lui, le cadre est seulement dessiné (un aperçu) : ni lien, ni bouton, ni enfoncement. */
+  onPress?: (() => void) | undefined
   style: object
   children: ReactNode
   frameRef?: Ref<View> | undefined
@@ -75,6 +76,25 @@ function TileFrame({
   // Dans une mosaïque, la tuile remplit sa case (la largeur de sa colonne, la hauteur de sa rangée) :
   // la vue qui s'enfonce et le cadre touchable s'étirent tous deux.
   const cell = useContext(TileCellContext)
+  const frameStyle = {
+    ...(cell
+      ? { width: '100%' as const, flexGrow: 1, minHeight: cell.minHeight }
+      : { width: TILE.width, minHeight: TILE.height }),
+    borderRadius: radii.tile,
+    overflow: 'hidden' as const,
+    ...style,
+  }
+  if (!onPress) {
+    // R12 : la tuile d'un aperçu (« Voir ma page comme un visiteur ») : le même cadre, sans rien à
+    // toucher. Ni rôle ni nom : ses textes (titre, auteur, pastille) se lisent un à un, dans l'ordre.
+    return (
+      <View style={cell ? { flexGrow: 1 } : null}>
+        <View ref={frameRef} style={frameStyle}>
+          {children}
+        </View>
+      </View>
+    )
+  }
   return (
     <Animated.View style={[pressed, cell ? { flexGrow: 1 } : null]}>
       <Pressable
@@ -92,14 +112,7 @@ function TileFrame({
         onPressOut={() => {
           scale.value = spring(1)
         }}
-        style={{
-          ...(cell
-            ? { width: '100%', flexGrow: 1, minHeight: cell.minHeight }
-            : { width: TILE.width, minHeight: TILE.height }),
-          borderRadius: radii.tile,
-          overflow: 'hidden',
-          ...style,
-        }}
+        style={frameStyle}
       >
         {children}
       </Pressable>
@@ -111,7 +124,11 @@ type ProjectTileProps = {
   title: string
   /** Le nom de la personne qui a publié le projet. */
   author: string
-  onPress: () => void
+  /**
+   * Ouvre le projet. R12 : absent, la tuile est seulement dessinée, sans lien (l'aperçu « Voir ma
+   * page comme un visiteur », d'où rien ne doit faire sortir) ; ses textes se lisent un à un.
+   */
+  onPress?: (() => void) | undefined
   /** La teinte de la tuile (miel par défaut). Elle ne change rien à ce qui est lu. */
   variant?: TileVariant
   /** La photo de couverture ; sans elle, le titre prend la place, en plus grand. */
