@@ -220,7 +220,9 @@ for path in /nope /projects /projects/a/b/c /members /tags/a/b /sign-in/extra /_
   # « @generic_lang »), sous aucune écriture ; une langue inconnue, une page de membre sous une
   # langue non plus. Les relais vers l'API ne prennent que leurs adresses exactes : la tête n'est
   # demandée que par Caddy lui-même, aucune autre route de l'API ne passe par ce domaine.
-  status=$(web --path-as-is -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
+  # --globoff : sans lui, curl lit « [lang] » comme une suite d'adresses à essayer (son « globbing »)
+  # et refuse l'adresse avant même de l'envoyer.
+  status=$(web --globoff --path-as-is -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
   expect "code HTTP de $path" "$status" 404
   cmp -s "$WORK/not-found" "$WORK/body" || die "$path ne sert pas la page introuvable"
   echo "ok : $path → 404"
