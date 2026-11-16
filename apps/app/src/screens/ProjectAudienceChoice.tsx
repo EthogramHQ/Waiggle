@@ -63,6 +63,9 @@ export const audienceSentence = (
       ? t(($) => $.project.form.audienceHiveEdit, { hive: name })
       : t(($) => $.project.form.audienceHive, { hive: name })
   }
+  // R12 : « Public » dit la même phrase à la publication et à la modification (tout le monde, et
+  // les moteurs de recherche qui gardent une copie un temps).
+  if (choice.audience === 'web') return t(($) => $.project.form.audienceWeb)
   return already
     ? t(($) => $.project.form.audienceMembersEdit)
     : t(($) => $.project.form.audienceMembers)
@@ -98,6 +101,7 @@ export function ProjectAudienceChoice({ audience, hiveId, change, hiveError, hiv
   const choose = change('audience')
   const chooseHive = change('hiveId')
   const hiveHint = t(($) => $.project.form.hiveHint)
+  const webHint = t(($) => $.project.form.webHint)
   const privateHint = t(($) => $.project.form.privateHint)
   // « Une ruche » seulement à un membre d'au moins une ruche ; un projet déjà réservé le garde,
   // même avant que ses ruches soient lues (sinon aucun choix ne serait coché).
@@ -120,6 +124,15 @@ export function ProjectAudienceChoice({ audience, hiveId, change, hiveError, hiv
             onPress={() => choose('hive')}
           />
         ) : null}
+        {/* R12 : « Public », entre « Une ruche » et « Privé ». Un membre suspendu n'arrive jamais
+            ici : la feuille lui reste fermée (R9), aucun cas à écarter dans ce composant. */}
+        <ListRow
+          label={t(($) => $.project.form.web)}
+          detail={webHint}
+          hint={webHint}
+          selected={audience === 'web'}
+          onPress={() => choose('web')}
+        />
         <ListRow
           label={t(($) => $.project.form.private)}
           detail={privateHint}
