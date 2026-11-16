@@ -120,7 +120,7 @@ const suggestedProjectIds = async (
           sql`not exists (select 1 from ${schema.profile} where ${schema.profile.userId} = ${latest.authorId} and ${schema.profile.hideFromSuggestions})`,
           // R12b : jamais un compte d'exemples, ni à personne (accounts/example.ts). Clé primaire
           // d'example_account (user_id), une lecture par auteur gardé ; après la fenêtre, comme
-          // les autres exclusions. Son dernier projet occupe donc une place de la fenêtre : c'est
+          // les autres exclusions. Ses projets récents occupent donc des places de la fenêtre : c'est
           // le prix d'une fenêtre qui reste 200 lignes d'index, quel que soit le lecteur.
           not(isExampleAccountSql(latest.authorId)),
           sql`not exists (select 1 from ${f} where ${f.followerId} = ${viewerId} and ${f.memberId} = ${latest.authorId})`,
