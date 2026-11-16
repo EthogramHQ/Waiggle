@@ -35,6 +35,17 @@ describe('ShowcaseCard with a project of the examples account (R12b)', () => {
     // Témoin : la carte est là.
     expect(screen.getByText('Testable')).toBeTruthy()
     expect(screen.queryAllByText(EXAMPLE)).toHaveLength(0)
+    expect(
+      screen.getByRole('link', { name: 'Le carnet des plantes' }).props.accessibilityHint,
+    ).toBeUndefined()
+  })
+
+  it('has « Exemple » read on a phone, as the hint of the link', async () => {
+    await renderWithProviders(card(true))
+
+    expect(
+      screen.getByRole('link', { name: 'Le carnet des plantes' }).props.accessibilityHint,
+    ).toBe(EXAMPLE)
   })
 
   it('is described on the web by its status, « Exemple », then its author', async () => {

@@ -26,6 +26,7 @@
 // vrai.
 import { layout, type ShadowName, space } from '@ruche/brand'
 import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
 import { ExampleBadge } from './ExampleBadge'
@@ -93,6 +94,7 @@ export function ShowcaseCard({
 }: Props) {
   // Les identifiants des textes qui décrivent le lien : le statut, « Exemple » s'il est là, puis
   // l'auteur, dans l'ordre où l'œil les lit.
+  const { t } = useTranslation()
   const unique = useId()
   const statusId = `showcase-status-${unique}`
   const exampleId = `showcase-example-${unique}`
@@ -114,6 +116,9 @@ export function ShowcaseCard({
         role="link"
         onPress={onPress}
         describedBy={describedIds}
+        // Sur téléphone, `describedBy` ne vaut rien (aria.ts) : « Exemple » passe par l'indice du
+        // lien, comme dans TesterCard (relecture de l'interface de R12b).
+        {...(example ? { hint: t(($) => $.common.example) } : null)}
         radius="sheet"
       >
         <ProjectCover
