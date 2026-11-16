@@ -5,6 +5,7 @@ import { BLOCKS_PAGE_SIZE, type BlockExport, type BlockedPage, MemberId } from '
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { CursorDate } from '../cursor'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { avatarUrlOf } from '../profile/me'
@@ -17,11 +18,11 @@ const b = schema.memberBlock
  * Le curseur de la liste : la date du dernier blocage de la page et l'identifiant du membre bloqué.
  * Le curseur commun (cursor.ts) attend un uuid, or l'identifiant d'un membre n'en est pas un (il
  * vient de Better Auth) : celui-ci le vérifie avec MemberId, la forme de tout identifiant de membre.
- * strictObject refuse tout champ de plus ; la date est bornée comme dans cursor.ts (PostgreSQL
- * refuse l'an 0 : une erreur 500 au lieu d'un refus 400).
+ * strictObject refuse tout champ de plus ; la date est celle du curseur commun (`CursorDate`),
+ * bornée des deux côtés (PostgreSQL refuse l'an 0 : une erreur 500 au lieu d'un refus 400).
  */
 const BlocksCursor = z.strictObject({
-  at: z.iso.datetime().refine((at) => at >= '2000', 'date trop ancienne'),
+  at: CursorDate,
   id: MemberId,
 })
 type BlocksCursor = z.infer<typeof BlocksCursor>

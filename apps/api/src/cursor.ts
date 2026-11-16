@@ -17,10 +17,15 @@ import { z } from 'zod'
  * milliards de milliards, deux éléments n'ont en pratique jamais le même). strictObject refuse tout
  * champ de plus. La date est bornée : PostgreSQL refuse l'an 0, et un curseur fabriqué avec cette
  * date ferait échouer la requête (erreur 500) au lieu d'être refusé comme invalide (400). Rien n'a
- * été publié avant l'an 2000 (et la date ISO a toujours une année de quatre chiffres : comparer les
- * textes suffit).
+ * été publié avant l'an 2000, ni ne le sera après 2099 : une date hors de ces bornes n'est pas celle
+ * d'un vrai élément, elle est refusée des deux côtés (relecture de sécurité, R4 et R11). La date
+ * ISO a toujours une année de quatre chiffres : comparer les textes suffit. Une borne fixe plutôt
+ * que « maintenant » : l'horloge simulée des tests peut être en avance sur l'horloge réelle.
  */
-export const CursorDate = z.iso.datetime().refine((at) => at >= '2000', 'date trop ancienne')
+export const CursorDate = z.iso
+  .datetime()
+  .refine((at) => at >= '2000', 'date trop ancienne')
+  .refine((at) => at < '2100', 'date trop lointaine')
 
 /** Le contenu du curseur : la date bornée ci-dessus (lue aussi par le marque-page d'une ruche, hives/load.ts) et l'identifiant. */
 const CursorContent = z.strictObject({
