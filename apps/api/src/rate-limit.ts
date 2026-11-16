@@ -4,6 +4,7 @@
 import { createHmac } from 'node:crypto'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, gt, inArray, sql } from 'drizzle-orm'
+import { ipCounterId } from './security/ip'
 
 export type RateRule = { windowMs: number; max: number }
 
@@ -251,7 +252,18 @@ export const ADDRESS_COUNTER_PURPOSES = {
   // (routes/unverified-email.ts).
   unverified: 'unverified',
   unverifiedTo: 'unverified-to',
+  // L'accusé de réception d'un signalement de visiteur (R12) : au plus un par adresse et par jour,
+  // d'où qu'elle vienne (routes/public-reports.ts). Sans lui, on pourrait inonder une adresse.
+  visitorReportAck: 'visitor-report-ack',
 } as const
+
+/**
+ * Le compteur des signalements d'un visiteur (R12) : 5 par jour et par réseau, mal formés compris.
+ * Le réseau est l'adresse IPv4, ou le /64 d'une adresse IPv6 (security/ip.ts) ; `ipCounterId` rend
+ * un texte sans danger, borné. La clé ne porte aucune donnée d'un membre : elle part avec la purge
+ * de nuit, à la fin de sa fenêtre.
+ */
+export const visitorReportKey = (ip: string | undefined) => `visitor-report:${ipCounterId(ip)}`
 
 /** L'un des parcours ci-dessus : `(typeof X)[keyof typeof X]` est l'union de ses valeurs. */
 export type AddressCounterPurpose =

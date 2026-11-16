@@ -44,6 +44,9 @@ const SERVICE = [
   'suspension-7d',
   'suspension-indefinite',
   'verification',
+  // R12 : l'accusé de réception et la décision envoyés à un visiteur qui signale sans compte.
+  'visitor-report-decided',
+  'visitor-report-received',
 ]
 
 // Les modèles de templates.ts qui n'ont pas d'aperçu, chacun avec sa raison (efficacité,
