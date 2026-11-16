@@ -97,6 +97,9 @@ function MemberExplore({ userId }: { userId: string }) {
       width="page"
       header={<TopNav />}
       title={t(($) => $.explore.title)}
+      // « Moins de mots » (16/11/2026) : l'onglet Explorer allumé dit déjà où l'on est ; le titre
+      // reste lu par les lecteurs d'écran (niveau 1), caché à l'œil.
+      titleHidden
       pageTitle={t(($) => $.explore.title)}
     >
       {compact ? (

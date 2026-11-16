@@ -63,7 +63,8 @@ describe('ForgotPasswordScreen', () => {
     await renderWithProviders(<ForgotPasswordScreen />)
 
     expect(screen.getByRole('header', { name: text('title') })).toBeTruthy()
-    expect(screen.getAllByText(containing(text('intro'))).length).toBeGreaterThan(0)
+    // « Moins de mots » (16/11/2026) : plus de sous-titre « Nous t’envoyons un lien » sous le titre.
+    expect(screen.queryByText(/envoyons un lien/)).toBeNull()
     const field = screen.getByLabelText(emailLabel)
     expect(field).toHaveProp('keyboardType', 'email-address')
     expect(field).toHaveProp('autoComplete', 'email')

@@ -272,7 +272,6 @@ export const en: Translation = {
     chooseNewPassword: 'Choose a new password',
     forgotPassword: {
       title: 'Forgot your password?',
-      intro: 'We will send you a link.',
       submit: 'Send the link',
       sentTitle: 'Sent',
       sent: 'If an account exists for this address, an email has just been sent.',
@@ -392,7 +391,6 @@ export const en: Translation = {
     contact: {
       label: 'Contact us',
       spoken: 'Contact us: {{contactEmail}}',
-      hint: 'In English or French.',
     },
     moderation: 'Moderation',
     blocks: 'Blocked members',
@@ -404,8 +402,7 @@ export const en: Translation = {
     changeEmail: {
       title: 'Change email address',
       current: 'Your current address: {{email}}',
-      intro:
-        'Your new address will be used to sign in and to receive emails from {{appName}}. Other members never see it.',
+      intro: 'Other members do not see it.',
       steps:
         'It only changes after two confirmations: a link sent to your current address, then a link sent to the new one.',
       newEmail: 'New email address',
@@ -524,7 +521,7 @@ export const en: Translation = {
       name: 'Display name',
       handle: 'Handle',
       handleHint:
-        'Members see you as @handle on your page. It was made from your name and does not change with it. {{min}} to {{max}} characters: letters without accents, digits and “_”.',
+        'It does not change with your name. {{min}} to {{max}} characters: letters without accents, digits and “_”.',
       bio: 'Bio',
       tools: 'Favorite tools',
       toolsHint: 'Visible to all members on your page.',
@@ -567,7 +564,6 @@ export const en: Translation = {
   project: {
     form: {
       newTitle: 'New project',
-      newIntro: 'You can change everything later.',
       editTitle: 'Edit the project',
       publish: 'Publish',
       save: 'Save',
@@ -651,8 +647,7 @@ export const en: Translation = {
         'Other tools are reviewed by the administrators: they can add them to the catalogue, or link them to a tool that’s already in it.',
       otherToolsHintPrivate:
         'Private project: this name isn’t shown to anyone and isn’t reviewed. If it enters the catalogue through another project, yours will follow.',
-      otherCategoryHint:
-        'The administrators may move your project to a category that fits it. You can change it like the rest of the project.',
+      otherCategoryHint: 'The administrators may move your project to a category that fits it.',
       categoriesError: 'The categories could not load.',
       removeTool: 'Remove {{name}}',
       startedOn: 'Started in',
@@ -790,7 +785,6 @@ export const en: Translation = {
       removeLineLabel: 'Remove line {{number}}',
       lineLabel: 'Change {{number}} of {{total}}, {{family}}',
       familyButton: 'Kind: {{family}}',
-      linesHint: '5 lines at most.',
       versionField: 'Version number, optional',
       versionPlaceholder: 'v1.3',
       photos: 'Photos',
@@ -1124,8 +1118,7 @@ export const en: Translation = {
       error: 'The comment could not be posted. Try again.',
       limited: 'You posted 60 comments in an hour. Wait a little before the next one.',
       reply: 'Reply',
-      replyHint:
-        'Your reply will show at the end of this thread. Every signed-in member will read it; the project’s author can hide it.',
+      replyHint: 'Every signed-in member will read it; the project’s author can hide it.',
       replyHintPrivate:
         'This project is private: no other member will read this reply. If it becomes visible to members, every member will read it.',
       replyError: 'The reply could not be posted. Try again.',
@@ -1585,8 +1578,6 @@ export const en: Translation = {
       admit: 'Add to the catalogue',
       merge: 'Link to a tool',
       dismiss: 'Leave out of the catalogue',
-      dismissHint:
-        'For a name that isn’t a tool. It stays on its projects and profiles, as plain text.',
       admitted: 'Added to the catalogue.',
       merged: 'Linked to {{target}}.',
       dismissed: 'Left out of the catalogue.',
@@ -2369,8 +2360,7 @@ export const en: Translation = {
     choiceDigest: 'In the recap',
     choiceDigestHint: 'On Sunday at 10 am, with the rest of your week.',
     choiceNever: 'Never',
-    choiceNeverHint:
-      'No more emails for these types. Everything stays in your Activity in the app.',
+    choiceNeverHint: 'Everything stays in the app’s Activity.',
     onlyConfirm: 'Opening this page changes nothing: only “Confirm” changes your choices.',
     doneInstantDigest: 'Done: these types are no longer sent right away, they go into the recap.',
     doneInstantNever: 'Done: no more emails for these types. Everything stays in your Activity.',
@@ -2393,7 +2383,6 @@ export const en: Translation = {
       mine: 'Your reaction',
       remove: 'Remove',
       removeNamed: 'Remove {{name}}',
-      hint: 'You can add several, one of each.',
       helpLead: 'Tap a reaction to add it.',
       help: 'A long press on the capsule opens this fan, with the name of each one.',
       helpOk: 'Got it',
@@ -2723,7 +2712,6 @@ export const en: Translation = {
     nobodyAction: 'Explore projects',
     discoverEmpty: 'No public project yet.',
     testersEmpty: 'No project is looking for testers yet.',
-    discoverCaption: 'The latest projects published by members.',
     testersCaption: 'Projects to try: their makers are waiting for your feedback.',
     more: 'Show more',
     moreError: 'The rest of the feed could not load.',

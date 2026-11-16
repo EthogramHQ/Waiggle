@@ -29,7 +29,6 @@ const lineName = (number: number, total: number, key: UpdateFamily) =>
   fr.t(($) => $.project.updates.lineLabel, { number, total, family: family(key) })
 const removeName = (number: number) => fr.t(($) => $.project.updates.removeLineLabel, { number })
 const ADD = fr.t(($) => $.project.updates.addLine)
-const HINT = fr.t(($) => $.project.updates.linesHint)
 const REQUIRED = fr.t(($) => $.project.updates.required)
 
 /** Une ligne, son id stable fabriqué par le parent. */
@@ -185,10 +184,12 @@ describe('UpdateLinesField, its lines (R7a)', () => {
     expect(fr.t(($) => $.project.updates.counterLabel, { count: 1, max: 5 })).toBe('1 ligne sur 5')
   })
 
-  it('shows its hint under the list', async () => {
+  // « Moins de mots » (16/11/2026) : le compteur « 1 / 5 » dit la limite, plus d'aide sous la liste.
+  it('says its limit by the counter only, without a hint under the list', async () => {
     await renderWithProviders(<Lines start={rocketLines.slice(0, 1)} />)
 
-    expect(screen.getByText(HINT)).toBeTruthy()
+    expect(readAs('1 ligne sur 5')).not.toBeNull()
+    expect(screen.queryByText(/5 lignes au plus/)).toBeNull()
   })
 
   it('makes every line read-only while sending', async () => {

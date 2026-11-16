@@ -41,7 +41,6 @@ const removeName = (kind: ReactionKind) =>
 
 const title = fr.t(($) => $.reactions.fan.title)
 const mine = fr.t(($) => $.reactions.fan.mine)
-const hint = fr.t(($) => $.reactions.fan.hint)
 const help = fr.t(($) => $.reactions.fan.help)
 const helpOk = fr.t(($) => $.reactions.fan.helpOk)
 
@@ -198,12 +197,13 @@ describe('ReactionFan', () => {
     expect(dialogName()).toBe(title)
   })
 
-  it('shows each reaction with its name and count, and « Tu peux en poser plusieurs »', async () => {
+  // « Moins de mots » (16/11/2026) : plus de phrase « Tu peux en poser plusieurs » sous les lignes.
+  it('shows each reaction with its name and count, without a sentence under them', async () => {
     await show()
 
     for (const reaction of reactions) expect(screen.getByText(nameOf(reaction.kind))).toBeTruthy()
     expect(screen.getByText('21')).toBeTruthy()
-    expect(screen.getByText(hint)).toBeTruthy()
+    expect(screen.queryByText(/en poser plusieurs/)).toBeNull()
   })
 
   // ui-6 : une ligne = un seul contrôle, nommé par la réaction et son nombre.

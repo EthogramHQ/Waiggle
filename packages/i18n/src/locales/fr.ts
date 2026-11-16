@@ -327,7 +327,6 @@ export const fr = {
     // R2 : « J'ai oublié mon mot de passe ». La réponse est la même qu'un compte existe ou non.
     forgotPassword: {
       title: 'Mot de passe oublié ?',
-      intro: 'Nous t’envoyons un lien.',
       submit: 'Envoyer le lien',
       sentTitle: 'C’est envoyé',
       sent: 'Si un compte existe pour cette adresse, un e‑mail vient de partir.',
@@ -485,7 +484,6 @@ export const fr = {
     contact: {
       label: 'Nous écrire',
       spoken: 'Nous écrire : {{contactEmail}}',
-      hint: 'En français ou en anglais.',
     },
     moderation: 'Modération',
     blocks: 'Membres bloqués',
@@ -502,8 +500,7 @@ export const fr = {
       // « mail » sur un petit téléphone (relecture de design, 360 et 390 px).
       title: 'Changer d’adresse e‑mail',
       current: 'Ton adresse actuelle : {{email}}',
-      intro:
-        'Ta nouvelle adresse servira à te connecter et à recevoir les e‑mails de {{appName}}. Les autres membres ne la voient pas.',
+      intro: 'Les autres membres ne la voient pas.',
       steps:
         'Elle ne change qu’après deux confirmations : un lien envoyé à ton adresse actuelle, puis un lien envoyé à la nouvelle.',
       newEmail: 'Nouvelle adresse e‑mail',
@@ -640,7 +637,7 @@ export const fr = {
       name: 'Nom affiché',
       handle: 'Pseudo',
       handleHint:
-        'Les membres te voient sous @pseudo sur ta page. Il a été tiré de ton nom et ne change pas avec lui. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
+        'Il ne change pas avec ton nom. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
       bio: 'Bio',
       tools: 'Outils favoris',
       // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3).
@@ -692,7 +689,6 @@ export const fr = {
     // Les blocs `new`, `edit`, `fields`, `visuals` et `preview` disparaîtront avec l'ancien écran.
     form: {
       newTitle: 'Nouveau projet',
-      newIntro: 'Tu pourras tout modifier ensuite.',
       editTitle: 'Modifier le projet',
       publish: 'Publier',
       save: 'Enregistrer',
@@ -792,7 +788,7 @@ export const fr = {
       otherToolsHintPrivate:
         'Projet privé : ce nom n’est montré à personne et n’est pas relu. S’il entre au catalogue grâce à un autre projet, le tien suivra.',
       otherCategoryHint:
-        'Les administrateurs pourront ranger ton projet dans une catégorie qui lui va. Tu pourras la modifier comme le reste du projet.',
+        'Les administrateurs pourront ranger ton projet dans une catégorie qui lui va.',
       categoriesError: 'Les catégories n’ont pas pu se charger.',
       removeTool: 'Retirer {{name}}',
       // « Commencé en » et « Facile à refaire ? ».
@@ -951,7 +947,6 @@ export const fr = {
       removeLineLabel: 'Retirer la ligne {{number}}',
       lineLabel: 'Changement {{number}} sur {{total}}, {{family}}',
       familyButton: 'Famille : {{family}}',
-      linesHint: '5 lignes au plus.',
       versionField: 'Numéro de version, facultatif',
       versionPlaceholder: 'v1.3',
       photos: 'Photos',
@@ -1344,7 +1339,7 @@ export const fr = {
       limited: 'Tu as publié 60 commentaires en une heure. Attends un peu avant le suivant.',
       reply: 'Répondre',
       replyHint:
-        'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
+        'Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
       replyHintPrivate:
         'Ce projet est privé : aucun autre membre ne lira cette réponse. S’il devient visible des membres, tous les membres la liront.',
       replyError: 'La réponse n’a pas pu être publiée. Réessaie.',
@@ -1888,8 +1883,6 @@ export const fr = {
       admit: 'Ajouter au catalogue',
       merge: 'Rattacher à un outil',
       dismiss: 'Laisser hors du catalogue',
-      dismissHint:
-        'Pour un nom qui n’est pas un outil. Il reste sur ses projets et profils, en texte simple.',
       /** Le résultat d'une carte décidée, à la place de ses boutons. */
       admitted: 'Ajouté au catalogue.',
       merged: 'Rattaché à {{target}}.',
@@ -2829,7 +2822,7 @@ export const fr = {
     choiceDigest: 'Dans le récap',
     choiceDigestHint: 'Le dimanche à 10 h, avec le reste de ta semaine.',
     choiceNever: 'Jamais',
-    choiceNeverHint: 'Plus aucun e‑mail pour ces types. Tout reste dans l’Activité de l’appli.',
+    choiceNeverHint: 'Tout reste dans l’Activité de l’appli.',
     onlyConfirm: 'Ouvrir cette page ne change rien : seul « Confirmer » change tes choix.',
     doneInstantDigest:
       'C’est fait : ces types ne partent plus tout de suite, ils passent dans le récap.',
@@ -2858,7 +2851,6 @@ export const fr = {
       mine: 'Ta réaction',
       remove: 'Retirer',
       removeNamed: 'Retirer {{name}}',
-      hint: 'Tu peux en poser plusieurs, une de chaque.',
       // L'aide en deux temps, comme sur la planche : la 1re phrase en gras (`helpLead`), puis la suite.
       helpLead: 'Touche une réaction pour la poser.',
       help: 'Un appui long sur la capsule ouvre cet éventail, avec le nom de chacune.',
@@ -3270,7 +3262,6 @@ export const fr = {
     nobodyAction: 'Explorer les projets',
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
-    discoverCaption: 'Les derniers projets publiés par les membres.',
     testersCaption:
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
     more: 'Afficher la suite',

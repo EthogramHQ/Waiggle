@@ -48,6 +48,7 @@ import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { useFloatingClaim } from './floatingSpace'
 import { type Focusable, focusTarget, holdsFocus } from './focus'
+import { hiddenFrame } from './HiddenHeading'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
@@ -67,6 +68,14 @@ import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
   title?: string
+  /**
+   * « Moins de mots » (16/11/2026) : le titre n'est pas affiché, la barre d'onglets dit déjà où l'on
+   * est (Fil, Explorer, Ruches). Il reste le titre de niveau 1 des lecteurs d'écran, caché à l'œil
+   * (la recette de `HiddenHeading`) et toujours focalisable par `titleRef`. Il ne prend aucune
+   * place : ce qui était à côté de lui (`titleAside`, `sticky` sur ordinateur) passe en haut à
+   * droite du contenu, sans vide au-dessus.
+   */
+  titleHidden?: boolean
   /**
    * Le nom de la page dans l'onglet du navigateur (« Carnet de cafés | Waiggle »), quand il diffère
    * du titre affiché ou que l'écran n'a pas de titre (la page d'un projet, d'un membre). null : le
@@ -213,6 +222,7 @@ type Props = {
 
 export function Screen({
   title,
+  titleHidden = false,
   pageTitle,
   subtitle,
   titleAside,
@@ -456,6 +466,7 @@ export function Screen({
     title || subtitle ? (
       <PageHeading
         title={title}
+        titleHidden={titleHidden}
         aside={asideAway ? undefined : titleAside}
         asideRef={asideBeside}
         end={stickyInTitle ? sticky : undefined}
@@ -833,6 +844,7 @@ export function PageHeading({
   titleRef,
   asideRef,
   end,
+  titleHidden = false,
 }: {
   title?: string | undefined
   /** La vue du titre, pour y poser le focus. */
@@ -858,9 +870,57 @@ export function PageHeading({
    * barre fixe : rien de ce qui suit ne remonte.
    */
   rowMinHeight?: number | undefined
+  /** Le titre caché à l'œil, lu seulement (prop `titleHidden` de Screen). */
+  titleHidden?: boolean | undefined
 }) {
   // La rangée du titre : avec l'élément d'à côté, ou sans lui mais à sa hauteur gardée.
   const row = Boolean(title) && (Boolean(aside) || Boolean(end) || rowMinHeight !== undefined)
+  if (titleHidden && title) {
+    // Le titre caché : une case d'un point hors du flux (position absolue), qui ne pousse rien et
+    // n'ajoute aucun écart (`gap`) ; il garde son niveau et sa `focusRef` (le focus s'y pose
+    // toujours). Il passe en premier dans l'ordre de lecture, comme le titre affiché.
+    const hidden = (
+      <View style={hiddenFrame} pointerEvents="none">
+        <Text variant="title2" heading={level} focusRef={titleRef}>
+          {title}
+        </Text>
+      </View>
+    )
+    // Rien d'autre à montrer : la case seule, sans colonne autour, pour ne laisser aucun vide.
+    if (!row && !subtitle) return hidden
+    return (
+      <View style={{ gap: space.sm }} onLayout={onLayout}>
+        {row ? null : hidden}
+        {row ? (
+          // Ce qui était à côté du titre, en haut à droite du contenu ; à 320 points ou en grand
+          // texte, ce qui passe à la ligne reste à droite. La case du titre caché reste dans cette
+          // rangée, en premier : hors du flux, elle n'y prend aucune place, et la rangée reste
+          // « celle du titre » pour `keepAsideInView` (sa mise en page dit quand il passe sous la
+          // barre fixe).
+          <View
+            onLayout={onRowLayout}
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: space.md,
+              ...(rowMinHeight !== undefined ? { minHeight: rowMinHeight } : null),
+            }}
+          >
+            {hidden}
+            {aside ? (
+              <View ref={asideRef} style={{ flexShrink: 1, maxWidth: '100%' }}>
+                {aside}
+              </View>
+            ) : null}
+            {end ? <View style={{ flexShrink: 1, maxWidth: '100%' }}>{end}</View> : null}
+          </View>
+        ) : null}
+        {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
+      </View>
+    )
+  }
   return (
     // L'écart entre le titre et le sous-titre est le seul `gap` de cette colonne (point des listes
     // R4 : 32 points sur le Fil, 8 ailleurs, quand le Fil avait son en-tête à lui).

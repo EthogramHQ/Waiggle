@@ -3,7 +3,8 @@
 // montre par-dessus la page floutée chaque réaction avec son icône, son nom et son nombre. Toucher
 // une ligne pose sa réaction ; sur une réaction déjà posée, la ligne dit « Ta réaction » et un
 // bouton « Retirer » à part la retire (relecture ui-6 : une ligne, un seul contrôle). L'éventail
-// reste ouvert après un choix : on peut en poser plusieurs, ce que rappelle la phrase du bas.
+// reste ouvert après un choix : on peut en poser plusieurs. Aucune phrase ne le redit en bas
+// (« Moins de mots », 16/11/2026) : la ligne qui passe à « Ta réaction » le montre.
 // À partir de 1 000, le nombre s'écrit en court (« 1,2 k », `shortCount`) ; le nom lu garde le
 // nombre entier.
 //
@@ -303,7 +304,6 @@ export function ReactionFanPanel({
   firstRef,
   helpOkRef,
 }: PanelProps) {
-  const { t } = useTranslation()
   // Poser une réaction remplace sa ligne-bouton par une vue avec « Retirer », et retirer fait
   // l'inverse : le contrôle qui avait le focus disparaît (relecture R5a, C1). On garde donc le
   // contrôle de chaque réaction (`controls`) et la réaction que le membre vient de choisir
@@ -362,16 +362,6 @@ export function ReactionFanPanel({
           </View>
         ))}
       </View>
-      {/* « Tu peux en poser plusieurs, une de chaque. », en bas, sur une pilule de verre. Rayon de
-          panneau : à 200 %, la phrase passe à la ligne sans rogner ses lettres. */}
-      <Surface variant="glass" radius="panel" padding="md" fill={false}>
-        <View style={styles.hint}>
-          <Icon name="info" size={18} tone="secondary" />
-          <View style={styles.shrink}>
-            <Text variant="callout">{t(($) => $.reactions.fan.hint)}</Text>
-          </View>
-        </View>
-      </Surface>
     </View>
   )
 }
@@ -579,6 +569,5 @@ const styles = StyleSheet.create({
   helpRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
   helpText: { gap: space.xs },
   end: { alignItems: 'flex-end' },
-  hint: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   shrink: { flexShrink: 1 },
 })

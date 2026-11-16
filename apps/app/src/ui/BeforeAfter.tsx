@@ -30,6 +30,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { describedBy } from './aria'
+import { ActionDescription } from './CommentAction'
 import { Icon } from './Icon'
 import type { GalleryPhoto } from './PhotoGallery'
 import { type CoverShape, ProjectCover } from './ProjectCover'
@@ -206,8 +207,10 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
   const name = label ?? t(($) => $.project.updates.compare)
   const valueText = t(($) => $.project.updates.compareValue, { value })
   const hint = t(($) => $.project.updates.compareHint)
-  // L'aide est écrite sous la comparaison sur ordinateur (planche) ; sur téléphone, le lecteur
-  // d'écran la lit en indice. Sur le web, le curseur est décrit par le texte affiché.
+  // L'aide n'est plus écrite sous la comparaison (« Moins de mots », 16/11/2026) : la poignée se
+  // voit. Le lecteur d'écran la lit encore, lui qui ne voit pas la poignée : en indice sur
+  // téléphone ; sur le web, par un texte caché que le curseur désigne (`aria-describedby`).
+  // react-native-web ne transmet pas `aria-description` au navigateur : d'où le texte caché.
   const hintId = `before-after-hint-${useId().replace(/[^\w-]/g, '')}`
 
   const base = shape ?? (desktop ? 'medium' : 'band')
@@ -225,7 +228,7 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
           'aria-valuetext': valueText,
           'aria-orientation': 'horizontal',
           tabIndex: 0 as const,
-          ...describedBy(desktop ? hintId : undefined),
+          ...describedBy(hintId),
           // L'anneau du focus dessiné à l'intérieur : le cadre arrondi rogne ce qui dépasse.
           ...insetFocus,
         }
@@ -381,11 +384,7 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
           </View>
         </View>
       </View>
-      {desktop ? (
-        <Text variant="caption" tone="muted" nativeID={hintId}>
-          {hint}
-        </Text>
-      ) : null}
+      <ActionDescription id={hintId} text={hint} />
     </View>
   )
 }

@@ -443,7 +443,6 @@ function ProjectFormView({
         open={open}
         title={editing ? t(($) => $.project.form.editTitle) : t(($) => $.project.form.newTitle)}
         heading={1}
-        {...(editing ? null : { subtitle: t(($) => $.project.form.newIntro) })}
         cancelLabel={t(($) => $.project.form.cancel)}
         action={{
           label: editing ? t(($) => $.project.form.save) : t(($) => $.project.form.publish),

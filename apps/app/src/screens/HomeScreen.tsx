@@ -297,10 +297,13 @@ function MemberHome({ session }: { session: SessionData }) {
             topNav
           )
         }
-        // Sur ordinateur, le titre « Fil » (la barre du haut porte déjà le logo et le mot), le bouton
-        // des nouveautés à côté de lui (R4, même écart titre → sous-titre qu'Explorer et Outils). Sur
-        // téléphone, le logo tient lieu de titre, et l'onglet « Fil » de la barre du bas dit où l'on est.
+        // Sur ordinateur, le titre « Fil » n'est plus affiché (« Moins de mots », 16/11/2026 : l'onglet
+        // allumé de la barre du haut le dit déjà) ; il reste le titre de niveau 1 lu, et le focus s'y
+        // pose toujours (`titleRef`). Le bouton des nouveautés et les pastilles des ruches passent en
+        // haut à droite du contenu. Sur téléphone, le logo tient lieu de titre, et l'onglet « Fil »
+        // de la barre du bas dit où l'on est.
         title={compact ? undefined : t(($) => $.feed.title)}
+        titleHidden
         titleRef={feedTitle}
         // RF (ui-5) : quand le titre passe sous la barre fixe, Screen pose le bouton sous elle ; il
         // reste ainsi en vue pendant qu'on descend dans le fil.

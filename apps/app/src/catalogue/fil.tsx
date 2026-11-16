@@ -39,7 +39,7 @@ const fr = {
   cardQuiet: 'Sans démo ni réaction, il y a trois jours',
   cardOne: 'Une seule réaction (au singulier, « 1 réaction »)',
   heading:
-    'L’en-tête de page de Screen (PageHeading) : le titre, l’emplacement titleAside (le bouton des nouveautés du Fil), le sous-titre ; puis rien de neuf',
+    'L’en-tête de page de Screen (PageHeading) : le titre, l’emplacement titleAside (le bouton des nouveautés du Fil), le sous-titre ; puis rien de neuf ; puis le titre caché (titleHidden : lu, pas affiché, le bouton en haut à droite)',
   feedTitle: 'Fil',
   feedCaption: 'Les nouveaux projets et notes des personnes que tu suis.',
   arrival:
@@ -90,7 +90,7 @@ const en: typeof fr = {
   cardQuiet: 'No demo nor reaction, three days ago',
   cardOne: 'A single reaction (singular, “1 reaction”)',
   heading:
-    'The page heading of Screen (PageHeading): the title, the titleAside slot (the news button of the feed), the subtitle; then nothing new',
+    'The page heading of Screen (PageHeading): the title, the titleAside slot (the news button of the feed), the subtitle; then nothing new; then the hidden title (titleHidden: read, not shown, the button at the top right)',
   feedTitle: 'Feed',
   feedCaption: 'New projects and notes from the people you follow.',
   arrival:
@@ -231,6 +231,23 @@ function Pieces({ l }: { l: typeof fr }) {
               <NewItemsBanner count={null} more={false} kinds={[]} authors={[]} onPress={noop} />
             }
             subtitle={l.feedCaption}
+          />
+          <PageHeading
+            level={2}
+            title={l.feedTitle}
+            titleHidden
+            aside={
+              <NewItemsBanner
+                count={3}
+                more={false}
+                kinds={['project']}
+                authors={[
+                  { name: 'Nora Benali', source: null },
+                  { name: 'Sam Morel', source: null },
+                ]}
+                onPress={noop}
+              />
+            }
           />
         </Stack>
       </Captioned>
