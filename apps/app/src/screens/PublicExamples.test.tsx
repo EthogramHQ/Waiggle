@@ -40,6 +40,9 @@ jest.mock('../api/media', () => ({
 }))
 jest.mock('../profile/api', () => ({ getMe: jest.fn(), updateProfile: jest.fn() }))
 jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
+// Sur le web, `Screen` passe l'appli à la langue de l'appareil (`useBrowserLanguage`) : l'anglais
+// dans Jest, sans ce faux. Les textes attendus ici sont français.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
 jest.mock('expo-router', () => {
   const kit = () => require('./Public.testkit').mockNav
   return {
