@@ -26,8 +26,18 @@ const mockRenders: string[] = []
 const mockParams: { lang?: string } = {}
 jest.mock('expo-router', () => {
   const { createElement } = require('react')
-  // La page sous la mise en page : un écran qui appelle `useBrowserLanguage`, comme `Screen`.
-  const Page = () => createElement(require('./pageLanguage.probe').Probe)
+  const { Text: RNText } = require('react-native')
+  const { useTranslation: useT } = require('react-i18next')
+  const { useBrowserLanguage: useBrowser } = require('../i18n')
+  // La page sous la mise en page : un écran qui appelle `useBrowserLanguage`, comme `Screen`, et
+  // note le texte de chacun de ses rendus.
+  const Page = () => {
+    const { t } = useT()
+    useBrowser()
+    const text = t(($: { home: { title: string } }) => $.home.title)
+    mockRenders.push(text)
+    return createElement(RNText, null, text)
+  }
   const Stack = Object.assign(() => createElement(Page), { Screen: () => null })
   return {
     Slot: Page,
@@ -42,25 +52,6 @@ jest.mock('expo-router', () => {
     useNavigation: () => ({ addListener: () => () => {}, setOptions: jest.fn() }),
   }
 })
-jest.mock(
-  './pageLanguage.probe',
-  () => {
-    const { createElement } = require('react')
-    const { Text: RNText } = require('react-native')
-    const { useTranslation: useT } = require('react-i18next')
-    const { useBrowserLanguage: useBrowser } = require('../i18n')
-    return {
-      Probe: () => {
-        const { t } = useT()
-        useBrowser()
-        const text = t(($: { home: { title: string } }) => $.home.title)
-        mockRenders.push(text)
-        return createElement(RNText, null, text)
-      },
-    }
-  },
-  { virtual: true },
-)
 
 type Layout = { default: () => ReactNode; generateStaticParams?: () => unknown }
 const loadLayout = (): Layout => require('../../app/[lang]/_layout') as Layout
