@@ -5,8 +5,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { firstParam } from '../src/navigation/params'
-import { HomeScreen } from '../src/screens/HomeScreen'
 import { ReportSheet } from '../src/screens/ReportSheet'
+import { ShowcaseScreen } from '../src/screens/ShowcaseScreen'
 
 export default function ReportPage() {
   const { kind, id } = useLocalSearchParams<{ kind?: string | string[]; id?: string | string[] }>()
@@ -19,11 +19,12 @@ export default function ReportPage() {
   // jamais (comme app/suspend.tsx). Toujours l'accueil, jamais la page du contenu : la page est
   // pré-rendue sans ses paramètres, et un projet posé dessous d'après l'adresse différait du HTML
   // pré-rendu (#418, vu dans les captures). « Fermer » mène ensuite au projet ou au profil.
-  // Décidé une fois, à l'ouverture.
+  // Décidé une fois, à l'ouverture. R12 : l'accueil est la vitrine, pour un membre comme pour un
+  // visiteur venu d'une page publique (le Fil, à /feed, dirait « Réservé aux membres » à ce dernier).
   const [alone] = useState(() => !router.canGoBack())
   return (
     <>
-      {alone ? <HomeScreen /> : null}
+      {alone ? <ShowcaseScreen /> : null}
       <ReportSheet kind={kindParam} id={idParam} />
     </>
   )
