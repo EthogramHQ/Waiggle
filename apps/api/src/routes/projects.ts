@@ -1,5 +1,6 @@
 // Routes des projets : publier, lire, modifier, supprimer. Toutes exigent d'être connecté
-// (« public » veut dire « visible par les membres »). Qui voit quoi : voir projects/load.ts.
+// (« public » veut dire « visible par les membres » ; R12 : `web`, « Public », l'est aussi des
+// visiteurs sans compte, par les routes /v1/public/*). Qui voit quoi : voir projects/load.ts.
 import { createRoute, z } from '@hono/zod-openapi'
 import { Project, ProjectChanges, ProjectInput } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -12,9 +13,14 @@ import { isForeignKeyViolation, lockMembershipForShare } from '../hives/write'
 import type { FileStorage } from '../media/storage'
 import { dropProjectPartRemovals, replacedProjectParts } from '../moderation/replaced'
 import { categoriesExist } from '../projects/categories'
-import { loadVisibleProject, mediaKeysOf, projectAccess } from '../projects/load'
+import {
+  currentVisibilityOf,
+  loadVisibleProject,
+  mediaKeysOf,
+  projectAccess,
+} from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
-import { suspendedProjectChange } from '../suspension/guard'
+import { suspendedProjectChange, suspendedVisibilityAllowed } from '../suspension/guard'
 import { isSuspended } from '../suspension/load'
 import { chargeOtherTools } from '../tools/quota'
 import {
@@ -84,7 +90,7 @@ const updateProjectRoute = createRoute({
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
     403: errorResponse(
-      'Someone else’s project, or a suspended account sending more than { visibility: private }.',
+      'Someone else’s project, or a suspended account sending more than { visibility: private } (from a `web` project: also `public`, or `hive` with its `hiveId`).',
     ),
     404: errorResponse(
       'No such project, or reserved to a hive that does not exist or that the author is not in.',
@@ -181,9 +187,15 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // autre corps reçoit 403 `suspended`, avant le validateur. Le corps n'est lu qu'une fois :
     // `c.req.json()` garde sa lecture, que le validateur reprend telle quelle ; une clé répétée
     // est donc jugée sur la valeur qui sera écrite (JSON garde la dernière).
+    // R12 : depuis un projet « Public » (`web`), il peut aussi descendre à « Membres » ou à une
+    // ruche ; la visibilité enregistrée est lue ici (`currentVisibilityOf`), puis relue sous le
+    // verrou de la transaction.
     if (await isSuspended(db, user.id, new Date())) {
       const body: unknown = await c.req.json().catch(() => null)
-      if (!suspendedProjectChange(body)) return c.json(errorBody(languageOf(c), 'suspended'), 403)
+      const current = await currentVisibilityOf(db, c.req.param('id'), user.id)
+      if (!suspendedProjectChange(body, current)) {
+        return c.json(errorBody(languageOf(c), 'suspended'), 403)
+      }
     }
     await next()
   })
@@ -317,9 +329,12 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // b : une date déjà là est gardée (repasser en privé puis en public ne fait pas remonter le
       // projet dans les fils). « Maintenant » vient de l'horloge de JavaScript, passé comme
       // paramètre lié par la colonne elle-même (sql.param).
-      ...((changes.visibility === 'public' || changes.visibility === 'hive') && {
-        publishedAt: sql`coalesce(${schema.project.publishedAt}, ${sql.param(new Date(), schema.project.publishedAt)}::timestamp)`,
-      }),
+      // R12 : « Public » (`web`) aussi : c'est la date qu'un visiteur lit (`PublicProject.publishedAt`,
+      // jamais nulle).
+      ...(changes.visibility !== undefined &&
+        changes.visibility !== 'private' && {
+          publishedAt: sql`coalesce(${schema.project.publishedAt}, ${sql.param(new Date(), schema.project.publishedAt)}::timestamp)`,
+        }),
       ...(changes.demoUrl !== undefined && { demoUrl: changes.demoUrl }),
       ...(changes.prompts !== undefined && { prompts: changes.prompts }),
       // R6a : la principale ne se remet jamais à nul (le contrat l'interdit) ; les trois autres, si.
@@ -348,6 +363,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         const [locked] = await tx
           .select({
             removedAt: schema.project.removedAt,
+            visibility: schema.project.visibility,
             primaryCategory: schema.project.primaryCategory,
             secondaryCategory: schema.project.secondaryCategory,
           })
@@ -361,6 +377,19 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // Ce qui est lu ici ne peut donc plus changer avant la fin de la transaction.
         if (!locked) return 'gone' as const
         if (locked.removedAt !== null) return 'removed' as const
+        // R12 : la garde a laissé un suspendu descendre de « Public » vers « Membres » ou une ruche
+        // d'après la visibilité lue avant la transaction. Relue ici sous le verrou : si le projet
+        // n'est plus `web` (une autre de ses demandes l'a changé entre-temps), seul « privé » reste
+        // permis. La suspension n'est relue que dans ce cas rare (index
+        // account_suspension_user_idx), par `tx` : sous PGlite, une lecture par `db` pendant la
+        // transaction attendrait sans fin (charte de l'API).
+        if (
+          (changes.visibility === 'public' || changes.visibility === 'hive') &&
+          !suspendedVisibilityAllowed(changes.visibility, locked.visibility) &&
+          (await isSuspended(tx, user.id, new Date()))
+        ) {
+          return 'suspended' as const
+        }
         // Les catégories qui resteront après la modification : celle du corps, sinon celle déjà
         // enregistrée (lue sous le verrou, donc sûre). Le contrat ne peut comparer que ce que le corps
         // contient ; ici on compare avec l'enregistré (sec-M2). Seule une modification qui touche une
@@ -417,6 +446,15 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             .set(fullSet)
             .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
         }
+        // R12 (plan, choix 10) : un projet qui cesse d'être « Public » quitte la vitrine de
+        // l'accueil, dans la même transaction que le changement : aucun visiteur ne peut lire une
+        // vitrine qui montre un projet déjà réservé aux membres. Il n'y revient pas seul s'il
+        // redevient public (la vitrine est choisie par la modération). Lecture par la clé primaire
+        // de showcase (project_id) ; rien à effacer s'il n'y était pas. Les places laissées libres
+        // ne se renumérotent pas : la vitrine se lit dans l'ordre de `position`.
+        if (changes.visibility !== undefined && changes.visibility !== 'web') {
+          await tx.delete(schema.showcase).where(eq(schema.showcase.projectId, id))
+        }
         // R9 (P5) : une nouvelle valeur non vide d'une partie retirée la remplace ; sa marque
         // s'efface, dans la même transaction que l'écriture (moderation/replaced.ts). Le titre, la
         // visibilité ou l'ordre des photos ne touchent à aucune marque.
@@ -431,6 +469,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (createdHere > counted) await chargeOtherTools(limiter, user.id, createdHere - counted)
     if (outcome === 'gone') return notFound(c)
     if (outcome === 'removed') return removed(c)
+    if (outcome === 'suspended') return c.json(errorBody(languageOf(c), 'suspended'), 403)
     if (outcome === 'unknown_category') return unknownCategory(c)
     if (outcome === 'category_required') {
       return c.json(errorBody(languageOf(c), 'category_required'), 400)

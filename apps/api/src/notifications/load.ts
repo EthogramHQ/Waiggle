@@ -106,7 +106,7 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  * « null::uuid » : une colonne vide, mais du bon type, pour les sources qui n'en ont pas l'usage.
  *
  * Règles communes : rien ne vient de ses propres gestes (« <> me ») ; un projet privé ne produit
- * rien venant des autres (« visibility = 'public' »). Chaque source part de ce qui appartient au
+ * rien venant des autres (« visibility in ('public', 'web') », R12 : `listedProject`). Chaque source part de ce qui appartient au
  * membre, et chacune a son index (voir le rapport d'EXPLAIN dans notifications.test.ts) :
  *   1. réactions à ses projets : project_author_created_idx (ses projets), puis la clé primaire de
  *      project_reaction (project_id, …) ;

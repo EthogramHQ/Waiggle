@@ -138,7 +138,8 @@ type ProjectBase = Omit<
 >
 
 /**
- * La condition « visible par ce membre » : public et pas retiré, ou écrit par lui. Le nom que
+ * La condition « visible par ce membre » : « Membres » ou « Public » (`web`, R12) et pas retiré,
+ * réservé à l'une de ses ruches, ou écrit par lui. Le nom que
  * gardent les routes ; la règle elle-même est écrite une seule fois, dans visibility.ts (tranche
  * 7a).
  */
@@ -310,6 +311,26 @@ export const projectAccess = async (db: Reader, id: string, viewerId: string) =>
   if (!project) return 'not_found' as const
   if (project.authorId !== viewerId) return 'forbidden' as const
   return project.removedAt === null ? ('mine' as const) : ('removed' as const)
+}
+
+/**
+ * R12 : la visibilité enregistrée du projet `id` de ce membre (`public`, `web`, `hive`, `private`),
+ * ou null s'il n'est pas à lui, n'existe pas ou que l'identifiant est mal formé. Sert à la garde des
+ * suspendus de PATCH /v1/projects/{id} : depuis « Public », un suspendu peut descendre à « Membres »
+ * ou à une ruche. Clé primaire de project ; l'auteur est vérifié dans la même condition, si bien
+ * que la réponse ne dit rien du projet d'un autre.
+ */
+export const currentVisibilityOf = async (
+  db: Reader,
+  id: string,
+  authorId: string,
+): Promise<string | null> => {
+  if (!ProjectId.safeParse(id).success) return null
+  const [project] = await db
+    .select({ visibility: schema.project.visibility })
+    .from(schema.project)
+    .where(and(eq(schema.project.id, id), eq(schema.project.authorId, authorId)))
+  return project?.visibility ?? null
 }
 
 /**
