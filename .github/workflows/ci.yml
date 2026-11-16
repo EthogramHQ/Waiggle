@@ -185,8 +185,10 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-26.04
     # 25 min sur main avant R12 ; R12 ajoute les pages par langue et six étapes au parcours d'un
-    # membre, qui l'ont fait couper à 30 min en pleine étape (16/11/2026). 45 min gardent la marge.
-    timeout-minutes: 45
+    # membre, qui l'ont fait couper à 30 min en pleine étape (16/11/2026). La durée varie ensuite de
+    # 19 à 45 min selon la machine (16/11/2026 : 18,7 et 44,7 min pour le même parcours) : la limite
+    # suit le passage lent, plus une marge.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
