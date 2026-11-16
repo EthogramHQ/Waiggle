@@ -242,7 +242,16 @@ const readProject = async (someone, id) => {
  * (y branche son code) : un champ rempli avant ce moment serait vidé.
  */
 const open = async (page, url) => {
-  await page.goto(url)
+  try {
+    await page.goto(url)
+  } catch (error) {
+    // Chromium coupe une navigation quand le réseau de la machine change : sur la pile Docker de la
+    // CI, l'API redémarrée juste avant recrée son interface réseau (ERR_NETWORK_CHANGED, 16/11/2026).
+    // Ce n'est pas une réponse du site : on reprend une fois, sans délai à l'aveugle.
+    if (!String(error?.message).includes('net::ERR_NETWORK_CHANGED')) throw error
+    console.log(`  navigation reprise (réseau changé) : ${url}`)
+    await page.goto(url)
+  }
   // Le calme réseau, au plus 5 secondes : une page « introuvable » peut réessayer en arrière-plan.
   await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
   await page.waitForTimeout(800) // comme site-check.mjs : le temps de l'hydratation
