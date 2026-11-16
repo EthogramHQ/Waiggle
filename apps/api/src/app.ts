@@ -37,6 +37,8 @@ import { moderationCatalogueRoutes } from './routes/moderation-catalogue'
 import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { publicRoutes } from './routes/public'
+import { publicHeadRoutes } from './routes/public-head'
+import { publicSitemapRoutes } from './routes/public-sitemap'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { rulesRoutes } from './routes/rules'
@@ -434,6 +436,10 @@ export const createApp = ({
   // Les lectures sans compte (R12) : un projet public, ses mises à jour, une page publique, la
   // vitrine de l'accueil.
   app.route('/', publicRoutes({ db, publicApiUrl }))
+  // La tête HTML des pages publiques et le plan du site (R12, plan, choix 5 et 6), que Caddy
+  // demande pour les moteurs de recherche et les aperçus de liens.
+  app.route('/', publicHeadRoutes({ db, appUrl, publicApiUrl }))
+  app.route('/', publicSitemapRoutes({ db, appUrl }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.
   app.doc31('/openapi.json', {
