@@ -808,7 +808,15 @@ describe('pages', () => {
   })
 
   it('refuses a cursor that is not one of ours', async () => {
-    for (const cursor of ['{"at":"2026"}', 'pas un curseur']) {
+    // Une date hors des bornes (avant 2000, après 2099) n'est celle d'aucune notification.
+    const dated = (at: string) =>
+      Buffer.from(JSON.stringify({ at, key: 'reactions' }), 'utf8').toString('base64url')
+    for (const cursor of [
+      '{"at":"2026"}',
+      'pas un curseur',
+      dated('1999-12-31T23:59:59.000Z'),
+      dated('9999-12-31T23:59:59.000Z'),
+    ]) {
       const res = await send('GET', `/v1/notifications?${new URLSearchParams({ cursor })}`, ines)
       expect(res.status, cursor).toBe(400)
     }

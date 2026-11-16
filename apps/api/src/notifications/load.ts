@@ -25,6 +25,7 @@ import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { blockedWith, notBlockedWith } from '../blocks/visibility'
+import { CursorDate } from '../cursor'
 import { invitationValidSince } from '../hives/load'
 import { avatarUrlOf, mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
@@ -884,10 +885,11 @@ const moderationColumns = sql.raw(
  * Le curseur des notifications : la date et la clé de la dernière notification de la page. Le même
  * principe que celui des fils (cursor.ts), mais la clé d'un groupe n'est pas un uuid
  * (« reactions:<projet>:<jour> ») : elle a sa propre forme, vérifiée ici. Elle n'entre dans la
- * requête que comme paramètre lié.
+ * requête que comme paramètre lié. La date est celle du curseur commun (`CursorDate`), bornée des
+ * deux côtés.
  */
 const NotificationCursor = z.strictObject({
-  at: z.iso.datetime().refine((at) => at >= '2000', 'date trop ancienne'),
+  at: CursorDate,
   key: z
     .string()
     .max(200)

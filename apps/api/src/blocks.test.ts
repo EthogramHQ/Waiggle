@@ -364,6 +364,8 @@ describe('the list of blocked members', () => {
       Buffer.from('{pas du JSON', 'utf8').toString('base64url'),
       encode({ at: '2026-06-15T08:00:00.000Z', id: inesId, extra: 'de trop' }),
       encode({ at: '0001-01-01T00:00:00.000Z', id: inesId }),
+      // Une date que PostgreSQL accepte, mais qu'aucun élément ne peut porter : la borne haute.
+      encode({ at: '9999-12-31T23:59:59.000Z', id: inesId }),
     ]) {
       const res = await act.send('GET', `/v1/me/blocks?${new URLSearchParams({ cursor })}`, malik)
       await expectError(res, 400, 'validation')
