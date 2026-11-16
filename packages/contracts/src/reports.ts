@@ -657,3 +657,115 @@ export const ModerationDecisionExport = z.object({
   previousValue: z.string().nullable(),
 })
 export type ModerationDecisionExport = z.infer<typeof ModerationDecisionExport>
+
+// --- R12 : le signalement par un visiteur sans compte (POST /v1/public/reports) ---
+
+/**
+ * Au plus 5 signalements par adresse IP et par jour pour un visiteur (20 pour un membre,
+ * `REPORTS_PER_DAY`) ; au-delà, 429 `visitor_report_quota` (Q14). Une adresse IP est partagée (une
+ * famille, un bureau) : le message ne dit pas « tu ».
+ */
+export const VISITOR_REPORTS_PER_DAY = 5
+
+/** La plus longue adresse e-mail permise (la limite des normes du courrier électronique). */
+export const VISITOR_EMAIL_MAX = 254
+
+/**
+ * Ce qu'un visiteur peut signaler : un projet public, une de ses mises à jour, une page publique.
+ * Les mêmes formes que pour un membre, réduites à ces trois sortes ; l'API vérifie en plus que la
+ * cible est visible d'un visiteur (sinon 404, comme une cible inconnue).
+ */
+export const VisitorReportTarget = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('project'), id: ProjectId }),
+    z.object({ kind: z.literal('update'), id: UpdateId }),
+    z.object({ kind: z.literal('member'), id: MemberId }),
+  ])
+  .meta({ id: 'VisitorReportTarget' })
+export type VisitorReportTarget = z.infer<typeof VisitorReportTarget>
+
+/** Les trois sortes de `VisitorReportTarget`, pour lire un paramètre d'adresse. */
+export const VisitorReportTargetKind = z.enum(['project', 'update', 'member'])
+export type VisitorReportTargetKind = z.infer<typeof VisitorReportTargetKind>
+
+/**
+ * L'adresse e-mail facultative d'un visiteur : `trim` retire les espaces autour, puis une case vide
+ * devient « aucune adresse » (`undefined`) ; sinon, une adresse valable de 254 caractères au plus.
+ * `pipe` enchaîne les deux étapes : la vérification porte sur le texte nettoyé.
+ */
+const VisitorEmail = z
+  .string()
+  .trim()
+  .transform((value) => (value === '' ? undefined : value))
+  .pipe(z.email().max(VISITOR_EMAIL_MAX).optional())
+
+/**
+ * Ce qu'un visiteur envoie pour signaler : comme un membre (la partie, le motif, la précision,
+ * obligatoire pour un contenu illégal), plus son adresse e-mail, **facultative** (Q13). Elle sert
+ * seulement à lui envoyer l'accusé de réception, puis la décision (deux e-mails au plus), et elle
+ * est effacée à toute clôture du signalement (décision 17). Pas de nom.
+ * La réponse est la même pour un premier signalement et pour un doublon (même adresse, même cible,
+ * déjà ouvert ou déjà examiné, décision 2) : rien ne dit qu'un signalement existait déjà.
+ */
+export const VisitorReport = z
+  .strictObject({
+    target: VisitorReportTarget,
+    part: ReportPart.optional(),
+    reason: ReportReason,
+    details: FreeText(REPORT_DETAILS_MAX).optional(),
+    email: VisitorEmail.optional(),
+  })
+  .refine(partFitsTarget, PART_DOES_NOT_FIT)
+  .refine(
+    (report) =>
+      report.reason !== 'illegal' ||
+      (!!report.details && isClean(report.details, { lineBreaks: true, needsVisible: true })),
+    { path: ['details'], message: 'an illegal content needs an explanation' },
+  )
+  .meta({ id: 'VisitorReport' })
+/** Le type de ce qu'on envoie (`z.input`) : l'adresse y est une chaîne, vide permise. */
+export type VisitorReport = z.input<typeof VisitorReport>
+
+/** Les paramètres de GET /v1/public/reports/target?kind=…&id=… (l'API vérifie l'identifiant selon la sorte). */
+export const PublicReportTargetQuery = z.object({ kind: VisitorReportTargetKind, id: z.string() })
+export type PublicReportTargetQuery = z.infer<typeof PublicReportTargetQuery>
+
+/** Une miniature : l'adresse et le ThumbHash d'une image, rien d'autre. */
+const PublicThumb = ProjectVisual.pick({ url: true, thumbhash: true }).strict()
+
+/**
+ * Ce que la feuille « Signaler » d'un visiteur montre de la cible (GET /v1/public/reports/target,
+ * décision 10) : comme `ReportTargetPreview`, sans rien de ce qui est réservé aux membres : ni
+ * pseudo (Q8), ni auteur à bloquer, ni « déjà signalé » (un visiteur n'a pas de compte). Même règle
+ * de visibilité que le signalement : 404 pour une cible qui n'est pas visible d'un visiteur.
+ * Liste blanche (`strictObject`).
+ */
+export const PublicReportTarget = z
+  .strictObject({
+    target: VisitorReportTarget,
+    /** Le texte actuel : titre et pitch d'un projet, titre et lignes d'une mise à jour, nom d'un membre. */
+    text: z.string(),
+    /** Le projet de la cible, pour revenir à sa page ; null pour une page de membre. */
+    projectId: ProjectId.nullable(),
+    head: z.strictObject({
+      title: z.string().nullable(),
+      authorName: z.string(),
+      image: PublicThumb.nullable(),
+    }),
+    /** Les parties visibles sur la page publique, dans l'ordre de `REPORTABLE_PARTS` (jamais le pseudo). */
+    parts: z.array(
+      z.strictObject({
+        field: ReportPartField,
+        mediaId: z.uuid().nullable(),
+        position: z.int().positive().nullable(),
+        thumb: PublicThumb.nullable(),
+      }),
+    ),
+    /**
+     * Les signalements que cette adresse IP peut encore envoyer dans les 24 heures
+     * (`VISITOR_REPORTS_PER_DAY` au plus), lu sans compter ; à 0, la feuille le dit dès son ouverture.
+     */
+    remainingToday: z.int().min(0).max(VISITOR_REPORTS_PER_DAY),
+  })
+  .meta({ id: 'PublicReportTarget' })
+export type PublicReportTarget = z.infer<typeof PublicReportTarget>

@@ -176,6 +176,13 @@
       "when": 1794764042258,
       "tag": "0024_compliance_r11",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794811725250,
+      "tag": "0025_public_projects_r12",
+      "breakpoints": true
     }
   ]
 }

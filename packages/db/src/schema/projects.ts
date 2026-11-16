@@ -72,6 +72,10 @@ export const project = pgTable(
     // La décision de retrait, pour retrouver son fondement et son explication. onDelete:
     // 'set null' : l'API ne purge pas une décision tant que son contenu reste retiré.
     removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'set null' }),
+    // R12 (relecture juridique du plan, décision 18) : le moment où l'auteur a retiré son projet de
+    // l'accueil (« Retirer de l'accueil »). Non nul, la modération ne peut plus l'y remettre (409
+    // `author_declined`). Écrite par l'API ; elle part avec le projet et entre dans l'export.
+    showcaseDeclinedAt: timestamp('showcase_declined_at'),
   },
   // Les index sont des sommaires qui accélèrent les recherches fréquentes :
   // - les projets d'un membre, du plus récent au plus ancien ;
@@ -83,17 +87,28 @@ export const project = pgTable(
   //   c'est l'ordre que PostgreSQL donne à « order by … desc » ; sans lui, drizzle écrirait
   //   « nulls last », et l'index ne serait plus rangé dans l'ordre exact que demande le fil ;
   // - le fil « Abonnements » : pour chaque membre suivi, ses projets rangés par date.
+  // R12 : un projet `web` (« Public ») est visible des membres comme un projet `public` : les deux
+  // index partiels qui rangent « ce que voient les membres » prennent aussi `web` (migration 0025).
+  // Une requête ne lit un index partiel que si PostgreSQL peut prouver que sa condition implique
+  // celle de l'index : `visibility in ('public', 'web')` (`MEMBER_VISIBLE` de l'API) comme
+  // `visibility = 'public'` l'impliquent ; un `or` qui mêle d'autres colonnes, non.
   (t) => [
     index('project_author_created_idx').on(t.authorId, t.createdAt),
     index('project_public_published_idx')
       .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
-      .where(sql`${t.visibility} = 'public'`),
+      .where(sql`${t.visibility} in ('public', 'web')`),
     // R10 : Explorer et les suggestions lisent les projets publics **ou réservés à une ruche** du
     // lecteur. Le `or` de la règle d'accès empêche PostgreSQL d'utiliser l'index ci-dessus : sans
     // celui-ci, Explorer triait 10 000 projets (300 ms et plus) au lieu de lire l'index (1,4 ms).
     index('project_shared_published_idx')
       .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
-      .where(sql`${t.visibility} in ('public', 'hive') and ${t.removedAt} is null`),
+      .where(sql`${t.visibility} in ('public', 'hive', 'web') and ${t.removedAt} is null`),
+    // R12 : ce qu'un visiteur sans compte peut lire (le plan du site, les projets publics d'une
+    // page publique) : les seuls projets `web` non retirés, du plus récent au plus ancien. Petit :
+    // les projets réservés aux membres n'y sont pas.
+    index('project_web_published_idx')
+      .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
+      .where(sql`${t.visibility} = 'web' and ${t.removedAt} is null`),
     index('project_author_published_idx').on(t.authorId, t.publishedAt),
     // Les filtres par catégorie (principale ou seconde) et les nombres de projets par catégorie ;
     // ils servent aussi aux vérifications de la clé étrangère quand une catégorie change de code.
@@ -105,6 +120,9 @@ export const project = pgTable(
       .on(t.hiveId, t.createdAt)
       .where(sql`${t.visibility} = 'hive'`),
     check('project_hive_check', sql`(${t.visibility} = 'hive') = (${t.hiveId} is not null)`),
+    // R12 : la base refuse elle-même une visibilité inconnue (Zod la vérifie déjà à l'entrée). Un
+    // `check` : une condition que chaque ligne doit remplir, sinon l'écriture échoue.
+    check('project_visibility_check', sql`${t.visibility} in ('public', 'hive', 'private', 'web')`),
   ],
 )
 

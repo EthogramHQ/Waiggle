@@ -70,6 +70,11 @@ const errorMessages = {
   hive_invitations_limited: 'hiveInvitationsLimited',
   // Tranche R11 : une écriture d'un membre qui n'a pas accepté la version des règles en vigueur.
   rules_required: 'rulesRequired',
+  // Tranche R12 : le quota des signalements d'un visiteur (par adresse IP), et la mise en avant
+  // d'un projet que son auteur a retiré de l'accueil. Le premier cite {{contactEmail}}, que `fill`
+  // remplit comme {{appName}}.
+  visitor_report_quota: 'visitorReportQuota',
+  author_declined: 'authorDeclined',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

@@ -144,6 +144,8 @@ export const leaPage: Member = {
   ],
   isMe: false,
   isBlocked: false,
+  // R12 : sa page n'est pas publique (le réglage par défaut).
+  publicPage: false,
   isFollowed: false,
   followerCount: 3,
   projects: [summaryOf(projectWithPhotos)],

@@ -6,11 +6,13 @@ import { BlockExport } from './blocks'
 import { CommentId } from './comments'
 import { EmailPreferencesExport } from './email'
 import { HiveExport } from './hives'
+import { PublicPageSettings } from './members'
 import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 import { Removal, RemovedPart } from './removal'
 import { ModerationDecisionExport, ReportExport } from './reports'
 import { RulesAcceptance } from './rules'
+import { ShowcaseExport } from './showcase'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
 import {
@@ -180,6 +182,16 @@ export const AccountExport = z
      * plus anciennes aux plus récentes. L'historique entier : c'est la preuve de ses accords.
      */
     rulesAcceptances: z.array(RulesAcceptance),
+    /**
+     * R12 : sa page publique, ouverte ou non, et ce qu'il a choisi d'y montrer (les cinq cases de
+     * « Mon profil public »).
+     */
+    publicPage: PublicPageSettings,
+    /**
+     * R12 : ses projets mis sur l'accueil (la vitrine), ou qu'il en a retirés (« Retirer de
+     * l'accueil »), des plus anciens aux plus récents. Jamais l'administrateur qui les a choisis.
+     */
+    showcase: z.array(ShowcaseExport),
     /**
      * R11 : sa dernière visite connue (au plus une mise à jour par jour), celle qui compte pour la
      * suppression d'un compte inactif depuis 3 ans (`INACTIVE_ACCOUNT_YEARS`, email.ts).
