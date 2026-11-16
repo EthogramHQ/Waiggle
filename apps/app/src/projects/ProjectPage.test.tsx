@@ -128,4 +128,41 @@ describe('ProjectPageLayout', () => {
       restore()
     }
   })
+
+  it('keeps the recipe next to the photo on a computer when reactions fill the space under it', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithProviders(
+        <ProjectPageLayout
+          topBar={null}
+          onBack={() => {}}
+          pageTitle="Décollage !"
+          thumbhash={null}
+          fade={false}
+          bleed
+          gallery={slot('slot:gallery')}
+          reactions={slot('slot:reactions')}
+          header={slot('slot:header')}
+          actions={slot('slot:actions')}
+          recipe={slot('slot:recipe')}
+          description={slot('slot:description')}
+          conversation={slot('slot:comments')}
+        />,
+      )
+
+      // La page d'un membre : ses réactions, sous la photo, comblent la colonne de gauche ; la
+      // recette reste dans la première rangée, lue avant la description.
+      expect(shownOrder()).toEqual([
+        'slot:gallery',
+        'slot:reactions',
+        'slot:header',
+        'slot:actions',
+        'slot:recipe',
+        'slot:description',
+        'slot:comments',
+      ])
+    } finally {
+      restore()
+    }
+  })
 })

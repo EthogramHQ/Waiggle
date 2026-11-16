@@ -150,6 +150,8 @@ export function ProjectPageLayout({
   // colonnes tiennent côte à côte. Entre les deux (tablette), une seule colonne.
   const large = sizeClass !== 'compact'
   const w = (node: ReactNode) => wrap(node ?? null)
+  // La recette à côté de la photo seulement si les réactions comblent la place sous celle-ci.
+  const recipeFirst = reactions != null
 
   if (large) {
     return (
@@ -170,10 +172,11 @@ export function ProjectPageLayout({
       >
         {w(banner)}
         {columns ? (
-          // Deux rangées, dans l'ordre de lecture : la galerie | l'en-tête et les actions ; un trait ;
-          // puis ce qui se lit longtemps | la recette et la conversation. La recette est dans la
-          // seconde rangée, comme sur la planche R12-Visiteur-Projet-Desktop (relecture de design
-          // R12, point 4) : dans la première, elle allongeait la colonne de droite d'environ 130
+          // Deux rangées, dans l'ordre de lecture : la galerie et les réactions | l'en-tête, les
+          // actions, la recette ; un trait ; puis ce qui se lit longtemps | la conversation. Sans
+          // réactions sous la photo (la page d'un visiteur), la recette passe dans la seconde rangée,
+          // au-dessus de la conversation, comme sur la planche R12-Visiteur-Projet-Desktop (relecture
+          // de design R12) : dans la première, elle allongeait la colonne de droite d'environ 130
           // points sous la photo, et poussait la description sous le pli. Enfin « Signaler ce projet »,
           // en bas à gauche : dans une rangée à lui, il vient après la conversation, au clavier
           // comme sur téléphone (décision de Louis du 2/11/2026).
@@ -196,6 +199,8 @@ export function ProjectPageLayout({
                     {w(header)}
                     {w(actions)}
                     {w(actionNotes)}
+                    {recipeFirst ? w(recipe) : null}
+                    {recipeFirst ? w(recipeNotes) : null}
                   </>
                 ),
               },
@@ -209,8 +214,8 @@ export function ProjectPageLayout({
                 ),
                 side: (
                   <>
-                    {w(recipe)}
-                    {w(recipeNotes)}
+                    {recipeFirst ? null : w(recipe)}
+                    {recipeFirst ? null : w(recipeNotes)}
                     {w(conversation)}
                   </>
                 ),
