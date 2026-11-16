@@ -77,12 +77,21 @@ export const takeClosedVisitorReports = async (db: Database): Promise<ClosedVisi
     )
   })
 
+/** De quoi envoyer la décision : la messagerie et l'adresse de l'appli (le pied de l'e-mail). */
+export type VisitorMail = { mailer: Mailer; appUrl: string }
+
 /**
- * Efface les adresses des signalements clos sans rien envoyer : la purge de nuit, pour ceux que
- * personne n'a lus depuis leur clôture (un compte supprimé les a classés « sans objet »).
+ * La clôture, en un appel : efface les adresses des signalements clos, puis envoie à chacun sa
+ * décision. La modération (routes/moderation.ts) et la purge de nuit (reports/retention.ts) passent
+ * toutes deux par ici : l'accusé a promis la décision, quel que soit le chemin qui clôt (relecture
+ * juridique R12, point 2). Sans messagerie (`null` : la purge quand EMAIL_JOBS=off coupe les
+ * e-mails automatiques), l'adresse est effacée quand même, sans e-mail : elle ne survit à aucune
+ * clôture. L'envoi vient après la transaction de `takeClosedVisitorReports`, jamais pendant (on
+ * ne tient pas de verrou le temps d'un appel à la messagerie).
  */
-export const eraseClosedVisitorAddresses = async (db: Database) => {
-  await takeClosedVisitorReports(db)
+export const closeVisitorReports = async (db: Database, mail: VisitorMail | null) => {
+  const closed = await takeClosedVisitorReports(db)
+  if (mail) await sendVisitorDecisions(mail.mailer, mail.appUrl, closed)
 }
 
 /**

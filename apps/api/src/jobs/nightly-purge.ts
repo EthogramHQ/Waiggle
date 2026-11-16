@@ -34,6 +34,7 @@ import type { FileStorage } from '../media/storage'
 import { notificationCutoff, utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
+import type { VisitorMail } from '../reports/visitor'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { DISMISSED_TOOL_KEEP_DAYS, dropDismissedOthers, dropOrphanOthers } from '../tools/write'
 
@@ -47,7 +48,18 @@ const API_RATE_KEEP_MS = RATE_WINDOW_MAX_MS + HOUR
 /** Une photo téléversée pour une mise à jour jamais publiée : gardée 24 heures. */
 const PENDING_PHOTO_KEEP_MS = DAY
 
-export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage) => {
+/**
+ * `visitorMail` (R12, relecture juridique point 2) : la messagerie, pour envoyer leur décision aux
+ * visiteurs dont le signalement est classé « sans objet » cette nuit. L'ordonnanceur la donne,
+ * sauf avec EMAIL_JOBS=off : la purge efface alors leurs adresses sans e-mail. Facultatif pour les
+ * tests qui ne regardent pas les e-mails.
+ */
+export const nightlyPurge = async (
+  db: Database,
+  now: Date,
+  storage: FileStorage,
+  visitorMail: VisitorMail | null = null,
+) => {
   // Chaque « delete … returning » rend les lignes effacées : leur nombre est le résultat.
   // Les tables session et verification sont petites (une ligne par appareil connecté, par lien
   // envoyé) : une lecture complète, une fois par nuit, coûte peu. Un index sur expires_at le
@@ -103,7 +115,7 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
   // date de fin ainsi notée compte déjà pour la durée de garde (365 jours après la fin).
   await closeSuspensionsOfDeparted(db, now)
   // Les signalements et les décisions de modération (tranche 7a) : reports/retention.ts.
-  const moderation = await purgeModeration(db, now)
+  const moderation = await purgeModeration(db, now, visitorMail)
   // R6b (sec-A5, jur-T6) : les « Autre » que plus aucun projet ni profil ne cite. L'API les efface
   // déjà dans la transaction qui retire leur dernière référence ; ceci est le filet (une panne entre
   // deux écritures, une suppression de compte, une ligne effacée à la main). Un outil du catalogue
@@ -147,9 +159,22 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
   // R12 (relecture juridique du plan, décision 19) : les traces « ton projet est sur l'accueil »
   // (`showcase_notice`) ne se gardent pas plus longtemps qu'elles ne se montrent, 90 jours, comme
   // celles du catalogue. Lecture par l'index `showcase_notice_created_idx` (la date seule).
+  // Relecture juridique R12, point 1 : sauf tant que le projet est encore dans la vitrine. La
+  // mise en avant n'a pas de fin, et cette ligne de l'Activité est la voie de l'autrice vers
+  // « Retirer de l'accueil » ; elle se montre donc aussi longtemps (notifications/load.ts). Sorti
+  // de la vitrine (refus, retrait, plus « Public », suppression), les 90 jours comptés depuis la
+  // notice reviennent. La vitrine se cherche par sa clé primaire (project_id), en
+  // « (select 1 … limit 1) is null » plutôt qu'en « not exists » (charte de l'API, 7b) ; la
+  // vitrine a quatre lignes au plus. `sql.raw` écrit la colonne avec sa table : Drizzle l'écrirait
+  // sans, et dans la sous-requête « project_id » désignerait celle de showcase (charte de l'API).
   const showcaseNotices = await db
     .delete(schema.showcaseNotice)
-    .where(sql`${schema.showcaseNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
+    .where(
+      and(
+        sql`${schema.showcaseNotice.createdAt} <= ${utc(notificationCutoff(now))}`,
+        sql`(select 1 from showcase s where s.project_id = ${sql.raw('showcase_notice.project_id')} limit 1) is null`,
+      ),
+    )
     .returning({ id: schema.showcaseNotice.id })
 
   // R7a (sécurité A5) : les photos « en attente » (slot 'update', jamais rattachées à une mise à

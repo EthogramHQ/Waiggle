@@ -19,6 +19,7 @@ import { schema } from '@ruche/db'
 import { asc, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nightlyPurge } from './jobs/nightly-purge'
+import { countUnread } from './notifications/load'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { later, UNKNOWN_ID, visitorGestures } from './testing/visitor-world'
@@ -130,6 +131,13 @@ const showcaseNotices = async (cookie: string) => {
     (item) => item.kind === 'showcase_added',
   )
 }
+
+/** Les notices « sur l'accueil » d'Inès gardées en base : ce que la purge de nuit laisse. */
+const storedNotices = () =>
+  ctx.db
+    .select({ id: schema.showcaseNotice.id })
+    .from(schema.showcaseNotice)
+    .where(eq(schema.showcaseNotice.memberId, inesId))
 
 const expectError = async (res: Response, status: number, code: string) => {
   expect(res.status).toBe(status)
@@ -409,20 +417,49 @@ describe('the notice in Activity', () => {
     expect(await showcaseNotices(zoe)).toEqual([])
   })
 
-  it('purges a showcase notice after 90 days, with the other notifications', async () => {
+  // Relecture juridique R12, point 1 : la notice est la voie de l'autrice vers « Retirer de
+  // l'accueil » ; elle ne suit donc la règle des 90 jours (comptés depuis la notice) qu'une fois le
+  // projet sorti de la vitrine. Ce test, qui la purgeait à 90 jours quoi qu'il arrive, fait d'abord
+  // sortir le projet.
+  it('purges a showcase notice 90 days after it, once the project left the showcase', async () => {
     const { meteo } = await threeProjects()
     await world.setShowcase(louis, [meteo])
-    const notices = () =>
-      ctx.db
-        .select({ id: schema.showcaseNotice.id })
-        .from(schema.showcaseNotice)
-        .where(eq(schema.showcaseNotice.memberId, inesId))
-    expect(await notices()).toHaveLength(1)
+    expect(await storedNotices()).toHaveLength(1)
+    await world.setShowcase(louis, [])
 
     await nightlyPurge(ctx.db, new Date(Date.now() + 89 * DAY), ctx.storage)
-    expect(await notices()).toHaveLength(1)
+    expect(await storedNotices()).toHaveLength(1)
     await nightlyPurge(ctx.db, new Date(Date.now() + 91 * DAY), ctx.storage)
-    expect(await notices()).toEqual([])
+    expect(await storedNotices()).toEqual([])
+  })
+
+  it('keeps the showcase notice while the project is still on the showcase', async () => {
+    const { meteo } = await threeProjects()
+    await world.setShowcase(louis, [meteo])
+    const noticedAt = Date.now()
+    const at = (days: number) => new Date(noticedAt + days * DAY)
+
+    // Encore à la une à 91 jours : la purge la garde, et l'Activité la montre toujours, avec
+    // « Retirer de l'accueil ».
+    await nightlyPurge(ctx.db, at(91), ctx.storage)
+    expect(await storedNotices()).toHaveLength(1)
+    // Une session de test ne dure pas 91 jours (la purge vient d'effacer les expirées) : Inès se
+    // reconnecte.
+    vi.setSystemTime(at(91))
+    const back = ctx.cookiesFrom(
+      await ctx.signIn({ email: 'ines@example.com', password: 'ines-long-password' }),
+    )
+    expect((await showcaseNotices(back)).map((one) => [one.project.id, one.onShowcase])).toEqual([
+      [meteo, true],
+    ])
+    // Ancienne de plus de 90 jours, elle n'allume pas la cloche.
+    expect(await countUnread(ctx.db, inesId, null, new Date())).toBe(0)
+
+    // Sortie de la vitrine, la règle des 90 jours revient : la ligne disparaît, la nuit l'efface.
+    expect((await leave(back, meteo)).status).toBe(204)
+    expect(await showcaseNotices(back)).toEqual([])
+    await nightlyPurge(ctx.db, at(92), ctx.storage)
+    expect(await storedNotices()).toEqual([])
   })
 
   it('deletes the showcase notices and rows of a deleted account', async () => {
