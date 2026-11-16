@@ -107,6 +107,11 @@ describe('RulesGate (R11)', () => {
     await expectGated('/settings')
   })
 
+  // R12 : le Fil a sa propre adresse ; `/` reste gardé aussi (l'accueil d'un membre).
+  it('opens the rules screen over the feed at its own address', async () => {
+    await expectGated('/feed')
+  })
+
   it('shows nothing to a member who has accepted the current rules', async () => {
     const view = await showAt('/', leaMe)
 

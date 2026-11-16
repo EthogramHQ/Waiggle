@@ -21,13 +21,15 @@ const mockNavigation = {
 jest.mock('expo-router', () => ({ useNavigation: () => mockNavigation }))
 
 type Entry = { state: unknown; url: string }
+/** L'adresse du Fil, la page d'où s'ouvre la feuille. */
+const FEED = '/feed'
 type PopEvent = { stopImmediatePropagation: () => void; stopPropagation: () => void }
 type Listener = { fn: (event: PopEvent) => void; capture: boolean }
 
-/** Un faux navigateur : le fil (`/`), puis la feuille « Nouveau projet » ouverte par-dessus. */
+/** Un faux navigateur : le fil (`/feed`, depuis R12), puis la feuille « Nouveau projet » par-dessus. */
 const makeBrowser = () => {
   const entries: Entry[] = [
-    { state: { id: 'feed' }, url: '/' },
+    { state: { id: 'feed' }, url: FEED },
     { state: { id: 'sheet' }, url: '/projects/new' },
   ]
   let index = 1
@@ -249,7 +251,7 @@ describe('on the web', () => {
     await browser.userBack()
     expect(onHeld).not.toHaveBeenCalled()
     expect(browser.expoRouter).toHaveBeenCalledTimes(1)
-    expect(browser.here().url).toBe('/')
+    expect(browser.here().url).toBe(FEED)
     await hook.unmount()
   })
 
@@ -292,7 +294,7 @@ describe('on the web', () => {
 
     expect(onHeld).not.toHaveBeenCalled()
     expect(browser.expoRouter).toHaveBeenCalledTimes(1)
-    expect(browser.here().url).toBe('/')
+    expect(browser.here().url).toBe(FEED)
     await hook.unmount()
   })
 

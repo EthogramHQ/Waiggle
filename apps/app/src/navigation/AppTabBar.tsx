@@ -28,7 +28,8 @@ import { useLayout } from '../ui/theme/layout'
 
 /** La première page de chaque onglet : celle qu'ouvre l'onglet, et où il ramène quand on le retouche. */
 const firstPages: Record<TabKey, string> = {
-  feed: '/',
+  // R12 : le Fil a sa propre adresse ; `/` est devenu l'accueil et sa vitrine, pour tous.
+  feed: '/feed',
   explore: '/explore',
   hives: '/hives',
   me: '/me',
@@ -51,20 +52,28 @@ type Place =
   | { kind: 'tab'; tab: TabKey; firstPage: boolean }
   /** La page d'un autre membre : la barre, et l'onglet d'où l'on vient reste actif. */
   | { kind: 'member' }
+  /**
+   * R12 : l'accueil et sa vitrine (`/`), ouvert depuis « À la une » d'Explorer ou un lien vers
+   * l'accueil. Ce n'est la première page d'aucun onglet : la barre reste, avec l'onglet d'où l'on
+   * vient, comme sur la page d'un autre membre (le membre y garde sa barre, scénario « Qui arrive
+   * où »).
+   */
+  | { kind: 'home' }
   /** Une page poussée par-dessus les onglets (un projet, les réglages…) : pas de barre. */
   | { kind: 'hidden' }
 
 /**
- * La table des chemins (plan de R3) : Fil `/` ; Explorer `/explore`, `/search`, `/tools`,
- * `/tags/<outil>` ; Ruches `/hives` ; Moi `/me` et sa propre page `/members/<soi>`. La page d'un
- * autre membre garde la barre ; toute autre adresse la cache. `selfId` : l'identifiant du membre
- * connecté. Exportée pour être lue d'un coup d'œil et essayée sans écran.
+ * La table des chemins (plan de R3) : Fil `/feed` (depuis R12) ; Explorer `/explore`, `/search`,
+ * `/tools`, `/tags/<outil>` ; Ruches `/hives` ; Moi `/me` et sa propre page `/members/<soi>`. La page
+ * d'un autre membre et l'accueil (`/`) gardent la barre ; toute autre adresse la cache. `selfId` :
+ * l'identifiant du membre connecté. Exportée pour être lue d'un coup d'œil et essayée sans écran.
  */
 export const placeOf = (pathname: string, selfId: string): Place => {
   // usePathname rend l'adresse sans ses paramètres ; on les retire quand même (une adresse écrite à
   // la main, un test), ainsi qu'une barre oblique finale (« /explore/ » vaut « /explore »).
   const path = pathname.split('?')[0]?.replace(/(.)\/+$/, '$1') ?? '/'
-  if (path === '/') return { kind: 'tab', tab: 'feed', firstPage: true }
+  if (path === '/feed') return { kind: 'tab', tab: 'feed', firstPage: true }
+  if (path === '/') return { kind: 'home' }
   if (path === '/explore') return { kind: 'tab', tab: 'explore', firstPage: true }
   if (path === '/search' || path === '/tools' || /^\/tags\/[^/]+$/.test(path))
     return { kind: 'tab', tab: 'explore', firstPage: false }

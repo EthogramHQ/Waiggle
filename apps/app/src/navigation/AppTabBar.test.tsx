@@ -30,7 +30,7 @@ jest.mock('../ui/theme/hydration', () => ({
 
 // L'adresse de la page et le routeur d'Expo Router, remplacés. Le test vérifie la destination
 // demandée, quelle que soit la méthode choisie par le code (push, replace, navigate, dismissTo).
-let mockPathname = '/'
+let mockPathname = '/feed'
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 const mockNavigate = jest.fn()
@@ -81,7 +81,7 @@ const renderAt = async (pathname: string) => {
 let restoreWindow = () => {}
 
 beforeEach(() => {
-  mockPathname = '/'
+  mockPathname = '/feed'
   for (const mock of [mockPush, mockReplace, mockNavigate, mockDismissTo]) mock.mockReset()
   // Léa (u1) est connectée, sur un téléphone, la page hydratée.
   mockSession({ user: { id: leaMe.id, name: leaMe.name } })
@@ -97,7 +97,7 @@ afterEach(() => {
 describe('where the tab bar shows, and which tab is active', () => {
   // La table des chemins du plan : chaque page de premier niveau et son onglet.
   it.each([
-    ['/', 'feed'],
+    ['/feed', 'feed'],
     ['/explore', 'explore'],
     ['/search', 'explore'],
     ['/search?q=carn', 'explore'],
@@ -120,6 +120,21 @@ describe('where the tab bar shows, and which tab is active', () => {
     // Un seul onglet actif.
     const others = (Object.keys(labels) as (keyof typeof labels)[]).filter((k) => k !== key)
     for (const other of others) expect(activeLink(labels[other])).toBeNull()
+  })
+
+  it('shows the bar on the home page (/, the showcase since R12), no tab marked by itself', async () => {
+    await renderAt('/')
+
+    expect(region()).toBeTruthy()
+    // Ce n'est la première page d'aucun onglet : ni le Fil, ni un autre, ouvert directement.
+    for (const label of [
+      t(($) => $.nav.feed),
+      t(($) => $.nav.explore),
+      t(($) => $.nav.hives),
+      t(($) => $.nav.me),
+    ]) {
+      expect(activeLink(label)).toBeNull()
+    }
   })
 
   it('shows the bar on the page of another member', async () => {
@@ -148,7 +163,7 @@ describe('where the tab bar shows, and which tab is active', () => {
 
   it('never shows the bar to a visitor', async () => {
     mockSession(null)
-    mockPathname = '/'
+    mockPathname = '/feed'
     await renderWithProviders(app())
 
     expect(region()).toBeNull()
@@ -157,7 +172,7 @@ describe('where the tab bar shows, and which tab is active', () => {
 
   it('shows nothing before the page is hydrated on the web', async () => {
     jest.mocked(useHydrated).mockReturnValue(false)
-    mockPathname = '/'
+    mockPathname = '/feed'
     await renderWithProviders(app())
 
     expect(region()).toBeNull()
@@ -165,15 +180,15 @@ describe('where the tab bar shows, and which tab is active', () => {
 
   it('leaves the computer to the top bar', async () => {
     restoreWindow = setDesktopWindow()
-    await renderAt('/')
+    await renderAt('/feed')
 
     expect(region()).toBeNull()
   })
 
   it('gives each tab its address', async () => {
-    await renderAt('/')
+    await renderAt('/feed')
 
-    expect(link(t(($) => $.nav.feed)).props.href).toBe('/')
+    expect(link(t(($) => $.nav.feed)).props.href).toBe('/feed')
     expect(link(t(($) => $.nav.explore)).props.href).toBe('/explore')
     expect(link(t(($) => $.nav.hives)).props.href).toBe('/hives')
     expect(link(t(($) => $.nav.me)).props.href).toBe('/me')
@@ -182,7 +197,7 @@ describe('where the tab bar shows, and which tab is active', () => {
 
 describe('the « + » of the tab bar', () => {
   it('opens the publication', async () => {
-    await renderAt('/')
+    await renderAt('/feed')
 
     await fireEvent.press(screen.getByRole('button', { name: t(($) => $.nav.publish) }))
 
@@ -191,7 +206,7 @@ describe('the « + » of the tab bar', () => {
 
   it('is gone for a suspended member, who keeps the four tabs', async () => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
-    await renderAt('/')
+    await renderAt('/feed')
 
     expect(screen.queryByRole('button', { name: t(($) => $.nav.publish) })).toBeNull()
     expect(screen.getAllByRole('link')).toHaveLength(4)
@@ -199,7 +214,7 @@ describe('the « + » of the tab bar', () => {
 
   it('stays for an administrator (not suspended)', async () => {
     jest.mocked(getMe).mockResolvedValue(adminMe)
-    await renderAt('/')
+    await renderAt('/feed')
 
     expect(screen.getByRole('button', { name: t(($) => $.nav.publish) })).toBeTruthy()
   })
@@ -207,7 +222,7 @@ describe('the « + » of the tab bar', () => {
 
 describe('touching a tab', () => {
   it('opens the first page of another tab', async () => {
-    await renderAt('/')
+    await renderAt('/feed')
 
     await fireEvent.press(link(t(($) => $.nav.explore)))
 
@@ -224,7 +239,7 @@ describe('touching a tab', () => {
   })
 
   it('scrolls to the top when the active tab is touched on its first page', async () => {
-    await renderAt('/')
+    await renderAt('/feed')
 
     await fireEvent.press(link(t(($) => $.nav.feed)))
 
@@ -251,7 +266,7 @@ describe('touching a tab', () => {
 
   it('shows the photo of the member on « Moi »', async () => {
     jest.mocked(getMe).mockResolvedValue({ ...leaMe, avatarUrl: 'https://cdn.example/lea.jpg' })
-    await renderAt('/')
+    await renderAt('/feed')
 
     // Avec une photo, les initiales ne sont plus là (ui/Avatar) ; le lien garde son nom.
     expect(screen.queryByText('LÉ')).toBeNull()
@@ -259,7 +274,7 @@ describe('touching a tab', () => {
   })
 
   it('shows the initials of the member on « Moi » without a photo', async () => {
-    await renderAt('/')
+    await renderAt('/feed')
 
     expect(screen.getByText('LÉ')).toBeTruthy()
   })

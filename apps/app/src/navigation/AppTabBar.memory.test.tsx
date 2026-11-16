@@ -98,9 +98,17 @@ describe('the tab one came from, on the page of another member', () => {
   })
 
   it('keeps the Fil active through a project page, which has no bar', async () => {
-    await walk('/', '/projects/p1', '/members/u7')
+    await walk('/feed', '/projects/p1', '/members/u7')
 
     expect(activeLink(t(($) => $.nav.feed))).toBeTruthy()
+  })
+
+  it('keeps Explorer active on the home page opened from Explorer (R12, « À la une »)', async () => {
+    await walk('/explore', '/')
+
+    expect(region()).toBeTruthy()
+    expect(activeLink(t(($) => $.nav.explore))).toBeTruthy()
+    expect(activeLink(t(($) => $.nav.feed))).toBeNull()
   })
 
   it('keeps « Moi » active after opening another member from one’s own page', async () => {
@@ -121,7 +129,11 @@ describe('the tab one came from, on the page of another member', () => {
 
 describe('the place of each address', () => {
   it.each([
-    ['/', { kind: 'tab', tab: 'feed', firstPage: true }],
+    ['/feed', { kind: 'tab', tab: 'feed', firstPage: true }],
+    ['/feed/', { kind: 'tab', tab: 'feed', firstPage: true }],
+    // R12 : l'accueil et sa vitrine, où la barre reste avec l'onglet d'où l'on vient.
+    ['/', { kind: 'home' }],
+    ['/feedx', { kind: 'hidden' }],
     ['/explore/', { kind: 'tab', tab: 'explore', firstPage: true }],
     ['/tags/claude', { kind: 'tab', tab: 'explore', firstPage: false }],
     ['/tags/claude/edit', { kind: 'hidden' }],
@@ -136,7 +148,7 @@ describe('the place of each address', () => {
 
 describe('no page asked twice by a double tap', () => {
   it('opens the publication once', async () => {
-    await walk('/')
+    await walk('/feed')
 
     const plus = screen.getByRole('button', { name: t(($) => $.nav.publish) })
     await fireEvent.press(plus)
