@@ -12,6 +12,8 @@ export const en: Translation = {
     loading: 'Loading…',
     crashed: 'This page could not be displayed.',
     retry: 'Try again',
+    /** R12b: the pill of a project or account of examples (made up). */
+    example: 'Example',
     back: 'Back',
     cancel: 'Cancel',
     close: 'Close',
@@ -1214,6 +1216,9 @@ export const en: Translation = {
       loading: 'Loading the comments…',
     },
     page: {
+      /** R12b: under the header of a project of an account of examples. */
+      exampleNote:
+        'A made-up project, created by the {{appName}} team to show what a project looks like.',
       published: 'published on {{date}}',
       publishedWhen: 'published {{when}}',
       publishedOn: 'Published {{when}}',
@@ -2029,6 +2034,9 @@ export const en: Translation = {
     provisionalNameValue: 'Member',
   },
   member: {
+    /** R12b: under the name of an account of examples, on its page. */
+    exampleNote:
+      'The projects of this account are made up: the {{appName}} team created them to show what a project looks like.',
     // {{nameOf}}: “Inès’s” (nameOf from @ruche/i18n, slice 6c).
     open: 'See {{nameOf}} page',
     handle: '@{{handle}}',

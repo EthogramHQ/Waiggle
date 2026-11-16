@@ -3,6 +3,7 @@
 // les dates de connexion. z.object ne garde que les champs listés ici, et l'API passe sa réponse
 // par Member.parse : un champ de plus, lu par erreur dans la base, ne pourrait pas en sortir.
 import { z } from 'zod'
+import { ExampleFlag } from './example'
 import { FollowState } from './follows'
 import { PROJECT_LIST_MAX, ProjectSummary, PublicProjectCard } from './projects'
 import { RemovedPart } from './removal'
@@ -38,6 +39,8 @@ export const Member = z
      * de partage dit alors que tout le monde peut l'ouvrir ; faux, seulement les membres.
      */
     publicPage: z.boolean(),
+    /** R12b : `true` pour un compte d'exemples (pastille et phrase « fictifs »), absent sinon. */
+    example: ExampleFlag,
     /** Si le visiteur la suit, et combien de membres la suivent (jamais leurs noms). */
     ...FollowState.shape,
     /** Ses projets que le visiteur a le droit de voir, du plus récent au plus ancien. */
@@ -133,6 +136,8 @@ export const PublicMember = z
     projects: z.array(PublicProjectCard).max(PROJECT_LIST_MAX).optional(),
     /** Le nombre de membres qui le suivent, jamais leurs noms. */
     followerCount: z.int().nonnegative().optional(),
+    /** R12b : `true` pour un compte d'exemples, absent sinon. */
+    example: ExampleFlag,
   })
   .meta({ id: 'PublicMember' })
 export type PublicMember = z.infer<typeof PublicMember>
