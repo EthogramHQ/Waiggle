@@ -35,7 +35,7 @@
 // Pas besoin de serveur d'API : les réponses de l'API sont simulées avec les mêmes données
 // d'exemple que les tests (src/testing/). Node lit ces fichiers TypeScript directement.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { crc32, deflateSync } from 'node:zlib'
 import { chromium } from 'playwright'
@@ -5210,6 +5210,26 @@ const scrollHeight = (page) =>
 // quand trois pages se dessinent en même temps, chacune va moins vite, et la première version
 // de ce script photographiait parfois une page coupée à mi-hauteur. On mesure toutes les 250 ms,
 // jusqu'à deux mesures de suite identiques (au plus 10 secondes).
+/**
+ * Prend une capture, et la reprend une fois si Chromium répond « Unable to capture screenshot » :
+ * une erreur passagère du navigateur de la CI, sans rapport avec la page, qui coûtait une relance
+ * entière du lot (R11-E1, Louis 16/11/2026). Au second échec, l'erreur nomme la page.
+ */
+const shoot = async (page, options, label) => {
+  try {
+    await page.screenshot(options)
+  } catch (error) {
+    if (!/Unable to capture screenshot/.test(String(error?.message))) throw error
+    console.warn(`capture reprise : ${label}`)
+    await page.waitForTimeout(500)
+    try {
+      await page.screenshot(options)
+    } catch (again) {
+      throw new Error(`capture impossible : ${label} (${again?.message ?? again})`)
+    }
+  }
+}
+
 const settle = async (page) => {
   let last = await scrollHeight(page)
   let steady = 0
@@ -5457,7 +5477,11 @@ async function layoutReport() {
             outside: [...new Set(outside)].slice(0, 5),
           }
         })
-        await page.screenshot({ path: join(dir, `${shot.name}-${width}.png`), fullPage: true })
+        await shoot(
+          page,
+          { path: join(dir, `${shot.name}-${width}.png`), fullPage: true },
+          `${shot.name} à ${width} px`,
+        )
         const notes = []
         if (unloaded) notes.push('**page non chargée**')
         if (found.scroll > 0) notes.push(`défilement horizontal de ${found.scroll} px`)
@@ -5618,7 +5642,7 @@ const capture = async ({ shot, device, scheme }) => {
       )
     }
     if (!shot.fullPage) {
-      await page.screenshot({ path: file(1, 1) })
+      await shoot(page, { path: file(1, 1) }, basename(file(1, 1)))
       return
     }
     // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
@@ -5650,7 +5674,7 @@ const capture = async ({ shot, device, scheme }) => {
         )
         await page.waitForTimeout(300)
       }
-      await page.screenshot({ path: file(part, parts) })
+      await shoot(page, { path: file(part, parts) }, basename(file(part, parts)))
     }
   } finally {
     await context.close()
