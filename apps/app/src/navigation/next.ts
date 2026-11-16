@@ -15,8 +15,11 @@ const MAX_LENGTH = 512
 // d'avertissement (/out), qui pourrait servir à pousser vers un faux site juste après la
 // connexion, ni les pages de connexion elles-mêmes. Depuis R2, les réglages (/settings et ses
 // rubriques, /settings/security/password…) : une session qui y expire ramène à la rubrique.
+// R12 (relecture du plan, C2) : aussi un projet public ou une page publique à leur adresse par
+// langue (`/fr/projects/<id>`, `/en/members/<id>`), d'où « Compte requis » envoie se connecter ;
+// seulement ces deux sortes, et seulement `fr` ou `en` : ni `/de/…`, ni `/fr/out`, ni `/fr/sign-in`.
 const RETURN_PAGES =
-  /^\/(?:(?:members|projects|tags)\/|(?:account|profile|settings|notifications|report|moderation|blocks)(?:[/?#]|$))/
+  /^\/(?:(?:fr|en)\/(?:members|projects)\/|(?:members|projects|tags)\/|(?:account|profile|settings|notifications|report|moderation|blocks)(?:[/?#]|$))/
 
 // Les caractères permis dans un chemin d'adresse, en ASCII seulement : rien d'invisible, aucune
 // barre oblique « pleine chasse » (／) ni caractère de contrôle qui pourrait tromper un navigateur.

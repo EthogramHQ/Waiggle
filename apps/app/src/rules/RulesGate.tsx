@@ -13,10 +13,13 @@
 // commentaires » et « Mes retours envoyés » (on peut retirer ce qu'on a écrit sans accepter).
 // « Mes données » (`/settings/data`) elle-même reste gardée : « Télécharger mes données » se fait
 // sur l'écran « Accepter ».
+import { LEGAL_PAGES } from '@ruche/contracts'
+import { supportedLanguages } from '@ruche/i18n'
 import { usePathname } from 'expo-router'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Modal, Platform } from 'react-native'
 import { useSession } from '../accounts/api'
+import { publicPath } from '../navigation/publicPath'
 import { useMe } from '../profile/hooks'
 import { AcceptRulesScreen } from '../screens/AcceptRulesScreen'
 import { openModalLayer, sameLayer } from '../ui/modalLayers'
@@ -30,10 +33,12 @@ import { useHydrated } from '../ui/theme/hydration'
  * commence pareil).
  */
 const OPEN_PATHS: ReadonlySet<string> = new Set([
-  '/rules',
-  '/privacy',
-  '/legal',
-  '/accessibility',
+  // Les pages légales, à leur adresse d'avant R12 et dans chaque langue (`/fr/rules`, R12) :
+  // `publicPath` les écrit, comme les liens du pied de page.
+  ...LEGAL_PAGES.flatMap((page) => [
+    `/${page}`,
+    ...supportedLanguages.map((lang) => publicPath(page, lang)),
+  ]),
   '/unsubscribe',
   '/settings/notifications',
   '/settings/account/delete',

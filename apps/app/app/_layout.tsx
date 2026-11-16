@@ -16,7 +16,7 @@ import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
-import { AmbientHost, hostedNavigationTheme, hostedStackStyle } from '../src/ui/AmbientHost'
+import { AmbientHost, hostedNavigationTheme, usePageStackOptions } from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
@@ -101,17 +101,13 @@ export default function RootLayout() {
 
 /** La barre d'état (heure, batterie) et la navigation, aux couleurs du thème en cours. */
 function ThemedChrome() {
-  const { scheme, colors } = useTheme()
+  const { scheme } = useTheme()
   // Stack : navigation en pile, chaque nouvelle page s'empile sur la précédente. Sur le web, les
   // pages sont transparentes : la lumière commune de l'hôte se voit derrière elles. Sur téléphone,
   // chaque page garde le fond de l'appli (et sa propre lumière, ui/Screen.tsx).
+  const screenOptions = usePageStackOptions()
   const stack = (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: isWeb ? hostedStackStyle : { backgroundColor: colors.background },
-      }}
-    >
+    <Stack screenOptions={screenOptions}>
       {/* R6a : publier et modifier sont des feuilles posées sur la page d'où l'on vient. Une
           fenêtre transparente (`transparentModal`) garde cette page dessinée dessous ; la feuille
           anime elle-même son entrée (`animation: 'none'`). Ouverte sans page d'avant, la feuille

@@ -10,8 +10,8 @@ import {
 } from '@ruche/i18n'
 import { getLocales } from 'expo-localization'
 import i18next, { type i18n } from 'i18next'
-import { useEffect } from 'react'
-import { initReactI18next, useTranslation } from 'react-i18next'
+import { useContext, useEffect } from 'react'
+import { I18nContext, initReactI18next, useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
 
 /** Langue de l'appareil si on la gère, le français sinon. */
@@ -78,17 +78,53 @@ export const createI18n = (language: Language = detectLanguage()): i18n => {
 // jamais revenir dessus si le membre choisit ensuite une autre langue.
 let browserLanguageAdopted = false
 
+// R12 (« La langue de la page ») : les instances dont la langue est celle de l'adresse (`/en/…`),
+// créées par `createPageI18n`. La langue du navigateur ne les touche jamais. Un `WeakSet` est un
+// ensemble qui ne retient pas ses éléments : une instance oubliée par la page part avec elle.
+const addressLanguage = new WeakSet<i18n>()
+
+/**
+ * Une instance i18next dans la langue d'une adresse publique (`/fr/…`, `/en/…`), pour un visiteur :
+ * la page s'affiche dans cette langue dès son premier rendu, HTML pré-rendu compris, quel que soit
+ * le réglage du navigateur (voir navigation/PageLanguage.tsx).
+ */
+export const createPageI18n = (language: Language): i18n => {
+  const instance = createI18n(language)
+  addressLanguage.add(instance)
+  return instance
+}
+
+/**
+ * R12 : un visiteur arrivé sur une adresse à langue garde cette langue pour toute sa visite, dans
+ * l'appli entière (les feuilles de la racine, comme « Signaler », et `<html lang>`, que la racine
+ * écrit à chaque changement) : la langue du navigateur n'est plus adoptée ensuite, elle ne doit pas
+ * défaire le choix porté par l'adresse.
+ */
+export const keepAddressLanguage = (appI18n: i18n, language: Language) => {
+  browserLanguageAdopted = true
+  if (appI18n.language !== language) void appI18n.changeLanguage(language)
+}
+
 /**
  * Sur le web, les pages sont préparées en français sur le serveur. Ce hook passe à la langue du
  * navigateur une fois la page affichée. Il est appelé par chaque écran (voir ui/Screen.tsx) et non
  * par la mise en page racine : React finit d'« hydrater » le contenu d'une page après la racine.
  * Changer de langue avant ferait différer le texte du HTML préparé, et React devrait tout redessiner.
+ * Sous une adresse à langue (`/en/…`, R12), pour un visiteur, il ne fait rien : la page garde la
+ * langue de son adresse.
  */
 export const useBrowserLanguage = () => {
   const { i18n } = useTranslation()
+  // L'instance posée par le fournisseur le plus proche, telle quelle : `useTranslation` en rend une
+  // copie (react-i18next 17), qu'on ne retrouverait pas dans `addressLanguage`.
+  const provided = useContext(I18nContext)?.i18n
   useEffect(() => {
+    // Sous une adresse à langue, pour un visiteur, la langue est celle de l'adresse (R12) : on
+    // regarde l'instance avant le drapeau, pour ne pas consommer l'adoption sur une page qui
+    // l'ignore.
+    if (provided && addressLanguage.has(provided)) return
     if (Platform.OS !== 'web' || browserLanguageAdopted) return
     browserLanguageAdopted = true
     void i18n.changeLanguage(detectLanguage())
-  }, [i18n])
+  }, [i18n, provided])
 }
