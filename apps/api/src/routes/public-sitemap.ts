@@ -4,13 +4,14 @@
 // (`<lastmod>`). Rien d'autre : jamais un titre ni un nom.
 //
 // Il liste, en français et en anglais : l'accueil, les quatre pages légales, les projets visibles
-// d'un visiteur et les pages publiques ouvertes. Il est relu à chaque demande, sans cache partagé
+// d'un visiteur et les pages publiques ouvertes, sauf ceux d'un compte d'exemples (R12b). Il est relu à chaque demande, sans cache partagé
 // (relecture du plan, décision 3) : un projet qui cesse d'être public en sort à l'instant. Hors de
 // la limite de lecture des visiteurs (décision 6 ; security/visitor-limit.ts l'exempte).
 import { createRoute, z } from '@hono/zod-openapi'
 import { LEGAL_PAGES, PUBLIC_LANGUAGES } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, not } from 'drizzle-orm'
+import { isExampleAccountSql } from '../accounts/example'
 import { publicPageOpen } from '../profile/public-page'
 import { visitorVisibleProject } from '../projects/visibility'
 import { createRouter } from './router'
@@ -48,20 +49,24 @@ const urlEntry = (loc: string, lastmod?: Date) =>
  *   à "user" sur sa clé primaire. Aucun index sur `profile.public_page` : la table des profils est
  *   lue en entier (une ligne par membre), ce qui reste petit, et le plan du site n'est lu que par
  *   les moteurs.
+ *
+ * R12b : ni les projets ni la page d'un compte d'exemples (leur tête dit `noindex`, seo/head.ts) :
+ * `not (exists …)` dans chacun des deux `where` (accounts/example.ts), par la clé primaire
+ * d'example_account (user_id), une lecture par ligne gardée. La table n'a que quelques lignes.
  */
 const sitemapOf = async (db: Database, appUrl: string): Promise<string> => {
   const [projects, members] = await Promise.all([
     db
       .select({ id: schema.project.id, updatedAt: schema.project.updatedAt })
       .from(schema.project)
-      .where(visitorVisibleProject())
+      .where(and(visitorVisibleProject(), not(isExampleAccountSql(schema.project.authorId))))
       .orderBy(desc(schema.project.publishedAt), desc(schema.project.id))
       .limit(PROJECTS_MAX),
     db
       .select({ id: schema.user.id })
       .from(schema.profile)
       .innerJoin(schema.user, eq(schema.user.id, schema.profile.userId))
-      .where(publicPageOpen())
+      .where(and(publicPageOpen(), not(isExampleAccountSql(schema.user.id))))
       .orderBy(schema.user.id)
       .limit(MEMBERS_MAX),
   ])
