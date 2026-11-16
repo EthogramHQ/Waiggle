@@ -12,7 +12,7 @@ import { MemberId, ProjectId } from '@ruche/contracts'
 import type { Language } from '@ruche/i18n'
 import { Platform, Share } from 'react-native'
 import { webAppUrl } from '../config'
-import { publicPath } from '../navigation/publicPath'
+import { publicPath } from '../publicPath'
 
 /** Ce qu'on partage : la page d'un projet, ou celle d'un membre, par son identifiant. */
 export type ShareTarget = { kind: 'project' | 'member'; id: string }
@@ -23,7 +23,7 @@ export type ShareTarget = { kind: 'project' | 'member'; id: string }
  *
  * R12 (scénario « Partager », Q18) : une page que tout le monde peut ouvrir (un projet public, une
  * page publique) se partage à son adresse par langue, celle de qui partage (`publicIn` :
- * `/fr/projects/<id>`, `/en/members/<id>`), fabriquée par `navigation/publicPath.ts`, seul endroit
+ * `/fr/projects/<id>`, `/en/members/<id>`), fabriquée par `src/publicPath.ts`, seul endroit
  * qui écrit ces adresses. Sans `publicIn`, l'adresse des membres d'aujourd'hui (`/projects/<id>`) :
  * un lien réservé aux membres n'a pas de page visiteur à ouvrir.
  */

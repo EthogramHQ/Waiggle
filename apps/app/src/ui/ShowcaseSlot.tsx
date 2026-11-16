@@ -9,10 +9,17 @@
 // Plusieurs cartes portent le même bouton « Retirer » : son nom lu dit lequel (« Retirer Décollage !
 // de l'accueil »), et la note « Modifié… » le décrit (`aria-describedby` sur le web, indice sur
 // téléphone) : on l'entend en arrivant sur le bouton, avant de décider.
+//
+// Un projet retiré (relecture de design R12, point 1 ; piège 7a de la charte) : sa place **reste**,
+// la carte comprise, avec le résultat (« Retiré de l'accueil ») à la place du bouton, au moins aussi
+// haut (`DecidedZone`). Sans cela, la carte suivante glissait à sa place et son « Retirer » arrivait
+// sous le doigt : une seconde tape, à 700 ms (après la garde de l'onglet), retirait aussi la voisine.
+// C'est l'écran qui décide quand la place part (au prochain changement de vue).
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type ReactNode, useId } from 'react'
 import { View } from 'react-native'
 import { Button } from './Button'
+import { DecidedZone } from './DecidedZone'
 import { Icon } from './Icon'
 import { SHOWCASE_CARD_SIZE } from './ShowcaseCard'
 import { Row } from './Stack'
@@ -26,9 +33,14 @@ type SlotProps = {
   note?: string | undefined
   /** Le bouton « Retirer » : son libellé, son nom lu (qui nomme le projet) et son geste. */
   remove: { label: string; spokenLabel: string; onPress: () => void; loading?: boolean }
+  /**
+   * Le résultat d'un retrait, déjà traduit (« Retiré de l'accueil ») : il prend la place du bouton,
+   * et la place reste où elle était. Absent ou null : le bouton « Retirer ».
+   */
+  removed?: string | null | undefined
 }
 
-export function ShowcaseSlot({ card, note, remove }: SlotProps) {
+export function ShowcaseSlot({ card, note, remove, removed = null }: SlotProps) {
   // L'identifiant de la note, qui décrit le bouton sur le web.
   const noteId = `showcase-note-${useId()}`
   return (
@@ -50,19 +62,26 @@ export function ShowcaseSlot({ card, note, remove }: SlotProps) {
           </View>
         </Row>
       ) : null}
-      <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
-        <Button
-          label={remove.label}
-          spokenLabel={remove.spokenLabel}
-          icon="x"
-          variant="secondary"
-          size="compact"
-          onPress={remove.onPress}
-          loading={remove.loading ?? false}
-          describedById={note ? noteId : undefined}
-          hint={note}
-        />
-      </View>
+      {/* La zone garde la hauteur du bouton quand le résultat le remplace, et rend le focus du
+          clavier au résultat s'il est tombé avec le bouton touché. */}
+      <DecidedZone
+        result={removed}
+        actions={
+          <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+            <Button
+              label={remove.label}
+              spokenLabel={remove.spokenLabel}
+              icon="x"
+              variant="secondary"
+              size="compact"
+              onPress={remove.onPress}
+              loading={remove.loading ?? false}
+              describedById={note ? noteId : undefined}
+              hint={note}
+            />
+          </View>
+        }
+      />
     </View>
   )
 }

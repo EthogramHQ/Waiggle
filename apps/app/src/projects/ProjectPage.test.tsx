@@ -109,14 +109,17 @@ describe('ProjectPageLayout', () => {
     try {
       await renderLayout()
 
+      // La recette est dans la seconde rangée, à droite, au-dessus de la conversation (planche
+      // R12-Visiteur-Projet-Desktop ; relecture de design R12, point 4) : lue après ce qui se lit
+      // longtemps, à gauche, et avant la conversation.
       expect(shownOrder()).toEqual([
         'slot:gallery',
         'slot:header',
         'slot:actions',
         'slot:reactionSummary',
-        'slot:recipe',
         'slot:description',
         'slot:journal',
+        'slot:recipe',
         'slot:membersOnly',
         'slot:report',
       ])

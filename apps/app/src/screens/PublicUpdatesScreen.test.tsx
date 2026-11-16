@@ -7,12 +7,13 @@
 // `PublicUpdatesScreen({ id }: { id: string })` (l'identifiant du projet), qui lit
 // GET /v1/public/projects/<id>/updates (`usePublicUpdates`, `public/api.ts`), et le projet pour son
 // titre. Le faux serveur, les données et le faux routeur : Public.testkit.tsx.
-import { screen } from '@testing-library/react-native'
+import { fireEvent, screen } from '@testing-library/react-native'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
 import {
   countdownUpdate,
   decollageId,
+  mockNav,
   onlyPublicRoutes,
   publicServer,
   requested,
@@ -71,5 +72,31 @@ describe('the updates of a public project seen by a visitor (R12)', () => {
       await screen.findByRole('header', { name: fr.t(($) => $.states.signedOutTitle) }),
     ).toBeTruthy()
     expect(screen.queryByText(containing(firstLine ?? ''))).toBeNull()
+  })
+})
+
+// Relecture de l'interface R12, A1 : « Revenir » d'une frise en panne, sans page d'avant, mène à
+// l'accueil de la langue de l'adresse (`/en/`), pas à `/`.
+describe('the updates of a public project that cannot load (R12)', () => {
+  it('goes back to the home of the address language when opened directly', async () => {
+    resetPublic(`/en/projects/${decollageId}/updates`, { id: decollageId, lang: 'en' })
+    mockNav.router.canGoBack.mockImplementation(() => false)
+    const route = jest.spyOn(publicServer, 'route').mockImplementation(() => ({ status: 500 }))
+    try {
+      // Sous `/en/`, la page est en anglais (la langue de la page est celle de son adresse).
+      const { i18n } = await renderWithProviders(<PublicUpdatesScreen id={decollageId} />, 'en')
+
+      await fireEvent.press(
+        await screen.findByRole(
+          'button',
+          { name: i18n.t(($) => $.states.back) },
+          { timeout: 5000 },
+        ),
+      )
+
+      expect(mockNav.router.replace).toHaveBeenCalledWith('/en/')
+    } finally {
+      route.mockRestore()
+    }
   })
 })

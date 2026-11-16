@@ -149,6 +149,7 @@ const T = {
   errorTitle: fr.t(($) => $.moderation.showcase.errorTitle),
   error: fr.t(($) => $.moderation.showcase.error),
   authorDeclined: fr.t(($) => $.errors.authorDeclined),
+  removed: fr.t(($) => $.moderation.showcase.removed),
 }
 
 const shown = (text: string) => screen.queryAllByText(containing(text)).length > 0
@@ -272,6 +273,66 @@ describe('ShowcaseTab, the refusal of an author (juridique 6, décision 18)', ()
       expect(screen.queryAllByText(containing(T.authorDeclined)).length).toBeGreaterThan(before),
     )
     expect(showcaseOrder()).toEqual([decollage.title, papillon.title, ciel.title])
+  })
+})
+
+// --- Une seconde tape où était la carte retirée (relecture de design R12, point 1) ---
+
+/** Le rang de chaque élément dans l'ordre de lecture de l'onglet (de haut en bas). */
+type TreeNode = { children: (TreeNode | string)[] }
+const rankOf = (element: unknown) => {
+  const all: unknown[] = []
+  const walk = (node: TreeNode) => {
+    all.push(node)
+    for (const child of node.children) if (typeof child !== 'string') walk(child)
+  }
+  walk(screen.root as unknown as TreeNode)
+  return all.indexOf(element)
+}
+
+/**
+ * Le « Retirer » de la première place de la vitrine, ou null : ce qu'une seconde tape au même
+ * endroit toucherait. La première place va de la première carte (un lien) à la deuxième.
+ */
+const firstPlaceRemove = () => {
+  const [first, second] = screen.queryAllByRole('link').map(rankOf)
+  if (first === undefined) return null
+  const removes = screen
+    .queryAllByRole('button')
+    .filter((button) =>
+      all.some((one) => button.props.accessibilityLabel === T.removeNamed(one.title)),
+    )
+  return (
+    removes.find((button) => {
+      const rank = rankOf(button)
+      return rank > first && (second === undefined || rank < second)
+    }) ?? null
+  )
+}
+
+describe('ShowcaseTab, a second tap where the removed card was (design review R12, point 1)', () => {
+  it('keeps the removed place with its result, so two taps 700 ms apart write once', async () => {
+    await open()
+    // L'heure des appuis, fixée : la seconde tape arrive 700 ms après la première, après la garde
+    // de 600 ms de l'onglet.
+    let now = Date.now()
+    const clock = jest.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      await fireEvent.press(firstPlaceRemove() as NonNullable<ReturnType<typeof firstPlaceRemove>>)
+      now += 700
+      const underTheFinger = firstPlaceRemove()
+      if (underTheFinger) await fireEvent.press(underTheFinger)
+    } finally {
+      clock.mockRestore()
+    }
+
+    await waitFor(() => expect(puts()).toHaveLength(1))
+    expect(puts()[0]).toEqual({ projectIds: [papillon.id, ciel.id] })
+    // La place de Décollage ! reste la première, avec le résultat ; les autres gardent la leur.
+    expect(screen.getByText(containing(T.removed))).toBeTruthy()
+    const [firstLink] = screen.getAllByRole('link')
+    expect(rankOf(firstLink)).toBe(rankOf(screen.getByRole('link', { name: decollage.title })))
+    expect(showcaseOrder()).toEqual([papillon.title, ciel.title])
   })
 })
 

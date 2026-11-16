@@ -74,6 +74,39 @@ describe('ShowcaseSlot', () => {
   })
 })
 
+describe('ShowcaseSlot, a removed project (design review R12, point 1)', () => {
+  const removedSlot = (
+    <ShowcaseSlot
+      card={
+        <ShowcaseCard
+          title="Décollage !"
+          author={{ name: 'Papi Jean', avatar: null }}
+          image={null}
+          status={{ label: 'Testable', strong: true }}
+          onPress={noop}
+        />
+      }
+      remove={{ label: 'Retirer', spokenLabel: 'Retirer Décollage ! de l’accueil', onPress: noop }}
+      removed="Retiré de l’accueil"
+    />
+  )
+
+  it('keeps the card, and says the result in place of « Retirer »', async () => {
+    await renderWithProviders(removedSlot)
+
+    expect(screen.getByRole('link', { name: 'Décollage !' })).toBeTruthy()
+    expect(screen.getByText('Retiré de l’accueil')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Retirer Décollage ! de l’accueil' })).toBeNull()
+  })
+
+  it('shows the button while nothing is removed (témoin)', async () => {
+    await renderWithProviders(slot(noop))
+
+    expect(screen.queryByText('Retiré de l’accueil')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Retirer Décollage ! de l’accueil' })).toBeTruthy()
+  })
+})
+
 describe('ShowcaseFreeSlot', () => {
   it('says « Une place libre », with nothing to press', async () => {
     await renderWithProviders(<ShowcaseFreeSlot label="Une place libre" />)

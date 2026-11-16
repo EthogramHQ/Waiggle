@@ -18,9 +18,9 @@ import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { publicPath } from '../navigation/publicPath'
 import { useGoBack } from '../navigation/useGoBack'
 import { usePageLanguage, usePublicProject, usePublicUpdates } from '../public/api'
+import { publicPath } from '../publicPath'
 import { BeforeAfter } from '../ui/BeforeAfter'
 import { Columns } from '../ui/Columns'
 import { CountedTitle } from '../ui/CountedTitle'
@@ -39,20 +39,23 @@ import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
 export function PublicUpdatesScreen({ id }: { id: string }) {
   const project = usePublicProject(id)
+  // Sans page d'avant, « Revenir » mène à l'accueil dans la langue de l'adresse (relecture de
+  // l'interface R12, A1) : le Fil serait « Réservé aux membres », et `/` reposerait le choix de la
+  // langue (un rechargement repasse par la redirection, qui suit le navigateur).
+  const home = publicPath('home', usePageLanguage())
 
   if (project.error) {
     if (errorKey(project.error) === 'notFound') return <SignedOutScreen width="page" />
-    // Sans page d'avant, « Revenir » mène à l'accueil : le Fil serait « Réservé aux membres ».
     return (
       <LoadErrorScreen
         error={project.error}
         onRetry={() => void project.refetch()}
-        fallback="/"
+        fallback={home}
         width="page"
       />
     )
   }
-  if (!project.data) return <LoadingScreen width="page" fallback="/" />
+  if (!project.data) return <LoadingScreen width="page" fallback={home} />
   return <UpdatesView project={project.data} />
 }
 

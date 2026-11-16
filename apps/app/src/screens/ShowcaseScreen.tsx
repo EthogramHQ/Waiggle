@@ -27,10 +27,10 @@ import { usePathname, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { useMediaSources } from '../api/media'
-import { languageOfPath, publicPath } from '../navigation/publicPath'
 import { TopNav } from '../navigation/TopNav'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { usePageLanguage } from '../public/api'
+import { languageOfPath, publicPath } from '../publicPath'
 import { useMemberShowcase, usePublicShowcase } from '../showcase/api'
 import { Button } from '../ui/Button'
 import { Carousel } from '../ui/Carousel'
@@ -40,7 +40,7 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { LegalLinks } from '../ui/LegalLinks'
 import { Logo } from '../ui/Logo'
 import { Screen } from '../ui/Screen'
-import { ShowcaseCard } from '../ui/ShowcaseCard'
+import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
@@ -141,6 +141,7 @@ function ShowcaseHome({ items, member }: ShowcaseHomeProps) {
           nextLabel={t(($) => $.explore.next)}
           header={showcaseTitle}
           bleed
+          cardShadow={SHOWCASE_CARD_SHADOW}
         >
           {cards}
         </Carousel>

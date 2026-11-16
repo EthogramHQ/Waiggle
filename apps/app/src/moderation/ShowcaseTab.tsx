@@ -21,8 +21,12 @@
 // Deux règles de la charte du design, pour que rien ne bouge sous le doigt :
 // - une ligne mise en avant reste à sa place dans la liste, avec « Sur l'accueil » à la place de son
 //   bouton, jusqu'à ce qu'on quitte l'onglet : la ligne d'en dessous ne remonte pas sous le doigt ;
-// - un appui arrivé moins de 600 ms après un geste est ignoré : une double tape sur « Retirer » ne
-//   retire pas aussi la carte qui vient prendre la place de la première.
+// - de même, la place d'un projet retiré reste dans la vitrine, sa carte comprise, avec « Retiré de
+//   l'accueil » à la place de « Retirer », jusqu'à ce qu'on quitte l'onglet (relecture de design
+//   R12, point 1) : la carte suivante ne glisse pas à sa place, et une seconde tape, même après la
+//   garde, ne retire pas la voisine ;
+// - un appui arrivé moins de 600 ms après un geste est ignoré : une double tape très rapide ne
+//   lance pas deux gestes.
 import { type ModerationShowcase, SHOWCASE_MAX, type ShowcaseCandidate } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
@@ -47,7 +51,8 @@ import { useModerationShowcase, useSetShowcase } from './showcase-api'
 /** Le temps de voir ce qui vient de changer : un appui arrivé avant est ignoré (charte, 6c). */
 const SETTLE_MS = 600
 
-type Project = ModerationShowcase['items'][number]['project']
+type Item = ModerationShowcase['items'][number]
+type Project = Item['project']
 
 /**
  * Le titre ramené à une forme simple pour la recherche : en minuscules, sans accents (« décoll »
@@ -73,8 +78,13 @@ export function ShowcaseTab() {
   const [featuredHere, setFeaturedHere] = useState<ReadonlyMap<string, ShowcaseCandidate>>(
     () => new Map(),
   )
+  // Les projets retirés pendant cette visite, avec leur place : elle reste dans la vitrine (voir
+  // l'en-tête), même après la relecture qui les a rendus aux candidats.
+  const [removedHere, setRemovedHere] = useState<ReadonlyMap<string, Item>>(() => new Map())
   // L'ordre des lignes au dernier affichage : une ligne gardée y retrouve son rang.
   const shownOrder = useRef<readonly string[]>([])
+  // L'ordre des places de la vitrine au dernier affichage : une place retirée y garde son rang.
+  const shownSlots = useRef<readonly string[]>([])
   // L'heure du dernier geste, lue au moment de l'appui, sans attendre que l'écran se redessine.
   const lastGesture = useRef(0)
   // Le titre « Sur l'accueil » : le focus y va après un geste, le bouton touché ayant disparu.
@@ -96,8 +106,15 @@ export function ShowcaseTab() {
       .map((candidate) => candidate.project.id)
       .filter((id) => !kept.includes(id)),
   ]
+  // Les places de la vitrine : celles retirées ici, puis celles de l'API (sa version gagne). Les
+  // places déjà montrées gardent leur rang ; les nouvelles (un ajout) viennent à la fin.
+  const slotItems = new Map<string, Item>(removedHere)
+  for (const item of items) slotItems.set(item.project.id, item)
+  const keptSlots = shownSlots.current.filter((id) => slotItems.has(id))
+  const slotOrder = [...keptSlots, ...onShowcase.filter((id) => !keptSlots.includes(id))]
   useEffect(() => {
     shownOrder.current = order
+    shownSlots.current = slotOrder
   })
 
   if (!data) {
@@ -152,15 +169,32 @@ export function ShowcaseTab() {
     if (full || onShowcase.includes(id) || candidate.showcaseDeclinedAt) return
     if (!settled()) return
     setFeaturedHere((previous) => new Map(previous).set(id, candidate))
+    // Remis après avoir été retiré pendant cette visite : il prend la dernière place, comme dans la
+    // vitrine que l'API garde, et non l'ancienne place restée en attente.
+    if (removedHere.has(id)) {
+      setRemovedHere((previous) => {
+        const next = new Map(previous)
+        next.delete(id)
+        return next
+      })
+      shownSlots.current = shownSlots.current.filter((one) => one !== id)
+    }
     focusTitle()
     answered(await save([...onShowcase, id]))
   }
 
-  /** « Retirer » : le projet quitte la vitrine, les autres gardent leur ordre. */
-  const remove = async (id: string) => {
+  /**
+   * « Retirer » : le projet quitte la vitrine, les autres gardent leur ordre. Sa place reste, avec le
+   * résultat à la place du bouton ; sur le web, `ShowcaseSlot` donne le focus du clavier au résultat
+   * (le bouton touché a disparu). Refusé, le projet revient avec son bouton, et le focus va au titre.
+   */
+  const remove = async (item: Item) => {
     if (!settled()) return
-    focusTitle()
-    answered(await save(onShowcase.filter((one) => one !== id)))
+    const id = item.project.id
+    setRemovedHere((previous) => new Map(previous).set(id, item))
+    const result = await save(onShowcase.filter((one) => one !== id))
+    answered(result)
+    if (!result.ok) focusTitle()
   }
 
   /** La photo d'un projet, pour sa carte ou sa vignette ; null : la lumière miel. */
@@ -179,27 +213,38 @@ export function ShowcaseTab() {
 
   const slots = (
     <Row gap="md" align="start" wrap>
-      {items.map(({ project, editedSinceAdded }) => (
-        <ShowcaseSlot
-          key={project.id}
-          card={
-            <ShowcaseCard
-              title={project.title}
-              author={{ name: project.author.name, avatar: null }}
-              image={coverOf(project)}
-              status={{ label: statusOf(project), strong: project.status === 'testable' }}
-              onPress={() => router.push(`/projects/${encodeURIComponent(project.id)}`)}
-            />
-          }
-          note={editedSinceAdded ? t(($) => $.moderation.showcase.changed) : undefined}
-          remove={{
-            label: t(($) => $.moderation.showcase.remove),
-            spokenLabel: t(($) => $.moderation.showcase.removeNamed, { title: project.title }),
-            onPress: () => void remove(project.id),
-          }}
-        />
-      ))}
-      {Array.from({ length: Math.max(0, SHOWCASE_MAX - items.length) }, (_, index) => (
+      {slotOrder.map((id) => {
+        const item = slotItems.get(id)
+        if (!item) return null
+        const { project, editedSinceAdded } = item
+        return (
+          <ShowcaseSlot
+            key={project.id}
+            // Retiré pendant cette visite, et toujours hors de la vitrine (un refus de l'API le remet).
+            removed={
+              !onShowcase.includes(project.id) ? t(($) => $.moderation.showcase.removed) : null
+            }
+            card={
+              <ShowcaseCard
+                title={project.title}
+                author={{ name: project.author.name, avatar: null }}
+                image={coverOf(project)}
+                status={{ label: statusOf(project), strong: project.status === 'testable' }}
+                onPress={() => router.push(`/projects/${encodeURIComponent(project.id)}`)}
+              />
+            }
+            note={editedSinceAdded ? t(($) => $.moderation.showcase.changed) : undefined}
+            remove={{
+              label: t(($) => $.moderation.showcase.remove),
+              spokenLabel: t(($) => $.moderation.showcase.removeNamed, { title: project.title }),
+              onPress: () => void remove(item),
+            }}
+          />
+        )
+      })}
+      {/* Les places libres complètent les places montrées : une place retirée compte encore, et la
+          rangée garde sa forme jusqu'au changement de vue. */}
+      {Array.from({ length: Math.max(0, SHOWCASE_MAX - slotOrder.length) }, (_, index) => (
         // Les places libres n'ont pas d'identité : leur rang suffit.
         // biome-ignore lint/suspicious/noArrayIndexKey: une place libre n'a que son rang.
         <ShowcaseFreeSlot key={index} label={t(($) => $.moderation.showcase.freeSlot)} />

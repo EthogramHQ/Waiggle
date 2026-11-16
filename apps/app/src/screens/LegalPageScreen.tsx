@@ -12,11 +12,13 @@
 // (`ui/LegalDocument` : la version, « En bref », le sommaire sur ordinateur, le texte complet), puis
 // le pied (`ui/LegalLinks` : les trois autres pages et l'adresse de contact).
 import type { LegalPage } from '@ruche/contracts'
+import { usePathname } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { legalDocument } from '../legal/documents'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { languageOfPath, publicPath } from '../publicPath'
 import { LegalDocument } from '../ui/LegalDocument'
 import { LegalLinks } from '../ui/LegalLinks'
 import { Screen } from '../ui/Screen'
@@ -35,8 +37,12 @@ export function LegalPageScreen({ page }: Props) {
   const doc = legalDocument(page, t)
   // Le sommaire seulement quand le texte et lui tiennent côte à côte (ordinateur, dès 1 100 points).
   const wide = useLayout().sizeClass === 'wide'
-  // Arrivé par un lien direct (un pied de page partagé, une recherche), rien derrière : l'accueil.
-  const back = useGoBack('/')
+  // Arrivé par un lien direct (un pied de page partagé, une recherche), rien derrière : l'accueil,
+  // dans la langue de l'adresse sous `/fr/…` et `/en/…` (relecture de l'interface R12, A1 : `/`
+  // reposait le choix de la langue, et un rechargement suivait celle du navigateur) ; `/` sous
+  // `/rules`, qui n'a pas de langue.
+  const language = languageOfPath(usePathname())
+  const back = useGoBack(language ? publicPath('home', language) : '/')
   // Un lien du texte (la CNIL, le Défenseur des droits, le code source) quitte l'appli : il passe
   // par la page d'avertissement « Tu quittes… » (/out), comme tout lien extérieur.
   const openOutside = useOpenOutside()

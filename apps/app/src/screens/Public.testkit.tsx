@@ -18,7 +18,7 @@
 //   l'envoi : POST /v1/public/reports, 204 sans corps (rapport de K1) ;
 // - un membre lit la vitrine par GET /v1/showcase (le faux serveur répond aux deux) ;
 // - les écrans reçoivent l'identifiant en prop (`id`), comme `ProjectScreen` ;
-// - les adresses d'un visiteur passent par `navigation/publicPath.ts` (`/fr/projects/<id>`…).
+// - les adresses d'un visiteur passent par `src/publicPath.ts` (`/fr/projects/<id>`…).
 import type {
   PublicMember,
   PublicProject,
