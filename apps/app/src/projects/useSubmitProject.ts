@@ -95,17 +95,23 @@ export function useSubmitProject({
     }
     await flushPhotos(projectId)
     await release()
-    // Un nouveau statut d'un projet visible des membres : la page propose une note toute prête.
-    const announce = result.data.status !== initial.status && result.data.visibility === 'public'
+    // Un nouveau statut d'un projet visible des membres (`public`) ou de tous (`web`, plan R12,
+    // décision 11) : la page propose une note toute prête.
+    const announce =
+      result.data.status !== initial.status &&
+      (result.data.visibility === 'public' || result.data.visibility === 'web')
     toast.show(
       t(($) => $.project.form.saved),
       { icon: 'check-circle' },
     )
     // dismissTo : retour à la page du projet dessous (ou à sa place), jamais une seconde copie.
-    router.dismissTo({
-      pathname: '/projects/[id]',
-      params: announce ? { id, announce: result.data.status } : { id },
-    })
+    // Avec une annonce, l'adresse s'écrit en texte, comme `/settings/security?announce=…` : le
+    // routeur la lit pareil, et elle se compare telle quelle (feed.test.tsx, plan R12 B4).
+    router.dismissTo(
+      announce
+        ? `/projects/${id}?announce=${result.data.status}`
+        : { pathname: '/projects/[id]', params: { id } },
+    )
     return null
   }
 
