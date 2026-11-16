@@ -41,6 +41,7 @@ import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { rulesRoutes } from './routes/rules'
 import { searchRoutes } from './routes/search'
+import { showcaseRoutes } from './routes/showcase'
 import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
 import { testerCallRoutes } from './routes/tester-calls'
@@ -427,6 +428,8 @@ export const createApp = ({
   app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl, appUrl }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter }))
+  // La vitrine de l'accueil (R12) : « À la une », l'onglet de la modération, « Retirer de l'accueil ».
+  app.route('/', showcaseRoutes({ db, limiter, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
   // Les lectures sans compte (R12) : un projet public, ses mises à jour, une page publique, la
   // vitrine de l'accueil.

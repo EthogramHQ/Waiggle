@@ -35,6 +35,7 @@ import {
   restorePart,
 } from '../moderation/parts'
 import { SuspensionChanged, type SuspensionError, suspendOrLift } from '../moderation/suspend'
+import { dropFromShowcase } from '../showcase/store'
 import { isActiveAdmin } from './admin'
 import { loadDecidable } from './target'
 
@@ -76,13 +77,17 @@ const mark = async (
     case 'project': {
       const t = schema.project
       const state = removal ? isNull(t.removedAt) : isNotNull(t.removedAt)
-      return (
+      const marked = (
         await tx
           .update(t)
           .set(set)
           .where(and(eq(t.id, target.id), state))
           .returning({ id: t.id })
       ).length
+      // R12 : retiré, il quitte la vitrine de l'accueil dans la même transaction ; rétabli, il n'y
+      // revient pas seul (showcase/store.ts).
+      if (removal && marked > 0) await dropFromShowcase(tx, target.id)
+      return marked
     }
     case 'update': {
       // Retirer une mise à jour la cache aux autres (updateShownTo) ; ses photos la suivent

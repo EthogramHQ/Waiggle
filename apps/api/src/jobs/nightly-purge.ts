@@ -144,6 +144,13 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     .delete(schema.hiveNotice)
     .where(sql`${schema.hiveNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
     .returning({ id: schema.hiveNotice.id })
+  // R12 (relecture juridique du plan, décision 19) : les traces « ton projet est sur l'accueil »
+  // (`showcase_notice`) ne se gardent pas plus longtemps qu'elles ne se montrent, 90 jours, comme
+  // celles du catalogue. Lecture par l'index `showcase_notice_created_idx` (la date seule).
+  const showcaseNotices = await db
+    .delete(schema.showcaseNotice)
+    .where(sql`${schema.showcaseNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
+    .returning({ id: schema.showcaseNotice.id })
 
   // R7a (sécurité A5) : les photos « en attente » (slot 'update', jamais rattachées à une mise à
   // jour) de plus de 24 heures : téléversées, mais la mise à jour n'a pas été publiée. La ligne
@@ -206,6 +213,7 @@ export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage
     catalogueNotices: catalogueNotices.length,
     hiveInvitations: hiveInvitations.length,
     hiveNotices: hiveNotices.length,
+    showcaseNotices: showcaseNotices.length,
     ...moderation,
   }
   console.log('Nightly purge', purged)

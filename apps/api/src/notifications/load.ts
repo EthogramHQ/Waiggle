@@ -546,7 +546,23 @@ const catalogueSources = (me: string, during: (column: string) => SQL): SQL => s
     from catalogue_notice cn
     join tool on tool.id = cn.tool_id
     where cn.member_id = ${me} and cn.kind in ('tool_added', 'tool_merged')
-      and ${during('cn.created_at')} and tool.status = 'catalogue'`
+      and ${during('cn.created_at')} and tool.status = 'catalogue'
+
+    union all
+
+    -- 20. (R12) Un de ses projets mis sur l'accueil (« showcase_added ») : la trace écrite par
+    --     showcase/store.ts dans la transaction de l'administrateur, signée par l'équipe comme celles
+    --     du catalogue (aucun nom, aucun filtre de blocage) et, comme elles, jamais dans un e-mail.
+    --     Montrée tant que le projet est encore à lui, public (« web ») et pas retiré : redevenu
+    --     « Membres » ou retiré, elle disparaît ; supprimé, la trace part avec lui (« cascade »).
+    --     Index showcase_notice_member_idx (member_id, created_at desc), puis la clé du projet.
+    select 'showcase_added', 'showcase_added:' || sn.id, sn.created_at,
+      sn.project_id, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, sn.id
+    from showcase_notice sn
+    join project on project.id = sn.project_id
+    where sn.member_id = ${me} and ${during('sn.created_at')}
+      and project.author_id = ${me} and project.visibility = 'web' and project.removed_at is null`
 
 /**
  * La source 11 (R7a) : une ligne par mise à jour d'un projet que `me` suit OU teste, avec les vingt
@@ -909,6 +925,8 @@ const ListRow = z.object({
     'hive_removed',
     'hive_animator',
     'hive_deleted',
+    // R12 : un projet mis sur l'accueil (source 20).
+    'showcase_added',
   ]),
   key: z.string(),
   at: z.string(),
@@ -986,6 +1004,9 @@ const ListRow = z.object({
   hive_renamable: z.boolean().nullable(),
   invitation_id: z.string().nullable(),
   hive_notice_id: z.string().nullable(),
+  // R12 : le projet d'une notification `showcase_added` est-il encore dans la vitrine ? Null pour
+  // toute autre sorte.
+  on_showcase: z.boolean().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -1149,6 +1170,11 @@ export const present = (
         toolSlug: row.tool_slug,
         toolName: row.tool_name,
       }
+    // R12 : signée par l'équipe, comme le catalogue ; « Retirer de l'accueil » tant que le projet y
+    // est encore (`onShowcase`).
+    case 'showcase_added':
+      if (!project || row.on_showcase === null) return null
+      return { ...common, kind: 'showcase_added', project, onShowcase: row.on_showcase }
     // R7b, le coin des testeurs. `author_id` est l'auteur du projet (un appel, un retour réglé) ou
     // l'expéditeur du message ; son compte supprimé entre-temps : rien n'est montré.
     case 'tester_call': {
@@ -1504,7 +1530,13 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
         is true as hive_renamable,
       coalesce(hive.icon, hv.icon) as hive_icon,
       hi.id as invitation_id,
-      hn.id as hive_notice_id
+      hn.id as hive_notice_id,
+      -- R12 : le projet d'une mise sur l'accueil y est-il encore ? Par la clé primaire de showcase
+      -- (project_id) ; « (select 1 … limit 1) is not null » plutôt qu'un « exists », qui peut lire
+      -- toute la table (charte de l'API, 7b). Seule cette sorte lance la sous-requête.
+      case when n.kind = 'showcase_added' then (
+        select 1 from showcase s where s.project_id = n.project_id limit 1
+      ) is not null end as on_showcase
     from (${chosen}) n
     left join hive hv on hv.id = n.item_id and n.target_kind = 'hive'
     left join project on project.id = n.project_id
