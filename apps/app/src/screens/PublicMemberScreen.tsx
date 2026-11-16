@@ -27,6 +27,7 @@
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import { PROJECT_LIST_MAX, type PublicMember } from '@ruche/contracts'
 import { type Href, useRouter } from 'expo-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
@@ -35,9 +36,12 @@ import { useGoBack } from '../navigation/useGoBack'
 import { usePageLanguage, usePublicMember } from '../public/api'
 import { CountedTitle } from '../ui/CountedTitle'
 import { FollowerCount } from '../ui/FollowerCount'
+import { IconButton } from '../ui/IconButton'
+import { LegalLinks } from '../ui/LegalLinks'
 import { MemberHeader } from '../ui/MemberHeader'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
+import { ShareSheet } from '../ui/ShareSheet'
 import { Row } from '../ui/Stack'
 import { TextLink } from '../ui/TextLink'
 import { ProjectTile } from '../ui/Tile'
@@ -103,9 +107,27 @@ function PublicMemberView({
   // Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas deux pages.
   const guard = useTapGuard()
 
+  // « Partager » (scénario R12 « Partager » : « une page publique se partage de même », planche
+  // R12-Visiteur-Profil) : la feuille dit « Tout le monde pourra l'ouvrir. », et le lien est
+  // l'adresse publique dans la langue de la page. Sur téléphone, dans la barre d'un visiteur ;
+  // ailleurs, en haut à droite, dans la rangée du « Retour » (`topAction`), comme sur la page d'un
+  // membre. Pas dans l'aperçu : le membre y regarde sa page, il la partage depuis sa vraie page.
+  const [sharing, setSharing] = useState(false)
+  const shareButton = preview ? null : (
+    <IconButton
+      icon="share-network"
+      label={t(($) => $.share.action)}
+      onPress={() => setSharing(true)}
+    />
+  )
+
   // La barre d'un visiteur : le logo ramène à l'accueil de sa langue, « Se connecter » revient ici.
   const header = preview ? null : (
-    <VisitorBar homeHref={publicPath('home', lang)} next={publicPath('member', lang, member.id)} />
+    <VisitorBar
+      homeHref={publicPath('home', lang)}
+      next={publicPath('member', lang, member.id)}
+      action={phone ? shareButton : undefined}
+    />
   )
 
   // Les projets : absents si la case est décochée (rien du tout), vides si elle est cochée sans
@@ -121,7 +143,13 @@ function PublicMemberView({
     router.push({ pathname: '/report', params: { kind: 'member', id: member.id } })
 
   return (
-    <Screen width="page" header={header} onBack={back} pageTitle={member.name}>
+    <Screen
+      width="page"
+      header={header}
+      onBack={back}
+      pageTitle={member.name}
+      topAction={phone ? undefined : shareButton}
+    >
       <MemberHeader
         name={member.name}
         avatar={toSource(member.avatarUrl)}
@@ -182,10 +210,25 @@ function PublicMemberView({
         </>
       ) : null}
       {preview ? null : (
-        // « Signaler ce profil », en bas, discret, comme sous un projet public.
-        <Row>
-          <TextLink label={t(($) => $.report.member)} tone="muted" onPress={report} />
-        </Row>
+        <>
+          {/* « Signaler ce profil », en bas, discret, comme sous un projet public. */}
+          <Row>
+            <TextLink label={t(($) => $.report.member)} tone="muted" onPress={report} />
+          </Row>
+          {/* Le pied des pages publiques (plan R12, décision 16) : les quatre pages dans la langue
+              de l'adresse, le code source et la même page dans l'autre langue. Sans « Signaler un
+              contenu » : « Signaler ce profil », juste au-dessus, signale déjà ce que la page
+              montre. Pas dans l'aperçu, où rien ne fait quitter la page. */}
+          <LegalLinks variant="footer" otherLanguage />
+          <ShareSheet
+            open={sharing}
+            onClose={() => setSharing(false)}
+            title={member.name}
+            target={{ kind: 'member', id: member.id }}
+            visibility="web"
+            image={toSource(member.avatarUrl)}
+          />
+        </>
       )}
     </Screen>
   )

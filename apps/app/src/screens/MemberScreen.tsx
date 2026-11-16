@@ -571,6 +571,9 @@ function MemberView({ member }: { member: Member }) {
         onClose={() => setSharing(false)}
         title={member.name}
         target={{ kind: 'member', id: member.id }}
+        // R12 (plan, décision 11) : une page publique s'ouvre pour tout le monde, à son adresse
+        // dans la langue de qui partage ; sinon, seuls les membres pourront l'ouvrir.
+        visibility={member.publicPage ? 'web' : 'public'}
         image={toSource(member.avatarUrl)}
       />
     </Screen>

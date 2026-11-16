@@ -9,8 +9,10 @@
 // - jur-4 : le menu de l'appareil ne reçoit que l'adresse. Ni le titre du projet, ni le nom de la
 //   personne qui partage : rien de plus que ce que le lien lui-même dit.
 import { MemberId, ProjectId } from '@ruche/contracts'
+import type { Language } from '@ruche/i18n'
 import { Platform, Share } from 'react-native'
 import { webAppUrl } from '../config'
+import { publicPath } from '../navigation/publicPath'
 
 /** Ce qu'on partage : la page d'un projet, ou celle d'un membre, par son identifiant. */
 export type ShareTarget = { kind: 'project' | 'member'; id: string }
@@ -18,15 +20,25 @@ export type ShareTarget = { kind: 'project' | 'member'; id: string }
 /**
  * L'adresse publique de la page, sans paramètre ni ancre (rien ne dit qui a partagé), ou `null`
  * si l'identifiant n'en est pas un : on ne fabrique jamais un lien à partir d'un texte douteux.
+ *
+ * R12 (scénario « Partager », Q18) : une page que tout le monde peut ouvrir (un projet public, une
+ * page publique) se partage à son adresse par langue, celle de qui partage (`publicIn` :
+ * `/fr/projects/<id>`, `/en/members/<id>`), fabriquée par `navigation/publicPath.ts`, seul endroit
+ * qui écrit ces adresses. Sans `publicIn`, l'adresse des membres d'aujourd'hui (`/projects/<id>`) :
+ * un lien réservé aux membres n'a pas de page visiteur à ouvrir.
  */
-export function shareUrl(target: ShareTarget): string | null {
+export function shareUrl(target: ShareTarget, publicIn?: Language): string | null {
   // safeParse : la validation de Zod qui ne lance pas d'erreur, et rend `success` vrai ou faux.
   const valid =
     target.kind === 'project'
       ? ProjectId.safeParse(target.id).success
       : MemberId.safeParse(target.id).success
   if (!valid) return null
-  const path = target.kind === 'project' ? `/projects/${target.id}` : `/members/${target.id}`
+  const path = publicIn
+    ? publicPath(target.kind, publicIn, target.id)
+    : target.kind === 'project'
+      ? `/projects/${target.id}`
+      : `/members/${target.id}`
   return new URL(path, webAppUrl).href
 }
 

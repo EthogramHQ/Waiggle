@@ -543,6 +543,9 @@ function ProjectFormView({
             title: project.title,
             cover,
             removed: Boolean(project.removal),
+            // R12 : public tel qu'enregistré (pas le choix en cours du formulaire), les moteurs de
+            // recherche ont pu le copier ; la fenêtre le dit, comme depuis la page du projet.
+            web: project.visibility === 'web',
           }}
           visible={deleting}
           onCancel={cancelDelete}

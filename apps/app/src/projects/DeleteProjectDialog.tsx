@@ -40,9 +40,17 @@ import { projectQueryKey } from './hooks'
 type Props = {
   /**
    * Le projet visé : son titre (dans le titre de la fenêtre), sa première photo (la vignette ; null,
-   * la lumière miel), et `removed` s'il a été retiré par la modération (le message le dit).
+   * la lumière miel), et `removed` s'il a été retiré par la modération (le message le dit). R12 :
+   * `web` s'il est public (ouvert à tous) : le message ajoute que les moteurs de recherche peuvent
+   * le montrer encore quelque temps (relecture juridique du plan).
    */
-  project: { id: string; title: string; cover: CoverImage | null; removed?: boolean }
+  project: {
+    id: string
+    title: string
+    cover: CoverImage | null
+    removed?: boolean
+    web?: boolean
+  }
   visible: boolean
   /** « Annuler », Échap, le voile ou le retour d'Android, hors envoi : l'écran ferme la fenêtre. */
   onCancel: () => void
@@ -152,9 +160,16 @@ export function DeleteProjectDialog({
       }
       title={t(($) => $.project.page.deleteTitle, { title: project.title })}
       message={
-        project.removed
-          ? t(($) => $.project.page.deleteConfirmRemoved)
-          : t(($) => $.project.page.deleteConfirm)
+        // Une phrase de plus pour un projet public, à la suite du message (une clé à part, pour ne
+        // pas doubler les deux messages qui existent déjà).
+        [
+          project.removed
+            ? t(($) => $.project.page.deleteConfirmRemoved)
+            : t(($) => $.project.page.deleteConfirm),
+          project.web ? t(($) => $.project.page.deleteConfirmWeb) : null,
+        ]
+          .filter(Boolean)
+          .join(' ')
       }
       // L'échec, lu en alerte dans la fenêtre. Une session expirée garde son lien : une alerte à
       // elle, avec l'action, parmi les boutons (le lien ferme d'abord la fenêtre).

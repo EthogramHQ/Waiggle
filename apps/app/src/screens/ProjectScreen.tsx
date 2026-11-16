@@ -78,10 +78,9 @@ import { PromptBlock } from '../ui/PromptBlock'
 import { ReactionCapsule } from '../ui/ReactionCapsule'
 import { ReactionFan } from '../ui/ReactionFan'
 import { RemovalNotice } from '../ui/RemovalNotice'
-import { ShareSheet } from '../ui/ShareSheet'
+import { ShareSheet, useShareLink } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import { useScreenFocused } from '../ui/screenFocus'
-import { shareUrl } from '../ui/share'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
@@ -258,11 +257,18 @@ function ProjectView({ project }: { project: Project }) {
     router.push({ pathname: '/report', params: { kind: 'project', id: project.id } })
 
   // « Copier le lien » du menu « … » : l'adresse publique du projet, rien d'autre (ui/share.ts),
-  // puis un toast qui dit qui pourra l'ouvrir (jur-3, jur-5). Le menu s'est déjà refermé.
+  // puis un toast qui dit qui pourra l'ouvrir (jur-3, jur-5). Le menu s'est déjà refermé. La même
+  // règle que la feuille « Partager » (`useShareLink`) : un projet public se copie à son adresse
+  // dans la langue du membre (`/fr/projects/<id>`), et le toast dit que tout le monde pourra
+  // l'ouvrir (R12, Q18) ; un projet d'une ruche nomme la ruche (R10).
+  const link = useShareLink({
+    target: { kind: 'project', id: project.id },
+    visibility: project.visibility,
+    hive: project.hive,
+  })
   const copyLink = async () => {
-    const url = shareUrl({ kind: 'project', id: project.id })
-    if (!url) return
-    const done = await copyText(url)
+    if (!link.url) return
+    const done = await copyText(link.url)
     if (!done) {
       toast.show(
         t(($) => $.share.copyFailed),
@@ -270,12 +276,7 @@ function ProjectView({ project }: { project: Project }) {
       )
       return
     }
-    toast.show(
-      project.visibility === 'private'
-        ? t(($) => $.share.copiedPrivate)
-        : t(($) => $.share.copiedMembers),
-      { icon: 'check-circle' },
-    )
+    toast.show(link.copied, { icon: 'check-circle' })
   }
   // Un projet retiré par la modération ne s'ouvre plus que pour son auteur : l'API répond 404 à
   // tous les autres. Ni « Partager » ni « Copier le lien », qui promettraient le contraire
@@ -289,8 +290,13 @@ function ProjectView({ project }: { project: Project }) {
   // R9 (J14, décision L6 de Louis) : « Rendre privé », le seul changement permis à un auteur
   // suspendu, sur un projet public qui n'a pas été retiré (un projet retiré ne se modifie plus).
   // Une fenêtre le confirme d'abord : pendant la suspension, il ne pourra pas revenir en arrière.
+  // R12 (plan, décision 11 ; Q6) : un projet ouvert à tous (`web`) se rend aussi privé, au même
+  // titre qu'un projet ouvert aux membres.
   const canMakePrivate =
-    project.isMine && suspended && !project.removal && project.visibility === 'public'
+    project.isMine &&
+    suspended &&
+    !project.removal &&
+    (project.visibility === 'public' || project.visibility === 'web')
   const [makingPrivate, setMakingPrivate] = useState(false)
   const onMadePrivate = () => {
     setMakingPrivate(false)
@@ -607,6 +613,8 @@ function ProjectView({ project }: { project: Project }) {
             }
           : null,
         removed: Boolean(project.removal),
+        // R12 : un projet public a pu être copié par les moteurs de recherche ; la fenêtre le dit.
+        web: project.visibility === 'web',
       }}
       visible={confirming}
       onCancel={() => setConfirming(false)}
