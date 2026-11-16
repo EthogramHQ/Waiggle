@@ -158,6 +158,7 @@ describe('the page of a member', () => {
         'isFollowed',
         'isMe',
         'moderation', // tranche 7c : null, sauf pour un administrateur
+        'publicPage', // R12 : sa page est-elle publique (jamais ce qu'elle montre)
         'name',
         'projects',
         'removedParts', // R9 : ses parties retirées, pour elle seule (vide pour les autres)
