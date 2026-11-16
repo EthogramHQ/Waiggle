@@ -1,7 +1,7 @@
 // Pile : range ses enfants les uns sous les autres (ou côte à côte avec `direction="row"`), avec un
 // écart régulier pris dans l'échelle des espaces. C'est la brique de mise en page des écrans : ils
 // n'écrivent ainsi jamais de marge ou d'écart en chiffres.
-import { type Space, space } from '@ruche/brand'
+import { readableWidth, type Space, space } from '@ruche/brand'
 import { Children, isValidElement, type ReactNode, type Ref } from 'react'
 import { View, type ViewStyle } from 'react-native'
 import type { FirstArrived } from './FeedEnd'
@@ -50,6 +50,11 @@ type Props = {
    * un élément de liste dans un autre, du HTML invalide que React signale (#418).
    */
   ownItems?: boolean
+  /**
+   * R11 : une colonne de lecture, bornée à `readableWidth` comme le Markdown et `Text readable`, même
+   * sur un grand écran : l'« En bref » de l'écran « Accepter » garde la largeur du texte des Règles.
+   */
+  readable?: boolean
 }
 
 const alignments = {
@@ -78,6 +83,7 @@ export function Stack({
   nativeID,
   firstArrived,
   ownItems = false,
+  readable = false,
 }: Props) {
   const style: ViewStyle = {
     flexDirection: direction,
@@ -90,6 +96,9 @@ export function Stack({
     ...(wrap ? { flexWrap: 'wrap' } : null),
     // minWidth: 0 laisse le texte se replier au lieu de pousser la mise en page hors de l'écran.
     ...(grow ? { flex: 1, minWidth: 0 } : null),
+    // `stretch` : la colonne prend la largeur de son parent jusqu'à la borne, même dans un parent
+    // aux éléments centrés.
+    ...(readable ? { alignSelf: 'stretch', maxWidth: readableWidth } : null),
   }
   // Une liste annoncée (« liste, 8 éléments ») : chaque enfant y devient un élément de liste. Les
   // lecteurs d'écran disent ainsi combien il y en a, et permettent de sauter d'un élément au suivant.

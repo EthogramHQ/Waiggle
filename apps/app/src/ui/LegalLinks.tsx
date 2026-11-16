@@ -125,8 +125,9 @@ export function LegalLinks({ variant, current }: Props) {
           icon="envelope-simple"
           href={mailto}
           breakAnywhere
-          // Sur le web, le `<a href="mailto:">` ouvre la messagerie de lui-même ; ailleurs, on la
-          // demande à l'appareil.
+          // Sur le web, le `<a href="mailto:">` ouvre la messagerie de lui-même, à Entrée comme au
+          // clic ; ailleurs, on la demande à l'appareil.
+          browserOpens
           onPress={() => {
             if (Platform.OS !== 'web') void Linking.openURL(mailto)
           }}
@@ -163,6 +164,12 @@ type FooterLinkProps = {
   trailingIcon?: IconName
   /** Le texte peut se couper n'importe où (une adresse, sans espace). */
   breakAnywhere?: boolean
+  /**
+   * Sur le web, le navigateur ouvre le lien lui-même (`mailto:`) : Entrée lui est laissée. Un
+   * gestionnaire d'Entrée ferait `preventDefault` et l'annulerait, sans rien ouvrir à sa place
+   * (relecture de design de R11, WCAG 2.1.1).
+   */
+  browserOpens?: boolean
 }
 
 /** Un lien du pied : texte souligné, 44 points de haut, sa vraie adresse. */
@@ -175,6 +182,7 @@ function FooterLink({
   icon,
   trailingIcon,
   breakAnywhere = false,
+  browserOpens = false,
 }: FooterLinkProps) {
   return (
     <Pressable
@@ -182,8 +190,9 @@ function FooterLink({
       accessibilityLabel={spokenLabel ?? label}
       {...(nativeHint && Platform.OS !== 'web' ? { accessibilityHint: nativeHint } : null)}
       {...linkProps(href, false)}
-      // Entrée ouvre le lien sur le web même quand le routeur intercepte le clic (keyboard.ts).
-      {...enterActivates(onPress)}
+      // Entrée ouvre le lien sur le web même quand le routeur intercepte le clic (keyboard.ts) ;
+      // un lien que le navigateur ouvre seul garde son Entrée native.
+      {...(browserOpens ? null : enterActivates(onPress))}
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',

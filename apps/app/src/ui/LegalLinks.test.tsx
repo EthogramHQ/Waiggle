@@ -14,7 +14,7 @@
 import { contactEmail, sourceUrl } from '@ruche/brand'
 import type { LegalPage } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
-import { Linking } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import { createI18n } from '../i18n'
 import { hrefOf, pathOf, visited } from '../testing/navigation'
 import { renderWithProviders } from '../testing/render'
@@ -111,6 +111,26 @@ describe('LegalLinks (R11)', () => {
     expect(String(openURL.mock.calls.at(-1)?.[0] ?? '')).toMatch(
       new RegExp(`^mailto:${contactEmail.replace('.', '\\.')}`),
     )
+  })
+
+  // Relecture de design de R11 : sur le web, le `<a href="mailto:">` ouvre la messagerie de lui-même,
+  // à Entrée comme au clic. Un gestionnaire d'Entrée (`enterActivates`) ferait `preventDefault` et
+  // l'en empêcherait, sans rien ouvrir à sa place : le lien de contact n'en a pas.
+  it('on the web, leaves Enter to the contact address link, which opens the mail app by itself', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<LegalLinks variant="footer" current="privacy" />)
+
+      const contactLink = screen.getByRole('link', { name: contact })
+      expect(hrefOf(contactLink.props.href)).toMatch(/^mailto:/)
+      // Témoin : un lien vers une page, que le routeur ouvre, garde son Entrée.
+      expect(typeof screen.getByRole('link', { name: pageNames.rules }).props.onKeyDown).toBe(
+        'function',
+      )
+      expect(contactLink.props.onKeyDown).toBeUndefined()
+    } finally {
+      jest.restoreAllMocks()
+    }
   })
 
   it('in the settings, shows the four pages and the source code as rows', async () => {
