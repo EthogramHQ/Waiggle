@@ -43,6 +43,12 @@ on_error() {
 }
 trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
 
+# Les deux étapes du navigateur (la visite, puis le parcours) tournent même si la première échoue :
+# en R12, un défaut du parcours est resté caché derrière celui de la visite, et a coûté une CI de
+# plus. Un échec à gauche d'un `||` ne déclenche pas le piège ERR ; il est noté ici, et le script
+# échoue à la fin en nommant les étapes. Les autres vérifications s'arrêtent toujours au premier échec.
+browser_failed=()
+
 # Échoue avec un message si deux valeurs diffèrent.
 expect() {
   [ "$2" = "$3" ] || die "$1 : attendu « $3 », obtenu « $2 »"
@@ -429,7 +435,7 @@ echo "ok"
 
 step "Dans un vrai navigateur : rien n'est bloqué par la CSP, aucune erreur dans les pages"
 # Demande l'installation des dépendances (pnpm install) et de Chromium (voir la CI).
-node apps/app/scripts/site-check.mjs "https://$APP_HOST"
+node apps/app/scripts/site-check.mjs "https://$APP_HOST" || browser_failed+=("visite (site-check.mjs)")
 
 step "Sauvegarde, puis restauration"
 sign_up avant@example.com
@@ -572,7 +578,8 @@ JOURNEY_FORGET_RULES_CMD="$WORK/forget-rules.sh" \
   JOURNEY_INVITE_CODE=$INVITE_CODE \
   JOURNEY_MAIL_CMD="docker logs $api_container" \
   JOURNEY_MEDIA_CMD="docker exec $api_container find /app/media -name '*.webp'" \
-  node apps/app/scripts/journey.mjs "https://$APP_HOST" "https://$API_HOST"
+  node apps/app/scripts/journey.mjs "https://$APP_HOST" "https://$API_HOST" ||
+  browser_failed+=("parcours (journey.mjs)")
 
 step "Déploiements avec infra/deploy.sh"
 # Un dépôt d'images local (comme ghcr.io) et un dépôt Git local (comme GitHub), avec deux commits
@@ -617,5 +624,9 @@ fi
 expect "copie du dépôt après un refus" "$(git -C "$WORK/repo" rev-parse HEAD)" "$first"
 expect "version après un refus" "$(health_version)" "$first"
 echo "ok : refus sans trace"
+
+if ((${#browser_failed[@]} > 0)); then
+  die "échec dans le navigateur : ${browser_failed[*]}"
+fi
 
 printf '\n✅ Pile de production prête : pages, en-têtes, redirections, parcours de deux membres, sauvegarde, restauration et déploiement.\n'
