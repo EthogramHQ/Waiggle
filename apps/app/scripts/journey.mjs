@@ -17,7 +17,13 @@
 // conformité ») : Max lit les Règles depuis l'accueil avant de s'inscrire (refusé sans les deux cases,
 // accepté avec) ; Inès, dont l'accord aux règles manque, voit l'écran « Accepter », coche, et
 // retrouve son Fil ; Léa supprime depuis « Mes commentaires » un commentaire sur un projet devenu
-// privé. Enfin le compte de Léa est supprimé. À chaque
+// privé. Tranche R12 (« Les projets publics ») : le Fil est à /feed, et / est la vitrine. Léa publie
+// « Décollage ! » en « Public » ; un visiteur (sans cookie) l'ouvre par son adresse par langue, lit
+// que les commentaires sont réservés aux membres, ouvre « Compte requis » et signale le projet avec
+// une adresse ; un administrateur le met en vitrine (l'accueil le montre, Léa le lit dans Activité,
+// Inès le voit dans « À la une ») ; Inès rend sa page publique sans sa bio ; Léa repasse le projet
+// aux membres : le visiteur lit « Réservé aux membres » et la vitrine le perd. Enfin le compte de
+// Léa est supprimé. À chaque
 // étape, on vérifie ce que voit chacun (le membre, l'autre membre, une personne sans compte) et ce
 // qui reste sur le disque du serveur.
 //
@@ -384,7 +390,7 @@ const signIn = async (someone, email, secret) => {
  */
 const openSettings = async (someone, name, path) => {
   const { page } = someone
-  await open(page, `${appUrl}/`)
+  await open(page, `${appUrl}/feed`)
   await byRole(page, 'link', 'Moi').first().click()
   await page.waitForURL((url) => url.pathname === '/me')
   // La roue est un bouton ou un lien selon la plateforme : on accepte les deux.
@@ -451,7 +457,7 @@ try {
     const inesBefore = await (await ines.request.get(`${apiUrl}/v1/me`)).json()
     expectEqual('accord d’Inès avant l’écran', inesBefore.rulesAccepted, false)
     // L'écran « Accepter » passe au-dessus de la page ouverte : le titre des règles, en niveau 1.
-    await open(ines.page, `${appUrl}/`)
+    await open(ines.page, `${appUrl}/feed`)
     await byRole(ines.page, 'heading', 'Les règles de Waiggle', { level: 1 }).waitFor()
     // Ses écritures sont refusées par l'API tant qu'elle n'a pas accepté (403, avant tout le reste).
     const blocked = await ines.request.post(`${apiUrl}/v1/projects`, {
@@ -482,7 +488,7 @@ try {
       'accord d’Inès enregistré',
       async () => (await (await ines.request.get(`${apiUrl}/v1/me`)).json()).rulesAccepted === true,
     )
-    await open(ines.page, `${appUrl}/`)
+    await open(ines.page, `${appUrl}/feed`)
     await ines.page
       .getByText(/^Bonjour Ines\s*!$/)
       .first()
@@ -696,7 +702,7 @@ try {
   step(
     'Sam ne suit personne : son fil l’attend ; il lit le pseudo de Léa et la suit depuis sa page',
   )
-  await open(sam.page, `${appUrl}/`)
+  await open(sam.page, `${appUrl}/feed`)
   // R4 (F-Fil9) : le premier lancement accueille au lieu de constater un vide. R11 (« Moins de
   // mots ») : le salut « Bonjour Sam ! » est le titre de cette section (l'espace avant « ! » est
   // insécable, d'où `\s`).
@@ -781,7 +787,7 @@ try {
   const photoUrl = project.visuals[0].url
 
   step('Le projet de Léa arrive dans le fil de Sam ; il le teste, revient, et il est à jour')
-  await open(sam.page, `${appUrl}/`)
+  await open(sam.page, `${appUrl}/feed`)
   // Nom exact (défaut de byRole) : « Tester Mon agent de recettes, … » est aussi un lien de la carte (R4).
   await byRole(sam.page, 'link', 'Mon agent de recettes').waitFor()
   // La date relative de la carte (R4, F-Fil2) : « publié à l'instant », sans heure ni jour.
@@ -791,7 +797,7 @@ try {
   await sam.page.waitForURL((url) => url.pathname === '/out')
   await byRole(sam.page, 'button', 'Ouvrir le site').waitFor()
   await byRole(sam.page, 'button', 'Rester sur Waiggle').click()
-  await sam.page.waitForURL((url) => url.pathname === '/')
+  await sam.page.waitForURL((url) => url.pathname === '/feed')
   await sam.page.getByText('Tu es à jour').waitFor()
   console.log('  ok : le projet est dans le fil de Sam, « Tester » mène à l’avertissement')
 
@@ -938,7 +944,7 @@ try {
   console.log('  ok : la mise à jour de Léa est publiée, avec son avant / après')
 
   step('Sam voit la cloche s’allumer, ouvre la frise et compare au clavier')
-  await open(sam.page, `${appUrl}/`)
+  await open(sam.page, `${appUrl}/feed`)
   await byRole(sam.page, 'button', /^Notifications, \d+ nouvelles?$/)
     .first()
     .click()
@@ -998,7 +1004,7 @@ try {
   )
   console.log('  ok : Léa voit « Waggle ! » compté une fois')
   // Le total de la carte du fil (R4) : le nombre dessiné est caché au lecteur, le nom lu l'écrit.
-  await open(sam.page, `${appUrl}/`)
+  await open(sam.page, `${appUrl}/feed`)
   await sam.page.getByText('1 réaction', { exact: true }).waitFor()
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   // R5b : Sam commente depuis un téléphone. Aucun commentaire encore : le bouton ouvre la feuille,
@@ -1030,7 +1036,7 @@ try {
   )
   await asPhone(lea.page)
   // Le nombre n'est relu que chaque minute : on recharge l'accueil pour le lire tout de suite.
-  await open(lea.page, `${appUrl}/`)
+  await open(lea.page, `${appUrl}/feed`)
   await byRole(lea.page, 'button', /^Notifications, \d+ nouvelles?$/)
     .first()
     .click()
@@ -1140,7 +1146,7 @@ try {
   step('Malik passe d’un onglet à l’autre : Fil, Explorer, Ruches')
   const mainNav = byRole(malik.page, 'navigation', 'Navigation principale').first()
   for (const [tab, path] of [
-    ['Fil', '/'],
+    ['Fil', '/feed'],
     ['Ruches', '/hives'],
     ['Explorer', '/explore'],
   ]) {
@@ -1537,7 +1543,7 @@ try {
   await signUp(karim, 'Karim')
   const karimMe = async () => (await karim.request.get(`${apiUrl}/v1/me`)).json()
   const karimId = (await karimMe()).id
-  await open(karim.page, `${appUrl}/`)
+  await open(karim.page, `${appUrl}/feed`)
   // Le témoin de l'absence qui suivra : avant la suspension, le bouton est bien là.
   await byRole(karim.page, 'button', 'Publier un projet').first().waitFor()
   console.log('  ok : Karim voit « Publier »')
@@ -1570,7 +1576,7 @@ try {
   console.log('  ok : Karim est suspendu 7 jours')
 
   step('Karim voit le bandeau de la suspension, et n’a plus « Publier »')
-  await open(karim.page, `${appUrl}/`)
+  await open(karim.page, `${appUrl}/feed`)
   const banner = byRole(karim.page, 'status').filter({ hasText: 'Ton compte est suspendu' })
   await banner.first().waitFor()
   await banner.first().getByText(new RegExp(suspensionExplanation)).waitFor()
@@ -1600,7 +1606,7 @@ try {
     'levée de la suspension, dans l’API',
     async () => (await karimMe()).suspension === null,
   )
-  await open(karim.page, `${appUrl}/`)
+  await open(karim.page, `${appUrl}/feed`)
   await byRole(karim.page, 'button', 'Publier un projet').first().waitFor()
   expectEqual('bandeau pour Karim, après la levée', await banner.count(), 0)
   console.log('  ok : Karim retrouve « Publier », sans bandeau')
@@ -1628,7 +1634,7 @@ try {
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Ce projet est introuvable').waitFor()
   console.log('  ok : la page du projet est introuvable pour Sam')
-  await open(sam.page, `${appUrl}/`)
+  await open(sam.page, `${appUrl}/feed`)
   // R4 (F-Fil5) : un fil vidé par l'auteur finit sur « Tu es à jour », sans la carte du projet.
   await sam.page.getByText('Tu es à jour').waitFor()
   expectEqual(
@@ -1758,7 +1764,7 @@ try {
     .first()
     .waitFor()
   console.log('  ok : l’onglet Projets de la ruche le montre aussi')
-  await open(sam.page, `${appUrl}/`)
+  await open(sam.page, `${appUrl}/feed`)
   await byRole(sam.page, 'tab', 'Famille').click()
   await sam.page.waitForURL((url) => url.searchParams.get('hive') === hiveId)
   const cardInFeed = byRole(sam.page, 'link', hiveRegexp).first()
@@ -1917,6 +1923,215 @@ try {
   )
   console.log('  ok : Léa a supprimé son commentaire, sur un projet qu’elle ne voit plus')
 
+  // --- Tranche R12 (« Les projets publics ») : un projet que tout le monde peut ouvrir. Sans Caddy
+  // (le parcours local n'en a pas), ni la redirection de l'ancienne adresse, ni la redirection d'un
+  // membre vers le Fil, ni les métadonnées de la page ne se jouent ici : `infra/stack-test.sh` les
+  // vérifie en CI. Le visiteur ouvre donc directement l'adresse par langue, `/fr/projects/<id>`, et
+  // le membre ouvre `/feed`. Un visiteur est le contexte « Visiteur » : un navigateur sans cookie. ---
+  step('Léa publie « Décollage ! » en « Public » et lit la phrase du bas')
+  const publicTitle = 'Décollage !'
+  await open(lea.page, `${appUrl}/projects/new`)
+  await lea.page.getByLabel('Titre').fill(publicTitle)
+  await lea.page.getByLabel('En une phrase').fill('Une fusée en carton, lancée au salon.')
+  await chooseCategory(lea.page, 'Code et outils')
+  await byRole(lea.page, 'radio', 'Public').click()
+  // La phrase du bas dit ce que « Public » change, avant l'envoi.
+  await lea.page
+    .getByText(/^Tout le monde pourra le voir, même sans compte\./)
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  const publicId = await publishToFeed(lea.page)
+  // L'API garde « Public » sous `web` : `public` y veut dire « Membres de Waiggle ».
+  expectEqual('visibilité de « Décollage ! »', (await readProject(lea, publicId)).visibility, 'web')
+  console.log('  ok : Léa a publié « Décollage ! » en « Public »')
+
+  step(
+    'Un visiteur ouvre /fr/projects/<id> : le titre, les commentaires réservés, « Compte requis », puis il signale avec une adresse',
+  )
+  const publicProjectUrl = `${appUrl}/fr/projects/${publicId}`
+  expectEqual(
+    'projet public, lu sans compte',
+    await statusFor(visitor, `${apiUrl}/v1/public/projects/${publicId}`),
+    200,
+  )
+  await open(visitor.page, publicProjectUrl)
+  await byRole(visitor.page, 'heading', publicTitle).first().waitFor()
+  await visitor.page
+    .getByText('Les commentaires sont réservés aux membres.')
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  console.log('  ok : le visiteur lit le projet, et la phrase à la place des commentaires')
+  // « Réagir » ouvre la feuille « Compte requis » : son titre suffit, sans rien envoyer.
+  await byRole(visitor.page, 'button', 'Réagir').first().click()
+  const accountRequired = visitor.page
+    .getByText('Pour réagir, crée ton compte')
+    .filter({ visible: true })
+    .first()
+  await accountRequired.waitFor()
+  await visitor.page.keyboard.press('Escape')
+  await accountRequired.waitFor({ state: 'hidden' })
+  expectEqual(
+    'adresse après la feuille',
+    new URL(visitor.page.url()).pathname,
+    `/fr/projects/${publicId}`,
+  )
+  console.log('  ok : « Réagir » ouvre « Compte requis », qui se referme sans quitter la page')
+
+  // Le signalement d'un visiteur : les mêmes étapes que celui d'un membre, plus une adresse
+  // facultative (celle-ci est une adresse de test).
+  await byRole(visitor.page, 'link', 'Signaler ce projet').click()
+  await visitor.page.waitForURL(/\/report\?/)
+  await byRole(visitor.page, 'heading', 'Signaler ce projet').waitFor()
+  await byRole(visitor.page, 'heading', 'Quelle partie ?').waitFor()
+  await byRole(visitor.page, 'button', 'Continuer').click()
+  await byRole(visitor.page, 'heading', 'Qu’est-ce qui ne va pas ?').waitFor()
+  // « Continuer » puis « Envoyer » : la garde de double tape ignore les 600 premières ms.
+  await visitor.page.waitForTimeout(700)
+  await byRole(visitor.page, 'radio', 'Arnaque ou spam').click()
+  await visitor.page.getByLabel(/^Ton adresse e.mail, facultative/).fill('visiteur@example.org')
+  await byRole(visitor.page, 'button', 'Envoyer le signalement').click()
+  await visitor.page
+    .getByText('Merci, ton signalement a été envoyé.', { exact: true })
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  // Avec une adresse, « Merci » promet l'e-mail de la décision.
+  await visitor.page
+    .getByText(/Un e.mail te dira quand il aura été traité\./)
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  await byRole(visitor.page, 'button', 'Fermer').last().click()
+  console.log('  ok : le visiteur a signalé le projet, avec une adresse')
+
+  step(
+    'Louis met « Décollage ! » en vitrine : l’accueil la montre ; Léa lit la ligne dans Activité',
+  )
+  await open(admin.page, `${appUrl}/moderation?tab=showcase`)
+  await byRole(admin.page, 'button', new RegExp(`^Mettre en avant ${publicTitle}`)).click()
+  /** Les projets de la vitrine, lus sans compte (l'accueil lit la même route). */
+  const showcaseIds = async () => {
+    const res = await visitor.request.get(`${apiUrl}/v1/public/showcase`)
+    return res.ok() ? JSON.stringify(await res.json()) : ''
+  }
+  await waitFor('« Décollage ! » dans la vitrine, lue sans compte', async () =>
+    (await showcaseIds()).includes(publicId),
+  )
+  await open(visitor.page, `${appUrl}/`)
+  await byRole(visitor.page, 'heading', 'Des projets à voir').waitFor()
+  await byRole(visitor.page, 'link', publicTitle).click()
+  await visitor.page.waitForURL((url) => url.pathname === `/fr/projects/${publicId}`)
+  console.log('  ok : le visiteur voit « Décollage ! » sur l’accueil, et l’ouvre')
+  await open(lea.page, `${appUrl}/notifications`)
+  await byRole(lea.page, 'link', /Décollage ! est sur l.accueil de Waiggle/).waitFor()
+  await byRole(lea.page, 'button', 'Retirer de l’accueil').waitFor()
+  console.log(
+    '  ok : Léa lit « Décollage ! est sur l’accueil de Waiggle », avec « Retirer de l’accueil »',
+  )
+
+  step('Inès arrive sur le Fil, puis voit « Décollage ! » dans « À la une » d’Explorer')
+  // Inès est inscrite plus haut quand la base ou une commande sait retirer son accord ; sinon, ici.
+  if (!canForgetRules) await signUp(ines, 'Ines')
+  await open(ines.page, `${appUrl}/feed`)
+  await ines.page
+    .getByText(/^Bonjour Ines\s*!$/)
+    .first()
+    .waitFor()
+  await open(ines.page, `${appUrl}/explore`)
+  await byRole(ines.page, 'heading', 'À la une').waitFor()
+  await byRole(ines.page, 'link', publicTitle).first().waitFor()
+  console.log('  ok : « À la une » d’Explorer montre « Décollage ! »')
+
+  step('Inès rend sa page publique et décoche « Ma bio » : le visiteur ne la lit plus')
+  const inesBio = 'Je teste des idées de jeux de société.'
+  const inesId = (await (await ines.request.get(`${apiUrl}/v1/me`)).json()).id
+  await open(ines.page, `${appUrl}/settings/profile`)
+  await ines.page.getByLabel('Bio', { exact: true }).fill(inesBio)
+  await byRole(ines.page, 'button', 'Enregistrer').last().click()
+  await ines.page.getByText('Profil enregistré.').waitFor()
+  await open(ines.page, `${appUrl}/settings/public-page`)
+  await byRole(ines.page, 'switch', /^Rendre ma page publique/).click()
+  const bioBox = byRole(ines.page, 'checkbox', /^Ma bio/)
+  await bioBox.waitFor()
+  // Le témoin d'abord : la bio cochée, la page la montre à un visiteur.
+  if (!(await bioBox.isChecked())) await bioBox.click()
+  const publicMember = async () => {
+    const res = await visitor.request.get(`${apiUrl}/v1/public/members/${inesId}`)
+    return res.ok() ? await res.text() : ''
+  }
+  await waitFor('page publique d’Inès, avec sa bio', async () =>
+    (await publicMember()).includes(inesBio),
+  )
+  await open(visitor.page, `${appUrl}/fr/members/${inesId}`)
+  await shownText(visitor.page, inesBio).waitFor()
+  console.log('  ok : bio cochée, le visiteur la lit sur la page publique d’Inès')
+  await bioBox.click()
+  await waitFor('bio retirée de la page publique', async () => {
+    const body = await publicMember()
+    return body !== '' && !body.includes(inesBio)
+  })
+  // L'aperçu « comme un visiteur » ne la montre pas non plus ; la page d'un visiteur non plus.
+  await byRole(ines.page, 'button', 'Voir ma page comme un visiteur').click()
+  await byRole(ines.page, 'link', 'Signaler ce profil').waitFor({ state: 'hidden' })
+  await ines.page.getByText('Ines', { exact: true }).filter({ visible: true }).first().waitFor()
+  expectEqual('bio dans l’aperçu', await ines.page.getByText(inesBio).count(), 0)
+  // Un autre visiteur : l'API des pages publiques répond `private, max-age=60` (décision du plan R12),
+  // si bien que le navigateur du premier visiteur garderait la page d'avant pendant une minute.
+  const bioVisitor = await person('Visiteur (page d’Inès)')
+  await open(bioVisitor.page, `${appUrl}/fr/members/${inesId}`)
+  await bioVisitor.page
+    .getByText('Ines', { exact: true })
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  await byRole(bioVisitor.page, 'link', 'Signaler ce profil').waitFor()
+  expectEqual('bio sur la page du visiteur', await bioVisitor.page.getByText(inesBio).count(), 0)
+  console.log('  ok : bio décochée, ni l’aperçu ni la page publique ne la montrent')
+
+  step(
+    'Léa repasse « Décollage ! » en « Membres » : le visiteur lit « Réservé aux membres », et la vitrine le perd',
+  )
+  await open(lea.page, `${appUrl}/projects/${publicId}/edit`)
+  await byRole(lea.page, 'radio', 'Membres de Waiggle').click()
+  await byRole(lea.page, 'button', 'Enregistrer').last().click()
+  await lea.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
+  expectEqual(
+    'visibilité, après le retour',
+    (await readProject(lea, publicId)).visibility,
+    'public',
+  )
+  await waitFor('« Décollage ! » sorti de la vitrine', async () => {
+    const body = await showcaseIds()
+    return body !== '' && !body.includes(publicId)
+  })
+  expectEqual(
+    'projet repassé aux membres, lu sans compte',
+    await statusFor(visitor, `${apiUrl}/v1/public/projects/${publicId}`),
+    404,
+  )
+  // Encore un visiteur neuf, pour la même raison que plus haut (la page et la vitrine sont gardées
+  // une minute par le navigateur de celui qui les a déjà ouvertes).
+  const lastVisitor = await person('Visiteur (retour aux membres)')
+  await open(lastVisitor.page, publicProjectUrl)
+  await byRole(lastVisitor.page, 'heading', 'Réservé aux membres').waitFor()
+  // L'écran « Réservé aux membres » propose « Me connecter » (texte `home.signIn`) ; « Se connecter »
+  // est celui de la barre d'une page publique, absente ici : un projet repassé aux membres est
+  // « introuvable » pour un visiteur, comme n'importe quelle page réservée.
+  await byRole(lastVisitor.page, 'button', 'Me connecter')
+    .or(byRole(lastVisitor.page, 'link', 'Me connecter'))
+    .first()
+    .waitFor()
+  await open(lastVisitor.page, `${appUrl}/`)
+  await byRole(lastVisitor.page, 'button', 'Créer un compte').waitFor()
+  expectEqual(
+    '« Décollage ! » sur l’accueil du visiteur',
+    await byRole(lastVisitor.page, 'link', publicTitle).count(),
+    0,
+  )
+  console.log('  ok : le projet est réservé aux membres, et il a quitté la vitrine')
+
   step('Léa supprime son compte : son avatar disparaît du disque')
   // R2 : depuis la rubrique « Compte », une feuille posée sur les réglages
   // (/settings/account/delete), avec le mot de passe choisi dans la rubrique « Sécurité ».
@@ -1931,7 +2146,16 @@ try {
 } catch (error) {
   // Une capture de chaque navigateur, et le texte qu'il affiche : de quoi comprendre où le
   // parcours s'est arrêté, même sans ouvrir les captures (gardées par la CI).
-  for (const [who, someone] of Object.entries({ lea, sam, malik, admin, karim, max, ines })) {
+  for (const [who, someone] of Object.entries({
+    lea,
+    sam,
+    malik,
+    admin,
+    karim,
+    max,
+    ines,
+    visitor,
+  })) {
     await someone.page.screenshot({ path: `journey-${who}.png`, fullPage: true }).catch(() => {})
     const text = await someone.page
       .locator('body')
