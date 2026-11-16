@@ -74,6 +74,8 @@ beforeEach(async () => {
     pitch: PITCH,
     status: 'testable',
     demoUrl: DEMO,
+    // La partie « description » se signale seulement si elle existe (comme pour un membre).
+    description: 'Une description.',
   })
 })
 
@@ -236,7 +238,9 @@ describe('a visitor reports a public content', () => {
     later()
     const members = (await act.publish(ines, 'Entre membres', { visibility: 'public' })).id
     const membersUpdate = await world.publishUpdate(ines, members)
-    const expected = await answerOf(await reportProject(UNKNOWN_ID))
+    // Un réseau par envoi : le quota de 5 par jour compte chaque envoi avant l'examen, et ce test
+    // en fait 7 ; il compare des réponses, pas le quota.
+    const expected = await answerOf(await reportProject(UNKNOWN_ID, undefined, '2001:db8:a0::1'))
     expect(expected.status).toBe(404)
 
     const cases: Body[] = [
@@ -247,13 +251,13 @@ describe('a visitor reports a public content', () => {
       { kind: 'update', id: UNKNOWN_ID },
       { kind: 'member', id: 'inconnu' },
     ]
-    for (const target of cases) {
-      const got = await answerOf(await report({ target, reason: 'other' }))
+    for (const [i, target] of cases.entries()) {
+      const got = await answerOf(await report({ target, reason: 'other' }, `2001:db8:a${i + 1}::1`))
       expect(got, JSON.stringify(target)).toEqual(expected)
     }
     expect(await storedReports()).toEqual([])
     // Témoin : le projet public, lui, se signale (sans lui, ce test passerait sans la route).
-    expect((await reportProject(project)).status).toBe(204)
+    expect((await reportProject(project, undefined, '2001:db8:af::1')).status).toBe(204)
   })
 
   it('never ties a visitor report to the session sent with it', async () => {
