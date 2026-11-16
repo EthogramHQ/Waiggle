@@ -21,3 +21,7 @@ e7c44434b3a6d135cad7b7c4287611b1dc1c9669:apps/api/src/email/preview.ts:generic-a
 # Un identifiant de projet d'exemple (UUID) des tests du récap habillé (R8, 12/11/2026), pris pour
 # une clé. La version suivante du fichier porte « gitleaks:allow » sur la ligne.
 7b07a3cd2b3e340b1e2acd0d8ea06e84251eabb2:apps/api/src/email/templates.test.ts:generic-api-key:493
+
+# Un identifiant inventé (forme d'UUID) des fausses données des pages visiteur (tranche R12), pas
+# une clé. Les versions suivantes du fichier portent « gitleaks:allow » sur la ligne.
+a9b6377baa729b780f2911c834a1620204ee4326:apps/app/src/screens/Public.testkit.tsx:generic-api-key:34
