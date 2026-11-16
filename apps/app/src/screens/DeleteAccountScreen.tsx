@@ -227,6 +227,9 @@ export function DeleteAccountScreen() {
           {/* Tranche 7b (relecture juridique du plan, J11) : la copie des textes signalés, gardée
             pour que la modération puisse décider. Au conditionnel : l'écran s'affiche pour tous. */}
           <ListRow icon="note-pencil" label={t(($) => $.account.delete.remains.reportCopies)} />
+          {/* R12 (relecture juridique, point 3) : ce qui a été public a pu être copié par les
+            moteurs de recherche ; l'appli ne peut pas l'effacer chez eux, les Règles le disent. */}
+          <ListRow icon="globe-simple" label={t(($) => $.account.delete.remains.searchCopies)} />
         </ListGroup>
 
         {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}

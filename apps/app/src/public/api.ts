@@ -25,8 +25,9 @@ const memberPath = (id: string) => `/v1/public/members/${encodeURIComponent(id)}
 const read = async <T>(
   path: string,
   schema: Parameters<typeof requestWithoutSession<T>>[2],
+  init: RequestInit = {},
 ): Promise<T> => {
-  const result = await requestWithoutSession(path, {}, schema)
+  const result = await requestWithoutSession(path, init, schema)
   if (!result.ok) throw new ApiError(result.error)
   return result.data
 }
@@ -50,9 +51,14 @@ export const getPublicUpdatesPage = (id: string, cursor?: string): Promise<Publi
 export const getPublicUpdate = (id: string, updateId: string): Promise<PublicUpdate> =>
   read(`${updatesPath(id)}/${encodeURIComponent(updateId)}`, PublicUpdate)
 
-/** La page publique d'un membre (GET /v1/public/members/{id}). `notFound` si elle est fermée. */
-export const getPublicMember = (id: string): Promise<PublicMember> =>
-  read(memberPath(id), PublicMember)
+/**
+ * La page publique d'un membre (GET /v1/public/members/{id}). `notFound` si elle est fermée.
+ * `fresh` : demander au navigateur une copie neuve (`cache: 'no-store'`) plutôt que celle qu'il
+ * garde. L'API dit aux navigateurs de garder la page d'un visiteur une minute (`max-age=60`) ; c'est
+ * bien pour un visiteur, mais l'aperçu d'un membre qui vient de changer une case montrerait l'ancienne.
+ */
+export const getPublicMember = (id: string, fresh = false): Promise<PublicMember> =>
+  read(memberPath(id), PublicMember, fresh ? { cache: 'no-store' } : {})
 
 /** Les clés du cache des lectures d'un visiteur, toutes sous « public » (voir l'en-tête). */
 export const publicKeys = {
@@ -60,6 +66,8 @@ export const publicKeys = {
   updates: (id: string) => ['public', 'updates', id] as const,
   update: (id: string, updateId: string) => ['public', 'update', id, updateId] as const,
   member: (id: string) => ['public', 'member', id] as const,
+  /** L'aperçu d'un membre connecté : sous la clé de la page (une invalidation de `member` l'atteint). */
+  memberPreview: (id: string) => ['public', 'member', id, 'preview'] as const,
 }
 
 /**
@@ -114,10 +122,18 @@ export const usePublicUpdate = (id: string, updateId: string, enabled = true) =>
  * ne montre que ce qui est là. Même lecture pour la page d'un visiteur et pour l'aperçu d'un membre
  * connecté (« Voir ma page comme un visiteur ») : toutes deux partent sans session.
  * `data` : `PublicMember` ; `error` : une `ApiError` (`notFound` si la page est fermée).
+ *
+ * `preview` (l'aperçu, relecture de sécurité R12) : il ne montre jamais la page d'avant.
+ * - Une clé à lui, oubliée dès que l'aperçu se ferme (`gcTime: 0`, le temps qu'une lecture finie
+ *   reste en cache sans écran qui la lit) : rouvert, il attend sa nouvelle lecture au lieu de
+ *   montrer un instant la page lue la fois d'avant (une bio changée entre-temps dans « Mon profil »).
+ * - Une copie neuve du navigateur (`getPublicMember(id, true)`), jamais celle qu'il garde.
+ * - Après chaque changement de case, `usePublicPageChange` (profile/api.ts) le vide et le relit.
  */
-export const usePublicMember = (id: string, enabled = true) =>
+export const usePublicMember = (id: string, enabled = true, preview = false) =>
   useQuery({
-    queryKey: publicKeys.member(id),
-    queryFn: () => getPublicMember(id),
+    queryKey: preview ? publicKeys.memberPreview(id) : publicKeys.member(id),
+    queryFn: () => getPublicMember(id, preview),
     enabled,
+    ...(preview ? { gcTime: 0 } : null),
   })

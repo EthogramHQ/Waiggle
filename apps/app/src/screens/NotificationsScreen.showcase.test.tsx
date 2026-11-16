@@ -69,6 +69,7 @@ const containing = (text: string) =>
 
 const T = {
   added: plain(translate(($) => $.notifications.showcaseAdded, { title: decollageProject.title })),
+  was: plain(translate(($) => $.notifications.showcaseWas, { title: decollageProject.title })),
   leave: translate(($) => $.notifications.showcaseLeave),
   left: translate(($) => $.notifications.showcaseLeft),
   leaveError: translate(($) => $.notifications.showcaseLeaveError),
@@ -177,12 +178,15 @@ describe('« … est sur l’accueil » in the Activity (R12)', () => {
     expect(await screen.findByRole('button', { name: T.leave })).toBeTruthy()
   })
 
-  it('offers nothing once the project has left the home page', async () => {
+  // Relecture juridique R12, point 1 : hors de l'accueil, la ligne passe au passé (« a été sur
+  // l'accueil ») ; le présent ferait croire à l'auteur qui a refusé que son refus est perdu.
+  it('says « a été sur l’accueil », and offers nothing, once the project has left the home page', async () => {
     mockPages([notificationPageOf([{ ...showcaseAdded, onShowcase: false }])])
     await openActivity()
 
-    // Témoin : la ligne est là.
-    expect(await screen.findAllByText(containing(T.added))).not.toHaveLength(0)
+    // Témoin : la ligne est là, au passé.
+    expect(await screen.findAllByText(containing(T.was))).not.toHaveLength(0)
+    expect(screen.queryAllByText(containing(T.added))).toHaveLength(0)
     expect(screen.queryByRole('button', { name: T.leave })).toBeNull()
   })
 

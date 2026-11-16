@@ -40,7 +40,8 @@ export type LegalDocumentContent = {
  */
 export const LEGAL_VERSIONS: Record<LegalPage, string> = {
   rules: RULES_VERSION,
-  privacy: '2026-11-16',
+  // R12 (relecture juridique, point 5) : sept parties réécrites, le jour des nouvelles Règles.
+  privacy: '2026-11-17',
   legal: '2026-11-16',
   accessibility: '2026-11-16',
 }
