@@ -3532,7 +3532,7 @@ la suspension, « Ne pas me proposer aux autres ».
 
 ## R12 — Les projets publics
 
-Statut : **à valider par Louis**. Écrit le 16/11/2026 à partir de ses réponses aux vingt questions du
+Statut : **validé par Louis** le 16/11/2026 (« Oui, tout »). Écrit le même jour à partir de ses réponses aux vingt questions du
 brouillon (toutes les recommandations, sauf Q1, Q9, Q16 et Q20, changées par lui) et des deux
 précisions qu'il a validées le même jour.
 
@@ -3549,8 +3549,8 @@ Décisions de Louis (16/11/2026) :
   public **sans devenir commercial** ; la validation des textes par un professionnel et l'offre
   professionnelle de l'assistant de code attendent encore ; **l'inscription reste sur code
   d'invitation** ;
-- **la vitrine devient l'accueil (`/`) pour tout le monde**, mais un membre connecté arrive
-  directement sur le Fil ; un membre l'atteint par « À la une », en tête d'Explorer ;
+- **la vitrine devient l'accueil (`/`) pour tout le monde**, mais un membre connecté qui arrive sur
+  {{appName}} va directement au Fil ; dans l'appli, le logo et « À la une » (Explorer) y mènent ;
 - **une adresse par langue** (`/fr/…`, `/en/…`) et les liens `hreflang`, **dans R12**, sur les pages
   publiques seulement ;
 - **inviter dans une ruche quelqu'un qui n'a pas de compte : on n'en veut pas.**
@@ -3590,11 +3590,10 @@ Hors de R12, et où ça va :
 - Étant donné le serveur de production, dès le déploiement de R12
 - Alors « Public » est proposé à tous les auteurs, et « Rendre ma page publique » à tous les membres
 - Et l'inscription demande toujours un code d'invitation (`SIGNUP_INVITE_CODE`, exigé en production)
-- Et les Mentions légales sont complètes avant ce déploiement : des contenus deviennent visibles de
-  tous, la loi (LCEN, art. 6) demande l'éditeur, son adresse et son directeur de la publication ;
-  **proposition, à trancher par Louis** : le garde `scripts/legal-placeholders.mjs` refuse le
-  déploiement tant qu'un emplacement reste, invitation ou non (aujourd'hui, il avertit seulement
-  tant que l'invitation est exigée, décision du 16/11/2026)
+- Et le garde des Mentions légales (`scripts/legal-placeholders.mjs`) reste tel quel : tant que
+  l'inscription demande un code d'invitation, un emplacement à remplir avertit sans bloquer le
+  déploiement (Louis, 16/11/2026) ; les coordonnées de l'éditeur se font avec Louis après le
+  déploiement de R12
 
 ### Rendre un projet public (F-Pub6, planche `R6-Modifier` ; à dessiner `R12-Qui-Peut-Voir`)
 
@@ -3689,14 +3688,21 @@ Hors de R12, et où ça va :
 
 ### L'accueil : la vitrine, pour tout le monde (A14, Q9 ; planches `R12-Visiteur-Accueil`, `R12-Visiteur-Desktop`)
 
-**Qui arrive où**
-- Étant donné un visiteur sans compte qui ouvre {{appName}} (`/`, ou `/fr/`, `/en/`)
-- Alors il arrive sur l'accueil : l'accroche, la vitrine, « Créer un compte » et « Se connecter »
-- Étant donné un membre connecté qui ouvre {{appName}}, ou qui vient de se connecter sans lien à
-  suivre
-- Alors il arrive directement sur le Fil, comme aujourd'hui ; l'accueil ne s'affiche pas avant
-- Et un membre connecté qui ouvre un lien vers l'accueil (`/`, `/fr/`, `/en/`) arrive aussi sur le
-  Fil ; il voit la vitrine par « À la une » (ci-dessous)
+**Qui arrive où** (Louis, 16/11/2026)
+- `/` est l'accueil, avec la vitrine, **pour tout le monde**, connecté ou non ; le Fil prend sa
+  propre adresse (`/feed`, page des membres, sans langue)
+- Étant donné un visiteur sans compte qui ouvre {{appName}} (`/`)
+- Alors il arrive sur l'accueil dans la langue de son navigateur (`/fr/` ou `/en/`) : l'accroche,
+  la vitrine, « Créer un compte » et « Se connecter »
+- Étant donné un membre connecté qui **arrive** sur {{appName}} : il tape l'adresse, ouvre un favori,
+  rouvre l'onglet, ou vient de se connecter sans lien à suivre
+- Alors il arrive directement sur le Fil ; sur le web, c'est le serveur qui l'y envoie, dès la
+  demande de la page, avant tout affichage (aucun clignotement de l'accueil)
+- Et sur téléphone, l'appli s'ouvre sur l'onglet Fil
+- Étant donné le même membre, déjà dans l'appli
+- Quand il touche le logo « {{appName}} » ou un lien vers l'accueil
+- Alors il voit l'accueil et la vitrine, avec sa barre de membre
+- Et « À la une », en tête d'Explorer, reste le chemin le plus court vers la vitrine sur téléphone
 
 **La vitrine**
 - Sous l'accroche, « Des projets à voir » : 3 projets publics sur téléphone, 4 sur ordinateur
