@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Checkbox } from '../ui/Checkbox'
+import { ListGroup } from '../ui/ListGroup'
 import { RadioGroup, RadioMark } from '../ui/Radio'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -39,6 +40,11 @@ const fr = {
   samDetail:
     '« tout marche, mais le bouton pour recommencer la partie est caché tout en bas de l’écran, sous les scores » · 2 nov.',
   detailError: 'Choisis au moins un retour.',
+  grouped: 'Cases en lignes d’un groupe (R12, Mon profil public) : cochée, inactive cochée, libre',
+  groupedBio: 'Ma bio',
+  groupedName: 'Mon nom et ma photo',
+  groupedNameDetail: 'Toujours, si la page est publique',
+  groupedFollowers: 'Mon nombre d’abonnés',
   radios: 'Boutons radio',
   marks: 'Le rond seul (RadioMark) : choisi, libre, inactif',
   sizeLabel: 'Taille de la ruche',
@@ -84,6 +90,12 @@ const en: typeof fr = {
   samDetail:
     '“everything works, but the button to restart the game is hidden at the very bottom of the screen, under the scores” · Nov 2',
   detailError: 'Choose at least one piece of feedback.',
+  grouped:
+    'Checkboxes as rows of a group (R12, My public profile): checked, disabled checked, free',
+  groupedBio: 'My bio',
+  groupedName: 'My name and photo',
+  groupedNameDetail: 'Always, if the page is public',
+  groupedFollowers: 'My follower count',
   radios: 'Radio buttons',
   marks: 'The mark alone (RadioMark): chosen, free, disabled',
   sizeLabel: 'Hive size',
@@ -120,6 +132,7 @@ export function FormSamples() {
       </Text>
       <Checkboxes l={l} />
       <DetailedCheckboxes l={l} />
+      <GroupedCheckboxes l={l} />
       <Radios l={l} />
       {/* Un fournisseur propre à la section : le bouton « Montrer » y trouve son toast. */}
       <ToastProvider>
@@ -190,6 +203,33 @@ function DetailedCheckboxes({ l }: { l: Labels }) {
         onValueChange={setSam}
         error={sam ? undefined : l.detailError}
       />
+    </Part>
+  )
+}
+
+/** Les cases d'une page de réglages (R12) : lignes d'un groupe, avec leur trait de séparation. */
+function GroupedCheckboxes({ l }: { l: Labels }) {
+  const [bio, setBio] = useState(true)
+  const [followers, setFollowers] = useState(false)
+  return (
+    <Part title={l.grouped}>
+      <ListGroup>
+        <Checkbox
+          inGroup
+          label={l.groupedName}
+          detail={l.groupedNameDetail}
+          value
+          onValueChange={() => {}}
+          disabled
+        />
+        <Checkbox inGroup label={l.groupedBio} value={bio} onValueChange={setBio} />
+        <Checkbox
+          inGroup
+          label={l.groupedFollowers}
+          value={followers}
+          onValueChange={setFollowers}
+        />
+      </ListGroup>
     </Part>
   )
 }

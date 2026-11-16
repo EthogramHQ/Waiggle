@@ -56,12 +56,18 @@ type Props = {
    * et « Retour » vers les réglages. Faux par défaut : la page d'un vrai visiteur.
    */
   preview?: boolean
+  /**
+   * Avec `preview` : ce que fait « Retour » quand l'aperçu est posé dans l'écran des réglages (il
+   * ne change pas d'adresse : revenir, c'est le refermer). Sans lui, « Retour » revient à la page
+   * d'avant, ou aux réglages.
+   */
+  onClose?: () => void
 }
 
 /** Où mène « Retour » sans page d'avant, dans l'aperçu : les réglages de la page publique. */
 const PREVIEW_FALLBACK: Href = '/settings/public-page'
 
-export function PublicMemberScreen({ id, preview = false }: Props) {
+export function PublicMemberScreen({ id, preview = false, onClose }: Props) {
   const lang = usePageLanguage()
   const member = usePublicMember(id)
   // Sans page d'avant, « Revenir » mène à l'accueil dans la langue de la page : le Fil d'un membre
@@ -81,23 +87,33 @@ export function PublicMemberScreen({ id, preview = false }: Props) {
     )
   }
   if (!member.data) return <LoadingScreen width="page" fallback={fallback} />
-  return <PublicMemberView member={member.data} preview={preview} fallback={fallback} />
+  return (
+    <PublicMemberView
+      member={member.data}
+      preview={preview}
+      fallback={fallback}
+      onClose={preview ? onClose : undefined}
+    />
+  )
 }
 
 function PublicMemberView({
   member,
   preview,
   fallback,
+  onClose,
 }: {
   member: PublicMember
   preview: boolean
   fallback: Href
+  onClose: (() => void) | undefined
 }) {
   const { t } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
   const lang = usePageLanguage()
-  const back = useGoBack(fallback)
+  const goBack = useGoBack(fallback)
+  const back = onClose ?? goBack
   // Deux colonnes de tuiles sur téléphone, quatre ailleurs, comme la page d'un membre.
   const phone = useLayout().sizeClass === 'compact'
   // Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas deux pages.

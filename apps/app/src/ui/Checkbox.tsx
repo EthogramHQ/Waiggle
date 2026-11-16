@@ -19,6 +19,7 @@ import { describedBy, invalid } from './aria'
 import { Icon } from './Icon'
 import { spaceToggles } from './keyboard'
 import { Text } from './Text'
+import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -33,6 +34,12 @@ type Props = {
    * décrit la case sans la nommer. Avec un détail, le libellé passe en gras, comme un titre.
    */
   detail?: string
+  /**
+   * Une ligne d'un ListGroup (R12, « Mon profil public ») : les marges et la hauteur d'une ligne de
+   * réglage, et l'anneau de focus dessiné à l'intérieur, puisque le groupe rogne ce qui dépasse.
+   * Même sens que `inGroup` de l'interrupteur (Switch).
+   */
+  inGroup?: boolean
   /** Pour y poser le focus du clavier, après un envoi refusé par exemple (voir focus.ts). */
   ref?: Ref<View>
 }
@@ -49,6 +56,7 @@ export function Checkbox({
   disabled = false,
   error,
   detail,
+  inGroup = false,
   ref,
 }: Props) {
   const { colors } = useTheme()
@@ -78,6 +86,7 @@ export function Checkbox({
         disabled={disabled}
         onPress={toggle}
         {...spaceToggles(toggle, disabled)}
+        {...(inGroup ? insetFocus : null)}
         style={{
           flexDirection: 'row',
           // Avec un détail, la case s'aligne sur la première ligne du libellé (la case et la ligne
@@ -86,7 +95,8 @@ export function Checkbox({
           alignItems: detail ? 'flex-start' : 'center',
           ...(detail ? { paddingVertical: space.xs } : null),
           gap: space.md,
-          minHeight: layout.touchTarget,
+          minHeight: inGroup ? layout.controlHeight.regular : layout.touchTarget,
+          ...(inGroup ? { paddingHorizontal: space.lg, paddingVertical: space.md } : null),
           // L'anneau de focus du clavier (web) suit le contour de la rangée : arrondi, comme celui
           // des choix d'un RadioGroup, et non un rectangle à angles vifs.
           borderRadius: radii.small,
