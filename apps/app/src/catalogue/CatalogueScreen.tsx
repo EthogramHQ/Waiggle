@@ -495,9 +495,9 @@ export function CatalogueScreen() {
           summary={t(($) => $.block.summary, { name: 'Max Durand' })}
           points={[
             { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
-            { icon: 'users', text: t(($) => $.block.bullets.follows) },
-            // R12 (Q19) : la puce ajoutée quand le membre a au moins un projet public.
+            // R12 (Q19) : un projet public se voit sans compte, donc aussi de la personne bloquée.
             { icon: 'globe-simple', text: t(($) => $.block.bullets.publicProjects) },
+            { icon: 'users', text: t(($) => $.block.bullets.follows) },
           ]}
         />
         <Dialog
