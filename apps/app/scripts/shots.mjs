@@ -2473,6 +2473,56 @@ const myTesterMessagesShot = (page) =>
     createdAt: shotDateOf(one.createdAt),
   }))
 
+// R12b, « Les exemples » : une capture à `examples: true` fait d'Inès un compte d'exemples. Plutôt
+// qu'une seconde version de chaque réponse, on retouche celles de l'API simulée : tout auteur ou
+// membre qui est Inès reçoit `example: true`, comme le fait la vraie API (le champ est absent pour
+// les autres). Une carte de la vitrine n'a pas l'identifiant de son auteur : on la reconnaît à son
+// nom et à sa photo.
+const isExampleAuthor = (value) =>
+  'name' in value &&
+  (value.id === ines.id ||
+    (value.id === undefined && value.name === ines.name && 'avatarUrl' in value))
+const markExamples = (value) => {
+  if (Array.isArray(value)) return value.map(markExamples)
+  if (value === null || typeof value !== 'object') return value
+  const marked = Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => [key, markExamples(inner)]),
+  )
+  return isExampleAuthor(value) ? { ...marked, example: true } : marked
+}
+/**
+ * L'API simulée `handler`, dont les réponses JSON passent par `markExamples` quand la capture le
+ * demande. Un `Proxy` est un objet qui se fait passer pour un autre : ici, la requête Playwright,
+ * dont seule la méthode `fulfill` (répondre) est remplacée.
+ */
+const withExamples = (examples, handler) => {
+  if (!examples) return handler
+  return (route) =>
+    handler(
+      new Proxy(route, {
+        get(target, prop) {
+          const original = Reflect.get(target, prop)
+          if (prop !== 'fulfill') {
+            return typeof original === 'function' ? original.bind(target) : original
+          }
+          return (options = {}) => {
+            const { json, ...rest } = options
+            const isJson =
+              json !== undefined ||
+              (typeof rest.body === 'string' && rest.contentType === 'application/json')
+            if (!isJson) return target.fulfill(options)
+            const data = json !== undefined ? json : JSON.parse(rest.body)
+            return target.fulfill({
+              ...rest,
+              contentType: 'application/json',
+              body: JSON.stringify(markExamples(data)),
+            })
+          }
+        },
+      }),
+    )
+}
+
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
@@ -4975,6 +5025,33 @@ const pages = [
     fullPage: true,
   },
   { name: 'visiteur-membre', path: `/fr/members/${ines.id}`, signedIn: false, fullPage: true },
+  // R12b, « Les exemples » : Inès devient un compte d'exemples (`examples: true`). La pastille
+  // « Exemple » sur les cartes de la vitrine, d'« À la une » et du Fil ; la pastille et la phrase
+  // « Projet fictif… » sur la page d'un de ses projets et sur sa page, pour un visiteur comme pour
+  // un membre.
+  { name: 'accueil-exemples', path: '/fr/', signedIn: false, examples: true },
+  {
+    name: 'visiteur-projet-exemple',
+    path: `/fr/projects/${webLaunchProject.id}`,
+    signedIn: false,
+    fullPage: true,
+    examples: true,
+  },
+  {
+    name: 'visiteur-membre-exemple',
+    path: `/fr/members/${ines.id}`,
+    signedIn: false,
+    examples: true,
+  },
+  { name: 'explorer-exemples', path: '/explore', signedIn: true, examples: true },
+  { name: 'fil-exemples', path: '/feed', signedIn: true, examples: true },
+  {
+    name: 'projet-exemple',
+    path: `/projects/${webLaunchProject.id}`,
+    signedIn: true,
+    examples: true,
+  },
+  { name: 'membre-exemple', path: `/members/${ines.id}`, signedIn: true, examples: true },
   {
     name: 'compte-requis',
     path: `/fr/projects/${webLaunchProject.id}`,
@@ -5390,19 +5467,22 @@ async function layoutReport() {
         await context.unrouteAll({ behavior: 'ignoreErrors' })
         await context.route(
           `${apiUrl}/**`,
-          fakeApi(
-            shot.signedIn,
-            shot.feed,
-            shot.notifications,
-            shot.admin,
-            shot.blocks,
-            shot.email,
-            shot.suspended,
-            shot.emailChoices,
-            shot.moderation,
-            shot.hives,
-            shot.rules,
-            shot.myData,
+          withExamples(
+            shot.examples,
+            fakeApi(
+              shot.signedIn,
+              shot.feed,
+              shot.notifications,
+              shot.admin,
+              shot.blocks,
+              shot.email,
+              shot.suspended,
+              shot.emailChoices,
+              shot.moderation,
+              shot.hives,
+              shot.rules,
+              shot.myData,
+            ),
           ),
         )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
@@ -5572,19 +5652,22 @@ const capture = async ({ shot, device, scheme }) => {
     await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(
-        shot.signedIn,
-        shot.feed,
-        shot.notifications,
-        shot.admin,
-        shot.blocks,
-        shot.email,
-        shot.suspended,
-        shot.emailChoices,
-        shot.moderation,
-        shot.hives,
-        shot.rules,
-        shot.myData,
+      withExamples(
+        shot.examples,
+        fakeApi(
+          shot.signedIn,
+          shot.feed,
+          shot.notifications,
+          shot.admin,
+          shot.blocks,
+          shot.email,
+          shot.suspended,
+          shot.emailChoices,
+          shot.moderation,
+          shot.hives,
+          shot.rules,
+          shot.myData,
+        ),
       ),
     )
     const page = await context.newPage()
