@@ -2473,15 +2473,20 @@ const myTesterMessagesShot = (page) =>
     createdAt: shotDateOf(one.createdAt),
   }))
 
-// R12b, « Les exemples » : une capture à `examples: true` fait d'Inès un compte d'exemples. Plutôt
+// R12b, « Les exemples » : une capture à `examples: true` fait d'Inès (et de Tante Odile, pour la
+// recherche) des comptes d'exemples. Plutôt
 // qu'une seconde version de chaque réponse, on retouche celles de l'API simulée : tout auteur ou
-// membre qui est Inès reçoit `example: true`, comme le fait la vraie API (le champ est absent pour
+// membre qui est l'une d'elles reçoit `example: true`, comme le fait la vraie API (le champ est absent pour
 // les autres). Une carte de la vitrine n'a pas l'identifiant de son auteur : on la reconnaît à son
 // nom et à sa photo.
+const exampleAccounts = () => [ines, odile]
 const isExampleAuthor = (value) =>
   'name' in value &&
-  (value.id === ines.id ||
-    (value.id === undefined && value.name === ines.name && 'avatarUrl' in value))
+  exampleAccounts().some(
+    (one) =>
+      value.id === one.id ||
+      (value.id === undefined && value.name === one.name && 'avatarUrl' in value),
+  )
 const markExamples = (value) => {
   if (Array.isArray(value)) return value.map(markExamples)
   if (value === null || typeof value !== 'object') return value
@@ -5052,6 +5057,17 @@ const pages = [
     examples: true,
   },
   { name: 'membre-exemple', path: `/members/${ines.id}`, signedIn: true, examples: true },
+  // Les cartes et lignes « Ils cherchent des testeurs », les tuiles d'une étiquette et d'une ruche,
+  // et la recherche « carn » (« Biscotte au parc » de Tante Odile, le statut et « Exemple » empilés).
+  { name: 'recherche-exemples', path: '/search?q=carn', signedIn: true, examples: true },
+  { name: 'etiquette-exemples', path: '/tags/claude-code', signedIn: true, examples: true },
+  {
+    name: 'ruche-exemples',
+    path: `/hives/${familleId}`,
+    signedIn: true,
+    fullPage: true,
+    examples: true,
+  },
   {
     name: 'compte-requis',
     path: `/fr/projects/${webLaunchProject.id}`,
