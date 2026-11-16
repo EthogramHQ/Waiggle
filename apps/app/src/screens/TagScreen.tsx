@@ -364,6 +364,8 @@ function ToolPageView({ slug, filters, page, isAdmin }: ViewProps) {
                 }}
                 title={project.title}
                 author={project.author.name}
+                // R12b : « Exemple » sur un projet du compte d'exemples de l'équipe.
+                example={project.author.example === true}
                 image={
                   visual
                     ? {

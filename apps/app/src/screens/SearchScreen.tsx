@@ -45,6 +45,7 @@ import { TopNav } from '../navigation/TopNav'
 import { useSearch } from '../search/api'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
+import { ExampleBadge } from '../ui/ExampleBadge'
 import { FilterButton } from '../ui/FilterButton'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HighlightedText } from '../ui/HighlightedText'
@@ -437,6 +438,14 @@ export function SearchScreen() {
                 ? t(($) => $.search.excerpt, { excerpt: project.excerpt })
                 : project.author.name
               const pill = mine ? t(($) => $.member.private) : statusLabel
+              // R12b : un projet du compte d'exemples porte « Exemple » sous sa pastille. Le nom de
+              // la ligne cache ses textes : il dit donc aussi « Exemple », après la pastille, par la
+              // même forme « titre, précision » (« Le carnet des plantes, Testable, Exemple »).
+              const example = project.author.example === true
+              const withStatus = t(($) => $.search.projectWithStatus, {
+                title: project.title,
+                status: pill,
+              })
               return (
                 <ListRow
                   key={project.id}
@@ -451,13 +460,24 @@ export function SearchScreen() {
                     />
                   }
                   // Le nom d'une ligne cache ce qu'elle contient : il dit aussi la pastille.
-                  spokenLabel={t(($) => $.search.projectWithStatus, {
-                    title: project.title,
-                    status: pill,
-                  })}
+                  spokenLabel={
+                    example
+                      ? t(($) => $.search.projectWithStatus, {
+                          title: withStatus,
+                          status: t(($) => $.common.example),
+                        })
+                      : withStatus
+                  }
                   hint={detail}
                   trailing={
-                    <StatusPill label={pill} strong={!mine && project.status === 'testable'} />
+                    example ? (
+                      <Stack gap="xs">
+                        <StatusPill label={pill} strong={!mine && project.status === 'testable'} />
+                        <ExampleBadge />
+                      </Stack>
+                    ) : (
+                      <StatusPill label={pill} strong={!mine && project.status === 'testable'} />
+                    )
                   }
                   href={path}
                   onPress={(event) => open(event, path)}

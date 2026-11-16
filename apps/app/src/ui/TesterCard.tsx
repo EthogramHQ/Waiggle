@@ -6,9 +6,17 @@
 // - « Tester » ouvre la démo par la page d'avertissement des liens externes : annoncé comme un site
 //   externe (comme `TextLink external`), il est posé par-dessus la photo, à côté du lien de la carte
 //   et non dedans.
+//
+// R12b (« Les exemples ») : le projet d'un compte d'exemples (`example`) porte « Exemple » à côté
+// du nom de l'auteur (dessous quand la carte est étroite). La pastille est dans le lien de la carte,
+// qui ne se lit que par son nom : elle le décrit donc, par `aria-describedby` sur le web et par son
+// indice sur téléphone (« Carnet des plantes, lien, Exemple »).
 import { layout, space } from '@ruche/brand'
+import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
+import { ExampleBadge } from './ExampleBadge'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
 import { TestLink } from './TestLink'
@@ -29,6 +37,11 @@ type Props = {
    * lui (le catalogue, un aperçu), la carte n'est pas touchable, seul « Tester » l'est.
    */
   onOpen?: () => void
+  /**
+   * R12b : l'auteur est un compte d'exemples (`example: true` du contrat) ; « Exemple » suit alors
+   * son nom. Absent ou faux : rien.
+   */
+  example?: boolean
 }
 
 // La largeur d'une carte : environ deux cartes et demie sur un téléphone (la troisième, coupée au
@@ -41,7 +54,10 @@ const COVER_RATIO = { compact: 3 / 4, medium: 3 / 5 }
 // La pastille de l'auteur : deux fois le grand pas d'espacement, sous la taille d'une ligne.
 const AUTHOR_DOT = space.xl
 
-export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
+export function TesterCard({ title, author, image, onTest, onOpen, example = false }: Props) {
+  const { t } = useTranslation()
+  // L'identifiant du texte « Exemple », que le lien de la carte désigne comme sa description.
+  const exampleId = `tester-example-${useId()}`
   const { sizeClass } = useLayout()
   const shape = sizeClass === 'compact' ? 'compact' : 'medium'
   const width = CARD_WIDTH[shape]
@@ -55,7 +71,8 @@ export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
       <Text variant="headline" numberOfLines={2}>
         {title}
       </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+      {/* La rangée passe à la ligne : « Exemple » se range sous le nom quand la place manque. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm }}>
         {/* Les initiales de l'auteur décorent : son nom est écrit à côté, on ne le lit qu'une fois. */}
         <View
           aria-hidden
@@ -69,6 +86,7 @@ export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
             {author}
           </Text>
         </View>
+        {example ? <ExampleBadge nativeID={exampleId} /> : null}
       </View>
     </View>
   )
@@ -78,7 +96,13 @@ export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
       {onOpen ? (
         // Le lien de la carte, nommé par le titre du projet ; l'anneau du clavier suit le rayon de
         // la photo.
-        <Pressed label={title} role="link" radius="group" onPress={guard(onOpen)}>
+        <Pressed
+          label={title}
+          role="link"
+          radius="group"
+          onPress={guard(onOpen)}
+          {...(example ? { describedBy: exampleId, hint: t(($) => $.common.example) } : null)}
+        >
           {body}
         </Pressed>
       ) : (

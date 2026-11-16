@@ -541,6 +541,8 @@ function SeekingTesters({
             key={project.id}
             title={project.title}
             author={project.author.name}
+            // R12b : « Exemple » sur un projet du compte d'exemples de l'équipe.
+            example={project.author.example === true}
             image={
               visual
                 ? {
@@ -682,6 +684,8 @@ function HiveProjects({
               key={project.id}
               title={project.title}
               author={project.author.name}
+              // R12b : « Exemple » sur un projet du compte d'exemples de l'équipe.
+              example={project.author.example === true}
               image={
                 visual
                   ? {

@@ -18,11 +18,17 @@
 // bouton, où « Tester » serait un lien dans un lien ; et il ne devient un lien qu'avec une adresse
 // (`href`), que la ligne n'a pas.
 import { space } from '@ruche/brand'
-import { Pressable, View } from 'react-native'
+import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Platform, Pressable, View } from 'react-native'
+import { describedBy } from './aria'
+import { ExampleBadge } from './ExampleBadge'
 import { enterActivates } from './keyboard'
 import { ListRow } from './ListGroup'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { Row } from './Stack'
 import { TestLink } from './TestLink'
+import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -40,6 +46,12 @@ type Props = {
    * titre. Sans lui (le catalogue, un aperçu), la ligne n'est pas touchable, seul « Tester » l'est.
    */
   onOpen?: () => void
+  /**
+   * R12b : l'auteur est un compte d'exemples (`example: true` du contrat) ; « Exemple » suit alors
+   * son nom, sous le titre. Dans le lien de la ligne, qui ne se lit que par son nom, la pastille le
+   * décrit : `aria-describedby` sur le web, son indice sur téléphone. Absent ou faux : rien.
+   */
+  example?: boolean
 }
 
 // La vignette : un peu plus grande que la pastille d'icône d'une ligne (40), pour qu'on reconnaisse
@@ -50,8 +62,11 @@ const THUMB = 48
 // de droite (320 points), « Tester » tient sur la ligne du titre à la taille de texte ordinaire.
 const LINK_BASIS = 180
 
-export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
+export function TesterRow({ title, author, image, onTest, onOpen, example = false }: Props) {
+  const { t } = useTranslation()
   const { colors } = useTheme()
+  // L'identifiant du texte « Exemple », que le lien de la ligne désigne comme sa description.
+  const exampleId = `tester-row-example-${useId()}`
   // Une seule garde pour les deux liens de la ligne (voir tapGuard.ts).
   const guard = useTapGuard()
   const test = guard(onTest)
@@ -60,7 +75,19 @@ export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
   const body = (
     <ListRow
       label={title}
-      detail={author}
+      detail={
+        example ? (
+          // L'auteur et « Exemple » sur une rangée, qui passe à la ligne quand la place manque.
+          <Row gap="xs" wrap>
+            <Text variant="callout" tone="muted">
+              {author}
+            </Text>
+            <ExampleBadge nativeID={exampleId} />
+          </Row>
+        ) : (
+          author
+        )
+      }
       leading={
         // La vignette ne s'étire ni ne rétrécit : la photo garde son cadre carré.
         <View style={{ width: THUMB, flexShrink: 0 }}>
@@ -92,6 +119,10 @@ export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
           <Pressable
             accessibilityRole="link"
             accessibilityLabel={title}
+            {...(example ? describedBy(exampleId) : null)}
+            {...(example && Platform.OS !== 'web'
+              ? { accessibilityHint: t(($) => $.common.example) }
+              : null)}
             // Entrée ouvre la page sur le web, comme un vrai lien (voir keyboard.ts).
             {...enterActivates(open)}
             onPress={open}
