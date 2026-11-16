@@ -102,9 +102,11 @@ const send = async (
     return { ok: false, error: 'network' }
   }
   if (res.ok) return { ok: true, data: res }
-  // Un statut partagé par plusieurs refus (409) : le code du corps dit lequel. Pour les autres, on
-  // ne lit pas le corps : un « 413 » peut venir de Caddy, en HTML.
-  const code = AMBIGUOUS_STATUSES.has(res.status) ? await readErrorCode(res) : undefined
+  // Un statut partagé par plusieurs refus (409) : le code du corps dit lequel. Pour les autres, le
+  // corps est lu sans être compris (un « 413 » peut venir de Caddy, en HTML), mais il est lu
+  // jusqu'au bout : sinon le navigateur garde la requête ouverte (R12 : derrière Caddy, la page
+  // d'un projet inconnu n'était jamais « au repos »).
+  const code = AMBIGUOUS_STATUSES.has(res.status) ? await readErrorCode(res) : await drain(res)
   const error = errorKeyFor(res.status, code)
   // R11 : une écriture refusée faute d'accord aux règles (403 `rules_required`) veut dire que le
   // profil gardé en cache est périmé (une nouvelle version des règles, ou un autre appareil). On
@@ -114,6 +116,16 @@ const send = async (
   return code === PROJECT_CALLS_LIMITED_CODE
     ? { ok: false, error, projectLimit: true }
     : { ok: false, error }
+}
+
+/** Lit le corps d'une réponse jusqu'au bout, sans le garder ; ne lève jamais d'erreur. */
+const drain = async (res: Response): Promise<undefined> => {
+  try {
+    await res.arrayBuffer()
+  } catch {
+    // Un corps déjà lu, coupé ou absent : il n'y a plus rien à lire.
+  }
+  return undefined
 }
 
 /** Le code d'erreur du corps d'une réponse (`{ error: { code: 'handle_taken' } }`), s'il y en a un. */
