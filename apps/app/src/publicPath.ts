@@ -5,6 +5,10 @@
 //
 // Un seul endroit fabrique et lit ces adresses : les liens d'un écran visiteur, le pied de page, le
 // partage et l'aperçu passent par ces fonctions, pour qu'aucun écran n'écrive `/fr/` à la main.
+//
+// Le fichier est à la racine de l'appli, comme `config.ts` et `useNameOf.ts`, et non dans
+// `navigation/` (relecture de l'interface R12) : les composants de `src/ui` (le pied de page, le
+// lien de langue, le partage) le lisent, et la règle des étages leur interdit la navigation.
 import { LEGAL_PAGES, type LegalPage } from '@ruche/contracts'
 import { type Language, supportedLanguages } from '@ruche/i18n'
 

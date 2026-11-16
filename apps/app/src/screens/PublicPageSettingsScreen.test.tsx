@@ -21,6 +21,7 @@
 // Le réseau est un faux `fetch` : la forme des hooks de `profile/api.ts` et `public/api.ts` est libre.
 import type { Me, MyPublicPage, PublicMember, PublicPageSettings } from '@ruche/contracts'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { AccessibilityInfo } from 'react-native'
 import { leaMe, suspendedMe } from '../testing/fixtures'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
@@ -339,6 +340,41 @@ describe('« Voir ma page comme un visiteur » (UI C4)', () => {
     expect(server.sent.some(({ path }) => path === `/v1/members/${leaMe.id}`)).toBe(false)
     expect(mockRouter.push).not.toHaveBeenCalled()
     expect(mockRouter.navigate).not.toHaveBeenCalled()
+  })
+})
+
+describe('« Voir ma page comme un visiteur », the focus (design review R12, point 2)', () => {
+  /** Les textes des vues où le lecteur d'écran a été posé (téléphone), dans l'ordre. */
+  const readerStops = (sent: jest.SpyInstance) =>
+    sent.mock.calls
+      .filter(([, event]) => event === 'focus')
+      .map(([node]) => (node as { props: { children?: unknown } }).props.children)
+
+  it('moves the reader to the name, the title of the preview, when it opens', async () => {
+    await open({ publicPage: true })
+    const sent = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent')
+    sent.mockClear()
+    try {
+      await fireEvent.press(await screen.findByRole('button', { name: containing(T.preview) }))
+      await screen.findByRole('header', { name: containing(leaMe.name) })
+
+      await waitFor(() => expect(readerStops(sent).at(-1)).toBe(leaMe.name))
+    } finally {
+      sent.mockRestore()
+    }
+  })
+
+  it('moves nothing before the preview opens (témoin)', async () => {
+    const sent = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent')
+    sent.mockClear()
+    try {
+      await open({ publicPage: true })
+      await screen.findByRole('button', { name: containing(T.preview) })
+
+      expect(readerStops(sent)).not.toContain(leaMe.name)
+    } finally {
+      sent.mockRestore()
+    }
   })
 })
 

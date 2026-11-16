@@ -5,11 +5,13 @@
 // chaque carte se rejoint par Tab ; et la bande ne défile jamais seule (relecture juridique,
 // jur-J7 : aucun minuteur, aucun défilement sans geste). Il ressemble à Thumbnails, le seul autre
 // ScrollView horizontal de l'appli.
+
+import { space } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { Platform, ScrollView } from 'react-native'
+import { Platform, ScrollView, type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
-import { Carousel } from './Carousel'
+import { Carousel, shadowReachBelow } from './Carousel'
 import { Pressed } from './Pressed'
 import { Text } from './Text'
 
@@ -173,5 +175,57 @@ describe('Carousel', () => {
       expect(setInterval).not.toHaveBeenCalled()
       expect(frame).not.toHaveBeenCalled()
     })
+  })
+})
+
+// Relecture de design R12, point 3 : l'ombre des cartes de la vitrine était coupée d'un trait
+// droit sous la bande, qui ne lui laissait que `space.xs`.
+describe('Carousel, the shadow of its cards (design review R12, point 3)', () => {
+  /** Le style aplati de la bande, et celui de son contenu (son premier enfant). */
+  const bandStyles = () => {
+    let found: Node | null = null
+    const visit = (node: Node | string) => {
+      if (typeof node === 'string' || found) return
+      if (node.type === 'RCTScrollView' && node.props.horizontal === true) found = node
+      for (const child of node.children) visit(child)
+    }
+    visit(screen.root as unknown as Node)
+    const scroller = found as unknown as Node
+    // Le faux ScrollView de Jest garde `contentContainerStyle` en propriété de la bande.
+    return {
+      band: StyleSheet.flatten(scroller.props.style as StyleProp<ViewStyle>) ?? {},
+      content:
+        StyleSheet.flatten(scroller.props.contentContainerStyle as StyleProp<ViewStyle>) ?? {},
+    }
+  }
+  const shadowed = () => (
+    <Carousel label={label} previousLabel={previous} nextLabel={next} cardShadow="card">
+      {cards}
+    </Carousel>
+  )
+
+  it('keeps room under the cards for their whole shadow, read from the token', async () => {
+    await renderWithProviders(shadowed())
+
+    const { content } = bandStyles()
+    // L'ombre `card` : 18 points de décalage et 40 de flou, lus dans le jeton.
+    expect(shadowReachBelow('card')).toBe(58)
+    expect(Number(content.paddingBottom)).toBeGreaterThanOrEqual(shadowReachBelow('card'))
+  })
+
+  it('moves nothing below the band: the extra room is taken back by its margin', async () => {
+    await renderWithProviders(shadowed())
+
+    const { band, content } = bandStyles()
+    expect(Number(content.paddingBottom) + Number(band.marginBottom ?? 0)).toBe(space.xs)
+  })
+
+  it('keeps the band as it was without a card shadow (témoin, « Ils cherchent des testeurs »)', async () => {
+    await renderWithProviders(band())
+
+    const { band: scroller, content } = bandStyles()
+    expect(content.paddingBottom).toBe(space.xs)
+    expect(content.paddingTop).toBe(space.xs)
+    expect(Number(scroller.marginBottom ?? 0)).toBe(0)
   })
 })

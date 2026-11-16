@@ -170,8 +170,11 @@ export function ProjectPageLayout({
       >
         {w(banner)}
         {columns ? (
-          // Deux rangées, dans l'ordre de lecture : la galerie | l'en-tête, les actions, la recette ;
-          // un trait ; puis ce qui se lit longtemps | la conversation. Enfin « Signaler ce projet »,
+          // Deux rangées, dans l'ordre de lecture : la galerie | l'en-tête et les actions ; un trait ;
+          // puis ce qui se lit longtemps | la recette et la conversation. La recette est dans la
+          // seconde rangée, comme sur la planche R12-Visiteur-Projet-Desktop (relecture de design
+          // R12, point 4) : dans la première, elle allongeait la colonne de droite d'environ 130
+          // points sous la photo, et poussait la description sous le pli. Enfin « Signaler ce projet »,
           // en bas à gauche : dans une rangée à lui, il vient après la conversation, au clavier
           // comme sur téléphone (décision de Louis du 2/11/2026).
           // `sideWidth="wide"` : la colonne de droite grandit jusqu'à environ 450 points (planche
@@ -193,8 +196,6 @@ export function ProjectPageLayout({
                     {w(header)}
                     {w(actions)}
                     {w(actionNotes)}
-                    {w(recipe)}
-                    {w(recipeNotes)}
                   </>
                 ),
               },
@@ -206,7 +207,13 @@ export function ProjectPageLayout({
                     {w(journal)}
                   </>
                 ),
-                side: <>{w(conversation)}</>,
+                side: (
+                  <>
+                    {w(recipe)}
+                    {w(recipeNotes)}
+                    {w(conversation)}
+                  </>
+                ),
               },
               ...(report ? [{ main: w(report), side: null, continues: true }] : []),
             ]}

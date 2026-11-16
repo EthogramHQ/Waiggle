@@ -1500,6 +1500,8 @@ export const en: Translation = {
       byline: '{{name}} · public since {{date}}',
       // The name of the group of the two top tabs, its own and not the page's.
       sections: 'Moderation sections',
+      // R12 design review, point 1: the place of a removed project stays until the view changes.
+      removed: 'Off the home page',
     },
     more: 'Show more',
     errorTitle: 'Moderation couldn’t load',

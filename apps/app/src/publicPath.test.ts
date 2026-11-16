@@ -4,7 +4,7 @@
 // qu'aujourd'hui précédés de la langue. Les liens d'un écran visiteur, le pied de page, le partage
 // et l'aperçu passent par ces fonctions.
 //
-// L'interface attendue (plan R12, « API des modules partagés ») : `navigation/publicPath.ts`,
+// L'interface attendue (plan R12, « API des modules partagés ») : `src/publicPath.ts`,
 // - `publicPath(kind: 'home' | 'project' | 'updates' | 'member' | LegalPage, lang: 'fr' | 'en',
 //   id?: string): string` ;
 // - `languageOfPath(pathname): 'fr' | 'en' | null` ;

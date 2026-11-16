@@ -131,7 +131,6 @@ flowchart LR
   n1 --> n67
   n1 --> n69
   n1 --> n70
-  n2 --> n4
   n2 --> n20
   n2 --> n32
   n2 --> n67
@@ -154,8 +153,6 @@ flowchart LR
   n4 --> n19
   n4 --> n20
   n4 --> n32
-  n4 --> n67
-  n4 --> n69
   n5 --> n6
   n5 --> n32
   n6 --> n5
@@ -246,10 +243,10 @@ flowchart LR
   n24 --> n67
   n25 --> n1
   n25 --> n2
-  n25 --> n4
   n25 --> n5
   n25 --> n6
   n25 --> n20
+  n25 --> n32
   n25 --> n67
   n25 --> n69
   n26 --> n5
@@ -275,6 +272,7 @@ flowchart LR
   n31 --> n11
   n31 --> n21
   n31 --> n67
+  n32 --> n67
   n32 --> n69
   n33 --> n35
   n33 --> n36
@@ -546,6 +544,3 @@ flowchart LR
 Exceptions acceptées :
 
 - `apps/app/src/ui/LanguageSwitcher.tsx -> apps/app/src/profile/useChooseLanguage.ts`
-- `apps/app/src/ui/LegalLinks.tsx -> apps/app/src/navigation/publicPath.ts`
-- `apps/app/src/ui/LanguageLink.tsx -> apps/app/src/navigation/publicPath.ts`
-- `apps/app/src/ui/share.ts -> apps/app/src/navigation/publicPath.ts`

@@ -1813,6 +1813,9 @@ export const fr = {
       // Le nom du groupe des deux onglets du haut (« Signalements », « Vitrine de l'accueil ») : un
       // nom à lui, pas celui de la page (relecture de 7a).
       sections: 'Rubriques de la modération',
+      // Relecture de design R12, point 1 : la place d'un projet retiré reste jusqu'au changement de
+      // vue, avec ce résultat à la place de « Retirer » (rien ne glisse sous le doigt).
+      removed: 'Retiré de l’accueil',
     },
     more: 'Afficher la suite',
     errorTitle: 'La modération n’a pas pu se charger',

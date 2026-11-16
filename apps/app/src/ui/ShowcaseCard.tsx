@@ -19,7 +19,7 @@
 // font grandir la carte au lieu de faire passer le panneau par-dessus le statut.
 //
 // Elle ne connaît pas l'API : l'écran lui donne des textes prêts (le statut traduit) et la photo.
-import { layout, space } from '@ruche/brand'
+import { layout, type ShadowName, space } from '@ruche/brand'
 import { useId } from 'react'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
@@ -62,6 +62,12 @@ const SIZES = {
  */
 export const SHOWCASE_CARD_SIZE = SIZES.carousel
 
+/**
+ * L'ombre de la carte, un nom de `packages/brand/src/shadows.ts` : un `Carousel` de ces cartes la
+ * reçoit (`cardShadow`) pour lui garder sa place dessous (relecture de design R12, point 3).
+ */
+export const SHOWCASE_CARD_SHADOW = 'card' as const satisfies ShadowName
+
 /** La photo de l'auteur, à la hauteur de la ligne de son nom (caption). */
 const AVATAR_SIZE = 18
 
@@ -88,7 +94,13 @@ export function ShowcaseCard({ title, author, image, status, onPress, size = 'ca
         describedBy={`${statusId} ${authorId}`}
         radius="sheet"
       >
-        <ProjectCover height={height} grow image={image} shadow="card" radius="sheet">
+        <ProjectCover
+          height={height}
+          grow
+          image={image}
+          shadow={SHOWCASE_CARD_SHADOW}
+          radius="sheet"
+        >
           {/* Le statut en haut, le panneau en bas ; la place entre eux est la photo. */}
           <View
             style={{

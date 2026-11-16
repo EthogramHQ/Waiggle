@@ -10,7 +10,7 @@
 // - `visibility` prend aussi `web` : un projet public (`<ShareSheet visibility={project.visibility}>`,
 //   comme aujourd'hui) ou, pour `target.kind === 'member'`, une page publique (`Member.publicPage`,
 //   la page du membre passe `visibility={member.publicPage ? 'web' : 'public'}`) ;
-// - l'adresse d'une page publique vient de `navigation/publicPath.ts`, dans la langue de l'appli
+// - l'adresse d'une page publique vient de `src/publicPath.ts`, dans la langue de l'appli
 //   de qui partage (i18n), sur l'adresse publique de l'appli (`webAppUrl`).
 // L'adresse d'un projet « Membres » n'est pas fixée ici (question au rapport de R12).
 import { act, fireEvent, screen } from '@testing-library/react-native'

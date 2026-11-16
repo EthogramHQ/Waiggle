@@ -33,7 +33,7 @@ import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { SearchLink } from '../ui/SearchLink'
-import { ShowcaseCard } from '../ui/ShowcaseCard'
+import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { Tag } from '../ui/Tag'
@@ -295,6 +295,7 @@ function Featured() {
       nextLabel={t(($) => $.explore.featuredNext)}
       header={title}
       bleed
+      cardShadow={SHOWCASE_CARD_SHADOW}
     >
       {items.map((item) => (
         <ShowcaseCard

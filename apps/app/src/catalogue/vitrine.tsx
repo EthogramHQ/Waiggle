@@ -12,7 +12,8 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { ShowcaseCard } from '../ui/ShowcaseCard'
+import { Carousel } from '../ui/Carousel'
+import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
 import { ShowcaseFreeSlot, ShowcaseSlot } from '../ui/ShowcaseSlot'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
@@ -30,11 +31,16 @@ const fr = {
   day: 'jour',
   night: 'nuit',
   slots:
-    'Dans la Modération (ShowcaseSlot, ShowcaseFreeSlot) : sans note, modifié depuis la mise en avant, titre long, place libre',
+    'Dans la Modération (ShowcaseSlot, ShowcaseFreeSlot) : sans note, modifié depuis la mise en avant, titre long, retiré (le résultat à la place du bouton), place libre',
   remove: 'Retirer',
   removeNamed: 'Retirer de l’accueil',
   changed: 'Modifié depuis la mise en avant',
   free: 'Une place libre',
+  removed: 'Retiré de l’accueil',
+  carousel: 'Dans un Carousel (cardShadow) : l’ombre des cartes entière sous la bande',
+  carouselLabel: 'Des projets à voir',
+  previous: 'Projets précédents',
+  next: 'Projets suivants',
 }
 
 const en: typeof fr = {
@@ -48,11 +54,16 @@ const en: typeof fr = {
   day: 'day',
   night: 'night',
   slots:
-    'In Moderation (ShowcaseSlot, ShowcaseFreeSlot): no note, edited since featured, long title, free spot',
+    'In Moderation (ShowcaseSlot, ShowcaseFreeSlot): no note, edited since featured, long title, removed (the result in place of the button), free spot',
   remove: 'Remove',
   removeNamed: 'Remove from the home page',
   changed: 'Edited since it was featured',
   free: 'A free spot',
+  removed: 'Off the home page',
+  carousel: 'In a Carousel (cardShadow): the whole card shadow under the band',
+  carouselLabel: 'Projects to see',
+  previous: 'Previous projects',
+  next: 'Next projects',
 }
 
 // Des résumés flous de photos (ThumbHash), ceux des autres cartes du catalogue.
@@ -121,6 +132,18 @@ export function ShowcaseCatalogue() {
                 {cards('carousel').slice(0, 3)}
               </Row>
             </Example>
+            <Example caption={`${l.carousel} — ${l[scheme]}`}>
+              {/* Relecture de design R12, point 3 : la bande garde la place de l'ombre des cartes
+                  (`cardShadow`), qu'elle coupait d'un trait droit. */}
+              <Carousel
+                label={`${l.carouselLabel} (${l[scheme]})`}
+                previousLabel={l.previous}
+                nextLabel={l.next}
+                cardShadow={SHOWCASE_CARD_SHADOW}
+              >
+                {cards('carousel')}
+              </Carousel>
+            </Example>
             <Example caption={`${l.fill} — ${l[scheme]}`}>
               {/* La largeur d'un ordinateur moyen, sans déborder d'un catalogue plus étroit. */}
               <View style={{ width: '100%', maxWidth: 1100 }}>
@@ -130,15 +153,18 @@ export function ShowcaseCatalogue() {
               </View>
             </Example>
             <Example caption={`${l.slots} — ${l[scheme]}`}>
-              {/* R12 : l'onglet « Vitrine de l'accueil » de la Modération, ses trois états de place. */}
+              {/* R12 : l'onglet « Vitrine de l'accueil » de la Modération, ses états de place. */}
               <Row gap="md" align="start" wrap>
                 {cards('carousel')
-                  .slice(0, 3)
+                  .slice(0, 4)
                   .map((card, index) => (
                     <ShowcaseSlot
                       key={card.key}
                       card={card}
                       note={index === 1 ? l.changed : undefined}
+                      // La quatrième vient d'être retirée : sa place reste, le résultat au lieu du
+                      // bouton (relecture de design R12, point 1).
+                      removed={index === 3 ? l.removed : null}
                       remove={{
                         label: l.remove,
                         spokenLabel: `${l.removeNamed} (${index + 1})`,

@@ -27,15 +27,16 @@
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import { PROJECT_LIST_MAX, type PublicMember } from '@ruche/contracts'
 import { type Href, useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { publicPath } from '../navigation/publicPath'
 import { useGoBack } from '../navigation/useGoBack'
 import { usePageLanguage, usePublicMember } from '../public/api'
+import { publicPath } from '../publicPath'
 import { CountedTitle } from '../ui/CountedTitle'
 import { FollowerCount } from '../ui/FollowerCount'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
 import { LegalLinks } from '../ui/LegalLinks'
 import { MemberHeader } from '../ui/MemberHeader'
@@ -124,6 +125,18 @@ function PublicMemberView({
   // Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas deux pages.
   const guard = useTapGuard()
 
+  // L'aperçu s'ouvre à la place de l'écran des réglages : le bouton touché disparaît, et le focus
+  // tombait sur la page entière (le lecteur d'écran ne disait rien, Tab repartait du haut). À
+  // l'arrivée de l'aperçu, il va au nom, le titre de la page (relecture de design R12, point 2) ;
+  // au retour, l'écran des réglages le rend à son bouton. Une vraie page de visiteur, ouverte par
+  // une adresse, ne prend pas le focus.
+  const nameRef = useRef<Focusable>(null)
+  useEffect(() => {
+    if (!preview) return
+    focusWithoutScroll(nameRef.current)
+    moveReaderTo(nameRef.current)
+  }, [preview])
+
   // « Partager » (scénario R12 « Partager » : « une page publique se partage de même », planche
   // R12-Visiteur-Profil) : la feuille dit « Tout le monde pourra l'ouvrir. », et le lien est
   // l'adresse publique dans la langue de la page. Sur téléphone, dans la barre d'un visiteur ;
@@ -171,6 +184,7 @@ function PublicMemberView({
         name={member.name}
         avatar={toSource(member.avatarUrl)}
         bio={member.bio ?? ''}
+        nameRef={preview ? nameRef : undefined}
         toolsTitle={t(($) => $.member.favoriteTools)}
         // Des pastilles sans `onPress` : la page d'un outil est réservée aux membres. Un « autre
         // outil », hors du catalogue, reste marqué comme tel (`inCatalogue`).
