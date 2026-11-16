@@ -9,6 +9,8 @@
 // et dit « La démo de …, ajoutée par … », mais seulement si sa démo est exactement l'adresse de la
 // page (sec-B4) : sinon un lien fabriqué (`/out?url=piège&project=<vrai projet>`) ferait parler un
 // vrai projet à côté d'un site piégé.
+// R12 : la page sert aussi à un visiteur sans compte (« Tester la démo » d'un projet public) : le
+// projet se lit alors à la route publique, avec la même règle (relecture de sécurité du plan, I5).
 import { ProjectId, publicHttpsUrl } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -19,6 +21,7 @@ import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
 import { useGoBack } from '../navigation/useGoBack'
 import { useProject } from '../projects/hooks'
+import { usePublicProject } from '../public/api'
 import { Button } from '../ui/Button'
 import { PortalRings } from '../ui/Illustrations'
 import { type LeavingOrigin, LeavingSheet, type LeavingTesters } from '../ui/LeavingSheet'
@@ -47,6 +50,14 @@ const safeTarget = (value: string | undefined): { host: string; href: string } |
  */
 const projectIdOf = (value: string | undefined): string | null =>
   value !== undefined && ProjectId.safeParse(value).success ? value : null
+
+/** Ce que la page sait du projet d'où vient le lien, lu par un membre ou par un visiteur. */
+type ShownProject = {
+  title: string
+  author: { name: string; avatarUrl: string | null }
+  /** L'adresse de sa démo ; null : pas de démo (ou son lien retiré par la modération). */
+  demoUrl: string | null
+}
 
 type Props = {
   /** L'adresse à ouvrir (`?url=`), telle qu'elle est arrivée : la page la vérifie. */
@@ -115,18 +126,34 @@ function OpenableTarget({
   onStay: () => void
 }) {
   const { t } = useTranslation()
-  const { data: session } = useSession()
-  // Le projet n'est lu que s'il y a de quoi : un identifiant de projet et une session (l'API ne
-  // montre un projet qu'à un membre connecté). La clé du cache est celle de la page du projet : en
-  // venant d'elle, la ligne est là tout de suite, sans requête.
+  const { data: session, isPending } = useSession()
+  // Le projet n'est lu que s'il y a de quoi : un identifiant de projet. Un membre connecté le lit à
+  // la route des membres ; R12 (relecture de sécurité du plan, I5) : un visiteur, à la route
+  // publique, sans session, qui ne répond que pour un projet public. Tant que la session se lit, on
+  // attend : on ne sait pas encore laquelle demander. La clé du cache est celle de la page du
+  // projet (membre ou visiteur) : en venant d'elle, la ligne est là tout de suite, sans requête.
   const asks = projectId !== null
-  const read = useProject(projectId ?? '', asks && Boolean(session))
+  const member = useProject(projectId ?? '', asks && Boolean(session))
+  const visitor = usePublicProject(projectId ?? '', asks && !isPending && !session)
+  // Ce que la page dit du projet, d'où qu'il vienne : son titre, son auteur, l'adresse de sa démo
+  // (null : pas de démo, ou son lien retiré par la modération).
+  const shown: ShownProject | undefined = session
+    ? member.data && {
+        title: member.data.title,
+        author: member.data.author,
+        demoUrl: member.data.demoUrl ?? null,
+      }
+    : visitor.data && {
+        title: visitor.data.title,
+        author: visitor.data.author,
+        demoUrl: visitor.data.demo?.url ?? null,
+      }
   // Ce qui peut encore arriver se décide à l'arrivée, une fois pour la visite (un état n'est
   // initialisé qu'au premier dessin). En venant de la page du projet, sa lecture est déjà là : on
   // sait tout de suite si les lignes viendront, et aucune place n'est gardée pour rien (sur
   // ordinateur, une place gardée sous la carte faisait défiler la page dans une fenêtre basse).
   // Par un lien direct, la réponse viendra plus tard : la place est gardée jusqu'à elle.
-  const [readAtArrival] = useState(() => read.data !== undefined)
+  const [readAtArrival] = useState(() => shown !== undefined)
   const mediaSource = useMediaSources(asks)
   // Une seule ouverture sur double tape : la seconde tape arrive avant que la page change.
   const guard = useTapGuard()
@@ -139,8 +166,9 @@ function OpenableTarget({
   // « recettes.example.com » sont le même site). Une autre page du même site, un nom qui commence
   // pareil, un « ?x=1 » ajouté : pas de ligne. Un refus de l'API (404, 401) : pas de ligne non plus,
   // et rien d'autre ne change à l'écran (rien ne dit si le projet existe).
-  const shown = read.data
   const sameDemo = shown ? publicHttpsUrl(shown.demoUrl ?? '')?.href === target.href : false
+  // Les testeurs : le projet d'un membre seulement (un visiteur n'a pas de liste à rejoindre).
+  const joinable = session ? member.data : undefined
   const origin: LeavingOrigin | null =
     shown && sameDemo
       ? {
@@ -158,17 +186,17 @@ function OpenableTarget({
   // Sans lui, on inviterait à rejoindre une liste dont le membre est écarté, et le bouton de la
   // page du projet n'y serait pas : la page se tait, sans rien dire du retrait.
   const testers: LeavingTesters | null =
-    shown &&
+    joinable &&
     sameDemo &&
-    shown.status === 'testable' &&
-    shown.testerJoinable &&
-    !shown.isMine &&
-    !shown.isTester &&
+    joinable.status === 'testable' &&
+    joinable.testerJoinable &&
+    !joinable.isMine &&
+    !joinable.isTester &&
     !suspended
       ? {
-          name: shown.author.name,
+          name: joinable.author.name,
           onOpenProject: guard(() =>
-            router.push({ pathname: '/projects/[id]', params: { id: shown.id } }),
+            router.push({ pathname: '/projects/[id]', params: { id: joinable.id } }),
           ),
         }
       : null

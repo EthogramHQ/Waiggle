@@ -32,6 +32,19 @@ export const apiFetch = async (path: string, init: RequestInit = {}): Promise<Re
   return fetch(`${apiUrl}${path}`, { ...init, headers, credentials: isWeb ? 'include' : 'omit' })
 }
 
+/**
+ * Envoie une requête **sans** la session (R12, les lectures d'un visiteur sous /v1/public/*) : ni
+ * cookie ajouté sur téléphone, ni cookie joint par le navigateur (`credentials: 'omit'`). Les routes
+ * publiques ne lisent pas la session ; ne pas l'envoyer garantit en plus qu'une réponse ne dépend
+ * jamais de qui regarde : l'aperçu « comme un visiteur » d'un membre connecté voit exactement ce
+ * qu'un inconnu verrait.
+ */
+const fetchWithoutSession = (path: string, init: RequestInit = {}): Promise<Response> =>
+  fetch(`${apiUrl}${path}`, { ...init, credentials: 'omit' })
+
+/** Une façon d'envoyer : avec la session (`apiFetch`) ou sans (`fetchWithoutSession`). */
+type Fetcher = (path: string, init: RequestInit) => Promise<Response>
+
 // La partie d'un schéma Zod dont on a besoin : safeParse. Décrire seulement cette forme évite que
 // l'appli dépende directement de la bibliothèque Zod (elle utilise les schémas de @ruche/contracts).
 type Schema<T> = { safeParse: (value: unknown) => { success: true; data: T } | { success: false } }
@@ -45,8 +58,9 @@ export const request = async <T>(
   path: string,
   init: RequestInit,
   schema: Schema<T>,
+  fetcher: Fetcher = apiFetch,
 ): Promise<ApiResult<T>> => {
-  const sent = await send(path, init)
+  const sent = await send(path, init, fetcher)
   if (!sent.ok) return sent
   const parsed = schema.safeParse(await sent.data.json().catch(() => null))
   if (parsed.success) return { ok: true, data: parsed.data }
@@ -54,6 +68,16 @@ export const request = async <T>(
   void reloadIfNewVersion()
   return { ok: false, error: 'internal' }
 }
+
+/**
+ * Comme `request`, sans la session (R12) : pour les lectures d'un visiteur (`public/api.ts`). La
+ * réponse est vérifiée par le même schéma, et un refus traduit de la même façon.
+ */
+export const requestWithoutSession = <T>(
+  path: string,
+  init: RequestInit,
+  schema: Schema<T>,
+): Promise<ApiResult<T>> => request(path, init, schema, fetchWithoutSession)
 
 /** Pour les requêtes dont la réponse n'a pas de contenu (une suppression répond « 204 »). */
 export const requestWithoutBody = async (
@@ -65,10 +89,14 @@ export const requestWithoutBody = async (
 }
 
 // Partie commune : envoyer, et traduire un échec (réseau ou refus de l'API) en clé de message.
-const send = async (path: string, init: RequestInit): Promise<ApiResult<Response>> => {
+const send = async (
+  path: string,
+  init: RequestInit,
+  fetcher: Fetcher = apiFetch,
+): Promise<ApiResult<Response>> => {
   let res: Response
   try {
-    res = await apiFetch(path, init)
+    res = await fetcher(path, init)
   } catch {
     // fetch ne lève une erreur que si le serveur est injoignable (pas de réseau, API arrêtée).
     return { ok: false, error: 'network' }
