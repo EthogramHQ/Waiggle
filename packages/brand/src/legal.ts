@@ -15,10 +15,15 @@ export const legalPlaceholder = '[…]'
  * leur forme exacte.
  */
 export const legal = {
-  /** L'éditeur : Louis, en micro-entreprise. `siren` : son numéro d'entreprise (9 chiffres). */
+  /**
+   * L'éditeur : Louis, en micro-entreprise. `siren` : son numéro d'entreprise (9 chiffres). `phone` :
+   * la LCEN (art. 6) demande le téléphone d'un éditeur qui est une personne physique (relecture
+   * juridique de R11, à faire confirmer par un professionnel).
+   */
   publisher: {
     name: legalPlaceholder,
     address: legalPlaceholder,
+    phone: legalPlaceholder,
     siren: legalPlaceholder,
     email: contactEmail,
   },

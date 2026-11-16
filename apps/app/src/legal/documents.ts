@@ -55,6 +55,7 @@ export const LEGAL_VERSIONS: Record<LegalPage, string> = {
 const params = {
   publisher: legal.publisher.name,
   publisherAddress: legal.publisher.address,
+  publisherPhone: legal.publisher.phone,
   siren: legal.publisher.siren,
   publisherEmail: legal.publisher.email,
   publicationDirector: legal.publicationDirector,

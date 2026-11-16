@@ -179,7 +179,7 @@ export const en: Translation = {
         sections: {
           publisher: {
             title: 'The publisher',
-            body: '{{publisher}}, sole trader (entrepreneur individuel).\n\n- **Address**: {{publisherAddress}}\n- **SIREN**: {{siren}}\n- **Email**: {{publisherEmail}}\n\nPublication director: {{publicationDirector}}.',
+            body: '{{publisher}}, sole trader (entrepreneur individuel).\n\n- **Address**: {{publisherAddress}}\n- **Phone**: {{publisherPhone}}\n- **SIREN**: {{siren}}\n- **Email**: {{publisherEmail}}\n\nPublication director: {{publicationDirector}}.',
           },
           host: {
             title: 'The host',

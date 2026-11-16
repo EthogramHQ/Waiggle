@@ -224,7 +224,7 @@ export const fr = {
         sections: {
           publisher: {
             title: 'L’éditeur',
-            body: '{{publisher}}, entrepreneur individuel.\n\n- **Adresse** : {{publisherAddress}}\n- **SIREN** : {{siren}}\n- **E‑mail** : {{publisherEmail}}\n\nDirecteur de la publication : {{publicationDirector}}.',
+            body: '{{publisher}}, entrepreneur individuel.\n\n- **Adresse** : {{publisherAddress}}\n- **Téléphone** : {{publisherPhone}}\n- **SIREN** : {{siren}}\n- **E‑mail** : {{publisherEmail}}\n\nDirecteur de la publication : {{publicationDirector}}.',
           },
           host: {
             title: 'L’hébergeur',

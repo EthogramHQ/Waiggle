@@ -21,6 +21,7 @@ describe('legal', () => {
     const marked = Object.entries({
       'publisher.name': legal.publisher.name,
       'publisher.address': legal.publisher.address,
+      'publisher.phone': legal.publisher.phone,
       'publisher.siren': legal.publisher.siren,
       'publisher.email': legal.publisher.email,
       publicationDirector: legal.publicationDirector,

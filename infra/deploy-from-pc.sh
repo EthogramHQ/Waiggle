@@ -9,6 +9,9 @@
 #
 # Usage, depuis le dossier du dépôt : infra/deploy-from-pc.sh [<commit>]
 #   Sans commit : le dernier commit de main.
+# Il dit aussi s’il reste des Mentions légales à remplir (« […] », scripts/legal-placeholders.mjs) :
+# un avertissement tant que l’inscription demande un code d’invitation, un refus une fois le site
+# ouvert à tous (relecture juridique de R11, décision de Louis du 16/11/2026).
 # Demande : GitHub CLI connecté (gh auth login), et l'accès SSH « waiggle » (docs/ops/serveur.md).
 # RUCHE_SSH : le programme ssh à utiliser (sous Windows, celui qui connaît l'agent de clés).
 set -euo pipefail
@@ -45,6 +48,9 @@ main() {
   IMAGE_PREFIX=$(sed -n 's/^IMAGE_PREFIX=//p' <<<"$site_env")
   [[ $IMAGE_PREFIX =~ ^ghcr\.io/[a-z0-9._/-]+$ ]] || die "IMAGE_PREFIX invalide dans infra/site.env : « $IMAGE_PREFIX »"
   echo "$IMAGE_PREFIX"
+
+  step "Vérification des Mentions légales"
+  node "$RUCHE_REPO/scripts/legal-placeholders.mjs" "$sha" || die "Mentions légales incomplètes sur un site ouvert : remplir packages/brand/src/legal.ts et les textes"
 
   step "Vérification de la provenance des images"
   local part digest
