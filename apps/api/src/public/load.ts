@@ -32,6 +32,7 @@ import {
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
+import { isExampleAccountSql, withExampleFlag } from '../accounts/example'
 import { notBlockedWith } from '../blocks/visibility'
 import { memberFollowState } from '../follows/load'
 import { avatarUrlOf } from '../profile/me'
@@ -273,6 +274,8 @@ export const loadPublicMember = async (
       name: schema.user.name,
       bio: schema.profile.bio,
       avatarKey: schema.profile.avatarKey,
+      // R12b : un compte d'exemples ? Dans la même lecture (accounts/example.ts).
+      example: isExampleAccountSql(schema.user.id),
     })
     .from(schema.user)
     .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
@@ -298,17 +301,21 @@ export const loadPublicMember = async (
     // `NOBODY` : le visiteur n'est l'abonné de personne ; seul le nombre sert.
     settings.showFollowerCount ? memberFollowState(db, memberId, NOBODY) : undefined,
   ])
-  return {
-    id: member.id,
-    name: member.name,
-    // R9 : une photo retirée par la modération ne paraît pas (avatarUrlOf rend null).
-    avatarUrl: avatarUrlOf(publicApiUrl, member.avatarKey),
-    // `...(condition && { champ })` : le champ n'existe dans l'objet que si la case est cochée.
-    ...(settings.showBio && { bio: member.bio ?? '' }),
-    ...(tools !== undefined && { favoriteTools: tools }),
-    ...(projects !== undefined && { projects }),
-    ...(follow !== undefined && { followerCount: follow.followerCount }),
-  }
+  return withExampleFlag(
+    {
+      id: member.id,
+      name: member.name,
+      // R9 : une photo retirée par la modération ne paraît pas (avatarUrlOf rend null).
+      avatarUrl: avatarUrlOf(publicApiUrl, member.avatarKey),
+      // `...(condition && { champ })` : le champ n'existe dans l'objet que si la case est cochée.
+      ...(settings.showBio && { bio: member.bio ?? '' }),
+      ...(tools !== undefined && { favoriteTools: tools }),
+      ...(projects !== undefined && { projects }),
+      ...(follow !== undefined && { followerCount: follow.followerCount }),
+    },
+    // R12b : la pastille « Exemple », quelles que soient les cases cochées (absente sinon).
+    member.example,
+  )
 }
 
 /**
@@ -334,6 +341,8 @@ export const loadShowcase = async (
       status: schema.project.status,
       authorName: schema.user.name,
       avatarKey: schema.profile.avatarKey,
+      // R12b : l'auteur est-il un compte d'exemples ? Dans la même requête (accounts/example.ts).
+      authorExample: isExampleAccountSql(schema.project.authorId),
     })
     .from(schema.showcase)
     .innerJoin(schema.project, eq(schema.project.id, schema.showcase.projectId))
@@ -353,7 +362,10 @@ export const loadShowcase = async (
     if (!card) throw new Error('showcase card missing')
     return {
       ...card,
-      author: { name: row.authorName, avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey) },
+      author: withExampleFlag(
+        { name: row.authorName, avatarUrl: avatarUrlOf(publicApiUrl, row.avatarKey) },
+        row.authorExample,
+      ),
     }
   })
 }

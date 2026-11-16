@@ -638,6 +638,11 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     alerted_at: 'date',
     other_recap_at: 'date',
   },
+  // R12b : les comptes d'exemples, marqués par infra/mark-example.sh, jamais par un membre.
+  example_account: {
+    user_id: 'identifiant',
+    marked_at: 'date',
+  },
   // R6b : le catalogue. Les noms que tapent les membres (tool.name, project_tool.label,
   // profile_tool.label, catalogue_change.merged_name) sont au registre MEMBER_INPUTS ; tout le reste
   // est écrit par l'API ou par un administrateur.

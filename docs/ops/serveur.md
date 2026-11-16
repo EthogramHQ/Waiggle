@@ -765,6 +765,17 @@ Donner ou retirer le rôle d'administrateur (`infra/grant-admin.sh`), traiter la
 signalements, un retrait demandé par e-mail, les durées de conservation : tout est dans
 [`moderation.md`](moderation.md).
 
+### Le compte d'exemples
+
+Le compte de l'équipe qui publie les projets fictifs de la vitrine (R12b) porte la pastille
+« Exemple ». Le marquage se pose et se retire par un script, jamais dans l'appli ; le compte doit
+avoir vérifié son adresse :
+
+```bash
+ssh waiggle '/srv/ruche/repo/infra/mark-example.sh bot@example.com'            # marquer
+ssh waiggle '/srv/ruche/repo/infra/mark-example.sh bot@example.com --revoke'   # rendre ordinaire
+```
+
 ### Changer de domaine
 
 Fait une fois, de `waiggle.io` vers `waiggle.com` (23/10/2026, ADR 0006). Dans l'ordre :
