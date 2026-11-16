@@ -115,8 +115,9 @@ export const keepAddressLanguage = (appI18n: i18n, language: Language) => {
  */
 export const useBrowserLanguage = () => {
   const { i18n } = useTranslation()
-  // L'instance posée par le fournisseur le plus proche, telle quelle : `useTranslation` en rend une
-  // copie (react-i18next 17), qu'on ne retrouverait pas dans `addressLanguage`.
+  // L'instance posée par le fournisseur le plus proche, telle quelle : `useTranslation` en rend un
+  // relais (react-i18next 18 ; une copie avant), un autre objet qu'on ne retrouverait pas dans
+  // `addressLanguage`.
   const provided = useContext(I18nContext)?.i18n
   useEffect(() => {
     // Sous une adresse à langue, pour un visiteur, la langue est celle de l'adresse (R12) : on

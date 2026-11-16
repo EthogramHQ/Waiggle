@@ -2,7 +2,7 @@
   {
     "ghsa": "GHSA-q76c-gcvw-89x9",
     "package": "i18next",
-    "reason": "Ne nous touche pas (jugé le 17/11/2026) : l'API n'utilise pas i18next (ses textes passent par fill de @ruche/i18n) ; l'appli ne lui donne qu'une langue de supportedLanguages (fr, en), filtrée avant (resolveLanguage ; avec R12, aussi app/[lang]/_layout.tsx), donc jamais un nom de propriété héritée. Le correctif est la version majeure 27 : montée ordinaire par Renovate.",
+    "reason": "Ne nous touche pas (jugé le 17/11/2026) : l'API n'utilise pas i18next (ses textes passent par fill de @ruche/i18n) ; l'appli ne lui donne qu'une langue de supportedLanguages (fr, en), filtrée avant (resolveLanguage ; avec R12, aussi app/[lang]/_layout.tsx), donc jamais un nom de propriété héritée. Le correctif est i18next 27.1.3 (la majeure 27.1.0 est montée le 16/11 ; 27.1.3 passe la règle des 7 jours le 23/11) : montée de correctif par Renovate.",
     "until": "2026-11-30"
   }
 ]

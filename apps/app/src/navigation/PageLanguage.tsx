@@ -16,7 +16,8 @@ import { createPageI18n, keepAddressLanguage } from '../i18n'
 
 export function PageLanguage({ language, children }: { language: Language; children: ReactNode }) {
   // L'instance de l'appli, posée par la mise en page racine (app/_layout.tsx), telle quelle :
-  // `useTranslation` en rend une copie (react-i18next 17), qu'on ne doit pas reposer plus bas.
+  // `useTranslation` en rend un relais (react-i18next 18 ; une copie avant), un autre objet qu'on
+  // ne doit pas reposer plus bas.
   const { i18n: copy } = useTranslation()
   const appI18n = useContext(I18nContext)?.i18n ?? copy
   const { state } = useMemberSession()
