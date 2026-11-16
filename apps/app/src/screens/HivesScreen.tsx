@@ -1,7 +1,9 @@
 // L'onglet Ruches (R10, docs/scenarios/refonte.md, « L'onglet Ruches » ; planches R10-Ruches et
 // R10-Etats). « Mes ruches » remplace « Les ruches arrivent bientôt » :
-// - en haut, le titre « Ruches », « Créer une ruche » à côté (blanc : l'action miel de la page est
-//   « Rejoindre la ruche » d'une invitation), et la phrase qui explique les ruches ;
+// - en haut à droite, « Créer une ruche » (blanc : l'action miel de la page est « Rejoindre la
+//   ruche » d'une invitation), et la phrase qui explique les ruches. Le titre « Ruches » n'est plus
+//   affiché, dans aucun état (« Moins de mots », 16/11/2026 : l'onglet allumé le dit déjà) ; il
+//   reste le titre de niveau 1 des lecteurs d'écran (`titleHidden` de Screen) ;
 // - les invitations reçues, avec leur nombre en pastille : chaque carte dit qui invite et où, ses
 //   trois promesses, « Rejoindre la ruche » et « Refuser » ; « … » pour signaler la ruche ;
 // - mes ruches, une ligne chacune (`HiveRow`), dans l'ordre de l'API (la plus récemment active
@@ -69,7 +71,7 @@ export function HivesScreen() {
 function HivesLoading() {
   const { t } = useTranslation()
   return (
-    <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
+    <Screen title={t(($) => $.hives.title)} titleHidden header={<TopNav />}>
       <SkeletonList count={2} />
     </Screen>
   )
@@ -86,7 +88,7 @@ function Hives() {
     // La session a expiré pendant la visite : se reconnecter, pas réessayer.
     if (key === 'unauthorized') return <SignedOutScreen expired />
     return (
-      <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
+      <Screen title={t(($) => $.hives.title)} titleHidden header={<TopNav />}>
         <StateMessage
           kind="error"
           title={t(($) => $.hives.loadError)}
@@ -296,7 +298,7 @@ function HivesView({ mine }: { mine: MyHives }) {
   // Ni ruche ni invitation : l'état vide, avec la mascotte.
   if (mine.hives.length === 0 && invitations.length === 0) {
     return (
-      <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
+      <Screen title={t(($) => $.hives.title)} titleHidden header={<TopNav />}>
         <StateMessage
           kind="empty"
           title={t(($) => $.hives.emptyTitle)}
@@ -315,7 +317,12 @@ function HivesView({ mine }: { mine: MyHives }) {
   }
 
   return (
-    <Screen title={t(($) => $.hives.title)} titleAside={createButton} header={<TopNav />}>
+    <Screen
+      title={t(($) => $.hives.title)}
+      titleHidden
+      titleAside={createButton}
+      header={<TopNav />}
+    >
       <Stack gap="xl" align="stretch">
         {limitText}
 

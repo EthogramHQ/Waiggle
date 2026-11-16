@@ -232,7 +232,6 @@ const T = {
   titleField: fr.t(($) => $.project.updates.titleField),
   versionField: fr.t(($) => $.project.updates.versionField),
   addLine: fr.t(($) => $.project.updates.addLine),
-  linesHint: fr.t(($) => $.project.updates.linesHint),
   hintPublic: fr.t(($) => $.project.updates.hintPublic),
   hintPrivate: fr.t(($) => $.project.updates.hintPrivate),
   required: fr.t(($) => $.project.updates.required),
@@ -394,7 +393,8 @@ describe('the sheet « Nouvelle mise à jour »', () => {
     expect(lineField(1, 1)).toHaveDisplayValue('')
     expect(screen.getByRole('button', { name: /^Famille\s:\sNouveau$/ })).toBeTruthy()
     expect(shown(counter(1))).toBe(true)
-    expect(shown(T.linesHint)).toBe(true)
+    // « Moins de mots » (16/11/2026) : le compteur suffit, plus d'aide « 5 lignes au plus ».
+    expect(screen.queryByText(/5 lignes au plus/)).toBeNull()
   })
 
   it('offers a title field and a version field, both optional', async () => {

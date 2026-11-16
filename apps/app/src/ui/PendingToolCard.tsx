@@ -100,12 +100,11 @@ export function PendingToolCard({
   const mergeGuard = useTapGuard()
   const dismissGuard = useTapGuard()
   const linkGuard = useTapGuard()
-  // Les textes cachés qui décrivent la carte (son nom) et « Laisser hors » (son aide), stables entre
-  // le pré-rendu web et le navigateur (useId).
+  // Le texte caché qui décrit la carte (son nom), stable entre le pré-rendu web et le navigateur
+  // (useId). « Laisser hors » n'a plus d'aide à lui (« Moins de mots », 16/11/2026) : son libellé
+  // suffit, comme celui des deux autres décisions.
   const descriptionId = useId()
-  const hintId = useId()
   const describes = { describedById: descriptionId, hint: tool.name }
-  const dismissHint = t(($) => $.moderation.catalogue.dismissHint)
   return (
     <View
       style={{
@@ -217,17 +216,9 @@ export function PendingToolCard({
                   variant="secondary"
                   size="compact"
                   loading={dismissing}
-                  // L'aide de ce bouton s'ajoute au nom de la carte : « Make.com. Pour un nom qui
-                  // n'est pas un outil… ».
-                  describedById={`${descriptionId} ${hintId}`}
-                  hint={`${tool.name}. ${dismissHint}`}
+                  {...describes}
                 />
               </View>
-              {/* Ce que veut dire « Laisser hors » : le geste écrit sans fenêtre de confirmation, la
-                phrase se lit donc avant de toucher. */}
-              <Text variant="caption" tone="muted" nativeID={hintId}>
-                {dismissHint}
-              </Text>
             </View>
           }
         />

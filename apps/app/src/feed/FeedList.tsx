@@ -103,13 +103,9 @@ export function DiscoverFeed({
       key={category ?? '~'}
       feed={feed}
       items={items}
-      news={
-        <FeedNews
-          news={news}
-          onPress={() => feed.refetch()}
-          caption={t(($) => $.feed.discoverCaption)}
-        />
-      }
+      // Sans légende quand rien n'est neuf (« Moins de mots », 16/11/2026) : la page des Règles dit
+      // ce que montre cette liste.
+      news={<FeedNews news={news} onPress={() => feed.refetch()} />}
       empty={emptyMessage ?? t(($) => $.feed.discoverEmpty)}
       emptyAction={emptyAction}
       overlay={overlay ? (project) => overlay(project, followed) : undefined}

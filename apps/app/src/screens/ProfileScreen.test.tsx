@@ -224,12 +224,15 @@ describe('ProfileScreen', () => {
 
   // Tranche 6a : le pseudo, unique, modifiable ici. Scénario : docs/scenarios/phase-1.md,
   // « Tranche 6a — Le pseudo ».
-  it('shows the current handle, and says who will see it', async () => {
+  // « Moins de mots » (16/11/2026) : l'aide ne redit plus « Les membres te voient sous @pseudo » ;
+  // elle commence par ce que l'écran ne montre pas, que le pseudo ne suit pas le nom.
+  it('shows the current handle, and says it does not follow the name', async () => {
     await renderWithProviders(<ProfileScreen />)
     await screen.findByDisplayValue('Léa')
 
     expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea')
-    expect(screen.getByText(/^Les membres te voient sous @pseudo sur ta page/)).toBeTruthy()
+    expect(screen.getByText(/^Il ne change pas avec ton nom\./)).toBeTruthy()
+    expect(screen.queryByText(/te voient sous @pseudo/)).toBeNull()
   })
 
   it('sends the handle only when it changed, cleaned up, and shows the saved one', async () => {

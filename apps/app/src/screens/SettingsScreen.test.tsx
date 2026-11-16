@@ -366,12 +366,13 @@ describe('the « Compte » section', () => {
     expect(paths()).toContain('/settings/account/delete')
   })
 
-  it('shows the contact address as a link that opens the mail app, with its help', async () => {
+  // « Moins de mots » (16/11/2026) : plus d'aide « En français ou en anglais » sous l'adresse.
+  it('shows the contact address as a link that opens the mail app, without a help', async () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
     try {
       await renderWithI18n(<SettingsScreen section="account" />)
 
-      expect(screen.getAllByText(containing(fr.t(($) => $.account.contact.hint))).length).toBe(1)
+      expect(screen.queryByText(/En français ou en anglais/)).toBeNull()
       const link = screen.getByRole('link', { name: containing(contactEmail) })
       await fireEvent.press(link)
 

@@ -118,7 +118,6 @@ export function ForgotPasswordScreen() {
   return (
     <Screen
       title={t(($) => $.auth.forgotPassword.title)}
-      subtitle={t(($) => $.auth.forgotPassword.intro)}
       onBack={back}
       footer={
         // Chaque état a sa clé : React dessine des boutons neufs au lieu de renommer ceux qui sont

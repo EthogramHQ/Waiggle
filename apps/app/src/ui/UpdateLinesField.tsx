@@ -2,7 +2,8 @@
 // mise à jour », relecture du plan, interface A1) : de 1 à 5 lignes (`UpdateLineField`), chacune
 // avec sa famille et son texte, dans une seule carte groupée, séparées par un trait ; la ligne où
 // l'on écrit se teinte de miel doux. Au-dessus, le titre et un compteur « 2 / 5 » (lu « 2 lignes
-// sur 5 ») ; dans la carte, « Ajouter une ligne » jusqu'à la cinquième ; dessous, une aide.
+// sur 5 ») ; dans la carte, « Ajouter une ligne » jusqu'à la cinquième. Pas d'aide dessous : le
+// compteur dit déjà la limite (« Moins de mots », 16/11/2026).
 //
 // Les lignes appartiennent à l'écran (la feuille, par `updates/form.ts`) : il les fabrique, chacune
 // avec un `id` stable, et ce composant ne fait que les montrer et dire ce qu'on y change. Chaque
@@ -202,11 +203,6 @@ export function UpdateLinesField({
         ))}
         {canAdd ? <AddLine key="add" onPress={add} disabled={!editable} /> : null}
       </FieldGroup>
-      <View style={{ paddingHorizontal: space.xs }}>
-        <Text variant="caption" tone="muted">
-          {t(($) => $.project.updates.linesHint)}
-        </Text>
-      </View>
     </View>
   )
 }

@@ -305,7 +305,7 @@ function AccountSection({ email }: { email: string }) {
       </ListGroup>
       {/* Juste sous la ligne touchée, pour que le message se voie là où le membre regarde. */}
       {signOutFailed ? <Notice tone="error" message={t(($) => $.account.signOutError)} /> : null}
-      <ListGroup footer={t(($) => $.account.contact.hint)}>
+      <ListGroup>
         <ListRow
           label={t(($) => $.account.contact.label)}
           detail={contactEmail}
