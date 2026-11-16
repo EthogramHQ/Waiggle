@@ -16,6 +16,14 @@ export const profile = pgTable('profile', {
   avatarKey: text('avatar_key'),
   // R10 : « Ne pas me proposer aux autres » : vrai, il n'apparaît plus dans « Proches à suivre ».
   hideFromSuggestions: boolean('hide_from_suggestions').notNull().default(false),
+  // R12 : la page publique (« Mon profil public »). Fermée par défaut : rien n'est public sans son
+  // accord. Les quatre cases suivantes disent ce qu'un visiteur y lit quand elle est ouverte (le nom
+  // et la photo y sont toujours) ; elles gardent leur valeur quand la page se ferme.
+  publicPage: boolean('public_page').notNull().default(false),
+  publicBio: boolean('public_bio').notNull().default(true),
+  publicTools: boolean('public_tools').notNull().default(true),
+  publicProjects: boolean('public_projects').notNull().default(true),
+  publicFollowerCount: boolean('public_follower_count').notNull().default(false),
   updatedAt: timestamp('updated_at')
     .defaultNow()
     .$onUpdate(() => new Date())

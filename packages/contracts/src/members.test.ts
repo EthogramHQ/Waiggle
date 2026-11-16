@@ -33,6 +33,8 @@ const lea = {
   favoriteTools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
   isMe: false,
   isBlocked: false,
+  // R12 : sa page n'est pas publique (le réglage par défaut).
+  publicPage: false,
   isFollowed: false,
   followerCount: 3,
   projects: [summary],

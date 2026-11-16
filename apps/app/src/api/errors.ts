@@ -64,6 +64,10 @@ export type ApiErrorKey =
   | 'pinNotVisible'
   // Relecture du design de R10 : les 20 invitations du jour sont parties (« demain »).
   | 'hiveInvitationsLimited'
+  // Tranche R12 : les signalements d'un visiteur du jour sont partis (par adresse IP), et un projet
+  // que son auteur a retiré de l'accueil n'y revient pas.
+  | 'visitorReportQuota'
+  | 'authorDeclined'
   | 'internal'
   | 'network'
 
@@ -174,6 +178,11 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   // Tranche R7b : le quota des appels d'un projet (429) a le message de « trop de demandes » ; son
   // code est lu à part (`projectLimit`).
   project_calls_limited: 'rateLimited',
+  // Tranche R12 : deux codes de plus, qui partagent leur statut avec d'autres refus : le quota des
+  // signalements d'un visiteur (429, par adresse IP, « demain ») et la mise en avant d'un projet que
+  // son auteur a retiré de l'accueil (409).
+  visitor_report_quota: 'visitorReportQuota',
+  author_declined: 'authorDeclined',
 }
 
 /**

@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { CategoryCode } from './categories'
 import { FollowState } from './follows'
+import { PublicLanguage } from './head'
 import { TOOL_MAX_LENGTH } from './profile'
 import { ReactionState } from './reactions'
 import { Removal, RemovedPart } from './removal'
@@ -15,7 +16,15 @@ import {
   ToolStatusFilter,
   uniqueTools,
 } from './tools'
-import { ProjectUpdate, UpdateSummary } from './updates'
+import {
+  ProjectUpdate,
+  UPDATE_PHOTOS_MAX,
+  UPDATES_PAGE_SIZE,
+  UpdateId,
+  UpdateLineOut,
+  UpdateSummary,
+  UpdatesCursor,
+} from './updates'
 import { publicHttpsUrl } from './url'
 import { ProjectVisual, VisualDescription } from './visuals'
 
@@ -58,7 +67,11 @@ export type ProjectStatus = z.infer<typeof ProjectStatus>
 // « public » reste le code stable ; l'appli l'affiche « Membres de Waiggle » (R6a) : seuls les
 // membres connectés voient un projet, jamais le web ouvert. R10 : `hive`, « Une ruche » : seuls
 // les membres de la ruche choisie (`hiveId`), son auteur, et la modération quand il est signalé.
-export const ProjectVisibility = z.enum(['public', 'hive', 'private'])
+// R12 : `web`, « Public » : tout le monde, même sans compte (les routes /v1/public/*), et les
+// moteurs de recherche. Pour un membre connecté, un projet `web` se lit exactement comme un projet
+// `public` : partout où `public` voulait dire « visible des membres », l'API lit « `public` ou
+// `web` » (`MEMBER_VISIBLE`, apps/api/src/projects/visibility.ts).
+export const ProjectVisibility = z.enum(['public', 'hive', 'private', 'web'])
 export type ProjectVisibility = z.infer<typeof ProjectVisibility>
 
 /**
@@ -73,7 +86,8 @@ export type ProjectHive = z.infer<typeof ProjectHive>
 /**
  * R10 : la ruche et la visibilité vont ensemble. « Une ruche » demande la ruche (`hiveId`) ; une
  * ruche sans « Une ruche » est refusée. Dans une modification, la règle ne vaut que si le corps porte
- * l'un des deux : passer d'une ruche à une autre envoie les deux.
+ * l'un des deux : passer d'une ruche à une autre envoie les deux. R12 : `web` (« Public ») suit la
+ * règle commune : une ruche envoyée avec `web` est refusée, comme avec `public` ou `private`.
  */
 const hiveMatchesVisibility = (value: {
   visibility?: ProjectVisibility | undefined
@@ -446,3 +460,159 @@ export const ToolPage = z
   })
   .meta({ id: 'ToolPage' })
 export type ToolPage = z.infer<typeof ToolPage>
+
+// --- R12 : ce qu'un visiteur sans compte lit (les routes /v1/public/*) ---
+//
+// Ces schémas sont des **listes blanches** : `z.strictObject` refuse toute clé qu'ils ne nomment
+// pas, et l'API passe chaque réponse par eux. Un champ des membres (commentaires, abonnés, qui a
+// réagi, ruche, testeurs, pseudo) ne peut donc jamais sortir vers un visiteur par mégarde : la
+// validation de la réponse échouerait (500) au lieu de le laisser passer. Ils ne réutilisent pas
+// `Project` : un champ ajouté un jour aux membres n'y entre pas tout seul.
+
+/**
+ * Les paramètres d'adresse des pages publiques (`?lang=fr`) : la langue de l'adresse de la page
+ * (`/fr/…`, `/en/…`), où l'API nomme les catégories. Absente : celle de `Accept-Language`, sinon le
+ * français.
+ */
+export const PublicLangQuery = z.object({ lang: PublicLanguage.optional() })
+export type PublicLangQuery = z.infer<typeof PublicLangQuery>
+
+/**
+ * Une photo vue par un visiteur : la même forme qu'une photo pour un membre (l'appli garde ses
+ * composants), fermée par `.strict()`. Son adresse ne s'ouvre sans session que pour un projet
+ * visible d'un visiteur (choix 4 du plan R12). `id` sert à signaler une photo précise.
+ */
+export const PublicVisual = ProjectVisual.strict()
+export type PublicVisual = z.infer<typeof PublicVisual>
+
+/** L'auteur d'un projet public : son nom et sa photo, jamais son pseudo (Q8). */
+export const PublicAuthor = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  avatarUrl: z.url().nullable(),
+  /** Vrai si sa page est publique : son nom mène alors à elle ; faux, il ne mène nulle part. */
+  publicPage: z.boolean(),
+})
+export type PublicAuthor = z.infer<typeof PublicAuthor>
+
+/**
+ * Une mise à jour vue par un visiteur : jamais une mise à jour retirée, ni une photo retirée seule
+ * (elles sont absentes, comme si elles n'avaient jamais été là) ; donc ni `removal`, ni
+ * `removedParts`.
+ */
+export const PublicUpdate = z
+  .strictObject({
+    id: UpdateId,
+    title: z.string().nullable(),
+    version: z.string().nullable(),
+    lines: z.array(UpdateLineOut).min(1),
+    /** Dans l'ordre de la mise à jour ; avec `beforeAfter`, la première est « Avant », la seconde « Après ». */
+    photos: z.array(PublicVisual).max(UPDATE_PHOTOS_MAX),
+    beforeAfter: z.boolean(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: 'PublicUpdate' })
+export type PublicUpdate = z.infer<typeof PublicUpdate>
+
+/**
+ * Une page de la frise vue par un visiteur (GET /v1/public/projects/{id}/updates), de la plus
+ * récente à la plus ancienne ; `nextCursor` vaut null tout au bout. Même curseur que pour un membre.
+ */
+export const PublicUpdatesPage = z
+  .strictObject({
+    items: z.array(PublicUpdate).max(UPDATES_PAGE_SIZE),
+    nextCursor: UpdatesCursor.nullable(),
+  })
+  .meta({ id: 'PublicUpdatesPage' })
+export type PublicUpdatesPage = z.infer<typeof PublicUpdatesPage>
+
+/**
+ * Le lien de démo pour un visiteur (relecture du plan, I5) : l'adresse complète, que « Tester la
+ * démo » ouvre par la page de sortie, et son nom de domaine (« meteo.example.org »), affiché sur
+ * le bouton et sur la page de sortie.
+ */
+export const PublicDemo = z.strictObject({ url: z.url(), domain: z.string().min(1) })
+export type PublicDemo = z.infer<typeof PublicDemo>
+
+/**
+ * Une catégorie d'un projet public, nommée par l'API dans la langue demandée (`?lang=`) : un
+ * visiteur ne peut pas lire GET /v1/categories, réservé aux membres. `code` : le code stable de la
+ * catégorie (le même que `primaryCategory` pour un membre).
+ */
+export const PublicCategory = z.strictObject({ code: CategoryCode, name: z.string() })
+export type PublicCategory = z.infer<typeof PublicCategory>
+
+/**
+ * Un projet public (`visibility` vaut `web`) tel qu'un visiteur sans compte le voit
+ * (GET /v1/public/projects/{id}). Tout ce que l'auteur a écrit (A14, Q5) ; jamais les commentaires,
+ * les abonnés, qui a réagi, la ruche, le coin des testeurs, « Suivre » ni le menu de l'auteur. Les
+ * noms des champs sont ceux de `Project` quand ils disent la même chose : l'appli garde ses
+ * composants. Un projet qui n'est pas public, retiré, d'un auteur parti ou suspendu-retiré : 404,
+ * le même que pour un projet inconnu (choix 2 du plan).
+ */
+export const PublicProject = z
+  .strictObject({
+    id: ProjectId,
+    author: PublicAuthor,
+    title: z.string(),
+    pitch: z.string(),
+    description: z.string(),
+    status: ProjectStatus,
+    /** La principale d'abord, puis la seconde s'il y en a une ; vide pour un projet d'avant R6a. */
+    categories: z.array(PublicCategory).max(2),
+    /** Les outils, sans lien vers leur page (réservée aux membres) : l'appli ignore `slug` ici. */
+    tools: z.array(ProjectTool.strict()),
+    /** « Facile à refaire ? » ; null : non renseigné. */
+    difficulty: ProjectDifficulty.nullable(),
+    /** « Commencé en », « AAAA-MM » ; null : non renseigné. */
+    startedOn: z.string().nullable(),
+    /** « Le prompt de départ » (et les suivants), nettoyés comme pour un membre, avec « Copier ». */
+    prompts: z.array(z.string()).max(PROJECT_PROMPTS_MAX),
+    /** La galerie, dans l'ordre de l'auteur : la première photo sert de couverture. */
+    visuals: z.array(PublicVisual).max(VISUALS_MAX),
+    /** La couverture verticale, affichée sur téléphone ; null : on recadre la première photo. */
+    portraitCover: PublicVisual.nullable(),
+    /** La démo ; null : pas de démo, ou son lien retiré par la modération. */
+    demo: PublicDemo.nullable(),
+    /**
+     * Le nombre de réactions des membres (« 12 réactions de membres »), la somme des cinq types :
+     * un nombre, jamais qui a réagi, ni le détail par type.
+     */
+    reactionCount: z.int().nonnegative(),
+    /** La dernière mise à jour visible d'un visiteur (la section « Les mises à jour »), ou null. */
+    latestUpdate: PublicUpdate.nullable(),
+    /** Le nombre de mises à jour visibles d'un visiteur (« Voir les 3 mises à jour »). */
+    updateCount: z.int().nonnegative(),
+    /**
+     * La date de la dernière mise à jour visible (« Mis à jour il y a 2 jours ») ; null s'il n'y en a
+     * aucune. La même que `latestUpdate.createdAt`, donnée à part pour l'en-tête.
+     */
+    latestUpdateAt: z.iso.datetime().nullable(),
+    /** La version sous le titre (« v1.2 »), mêmes règles que `Project.version`. */
+    version: z.string().nullable(),
+    /**
+     * Le moment où le projet a été montré aux membres ou au public pour la première fois. Un projet
+     * `web` en a toujours un : l'API le pose quand il devient `public` ou `web`.
+     */
+    publishedAt: z.iso.datetime(),
+    /** La dernière modification du projet lui-même (le plan du site, `lastmod`). */
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'PublicProject' })
+export type PublicProject = z.infer<typeof PublicProject>
+
+/**
+ * Un projet public en carte (la page publique d'un membre) : de quoi le montrer et y mener, rien
+ * de plus.
+ */
+export const PublicProjectCard = z
+  .strictObject({
+    id: ProjectId,
+    title: z.string(),
+    pitch: z.string(),
+    status: ProjectStatus,
+    /** La première photo de la galerie ; null : pas de photo, l'appli montre sa tuile. */
+    cover: PublicVisual.nullable(),
+  })
+  .meta({ id: 'PublicProjectCard' })
+export type PublicProjectCard = z.infer<typeof PublicProjectCard>

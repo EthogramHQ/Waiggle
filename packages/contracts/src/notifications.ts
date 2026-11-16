@@ -219,6 +219,20 @@ export const ToolAddedNotification = z.object({
   toolName: z.string(),
 })
 
+/**
+ * R12 : la modération a mis un de ses projets publics sur l'accueil (la vitrine) : « <b>Météo</b>
+ * est sur l'accueil de {{appName}} ». Signée par l'équipe, jamais par le nom de l'administrateur.
+ * Une par mise en avant (table `showcase_notice`, effacée après 90 jours). `onShowcase` : vrai tant
+ * que le projet y est encore ; l'appli propose alors « Retirer de l'accueil ». Un projet devenu non
+ * public, retiré ou supprimé la fait disparaître. Jamais par e-mail.
+ */
+export const ShowcaseAddedNotification = z.object({
+  ...Common,
+  kind: z.literal('showcase_added'),
+  project: NotifiedProject,
+  onShowcase: z.boolean(),
+})
+
 /** Son commentaire a été masqué par l'auteur du projet ; démasqué, la notification disparaît. */
 export const HiddenNotification = z.object({
   ...Common,
@@ -431,6 +445,7 @@ export const Notification = z
     HiveRemovedNotification,
     HiveAnimatorNotification,
     HiveDeletedNotification,
+    ShowcaseAddedNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

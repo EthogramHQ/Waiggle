@@ -4,7 +4,7 @@
 // par Member.parse : un champ de plus, lu par erreur dans la base, ne pourrait pas en sortir.
 import { z } from 'zod'
 import { FollowState } from './follows'
-import { PROJECT_LIST_MAX, ProjectSummary } from './projects'
+import { PROJECT_LIST_MAX, ProjectSummary, PublicProjectCard } from './projects'
 import { RemovedPart } from './removal'
 import { Suspension } from './suspension'
 import { ProjectTool } from './tools'
@@ -33,6 +33,11 @@ export const Member = z
      * projets, ni abonnés. Un membre qui a bloqué le visiteur n'a pas de page pour lui (404).
      */
     isBlocked: z.boolean(),
+    /**
+     * R12 : vrai si ce membre a rendu sa page publique (« Rendre ma page publique ») : la feuille
+     * de partage dit alors que tout le monde peut l'ouvrir ; faux, seulement les membres.
+     */
+    publicPage: z.boolean(),
     /** Si le visiteur la suit, et combien de membres la suivent (jamais leurs noms). */
     ...FollowState.shape,
     /** Ses projets que le visiteur a le droit de voir, du plus récent au plus ancien. */
@@ -60,3 +65,74 @@ export const Member = z
   })
   .meta({ id: 'Member' })
 export type Member = z.infer<typeof Member>
+
+// --- R12 : la page publique d'un membre ---
+
+/**
+ * Ce que le membre a choisi de montrer sur sa page publique (« Mon profil public ») : la page
+ * elle-même (`publicPage`, fermée par défaut : rien n'est public sans son accord), puis ce qu'un
+ * visiteur y lit. Le nom et la photo y sont toujours, sans case. Les quatre cases gardent leur valeur
+ * quand la page est fermée : la rouvrir retrouve les mêmes choix.
+ */
+export const PublicPageSettings = z
+  .strictObject({
+    publicPage: z.boolean(),
+    /** « Ma bio » (cochée par défaut). */
+    showBio: z.boolean(),
+    /** « Mes outils favoris » (cochée par défaut). */
+    showFavoriteTools: z.boolean(),
+    /** « Mes projets publics » (cochée par défaut) : ses seuls projets `web`, jamais les autres. */
+    showProjects: z.boolean(),
+    /** « Mon nombre d'abonnés » (décochée par défaut) : un nombre, jamais qui. */
+    showFollowerCount: z.boolean(),
+  })
+  .meta({ id: 'PublicPageSettings' })
+export type PublicPageSettings = z.infer<typeof PublicPageSettings>
+
+/**
+ * Ce que PATCH /v1/me/public-page accepte : une ou plusieurs des cinq cases. `partial()` rend chaque
+ * champ facultatif ; le `refine` refuse un corps vide, qui ne changerait rien. Un membre suspendu
+ * peut seulement fermer sa page (`publicPage: false`) : tout le reste lui répond 403 `suspended`
+ * (Q6), une règle de l'API, pas de la forme.
+ */
+export const PublicPageSettingsPatch = PublicPageSettings.partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: 'change at least one setting' })
+  .meta({ id: 'PublicPageSettingsPatch' })
+export type PublicPageSettingsPatch = z.infer<typeof PublicPageSettingsPatch>
+
+/**
+ * La réponse de GET et PATCH /v1/me/public-page : les cases, et de quoi écrire sous « Mes projets
+ * publics » « 2 sur 4 : les autres restent entre membres » (`webProjectCount` sur `projectCount`,
+ * ses projets non retirés, privés compris).
+ */
+export const MyPublicPage = z
+  .strictObject({
+    settings: PublicPageSettings,
+    webProjectCount: z.int().nonnegative(),
+    projectCount: z.int().nonnegative(),
+  })
+  .meta({ id: 'MyPublicPage' })
+export type MyPublicPage = z.infer<typeof MyPublicPage>
+
+/**
+ * La page publique d'un membre, vue par un visiteur sans compte (GET /v1/public/members/{id}) :
+ * son nom et sa photo, puis seulement ce qu'il a coché. Une case décochée donne un champ **absent**
+ * (pas vide) : la réponse ne dit même pas qu'il a une bio. Jamais son pseudo (Q8), ses ruches, qui
+ * il suit, ses commentaires ni ses réactions. Liste blanche (`strictObject`), comme les projets
+ * publics. Une page fermée, un membre inconnu, non vérifié ou supprimé : le même 404.
+ */
+export const PublicMember = z
+  .strictObject({
+    id: z.string(),
+    name: z.string(),
+    avatarUrl: z.url().nullable(),
+    bio: z.string().optional(),
+    /** Ses outils favoris, sans lien vers leur page (réservée aux membres). */
+    favoriteTools: z.array(ProjectTool.strict()).optional(),
+    /** Ses projets `web` visibles d'un visiteur, du plus récent au plus ancien. */
+    projects: z.array(PublicProjectCard).max(PROJECT_LIST_MAX).optional(),
+    /** Le nombre de membres qui le suivent, jamais leurs noms. */
+    followerCount: z.int().nonnegative().optional(),
+  })
+  .meta({ id: 'PublicMember' })
+export type PublicMember = z.infer<typeof PublicMember>

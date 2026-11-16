@@ -15,16 +15,19 @@ export const RulesVersion = z.iso.date()
  * La version des règles en vigueur (choix 3 du scénario). La changer fait revenir l'écran
  * « Accepter » chez chaque membre à sa visite suivante ; une correction de forme (une faute, un
  * lien) ne la change pas. Elle vaut le jour du déploiement de la version.
+ * R12 (les projets publics) : la deuxième version. La première (R11) valait 2026-11-16, déjà
+ * acceptée par les membres : la nouvelle doit en différer pour que l'écran « Accepter » revienne.
  */
-export const RULES_VERSION = '2026-11-16'
+export const RULES_VERSION = '2026-11-17'
 
 /**
- * « Ce qui change » dans la version en vigueur : des clés de texte (packages/i18n), affichées
- * au-dessus de l'écran « Accepter ». Vide pour la première version : il n'y a rien d'avant.
- * `readonly string[]` : sans ce type écrit, un tableau vide serait typé `never[]`, et on ne
- * pourrait rien y ajouter à la prochaine version.
+ * « Ce qui change » dans la version en vigueur : des clés de texte (`rules.changes.<clé>` dans
+ * packages/i18n), affichées au-dessus de l'écran « Accepter » à qui ne l'a pas encore acceptée.
+ * R12 : les projets publics (`public`), ce que peut faire un visiteur sans compte, signalement
+ * compris (`visitors`), et la vitrine de l'accueil (`showcase`). `readonly string[]` : le type
+ * écrit permet une liste vide à la prochaine version sans changer la forme.
  */
-export const RULES_CHANGES: readonly string[] = []
+export const RULES_CHANGES: readonly string[] = ['public', 'visitors', 'showcase']
 
 /**
  * Un accord donné par un membre, tel que l'export le montre (une ligne par version acceptée,
