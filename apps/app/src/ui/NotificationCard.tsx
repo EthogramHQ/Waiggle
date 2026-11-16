@@ -25,6 +25,9 @@
 // la ligne, jamais dedans : un lien dans un lien ne se toucherait pas seul, et le lecteur d'écran
 // dirait « Contester » dans le nom de la ligne. Le cadre de la ligne (fond et liseré d'une
 // nouvelle) entoure alors les deux.
+//
+// R12 : un geste qui écrit sur place (« Retirer de l'accueil ») dit ce qu'il a donné sous lui
+// (`actionNotice`) : l'erreur sous le geste, qui reste ; la réussite à sa place.
 import { borders, radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
 import { type Ref, useId } from 'react'
@@ -36,6 +39,7 @@ import { hiddenFrame } from './HiddenHeading'
 import { Icon, type IconName } from './Icon'
 import { InitialTile } from './InitialTile'
 import type { ImageSource } from './image'
+import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import type { CoverImage } from './ProjectCover'
 import { ProjectThumb } from './ProjectThumb'
@@ -112,6 +116,14 @@ type Props = {
    */
   action?: NotificationAction | undefined
   /**
+   * R12 : ce qu'a donné le geste de la ligne, posé sous lui, dans la même colonne (« Ton projet a
+   * quitté l'accueil. »). Une réussite remplace le geste (l'écran ne passe plus `action`) : le
+   * message prend sa place, et `ref` permet à l'écran d'y poser le focus, le bouton touché n'étant
+   * plus là. Un échec se pose sous le geste, qui reste pour réessayer ; il est annoncé (alerte).
+   * Absent ou null : rien.
+   */
+  actionNotice?: { message: string; tone: 'success' | 'error'; ref?: Ref<View> } | null
+  /**
    * La vue qui reçoit le focus quand la ligne arrive avec la page suivante (`useFirstArrived` de
    * l'écran) : le lien lui-même, que le lecteur d'écran du téléphone lit en entier, ou la ligne
    * quand elle ne mène nulle part.
@@ -174,10 +186,13 @@ function Row({
   isNew,
   onPress,
   action,
+  actionNotice,
   dateShown,
   dateName,
   ref,
 }: RowProps) {
+  // Quelque chose sous la ligne, hors de son lien : un geste, ou ce qu'il a donné.
+  const aside = Boolean(action || actionNotice)
   const { t } = useTranslation()
   const { colors, shadows } = useTheme()
   const newWord = t(($) => $.notifications.new)
@@ -207,12 +222,12 @@ function Row({
         padding: space.md,
         // Avec un geste dessous, presque rien en bas : sa zone de 44 points apporte déjà l'air
         // entre la citation et lui.
-        ...(action ? { paddingBottom: space.xxs } : null),
+        ...(aside ? { paddingBottom: space.xxs } : null),
         // Le rayon reste sur la ligne même quand le cadre l'entoure : l'anneau du focus du clavier
         // le suit (Pressed le lit ici).
         borderRadius: radii.group,
         // Avec un geste, le fond et le liseré passent au cadre qui entoure la ligne et le geste.
-        ...(action ? null : frame),
+        ...(aside ? null : frame),
       }}
     >
       <Leading leading={leading} />
@@ -329,12 +344,42 @@ function Row({
   ) : (
     content
   )
-  if (!action) return row
+  if (!aside) return row
   return (
     // Le cadre de la ligne entoure le lien et le geste : une nouvelle les éclaire tous les deux.
     <View style={{ ...frame, borderRadius: radii.group }}>
       {row}
-      <Action action={action} describedById={sentenceId} hint={partsText(parts)} />
+      {action ? (
+        <Action action={action} describedById={sentenceId} hint={partsText(parts)} />
+      ) : null}
+      {actionNotice ? <ActionNotice notice={actionNotice} /> : null}
+    </View>
+  )
+}
+
+/**
+ * Ce qu'a donné le geste, sous la colonne du texte comme le geste lui-même (`Notice`). Une
+ * réussite est une confirmation polie (rôle « status ») ; un échec, une alerte. Avec une `ref`,
+ * c'est le focus posé par l'écran qui la fait lire (voir `Notice`).
+ */
+function ActionNotice({ notice }: { notice: NonNullable<Props['actionNotice']> }) {
+  return (
+    <View
+      style={{
+        paddingLeft: space.md + LEADING + space.md,
+        paddingRight: space.md,
+        // Un peu d'air au-dessus : seul (la réussite), le message n'a pas la zone de 44 points
+        // d'un geste pour le séparer de la phrase.
+        paddingTop: space.xs,
+        paddingBottom: space.md,
+      }}
+    >
+      <Notice
+        message={notice.message}
+        tone={notice.tone}
+        polite={notice.tone === 'success'}
+        ref={notice.ref}
+      />
     </View>
   )
 }

@@ -3,6 +3,7 @@
 // - le titre, et sur ordinateur une phrase qui dit ce qu'on trouve ici ;
 // - sur téléphone, le champ de recherche, qui est un lien vers /search (sur ordinateur, le champ
 //   est celui de la barre du haut) ;
+// - R12 : « À la une », les projets de la vitrine de l'accueil (absente sans projet mis en avant) ;
 // - « Ils cherchent des testeurs » : un carrousel des projets testables qui ont une démo ;
 // - « Outils populaires » : les dix outils les plus cités, et « Tous les outils » ;
 // - « Récents » : l'ancien fil « Découvrir », page par page, où chaque carte d'un auteur qu'on ne
@@ -23,6 +24,7 @@ import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
+import { useMemberShowcase } from '../showcase/api'
 import { useTools } from '../tools/api'
 import { Carousel } from '../ui/Carousel'
 import { FilterPills } from '../ui/FilterPills'
@@ -31,6 +33,7 @@ import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { SearchLink } from '../ui/SearchLink'
+import { ShowcaseCard } from '../ui/ShowcaseCard'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { Tag } from '../ui/Tag'
@@ -114,6 +117,7 @@ function MemberExplore({ userId }: { userId: string }) {
           }}
         />
       ) : null}
+      <Featured />
       <Testers />
       <PopularTools />
       <Recent viewerId={userId} overlay={chipOf} />
@@ -256,6 +260,66 @@ function RecentCategories({ categories, category, onChange }: RecentCategoriesPr
       scroll={compact}
       onChange={onChange}
     />
+  )
+}
+
+/**
+ * « À la une » (R12, planche R12-A-La-Une ; scénario « La vitrine ») : les projets de la vitrine de
+ * l'accueil, dans l'ordre choisi par la modération, en cartes qu'on fait défiler de côté, sur
+ * téléphone comme sur ordinateur (« la même rangée »). C'est le chemin le plus court vers la vitrine
+ * sur téléphone.
+ *
+ * - La lecture est celle d'un membre, GET /v1/showcase (`useMemberShowcase`) : l'API y applique les
+ *   règles de blocage d'Explorer. Jamais la route des visiteurs.
+ * - Une carte ouvre la page du projet des membres (`/projects/<id>`, plan R12, choix 7).
+ * - Sans projet mis en avant, ni titre ni place vide : la section n'existe pas. Pendant la lecture
+ *   non plus (rien à annoncer tant qu'on ne sait pas s'il y en aura).
+ * - En panne, rien non plus, comme sur l'accueil (ShowcaseScreen) : la vitrine est un plus, et les
+ *   sections d'Explorer, elles, disent chacune leur panne.
+ */
+function Featured() {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const toSource = useMediaSources()
+  const items = useMemberShowcase().data?.items ?? []
+  if (items.length === 0) return null
+  const title = (
+    <Text variant="heading" heading={2}>
+      {t(($) => $.explore.featured)}
+    </Text>
+  )
+  return (
+    <Carousel
+      label={t(($) => $.explore.featured)}
+      previousLabel={t(($) => $.explore.featuredPrevious)}
+      nextLabel={t(($) => $.explore.featuredNext)}
+      header={title}
+      bleed
+    >
+      {items.map((item) => (
+        <ShowcaseCard
+          key={item.id}
+          title={item.title}
+          author={{ name: item.author.name, avatar: toSource(item.author.avatarUrl) }}
+          image={
+            item.cover
+              ? {
+                  source: toSource(item.cover.url),
+                  thumbhash: item.cover.thumbhash,
+                  label: item.title,
+                }
+              : null
+          }
+          // Le statut, déjà traduit ; « Testable » en miel, comme sur la vitrine de l'accueil.
+          status={{
+            label: t(($) => $.project.status[item.status]),
+            strong: item.status === 'testable',
+          }}
+          onPress={() => router.push({ pathname: '/projects/[id]', params: { id: item.id } })}
+          size="carousel"
+        />
+      ))}
+    </Carousel>
   )
 }
 
