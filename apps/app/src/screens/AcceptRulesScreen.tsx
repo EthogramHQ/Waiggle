@@ -239,6 +239,20 @@ export function AcceptRulesScreen({ me }: { me: Me }) {
         {exported ? (
           <Notice tone={exported.ok ? 'success' : 'error'} message={exported.text} />
         ) : null}
+        {/* Ouvertes sans accord (D1) : retirer ses commentaires et ses retours avant de décider. Sur
+            téléphone, sans barre d'adresse, ces liens sont le seul chemin (relecture juridique). */}
+        <TextLink
+          role="link"
+          tone="muted"
+          label={t(($) => $.account.data.comments)}
+          onPress={() => router.push('/settings/data/comments')}
+        />
+        <TextLink
+          role="link"
+          tone="muted"
+          label={t(($) => $.account.data.feedback)}
+          onPress={() => router.push('/settings/data/feedback')}
+        />
         <TextLink
           role="button"
           tone="muted"

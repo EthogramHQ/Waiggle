@@ -155,7 +155,7 @@ export const fr = {
           },
           changes: {
             title: 'Les changements des règles',
-            body: 'Une nouvelle version des règles porte une nouvelle date. Tu la lis et tu l’acceptes à ta visite suivante, avec ce qui change en tête. D’ici là, seul l’écran d’accord s’ouvre : tu peux y télécharger tes données, supprimer ton compte ou te déconnecter.\n\nUne correction de forme, comme une faute ou un lien, ne change pas la version.',
+            body: 'Une nouvelle version des règles porte une nouvelle date. Tu la lis et tu l’acceptes à ta visite suivante, avec ce qui change en tête. D’ici là, seul l’écran d’accord s’ouvre : tu peux y télécharger tes données, retirer tes commentaires et tes retours de testeur, supprimer ton compte ou te déconnecter.\n\nUne correction de forme, comme une faute ou un lien, ne change pas la version.',
           },
           liability: {
             title: 'Responsabilité, droit et contact',

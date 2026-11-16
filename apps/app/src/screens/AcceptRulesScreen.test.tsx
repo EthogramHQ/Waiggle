@@ -3,7 +3,8 @@
 // « Les règles de Waiggle », « Ce qui change » si la version a changé, « En bref » (les mêmes puces
 // que /rules), un lien vers le texte complet, les deux cases et « Continuer », qui dit ce qui manque.
 // Trois sorties restent : « Télécharger mes données » (sur place), « Supprimer mon compte », « Me
-// déconnecter ». Un membre suspendu y relit l'essentiel de sa suspension (relecture juridique, J2).
+// déconnecter » ; et deux liens vers « Mes commentaires » et « Mes retours envoyés », ouverts sans
+// accord (D1), pour retirer ses contenus avant de décider (relecture juridique de R11). Un membre suspendu y relit l'essentiel de sa suspension (relecture juridique, J2).
 //
 // L'API attendue (plan de R11, « API des modules partagés ») :
 // - `AcceptRulesScreen` reçoit le membre lu par la garde : `{ me: Me }` (il en lit `rulesChanges`
@@ -236,6 +237,15 @@ describe('AcceptRulesScreen (R11)', () => {
     expect(downloadMyData).toHaveBeenCalledTimes(1)
     expect(paths()).toEqual([])
     expect(await screen.findByText(fr.t(($) => $.account.export.done))).toBeTruthy()
+  })
+
+  it('opens « Mes commentaires » and « Mes retours envoyés » from the rules screen', async () => {
+    await show()
+
+    await press(fr.t(($) => $.account.data.comments))
+    await press(fr.t(($) => $.account.data.feedback))
+
+    expect(paths()).toEqual(['/settings/data/comments', '/settings/data/feedback'])
   })
 
   it('opens the account deletion from the rules screen', async () => {

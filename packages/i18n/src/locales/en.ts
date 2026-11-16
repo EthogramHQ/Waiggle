@@ -117,7 +117,7 @@ export const en: Translation = {
           },
           changes: {
             title: 'Changes to the rules',
-            body: 'A new version of the rules has a new date. You read and accept it on your next visit, with what changes at the top. Until then, only the agreement screen opens: there you can download your data, delete your account or sign out.\n\nA correction of form, such as a typo or a link, does not change the version.',
+            body: 'A new version of the rules has a new date. You read and accept it on your next visit, with what changes at the top. Until then, only the agreement screen opens: there you can download your data, remove your comments and your tester feedback, delete your account or sign out.\n\nA correction of form, such as a typo or a link, does not change the version.',
           },
           liability: {
             title: 'Liability, law and contact',

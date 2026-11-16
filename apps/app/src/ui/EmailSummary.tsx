@@ -23,19 +23,14 @@ type Props = {
    * ruches, « Tout de suite » ne vaut que pour les invitations… ») ; absente ou null : rien.
    */
   detail?: string | null
-  /**
-   * Une note sous la carte, facultative (R11 : l'Activité n'en met plus, la promesse « seulement des
-   * nombres » est dite dans les réglages). Absente : ni texte, ni place.
-   */
-  note?: string
   /** Le nom du bouton qui mène aux réglages (« Régler les notifications »). */
   actionLabel: string
   onAction: () => void
 }
 
-export function EmailSummary({ title, summary, detail, note, actionLabel, onAction }: Props) {
+export function EmailSummary({ title, summary, detail, actionLabel, onAction }: Props) {
   return (
-    // Une colonne : la carte, puis la note. Les textes s'étirent sur toute la largeur (ils se
+    // Une colonne : la carte. Les textes s'étirent sur toute la largeur (ils se
     // replient au lieu de déborder) ; le bouton garde sa largeur, rangé à gauche.
     <View style={{ gap: space.md }}>
       <Surface variant="grouped" padding="lg" gap="md">
@@ -63,14 +58,6 @@ export function EmailSummary({ title, summary, detail, note, actionLabel, onActi
           />
         </View>
       </Surface>
-      {/* La note, alignée sur le texte de la carte plutôt que sur son bord (planche). */}
-      {note ? (
-        <View style={{ paddingHorizontal: space.xs }}>
-          <Text variant="caption" tone="muted">
-            {note}
-          </Text>
-        </View>
-      ) : null}
     </View>
   )
 }
