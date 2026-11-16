@@ -174,12 +174,13 @@ describe('« À la une » at the top of Explorer (R12)', () => {
   it('shows « À la une » first, before « Ils cherchent des testeurs »', async () => {
     await renderWithProviders(<ExploreScreen />)
 
-    await screen.findByRole('header', { name: T.featured })
-    const headers = screen
-      .getAllByRole('header')
-      .map((header) => String(header.props.accessibilityLabel ?? ''))
-      .filter((name) => name === T.featured || name === T.testers)
-    expect(headers).toEqual([T.featured, T.testers])
+    // L'ordre des deux titres parmi tous les titres de l'écran. Leur nom vient de leur texte : un
+    // titre écrit par `Text heading` ne pose pas `accessibilityLabel`.
+    const featured = await screen.findByRole('header', { name: T.featured })
+    const testers = screen.getByRole('header', { name: T.testers })
+    const headers = screen.getAllByRole('header')
+    expect(headers.indexOf(featured)).toBeGreaterThanOrEqual(0)
+    expect(headers.indexOf(featured)).toBeLessThan(headers.indexOf(testers))
   })
 
   it('shows the projects of the showcase, in the order chosen by the moderation', async () => {
