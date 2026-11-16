@@ -46,6 +46,7 @@ import { usePageLanguage, usePublicProject } from '../public/api'
 import { Button } from '../ui/Button'
 import { Hint } from '../ui/Hint'
 import type { IconName } from '../ui/Icon'
+import { LegalLinks } from '../ui/LegalLinks'
 import { MembersOnlyNotice } from '../ui/MembersOnlyNotice'
 import { PhotoGallery } from '../ui/PhotoGallery'
 import { CoverControls } from '../ui/ProjectCover'
@@ -246,10 +247,16 @@ function PublicProjectView({ project }: { project: PublicProject }) {
       conversation={<MembersOnlyNotice onCreateAccount={askAccount} />}
       // « Signaler ce projet » ferme la page ; la page « Signaler » passe en mode visiteur sans
       // session (cibles publiques, adresse e-mail facultative).
+      // Puis le pied des pages publiques (plan R12, décision 16) : les quatre pages dans la langue
+      // de l'adresse, le code source et la même page dans l'autre langue. Sans « Signaler un
+      // contenu » : « Signaler ce projet », juste au-dessus, signale déjà ce que la page montre.
       report={
-        <Row>
-          <TextLink label={t(($) => $.project.page.report)} tone="muted" onPress={report} />
-        </Row>
+        <Stack gap="lg">
+          <Row>
+            <TextLink label={t(($) => $.project.page.report)} tone="muted" onPress={report} />
+          </Row>
+          <LegalLinks variant="footer" otherLanguage />
+        </Stack>
       }
       layers={<AccountRequiredSheet open={accountOpen} onClose={() => setAccountOpen(false)} />}
     />

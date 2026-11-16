@@ -9,20 +9,26 @@
 // geste ordinaire passe par le routeur d'Expo Router, qui change de page sans la recharger (comme
 // `SettingsNav`, l'autre composant de src/ui qui touche à expo-router).
 //
+// R12 (« Les adresses par langue », plan R12, décision 16) : sur une page publique à langue
+// (`/fr/…`, `/en/…`), les quatre pages gardent la langue de l'adresse (`/en/rules`) ; ailleurs
+// (pages des membres, réglages), leurs adresses d'avant (`/rules`). Le pied d'une page publique
+// gagne aussi « Signaler un contenu » (`report`) et le lien vers la même page dans l'autre langue
+// (`otherLanguage`, voir LanguageLink.tsx), rangé au bout de la ligne (planche R12-Visiteur-Desktop).
+//
 // « Le code source » est un site extérieur : il passe par la page d'avertissement « Tu quittes… »
 // (`/out`), comme tout lien qui quitte l'appli. Au pied d'une des quatre pages (`current`), il
 // laisse la place à l'adresse de contact (option 7 des planches R11) : on y cherche à qui écrire.
-import { contactEmail, layout, sourceUrl, space } from '@ruche/brand'
+import { contactEmail, sourceUrl, space } from '@ruche/brand'
 import { LEGAL_PAGES, type LegalPage } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+import { usePathname, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
-import { Linking, Platform, Pressable, View } from 'react-native'
+import { Linking, Platform, View } from 'react-native'
+import { languageOfPath, publicPath } from '../navigation/publicPath'
 import { contactMailto } from './ContactLink'
-import { Icon, type IconName } from './Icon'
-import { enterActivates } from './keyboard'
+import { FooterLink } from './FooterLink'
+import type { IconName } from './Icon'
+import { LanguageLink } from './LanguageLink'
 import { ListGroup, ListRow, type PressEvent } from './ListGroup'
-import { linkProps } from './SettingsNav'
-import { Text } from './Text'
 
 type Props = {
   /** `footer` : la rangée du pied ; `rows` : les lignes des réglages. */
@@ -32,6 +38,17 @@ type Props = {
    * elle-même, et l'adresse de contact remplace « Le code source ».
    */
   current?: LegalPage
+  /**
+   * Le pied d'une page qu'un visiteur lit (R12) : « Signaler un contenu », qui écrit à l'adresse de
+   * contact (un visiteur n'a pas le « Signaler » d'un membre sur chaque contenu de cette page).
+   */
+  report?: boolean
+  /**
+   * Le lien vers la même page dans l'autre langue (R12), au bout de la rangée. Il ne se montre que
+   * sur une adresse à langue (`/fr/…`), et seulement à un visiteur : un membre lit les pages dans la
+   * langue de son appli, l'autre adresse ne changerait rien pour lui.
+   */
+  otherLanguage?: boolean
 }
 
 /** L'icône de chaque page dans les lignes des réglages (décorative : le nom dit tout). */
@@ -45,9 +62,11 @@ const pageIcons: Record<LegalPage, IconName> = {
 /** L'adresse de la page « Tu quittes… » pour le dépôt du code (sa vraie adresse, pour `href`). */
 const sourceHref = `/out?url=${encodeURIComponent(sourceUrl)}`
 
-export function LegalLinks({ variant, current }: Props) {
+export function LegalLinks({ variant, current, report = false, otherLanguage = false }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
+  // La langue de l'adresse lue (`/en/projects/…` → `en`), ou null hors d'une page publique à langue.
+  const language = languageOfPath(usePathname())
   const pages = LEGAL_PAGES.filter((page) => page !== current)
   const names: Record<LegalPage, string> = {
     rules: t(($) => $.legal.links.rules),
@@ -56,6 +75,8 @@ export function LegalLinks({ variant, current }: Props) {
     accessibility: t(($) => $.legal.links.accessibility),
   }
   const sourceCode = t(($) => $.legal.links.sourceCode)
+  /** L'adresse d'une des quatre pages : dans la langue de la page lue, s'il y en a une. */
+  const hrefOf = (page: LegalPage) => (language ? publicPath(page, language) : `/${page}`)
 
   // Le geste sur un lien à adresse : sur le web, le navigateur ne recharge pas la page
   // (preventDefault sur le clic du `<a>`), et le routeur change de page.
@@ -77,8 +98,8 @@ export function LegalLinks({ variant, current }: Props) {
             label={names[page]}
             icon={pageIcons[page]}
             trailing="chevron"
-            href={`/${page}`}
-            onPress={open(`/${page}`)}
+            href={hrefOf(page)}
+            onPress={open(hrefOf(page))}
           />
         ))}
         {current ? null : (
@@ -96,6 +117,11 @@ export function LegalLinks({ variant, current }: Props) {
   }
 
   const mailto = contactMailto()
+  // Sur le web, le `<a href="mailto:">` ouvre la messagerie de lui-même, à Entrée comme au clic ;
+  // ailleurs, on la demande à l'appareil.
+  const writeToUs = () => {
+    if (Platform.OS !== 'web') void Linking.openURL(mailto)
+  }
   return (
     // Une région de navigation nommée : les lecteurs d'écran la proposent dans la liste des
     // repères de la page (« Les pages de Waiggle »).
@@ -114,7 +140,12 @@ export function LegalLinks({ variant, current }: Props) {
       }}
     >
       {pages.map((page) => (
-        <FooterLink key={page} label={names[page]} href={`/${page}`} onPress={open(`/${page}`)} />
+        <FooterLink
+          key={page}
+          label={names[page]}
+          href={hrefOf(page)}
+          onPress={open(hrefOf(page))}
+        />
       ))}
       {current ? (
         <FooterLink
@@ -125,12 +156,8 @@ export function LegalLinks({ variant, current }: Props) {
           icon="envelope-simple"
           href={mailto}
           breakAnywhere
-          // Sur le web, le `<a href="mailto:">` ouvre la messagerie de lui-même, à Entrée comme au
-          // clic ; ailleurs, on la demande à l'appareil.
           browserOpens
-          onPress={() => {
-            if (Platform.OS !== 'web') void Linking.openURL(mailto)
-          }}
+          onPress={writeToUs}
         />
       ) : (
         <FooterLink
@@ -146,87 +173,22 @@ export function LegalLinks({ variant, current }: Props) {
           onPress={openSource}
         />
       )}
+      {report ? (
+        // Après « Le code source », comme sur la planche : la même adresse que le contact de R11.
+        <FooterLink
+          label={t(($) => $.legal.links.report)}
+          href={mailto}
+          browserOpens
+          onPress={writeToUs}
+        />
+      ) : null}
+      {otherLanguage ? (
+        // Au bout de la rangée (marge automatique à gauche) : à droite sur ordinateur ; quand la
+        // rangée passe à la ligne sur téléphone, au bout de sa propre ligne.
+        <View style={{ marginLeft: 'auto', maxWidth: '100%', flexShrink: 1 }}>
+          <LanguageLink />
+        </View>
+      ) : null}
     </View>
-  )
-}
-
-type FooterLinkProps = {
-  label: string
-  /** Le nom lu, s'il diffère du texte affiché (il le contient toujours). */
-  spokenLabel?: string
-  /** L'indice lu après le nom, sur téléphone seulement (sur le web, le nom lu le porte déjà). */
-  nativeHint?: string
-  href: string
-  onPress: (event?: PressEvent) => void
-  /** Une icône avant le texte (l'enveloppe de l'adresse de contact). */
-  icon?: IconName
-  /** Une icône après le texte (la flèche d'un site extérieur). */
-  trailingIcon?: IconName
-  /** Le texte peut se couper n'importe où (une adresse, sans espace). */
-  breakAnywhere?: boolean
-  /**
-   * Sur le web, le navigateur ouvre le lien lui-même (`mailto:`) : Entrée lui est laissée. Un
-   * gestionnaire d'Entrée ferait `preventDefault` et l'annulerait, sans rien ouvrir à sa place
-   * (relecture de design de R11, WCAG 2.1.1).
-   */
-  browserOpens?: boolean
-}
-
-/** Un lien du pied : texte souligné, 44 points de haut, sa vraie adresse. */
-function FooterLink({
-  label,
-  spokenLabel,
-  nativeHint,
-  href,
-  onPress,
-  icon,
-  trailingIcon,
-  breakAnywhere = false,
-  browserOpens = false,
-}: FooterLinkProps) {
-  return (
-    <Pressable
-      accessibilityRole="link"
-      accessibilityLabel={spokenLabel ?? label}
-      {...(nativeHint && Platform.OS !== 'web' ? { accessibilityHint: nativeHint } : null)}
-      {...linkProps(href, false)}
-      // Entrée ouvre le lien sur le web même quand le routeur intercepte le clic (keyboard.ts) ;
-      // un lien que le navigateur ouvre seul garde son Entrée native.
-      {...(browserOpens ? null : enterActivates(onPress))}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: space.xs,
-        // La zone à toucher : 44 points de haut, même autour d'un mot court.
-        minHeight: layout.touchTarget,
-        maxWidth: '100%',
-        flexShrink: 1,
-        opacity: pressed ? 0.6 : 1,
-      })}
-    >
-      {icon ? (
-        // Une vue autour du dessin : sur le web, un dessin seul rétrécit quand le texte est long.
-        <View aria-hidden style={{ flexShrink: 0 }}>
-          <Icon name={icon} size={16} tone="secondary" />
-        </View>
-      ) : null}
-      <View style={{ flexShrink: 1, minWidth: 0 }}>
-        <Text
-          variant="callout"
-          weight={600}
-          tone="secondary"
-          underline
-          breakAnywhere={breakAnywhere}
-        >
-          {label}
-        </Text>
-      </View>
-      {trailingIcon ? (
-        <View aria-hidden style={{ flexShrink: 0 }}>
-          <Icon name={trailingIcon} size={14} tone="secondary" />
-        </View>
-      ) : null}
-    </Pressable>
   )
 }

@@ -8,6 +8,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import type { IconName } from '../ui/Icon'
+import { LanguageLink } from '../ui/LanguageLink'
 import { LegalDocument, type LegalSection } from '../ui/LegalDocument'
 import { LegalLinks } from '../ui/LegalLinks'
 import { Stack } from '../ui/Stack'
@@ -26,6 +27,9 @@ const fr = {
   footerHome: 'Le pied de l’accueil et de la connexion : les quatre pages et le code source',
   footerPage: 'Le pied de la page Confidentialité : les trois autres pages et l’adresse de contact',
   rows: 'Les lignes « À propos » des réglages',
+  footerPublic: 'R12, le pied de l’accueil d’un visiteur : « Signaler un contenu » en plus',
+  languageLink:
+    'R12, le lien vers l’autre langue (LanguageLink), au bout du pied d’une page /fr/… puis /en/…',
   summary: [
     { icon: 'eye-slash', text: 'Ni publicité, ni cookie de mesure.' },
     { icon: 'envelope-simple', text: 'Aucun membre ne voit ton adresse e‑mail.' },
@@ -69,6 +73,9 @@ const en: typeof fr = {
   footerHome: 'The footer of home and sign-in: the four pages and the source code',
   footerPage: 'The footer of the Privacy page: the three other pages and the contact address',
   rows: 'The “About” rows of the settings',
+  footerPublic: 'R12, the footer of a visitor’s home: “Report content” as well',
+  languageLink:
+    'R12, the link to the other language (LanguageLink), at the end of the footer of a /fr/… then /en/… page',
   summary: [
     { icon: 'eye-slash', text: 'No ads, no tracking cookie.' },
     { icon: 'envelope-simple', text: 'No member sees your e‑mail address.' },
@@ -135,6 +142,14 @@ export function LegalPagesCatalogue() {
             </Example>
             <Example caption={`${l.footerPage} — ${l[scheme]}`}>
               <LegalLinks variant="footer" current="privacy" />
+            </Example>
+            <Example caption={`${l.footerPublic} — ${l[scheme]}`}>
+              <LegalLinks variant="footer" report />
+            </Example>
+            {/* Le catalogue n'a pas d'adresse à langue : le lien reçoit celle d'une page publique. */}
+            <Example caption={`${l.languageLink} — ${l[scheme]}`}>
+              <LanguageLink path="/fr/" />
+              <LanguageLink path="/en/rules" />
             </Example>
             <Example caption={`${l.rows} — ${l[scheme]}`}>
               <LegalLinks variant="rows" />

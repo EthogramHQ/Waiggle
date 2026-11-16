@@ -178,6 +178,10 @@ const rules = [
 const allowed = new Set([
   // Le choix de la langue enregistre aussi la langue sur le compte du membre connecté.
   'apps/app/src/ui/LanguageSwitcher.tsx -> apps/app/src/profile/useChooseLanguage.ts',
+  // R12 : le pied d'une page publique lit la langue de son adresse et mène à l'autre ; les adresses
+  // par langue se fabriquent en un seul endroit, une fonction pure sans autre dépendance.
+  'apps/app/src/ui/LegalLinks.tsx -> apps/app/src/navigation/publicPath.ts',
+  'apps/app/src/ui/LanguageLink.tsx -> apps/app/src/navigation/publicPath.ts',
 ])
 
 const problems = []
