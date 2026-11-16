@@ -84,8 +84,25 @@ sign_up() {
   local link
   link=$(compose logs api 2>&1 | grep -o "https://$API_HOST/api/auth/verify-email[^ ]*" | tail -1)
   [ -n "$link" ] || die "lien de vérification introuvable pour $1"
-  web -o /dev/null "$link"
+  # Le lien ouvre aussi une session : son cookie est gardé dans $WORK/cookies-<adresse> (R12 : la
+  # publication d'un projet public, plus bas, sans connexion de plus, que Better Auth compte).
+  web -o /dev/null -c "$WORK/cookies-$1" "$link"
 }
+
+# Les en-têtes d'une réponse, en minuscules et sans retour chariot, pour les comparer simplement.
+headers_of() {
+  web -o /dev/null -D - "$@" | tr -d '\r' | tr '[:upper:]' '[:lower:]'
+}
+
+# Le code et la destination tels que Caddy les écrit : --path-as-is envoie le chemin sans le
+# simplifier, et %header{location} lit l'en-tête brut (%{redirect_url} le normaliserait).
+redirect_of() {
+  web --path-as-is -o /dev/null -w '%{http_code} %header{location}' "$@"
+}
+
+# R12 : le marqueur de membre (cookie posé par l'appli web quand une session existe, voir
+# infra/Caddyfile). Il ne donne aucun droit : il choisit seulement où Caddy envoie qui arrive.
+MEMBER_MARKER='Cookie: waiggle_member=1'
 
 step "Préparation : adresses locales, secrets tirés au hasard"
 printf 'APP_DOMAIN=%s\nAPI_DOMAIN=%s\nLEGACY_APP_DOMAIN=%s\nLEGACY_API_DOMAIN=%s\nIMAGE_PREFIX=ruche-stack-test\n' \
@@ -123,13 +140,15 @@ step "Chaque adresse mène à sa page"
 page_in_image() {
   docker run --rm --entrypoint cat ruche-stack-test-web:stack-test "/srv/app/$1"
 }
+# Avec le marqueur de membre : les anciennes adresses publiques (/projects/<id>, /rules…) servent
+# alors la page des membres, sans redirection (R12). Sans lui, voir « Qui arrive où », plus bas.
 while read -r path file; do
-  status=$(web -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
+  status=$(web -H "$MEMBER_MARKER" -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
   expect "code HTTP de $path" "$status" 200
   page_in_image "$file" | cmp -s - "$WORK/body" || die "$path ne sert pas $file"
   echo "ok : $path → $file"
 done <<'EOF'
-/ index.html
+/feed feed.html
 /sign-in sign-in.html
 /sign-up sign-up.html
 /account account.html
@@ -137,6 +156,7 @@ done <<'EOF'
 /projects/new projects/new.html
 /projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6 projects/[id].html
 /projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6/edit projects/[id]/edit.html
+/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6/updates projects/[id]/updates.html
 /members/AbC123_xyz-9 members/[id].html
 /tags/claude-code tags/[slug].html
 /rules rules.html
@@ -144,8 +164,46 @@ done <<'EOF'
 /legal legal.html
 /accessibility accessibility.html
 /licences-tierces.txt licences-tierces.txt
-/robots.txt robots.txt
 EOF
+
+step "Les pages publiques : une adresse par langue, et leur tête écrite par Caddy (R12)"
+# Caddy lit ces pages comme des gabarits (infra/Caddyfile, « templates ») : il y écrit la tête que
+# l'API lui donne (titre, description, aperçu des liens, « noindex ») et la langue de <html>. Le
+# reste du fichier, après </head>, arrive tel qu'il est dans l'image. Aucune instruction
+# « [[waiggle … ]] » ne reste dans la page reçue.
+public_page() { # public_page <adresse> <fichier> <langue attendue>
+  local body expected
+  expect "code HTTP de $1" "$(web -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$1")" 200
+  body=$(cat "$WORK/body")
+  expected=$(page_in_image "$2")
+  [[ $body != *'[[waiggle'* ]] || die "$1 : une instruction de gabarit est restée dans la page"
+  [ "${body#*</head>}" = "${expected#*</head>}" ] || die "$1 ne sert pas $2"
+  grep -q '<title>' <<<"$body" || die "$1 : la tête de l'API n'a pas été écrite"
+  # La langue que lit le navigateur : le premier « lang » de <html> (voir apps/app/app/+html.tsx).
+  expect "langue de $1" "$(grep -o '<html[^>]*>' <<<"$body" | grep -o ' lang="[a-z]*"' | head -1)" " lang=\"$3\""
+  echo "ok : $1 → $2 ($3)"
+}
+while read -r path file lang; do
+  public_page "$path" "$file" "$lang"
+done <<'EOF'
+/fr/ fr/index.html fr
+/en/ en/index.html en
+/fr/rules fr/rules.html fr
+/en/privacy en/privacy.html en
+/fr/legal fr/legal.html fr
+/en/accessibility en/accessibility.html en
+/fr/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6 fr/projects/[id].html fr
+/en/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6/updates en/projects/[id]/updates.html en
+/en/members/AbC123_xyz-9 en/members/[id].html en
+EOF
+# Un projet inconnu : la tête neutre, avec « noindex », sans titre ni image de projet.
+unknown=$(web "https://$APP_HOST/fr/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6")
+grep -q '<meta name="robots" content="noindex">' <<<"$unknown" || die "projet inconnu : pas de « noindex » dans la tête"
+if grep -q 'og:title' <<<"$unknown"; then die "projet inconnu : une balise d'aperçu dans la tête"; fi
+# Une page publique dit son adresse canonique, sur le domaine du site (APP_URL de l'API).
+grep -q '<link rel="canonical" href="https://'"$APP_HOST"'/fr/rules">' <<<"$(web "https://$APP_HOST/fr/rules")" ||
+  die "/fr/rules : pas d'adresse canonique"
+echo "ok : tête neutre d'un projet inconnu, adresse canonique d'une page publique"
 
 step "Une adresse inconnue mène à « introuvable », avec le code 404"
 page_in_image +not-found.html >"$WORK/not-found"
@@ -155,18 +213,27 @@ page_in_image +not-found.html >"$WORK/not-found"
 # /catalogue.html/ et /%63atalogue (« c » encodé) : d'autres façons d'écrire le même nom.
 for path in /nope /projects /projects/a/b/c /members /tags/a/b /sign-in/extra /_sitemap /_sitemap.html \
   /catalogue /catalogue.html /catalogue.php /catalogue.html/ /%63atalogue /_sitemap.html/./ \
-  /catalogue.html/./; do
+  /catalogue.html/./ \
+  /[lang]/rules /[lang] /%5Blang%5D/ /fr/../[lang]/rules /de/ /fr/sign-in /fr/feed \
+  '/v1/public/head?path=%2Ffr%2F&lang=fr' /v1/public/projects/x /v1/public/sitemap; do
+  # R12 : la copie générique des pages par langue n'est jamais servie (infra/Caddyfile,
+  # « @generic_lang »), sous aucune écriture ; une langue inconnue, une page de membre sous une
+  # langue non plus. Les relais vers l'API ne prennent que leurs adresses exactes : la tête n'est
+  # demandée que par Caddy lui-même, aucune autre route de l'API ne passe par ce domaine.
   status=$(web --path-as-is -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
   expect "code HTTP de $path" "$status" 404
   cmp -s "$WORK/not-found" "$WORK/body" || die "$path ne sert pas la page introuvable"
   echo "ok : $path → 404"
 done
+# Une écriture vers l'API par ce domaine : introuvable aussi (relecture de sécurité du plan, I3).
+expect "POST /v1/public/reports par le domaine de l'appli" "$(web -o /dev/null -w '%{http_code}' -X POST \
+  "https://$APP_HOST/v1/public/reports" -H "Origin: https://$APP_HOST" -H 'Content-Type: application/json' -d '{}')" 404
+echo "ok : POST /v1/public/reports → 404"
 
 step "En-têtes de sécurité et de cache"
-headers_of() {
-  web -o /dev/null -D - "$@" | tr -d '\r' | tr '[:upper:]' '[:lower:]'
-}
-for url in "https://$APP_HOST/" "https://$APP_HOST/nope"; do
+# R12 : / ne fait plus que rediriger ; une page publique est un gabarit ; le repli d'une page
+# publique, l'API arrêtée, est vérifié plus bas.
+for url in "https://$APP_HOST/" "https://$APP_HOST/fr/" "https://$APP_HOST/en/projects/x" "https://$APP_HOST/nope"; do
   h=$(headers_of "$url")
   for expected in \
     "strict-transport-security: max-age=31536000; includesubdomains" \
@@ -182,7 +249,7 @@ for url in "https://$APP_HOST/" "https://$APP_HOST/nope"; do
   if grep -q '^server:' <<<"$h"; then die "$url : Caddy annonce son nom"; fi
   echo "ok : $url"
 done
-script=$(web "https://$APP_HOST/" | grep -o '/_expo/static/js/web/[^"]*\.js' | head -1)
+script=$(web "https://$APP_HOST/fr/" | grep -o '/_expo/static/js/web/[^"]*\.js' | head -1)
 [ -n "$script" ] || die "aucun script trouvé dans la page d'accueil"
 grep -qx 'cache-control: public, max-age=31536000, immutable' <<<"$(headers_of "https://$APP_HOST$script")" ||
   die "$script : devrait être gardé un an par le navigateur"
@@ -194,30 +261,50 @@ if web "https://$APP_HOST$script" | grep -q 'localhost:8081'; then
 fi
 echo "ok : $script sans adresse de développement"
 
-step "Les moteurs de recherche : seuls l'accueil, la connexion, l'inscription et les quatre pages"
-# R11 (scénario, « Les moteurs de recherche ») : robots.txt (apps/app/public/robots.txt, servi tel
-# quel plus haut) propose ces adresses et écarte le reste ; l'en-tête X-Robots-Tag de Caddy dit
-# « noindex » partout ailleurs, pour un moteur qui ne lirait pas robots.txt.
+step "Les moteurs de recherche : les pages publiques par langue, la connexion et l'inscription"
+# R11 puis R12 (scénario, « Ce que lisent les moteurs ») : robots.txt (apps/app/public/robots.txt)
+# propose ces adresses, et les anciennes qui y redirigent, écarte le reste, refuse tout aux robots
+# d'entraînement et donne le plan du site ; l'en-tête X-Robots-Tag de Caddy dit « noindex »
+# partout ailleurs, pour un moteur qui ne lirait pas robots.txt.
 grep -qi '^content-type: text/plain' <<<"$(headers_of "https://$APP_HOST/robots.txt")" ||
   die "robots.txt : pas servi en text/plain"
 robots=$(web -f "https://$APP_HOST/robots.txt" | tr -d '\r')
+# Caddy le lit comme un gabarit, pour une seule instruction : le domaine du plan du site.
+[[ $robots != *'[[waiggle'* ]] || die "robots.txt : une instruction de gabarit est restée"
+expect "robots.txt sans son adresse de plan du site" "$(grep -v '^Sitemap: ' <<<"$robots")" \
+  "$(tr -d '\r' <apps/app/public/robots.txt | grep -v '^Sitemap: ')"
+grep -qx "Sitemap: https://$APP_HOST/sitemap.xml" <<<"$robots" || die "robots.txt : pas de plan du site à l'adresse du site"
 grep -qx 'User-agent: \*' <<<"$robots" || die "robots.txt : pas de « User-agent: * »"
+grep -qx 'User-agent: GPTBot' <<<"$robots" || die "robots.txt : les robots d'entraînement ne sont pas nommés"
 grep -qx 'Disallow: /' <<<"$robots" || die "robots.txt : le reste du site n'est pas écarté (« Disallow: / »)"
 # L'accueil seul (« /$ » : l'adresse exacte, pas tout ce qui commence par « / »).
 grep -qx 'Allow: /\$' <<<"$robots" || die "robots.txt : l'accueil n'est pas proposé (« Allow: /\$ »)"
-for path in /sign-in /sign-up /rules /privacy /legal /accessibility; do
+for path in /fr/ /en/ /sign-in /sign-up /rules /privacy /legal /accessibility; do
   # « [$]? » : un « $ » final permis (l'adresse exacte), jamais demandé.
   grep -Eqx "Allow: ${path}[\$]?" <<<"$robots" || die "robots.txt : $path n'est pas proposé"
 done
-for path in / /sign-in /sign-up /rules /privacy /legal /accessibility; do
+for path in /fr/ /en/ /fr/rules /en/privacy /fr/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6 /sign-in /sign-up; do
   if grep -q '^x-robots-tag:.*noindex' <<<"$(headers_of "https://$APP_HOST$path")"; then
     die "$path : écarté des moteurs (X-Robots-Tag), alors qu'il doit pouvoir être trouvé"
   fi
 done
-for path in /projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6 /members/AbC123_xyz-9 /account /tags/claude-code /nope; do
-  grep -q '^x-robots-tag:.*noindex' <<<"$(headers_of "https://$APP_HOST$path")" ||
+# Les pages des membres, à leur ancienne adresse (avec le marqueur, elles ne redirigent pas).
+for path in /feed /projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6 /members/AbC123_xyz-9 /rules /account \
+  /tags/claude-code /nope /[lang]/rules; do
+  grep -q '^x-robots-tag:.*noindex' <<<"$(headers_of -H "$MEMBER_MARKER" "https://$APP_HOST$path")" ||
     die "$path : pas d'en-tête « X-Robots-Tag: noindex »"
 done
+echo "ok"
+
+step "Le plan du site, relayé vers l'API (GET /v1/public/sitemap)"
+h=$(headers_of "https://$APP_HOST/sitemap.xml")
+grep -q '^http/[0-9.]* 200' <<<"$h" || die "/sitemap.xml : pas de réponse 200"
+grep -q '^content-type: application/xml' <<<"$h" || die "/sitemap.xml : pas servi en XML"
+sitemap=$(web -f "https://$APP_HOST/sitemap.xml")
+grep -q '<urlset' <<<"$sitemap" || die "/sitemap.xml : ce n'est pas un plan du site"
+grep -q "<loc>https://$APP_HOST/en/privacy</loc>" <<<"$sitemap" || die "/sitemap.xml : /en/privacy n'y est pas"
+# Seuls GET et HEAD sont relayés.
+expect "POST /sitemap.xml" "$(web -o /dev/null -w '%{http_code}' -X POST "https://$APP_HOST/sitemap.xml" -d x)" 404
 echo "ok"
 
 step "La politique MTA-STS des e-mails, et rien d'autre à son adresse"
@@ -235,12 +322,45 @@ expect "www → domaine" "$(web -o /dev/null -w '%{http_code} %{redirect_url}' "
   "301 https://$APP_HOST/sign-in?a=1"
 echo "ok"
 
+step "Qui arrive où : l'accueil, le Fil, et les anciennes adresses publiques (R12)"
+# Sans le marqueur, l'accueil mène à la langue du navigateur (le français s'il n'en dit rien), et
+# une ancienne adresse publique à la même page dans cette langue (301, ses paramètres gardés). Avec
+# le marqueur, l'accueil mène au Fil, et l'ancienne adresse sert la page des membres (plus haut).
+P=0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6
+EN='Accept-Language: en-GB,en;q=0.9,fr;q=0.8'
+while IFS='|' read -r label language path expected; do
+  expect "$label" "$(redirect_of -H "Accept-Language: $language" "https://$APP_HOST$path")" "$expected"
+done <<EOF
+accueil, sans langue||/|302 /fr/
+accueil, en anglais|en-GB,en;q=0.9,fr;q=0.8|/|302 /en/
+accueil, français avant anglais|fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7|/|302 /fr/
+accueil, allemand puis anglais|de-DE,de;q=0.9,en;q=0.8|/|302 /en/
+accueil, une langue que l'appli n'a pas|de-DE,de;q=0.9|/|302 /fr/
+accueil, « english » n'est pas « en »|english|/|302 /fr/
+/fr sans barre|en|/fr|301 /fr/
+/en sans barre||/en|301 /en/
+un projet|fr-CA|/projects/$P|301 /fr/projects/$P
+un projet, en anglais|en|/projects/$P|301 /en/projects/$P
+la frise d'un projet|EN-us|/projects/$P/updates|301 /en/projects/$P/updates
+une page de membre|de,en;q=0.5|/members/AbC123_xyz-9|301 /en/members/AbC123_xyz-9
+les Règles, avec un paramètre|fr|/rules?from=mail|301 /fr/rules?from=mail
+la Confidentialité, en-tête piégé|//evil.example|/privacy|301 /fr/privacy
+les Mentions||/legal|301 /fr/legal
+l'Accessibilité|en|/accessibility|301 /en/accessibility
+EOF
+expect "accueil d'un membre" "$(redirect_of -H 'Cookie: theme=dark; waiggle_member=1' "https://$APP_HOST/")" "302 /feed"
+expect "accueil, marqueur d'une autre valeur" "$(redirect_of -H 'Cookie: waiggle_member=10' "https://$APP_HOST/")" "302 /fr/"
+expect "projet d'un membre" "$(redirect_of -H "$MEMBER_MARKER" -H "$EN" "https://$APP_HOST/projects/$P")" "200 "
+# Les pages des membres ne redirigent jamais, marqueur ou non : « Nouveau projet » n'est pas un projet.
+for path in /projects/new /projects/$P/edit /feed /sign-in; do
+  expect "$path sans marqueur" "$(redirect_of -H "$EN" "https://$APP_HOST$path")" "200 "
+done
+# Une redirection ne se garde pas : elle dépend du marqueur et de la langue.
+grep -qx 'cache-control: no-cache' <<<"$(headers_of "https://$APP_HOST/projects/$P")" ||
+  die "/projects/<id> : la redirection peut être gardée par le navigateur"
+echo "ok"
+
 step "Les anciens domaines renvoient vers les nouveaux, et seulement chez nous"
-# Le code et la destination tels que Caddy les écrit : --path-as-is envoie le chemin sans le
-# simplifier, et %header{location} lit l'en-tête brut (%{redirect_url} le normaliserait).
-redirect_of() {
-  web --path-as-is -o /dev/null -w '%{http_code} %header{location}' "$@"
-}
 expect "ancien domaine" "$(redirect_of "https://$OLD_HOST/sign-in?code=a1")" "301 https://$APP_HOST/sign-in?code=a1"
 expect "ancien www" "$(redirect_of "https://www.$OLD_HOST/projects/x")" "301 https://$APP_HOST/projects/x"
 # L'ancien nom de l'API ne transmet rien à l'API : il redirige, même /health.
@@ -368,6 +488,52 @@ infra/grant-admin.sh avant@example.com --revoke
 expect "administrateurs après --revoke" "$(admins)" 0
 expect "lignes gardées après --revoke" "$(echo 'select count(*) from admin_member;' | db_query)" 1
 if GITHUB_ACTIONS="" infra/grant-admin.sh avant@example.com --revoke 2>/dev/null; then die "une seconde révocation a été acceptée"; fi
+echo "ok"
+
+step "Un projet public : son titre reste du texte, jamais une instruction de Caddy (R12)"
+# Relecture de sécurité du plan, B1 : Caddy relit la tête donnée par l'API comme un gabarit. Un
+# titre qui ressemble à une instruction (ici, lire une variable du serveur) doit s'afficher tel
+# quel. Le membre restauré (avant@example.com) publie en « Public » avec la session ouverte par son
+# lien de vérification (sign_up), puis le projet est supprimé : le parcours ne le voit jamais.
+jar=$WORK/cookies-avant@example.com
+# Les accents graves font partie du titre, ils ne doivent pas être exécutés par le shell.
+# shellcheck disable=SC2016
+title='[[waiggle env `APP_DOMAIN`]]'
+project=$(web -f -b "$jar" -X POST "https://$API_HOST/v1/projects" -H "Origin: https://$APP_HOST" \
+  -H 'Content-Type: application/json' \
+  -d "{\"title\":\"$title\",\"pitch\":\"Un compte à rebours.\",\"primaryCategory\":\"home-garden\",\"visibility\":\"web\"}" |
+  node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).id))')
+[ -n "$project" ] || die "le projet public n'a pas été publié"
+page=$(web -f "https://$APP_HOST/fr/projects/$project")
+shown=$(grep -o '<title>[^<]*</title>' <<<"$page" | head -1)
+[[ $shown == *'&#91;&#91;waiggle env'* ]] || die "titre du projet public : « $shown »"
+if grep -q "<title>$APP_HOST" <<<"$page"; then die "le titre du projet a été exécuté par Caddy : « $shown »"; fi
+grep -q '<meta property="og:title"' <<<"$page" || die "projet public : pas d'aperçu de lien dans la tête"
+if grep -q '<meta name="robots" content="noindex">' <<<"$page"; then die "projet public marqué « noindex »"; fi
+echo "ok : $shown"
+
+step "L'API arrêtée : les pages publiques restent lisibles, avec leurs en-têtes de sécurité (R12)"
+# Relecture de sécurité du plan, I1 : sans tête (l'instruction échoue), Caddy sert le fichier tel
+# qu'il est dans l'image (repli « handle_errors 500 502 503 »), avec le code 200 et la CSP. Le
+# plan du site, lui, ne peut pas être écrit.
+compose stop api
+for pair in "/fr/privacy fr/privacy.html" "/en/projects/$project en/projects/[id].html"; do
+  read -r path file <<<"$pair"
+  h=$(web -D - -o "$WORK/body" "https://$APP_HOST$path" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+  grep -q '^http/[0-9.]* 200' <<<"$h" || die "$path, API arrêtée : pas de réponse 200"
+  grep -q "^content-security-policy: default-src 'self'; script-src 'self' 'sha256-" <<<"$h" ||
+    die "$path, API arrêtée : CSP manquante"
+  grep -qx 'x-frame-options: deny' <<<"$h" || die "$path, API arrêtée : en-têtes de sécurité manquants"
+  if grep -q '^etag:' <<<"$h"; then die "$path, API arrêtée : le repli garde une empreinte (ETag)"; fi
+  page_in_image "$file" | cmp -s - "$WORK/body" || die "$path, API arrêtée : ne sert pas $file"
+  echo "ok : $path → $file, sans tête"
+done
+expect "/sitemap.xml, API arrêtée" "$(web -o /dev/null -w '%{http_code}' "https://$APP_HOST/sitemap.xml")" 502
+compose start api
+for _ in $(seq 1 60); do web -f -o /dev/null "https://$API_HOST/health" 2>/dev/null && break; sleep 1; done
+expect "version de l'API, redémarrée" "$(web -f "https://$API_HOST/health" | node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).version))')" stack-test
+expect "suppression du projet public" "$(web -o /dev/null -w '%{http_code}' -b "$jar" -X DELETE \
+  "https://$API_HOST/v1/projects/$project" -H "Origin: https://$APP_HOST")" 204
 echo "ok"
 
 step "Le parcours réel d'un membre, dans un vrai navigateur (apps/app/scripts/journey.mjs)"

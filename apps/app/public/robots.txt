@@ -1,14 +1,57 @@
-# Ce que les moteurs de recherche peuvent lire : l'accueil, la connexion, l'inscription et les
-# quatre pages publiques. Tout le reste (projets, membres, ruches, réglages…) est écarté ; l'en-tête
-# « X-Robots-Tag: noindex » de Caddy (infra/Caddyfile) le redit pour un moteur qui ne lirait pas ce
-# fichier. Un moteur retient la règle la plus précise : « Allow: /$ » ne vaut que pour l'accueil
-# (le « $ » veut dire « l'adresse s'arrête là »), « Disallow: / » pour tout le reste.
+# Ce que les robots peuvent lire (R11, puis R12). Ce fichier est une demande : un robot honnête la
+# suit, rien ne l'y oblige. L'en-tête « X-Robots-Tag: noindex » de Caddy (infra/Caddyfile) redit
+# « ne pas indexer » pour un moteur qui ne lirait pas ce fichier.
+#
+# Un robot suit le groupe qui le nomme, sinon celui de « * ». Dans un groupe, la règle la plus
+# précise (la plus longue) l'emporte : « Disallow: / » écarte tout ce qu'aucune règle « Allow »
+# plus précise ne propose. « * » remplace n'importe quels caractères, « $ » veut dire « l'adresse
+# s'arrête là ».
+#
+# Les robots qui collectent des pages pour entraîner des modèles d'IA sont refusés partout (scénario
+# R12, Q17). Ceux des moteurs de recherche, y compris ceux des assistants d'IA qui cherchent une
+# réponse pour quelqu'un, suivent le groupe « * ». La liste : les noms que leurs éditeurs publient
+# pour l'entraînement seul.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Meta-ExternalAgent
+User-agent: Bytespider
+User-agent: cohere-training-data-crawler
+User-agent: AI2Bot
+Disallow: /
+
+# Tous les autres robots :
+# - les pages publiques, à adresse par langue : l'accueil, les projets et pages publics, les quatre
+#   pages de R11 (/fr/…, /en/…) ;
+# - la connexion et l'inscription ;
+# - les anciennes adresses publiques, qui redirigent vers les nouvelles (un moteur ne suit pas une
+#   redirection qu'on lui interdit de lire) : l'accueil exact (« /$ »), un projet et sa frise des
+#   mises à jour, une page de membre, les quatre pages. Pas ce qui suit un projet ou un membre
+#   (« /projects/<id>/edit », écarté par « Disallow: /projects/*/ »), ni la feuille « Nouveau
+#   projet » ;
+# - tout le reste (Fil, réglages, publication, Activité, modération, ruches, recherche) est écarté.
 User-agent: *
 Allow: /$
+Allow: /fr/
+Allow: /en/
 Allow: /sign-in
 Allow: /sign-up
-Allow: /rules
-Allow: /privacy
-Allow: /legal
-Allow: /accessibility
+Allow: /projects/
+Disallow: /projects/new$
+Disallow: /projects/*/
+Allow: /projects/*/updates$
+Allow: /members/
+Disallow: /members/*/
+Allow: /rules$
+Allow: /privacy$
+Allow: /legal$
+Allow: /accessibility$
 Disallow: /
+
+# Le plan du site : toutes les pages publiques, dans les deux langues (GET /v1/public/sitemap,
+# relayé par Caddy). Le protocole demande une adresse complète : Caddy, qui lit ce fichier comme un
+# gabarit, y écrit le domaine du site (infra/Caddyfile, « robots.txt aussi »). Aucun autre double
+# crochet ouvrant dans ce fichier, commentaires compris : Caddy le prendrait pour une instruction.
+Sitemap: https://[[waiggle placeholder "http.vars.app_domain"]]/sitemap.xml
