@@ -496,6 +496,8 @@ export function CatalogueScreen() {
           points={[
             { icon: 'eye-slash', text: t(($) => $.block.bullets.content) },
             { icon: 'users', text: t(($) => $.block.bullets.follows) },
+            // R12 (Q19) : la puce ajoutée quand le membre a au moins un projet public.
+            { icon: 'globe-simple', text: t(($) => $.block.bullets.publicProjects) },
           ]}
         />
         <Dialog

@@ -262,10 +262,15 @@ describe('ShowcaseTab, the refusal of an author (juridique 6, décision 18)', ()
   it('says it when the API refuses the project, and keeps the showcase as it was', async () => {
     server.putFailure = { ok: false, error: 'authorDeclined' } as ApiResult<never>
     await open()
+    // Un autre projet des données est déjà refusé par son auteur, et sa ligne le dit (test
+    // précédent) : la phrase est donc déjà là une fois ; le refus de l'API en ajoute une.
+    const before = screen.queryAllByText(containing(T.authorDeclined)).length
 
     await fireEvent.press(featureButton(cafes.title))
 
-    expect(await screen.findByText(containing(T.authorDeclined))).toBeTruthy()
+    await waitFor(() =>
+      expect(screen.queryAllByText(containing(T.authorDeclined)).length).toBeGreaterThan(before),
+    )
     expect(showcaseOrder()).toEqual([decollage.title, papillon.title, ciel.title])
   })
 })
