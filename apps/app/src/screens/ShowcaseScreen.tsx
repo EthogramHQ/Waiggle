@@ -189,10 +189,11 @@ function ShowcaseHome({ items, member }: ShowcaseHomeProps) {
       {member ? null : <AccountButtons row={!compact} />}
       {showcase}
       {member ? null : <Hint icon="lock-simple" text={t(($) => $.home.membersOnly)} />}
-      {/* Le pied des pages publiques (R11) : les quatre pages et « Le code source ». Le lot suivant
-          de R12 y ajoute « Signaler un contenu » (l'adresse de contact) et le lien vers l'autre
-          langue (`LanguageLink`, décision 16 du plan) : leur place est ici, après `LegalLinks`. */}
-      <LegalLinks variant="footer" />
+      {/* Le pied des pages publiques (R11) : les quatre pages et « Le code source ». Pour un
+          visiteur, R12 y ajoute « Signaler un contenu » (l'adresse de contact) et, au bout, le lien
+          vers la même page dans l'autre langue (plan R12, décision 16 ; planche
+          R12-Visiteur-Desktop). Un membre a son « Signaler » sur chaque projet, et sa langue. */}
+      <LegalLinks variant="footer" report={!member} otherLanguage={!member} />
     </Screen>
   )
 }
@@ -277,9 +278,9 @@ export function VisitorHome() {
       {/* R11 (planche R11-Pied) : le pied des pages publiques, sur téléphone comme sur ordinateur :
           Règles, Confidentialité, Mentions légales, Accessibilité et « Le code source » (la licence
           AGPL demande d'offrir le code à ceux qui utilisent l'appli). « Moins de mots » : la phrase
-          « … est un logiciel libre » est partie, le lien suffit. Le lot suivant de R12 y ajoute
-          « Signaler un contenu » et le lien vers l'autre langue, après `LegalLinks`. */}
-      <LegalLinks variant="footer" />
+          « … est un logiciel libre » est partie, le lien suffit. R12 y ajoute « Signaler un
+          contenu », et sous `/fr/` ou `/en/` le lien vers l'autre langue (plan R12, décision 16). */}
+      <LegalLinks variant="footer" report otherLanguage />
     </Screen>
   )
 }

@@ -24,6 +24,7 @@ import { usePageLanguage, usePublicProject, usePublicUpdates } from '../public/a
 import { BeforeAfter } from '../ui/BeforeAfter'
 import { Columns } from '../ui/Columns'
 import { CountedTitle } from '../ui/CountedTitle'
+import { LegalLinks } from '../ui/LegalLinks'
 import type { GalleryPhoto } from '../ui/PhotoGallery'
 import { ProjectDatesLine } from '../ui/ProjectDatesLine'
 import { Screen } from '../ui/Screen'
@@ -185,6 +186,10 @@ function UpdatesView({ project }: { project: PublicProject }) {
           {timeline}
         </>
       )}
+      {/* Le pied des pages publiques (plan R12, décision 16) : les quatre pages dans la langue de
+          l'adresse, le code source et la même frise dans l'autre langue. Sans « Signaler un
+          contenu » : chaque mise à jour a déjà son « Signaler ». */}
+      <LegalLinks variant="footer" otherLanguage />
     </Screen>
   )
 }

@@ -51,7 +51,10 @@ export function LegalPageScreen({ page }: Props) {
           wide={wide}
           onLinkPress={openOutside}
         />
-        <LegalLinks variant="footer" current={page} />
+        {/* R12 (plan R12, décision 16) : sous `/fr/…` et `/en/…`, la même page dans l'autre
+            langue, au bout du pied ; sous `/rules`, rien de plus. Pas de « Signaler un contenu » :
+            l'adresse de contact du pied mène déjà au même endroit. */}
+        <LegalLinks variant="footer" current={page} otherLanguage />
       </Stack>
     </Screen>
   )
