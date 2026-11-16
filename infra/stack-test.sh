@@ -59,9 +59,11 @@ OLD_HOST=old.localhost
 OLD_API_HOST=api.$OLD_HOST
 
 # curl vers notre serveur local : ces noms (et www.) mènent à cette machine, et -k accepte le
-# certificat de Caddy, signé par sa propre autorité locale.
+# certificat de Caddy, signé par sa propre autorité locale. --globoff : sans lui, curl lit les
+# crochets d'une adresse (« /[lang]/rules », R12) comme une suite d'adresses à essayer (son
+# « globbing ») et la refuse avant même de l'envoyer.
 web() {
-  curl -sS -k --max-time 20 \
+  curl -sS -k --globoff --max-time 20 \
     --resolve "$APP_HOST:443:127.0.0.1" --resolve "$APP_HOST:80:127.0.0.1" \
     --resolve "$API_HOST:443:127.0.0.1" --resolve "www.$APP_HOST:443:127.0.0.1" \
     --resolve "$OLD_HOST:443:127.0.0.1" --resolve "$OLD_HOST:80:127.0.0.1" \
@@ -220,9 +222,7 @@ for path in /nope /projects /projects/a/b/c /members /tags/a/b /sign-in/extra /_
   # « @generic_lang »), sous aucune écriture ; une langue inconnue, une page de membre sous une
   # langue non plus. Les relais vers l'API ne prennent que leurs adresses exactes : la tête n'est
   # demandée que par Caddy lui-même, aucune autre route de l'API ne passe par ce domaine.
-  # --globoff : sans lui, curl lit « [lang] » comme une suite d'adresses à essayer (son « globbing »)
-  # et refuse l'adresse avant même de l'envoyer.
-  status=$(web --globoff --path-as-is -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
+  status=$(web --path-as-is -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
   expect "code HTTP de $path" "$status" 404
   cmp -s "$WORK/not-found" "$WORK/body" || die "$path ne sert pas la page introuvable"
   echo "ok : $path → 404"
