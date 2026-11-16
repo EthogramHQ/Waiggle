@@ -35,6 +35,7 @@ import {
 import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { isExampleAccountSql } from '../accounts/example'
 import { languageOfMember } from '../email/language'
 import { categoryTile, recapThumb } from '../email/recap-images'
 import { type Attachment, type RecapData, type RecapLine, recapEmail } from '../email/templates'
@@ -316,19 +317,27 @@ type FriendRow = z.infer<typeof FriendRow>
  * d'abord. `wanted` : seulement un projet « Testable » dont `me` n'est ni testeur, ni retiré par
  * l'auteur (project_tester_removal), le plus récent (relectures du plan sec-B1, jur-4).
  *
+ * R12b : jamais le projet d'un compte d'exemples (« Les Découvertes ne proposent pas les projets
+ * d'un compte d'exemples »). La condition est dans le `where`, donc AVANT la limite : sans cela,
+ * deux projets d'exemples récents prendraient deux des trois places et feraient sortir un vrai
+ * projet. Et si ces projets étaient la seule nouvelle, la liste est vide : pas de récap. La colonne
+ * de l'auteur est écrite en toutes lettres (`sql.raw`, du texte fixe) : la requête la nomme ainsi,
+ * `project` n'étant pas ici un objet Drizzle.
+ *
  *   select project.id, project.title, author.name
  *   from member_follow f
  *   join project on project.author_id = f.member_id
  *   join "user" author on author.id = project.author_id
  *   where f.follower_id = $me and project.published_at > $since and project.published_at <= $now
- *     and <listedVerifiedProjectFor> and not <auteur suspendu>
+ *     and <listedVerifiedProjectFor> and not <auteur suspendu> and not <compte d'exemples>
  *     [and project.status = 'testable' and not <testeur> and not <retiré>]
  *   order by project.published_at desc, project.id desc limit 3 (ou 1)
  *
  * Index : la clé primaire de member_follow (follower_id, member_id) donne les membres suivis ;
  * project_author_published_idx (author_id, published_at) leurs projets de la fenêtre ; les
  * vérifications passent par des clés primaires (project_tester (member_id, project_id),
- * project_tester_removal (project_id, member_id), "user") et account_suspension_user_idx.
+ * project_tester_removal (project_id, member_id), "user", example_account (user_id)) et
+ * account_suspension_user_idx.
  * La date de publication tient lieu de date du passage à « Testable » : aucune colonne ne la garde
  * (« à défaut : publié », plan R8).
  */
@@ -356,6 +365,7 @@ const friendProjects = async (
       and ${listedVerifiedProjectFor(me)}
       and not exists (select 1 from account_suspension s
         where s.user_id = project.author_id and ${activeSuspensionSql('s', now)})
+      and not ${isExampleAccountSql(sql.raw('project.author_id'))}
       ${testable}
     order by project.published_at desc, project.id desc
     limit ${wanted ? 1 : RECAP_FRIEND_PROJECTS_MAX}
