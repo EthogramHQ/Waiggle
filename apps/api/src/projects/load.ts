@@ -27,7 +27,7 @@ import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { latestUpdatesOf, updateCountsOf, updateSummariesOf } from '../updates/load'
 import { mediaShownTo, visibleMedia } from './media-visibility'
 import { testerRemovalsOf, testerStatesOf } from './testers'
-import { projectVisibleTo } from './visibility'
+import { projectVisibleTo, visitorVisibleProject } from './visibility'
 import { type MediaRow, toVisual } from './visual'
 
 // Reader : la base, ou une transaction en cours (les deux savent faire « select »).
@@ -489,8 +489,13 @@ export const mediaKeysOf = async (db: Reader, projectIds: string[]): Promise<str
  * and (project_media.removal_id is null or author_id = $viewer).
  * La clé unique de storage_key trouve la photo ; le projet et la mise à jour, par leur clé primaire.
  * « left join » : une photo de la galerie n'a pas de mise à jour, et doit rester dans le résultat.
+ *
+ * R12 : `viewerId` null, c'est un visiteur sans compte (isVisualVisibleToVisitor) : la même
+ * requête, avec la condition des visiteurs (`visitorVisibleProject`) à la place de celle des
+ * membres, et sans aucune exception de l'auteur (une photo en attente, d'une mise à jour retirée
+ * ou retirée seule ne s'ouvre jamais). Les règles des photos restent ainsi écrites une seule fois.
  */
-export const isVisualVisibleTo = async (db: Database, storageKey: string, viewerId: string) => {
+const visualShown = async (db: Database, storageKey: string, viewerId: string | null) => {
   const m = schema.projectMedia
   const [row] = await db
     .select({ id: m.id })
@@ -500,15 +505,32 @@ export const isVisualVisibleTo = async (db: Database, storageKey: string, viewer
     .where(
       and(
         eq(m.storageKey, storageKey),
-        visibleTo(viewerId),
+        viewerId === null ? visitorVisibleProject() : visibleTo(viewerId),
+        // `or` ignore un terme `undefined` : pour un visiteur, il n'y a pas d'exception de l'auteur.
         or(
           ne(m.slot, 'update'),
           and(isNotNull(m.updateId), isNull(schema.projectUpdate.removedAt)),
-          eq(schema.project.authorId, viewerId),
+          viewerId === null ? undefined : eq(schema.project.authorId, viewerId),
         ),
-        // R9 : une photo retirée seule par la modération, à son auteur seul (media-visibility.ts).
-        visibleMedia(m.removalId, { ownerId: schema.project.authorId, viewerId }),
+        // R9 : une photo retirée seule par la modération, à son auteur seul (media-visibility.ts) ;
+        // « à tous » (null) pour un visiteur : jamais.
+        visibleMedia(
+          m.removalId,
+          viewerId === null ? null : { ownerId: schema.project.authorId, viewerId },
+        ),
       ),
     )
+    .limit(1)
   return row !== undefined
 }
+
+export const isVisualVisibleTo = (db: Database, storageKey: string, viewerId: string) =>
+  visualShown(db, storageKey, viewerId)
+
+/**
+ * R12 (plan, choix 4 ; relecture de sécurité B3) : un fichier de visuel qu'un visiteur sans compte
+ * peut ouvrir : une photo de la galerie, la couverture verticale ou la photo d'une mise à jour
+ * publiée et pas retirée, d'un projet visible d'un visiteur, jamais retirée seule.
+ */
+export const isVisualVisibleToVisitor = (db: Database, storageKey: string) =>
+  visualShown(db, storageKey, null)
