@@ -35,14 +35,19 @@ type Width = 'form' | 'page'
 export function LoadingScreen({
   width = 'form',
   fade = true,
+  fallback = '/feed',
 }: {
   width?: Width
   /** RF : faux pour une page qui a son propre passage (un projet ouvert depuis une carte). */
   fade?: boolean
+  /**
+   * Où mène « Revenir » sans page d'avant : le Fil (`/feed`, plan R12, décision 9) ; l'accueil (`/`)
+   * pour une page de visiteur, à qui le Fil dirait « Réservé aux membres ».
+   */
+  fallback?: Href
 }) {
   const { t } = useTranslation()
-  // Sans page d'avant, « Revenir » mène au Fil (`/feed`, plan R12, décision 9).
-  const back = useGoBack('/feed')
+  const back = useGoBack(fallback)
   // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
   // « Revenir » apparaît sous le squelette (rien ne bouge au-dessus), pour ne jamais laisser le
   // membre sans issue.
