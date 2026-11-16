@@ -16,6 +16,8 @@ export const leaEmailPreferences: EmailPreferences = {
   updates: 'digest',
   testers: 'digest',
   hives: 'now',
+  // R11 : « Découvertes » dans le récap, comme pour tout membre qui n'a rien changé.
+  discoveries: 'digest',
 }
 
 /**

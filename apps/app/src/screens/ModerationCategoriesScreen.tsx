@@ -312,12 +312,7 @@ function AdminCategories() {
   )
 
   return (
-    <Screen
-      header={<TopNav />}
-      onBack={back}
-      title={t(($) => $.moderation.categories.title)}
-      subtitle={t(($) => $.moderation.categories.subtitle)}
-    >
+    <Screen header={<TopNav />} onBack={back} title={t(($) => $.moderation.categories.title)}>
       <Stack gap="xl">
         <Stack gap="lg">
           <Segmented<Tab>

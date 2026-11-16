@@ -39,11 +39,8 @@ export function PublishPrompt({ onPublish }: Props) {
     >
       {/* Une base réelle (pas flex: 1) : sous 180 points, le texte garde sa largeur et le bouton
           descend, au lieu de couper les mots lettre par lettre. */}
-      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0, gap: space.xxs }}>
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0 }}>
         <Text weight={700}>{t(($) => $.publishPrompt.title)}</Text>
-        <Text variant="callout" tone="muted">
-          {t(($) => $.publishPrompt.body)}
-        </Text>
       </View>
       <Button
         label={t(($) => $.publishPrompt.action)}

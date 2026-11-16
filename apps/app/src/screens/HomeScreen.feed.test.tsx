@@ -93,12 +93,13 @@ describe('the « following » feed on the home screen', () => {
   })
 
   // R4 (F-Fil9, scénario validé le 31/10/2026) : un membre qui ne suit personne voit le premier
-  // lancement et « Proches à suivre », plus le bouton vers Explorer de R3.
-  it('welcomes a member who follows nobody with « Ton fil t’attend » and people to follow', async () => {
+  // lancement et « Proches à suivre », plus le bouton vers Explorer de R3. R11 (« Moins de mots ») :
+  // « Ton fil t’attend » quitte l'écran, le salut devient le titre.
+  it('welcomes a member who follows nobody with people to follow, without « Ton fil t’attend »', async () => {
     mockFollowing({ items: [], followsAnyone: false })
     await renderMemberHome()
 
-    expect(screen.getByText('Ton fil t’attend')).toBeTruthy()
+    expect(screen.queryByText(/Ton fil t.attend/)).toBeNull()
     expect(screen.getByRole('header', { name: 'Proches à suivre' })).toBeTruthy()
     expect(screen.queryByText('Tu ne suis personne pour l’instant')).toBeNull()
   })

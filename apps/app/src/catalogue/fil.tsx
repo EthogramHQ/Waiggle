@@ -51,7 +51,8 @@ const fr = {
   datePhrase: 'Avec une phrase (prop phrase) : « bloqué le 12 oct. »',
   blockedOn: (when: string) => `bloqué ${when}`,
   grid: 'Grille imposée à deux colonnes (ProjectGrid columns={2}), rangée incomplète',
-  greeting: 'Salut du premier lancement (Greeting)',
+  greeting: 'Salut du premier lancement (Greeting) : le salut est le titre de niveau 2',
+  greetingWithTitle: 'Avec un titre à part (prop title) : le salut devient une accroche',
   hello: 'Bonjour Inès !',
   greetingTitle: 'Ton fil t’attend',
   greetingBody: 'Suis quelques proches : leurs projets arriveront ici.',
@@ -101,7 +102,8 @@ const en: typeof fr = {
   datePhrase: 'With a phrase (phrase prop): “blocked on Oct 12”',
   blockedOn: (when: string) => `blocked ${when}`,
   grid: 'Grid forced to two columns (ProjectGrid columns={2}), incomplete row',
-  greeting: 'First-run greeting (Greeting)',
+  greeting: 'First-run greeting (Greeting): the greeting is the level-2 heading',
+  greetingWithTitle: 'With a separate title (title prop): the greeting becomes a lead-in',
   hello: 'Hello Inès!',
   greetingTitle: 'Your feed is waiting',
   greetingBody: 'Follow a few close ones: their projects will show up here.',
@@ -274,6 +276,9 @@ function Pieces({ l }: { l: typeof fr }) {
       </Captioned>
 
       <Captioned caption={l.greeting}>
+        <Greeting hello={l.hello} body={l.greetingBody} />
+      </Captioned>
+      <Captioned caption={l.greetingWithTitle}>
         <Greeting hello={l.hello} title={l.greetingTitle} body={l.greetingBody} />
       </Captioned>
 

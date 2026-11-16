@@ -329,7 +329,7 @@ describe('the removed parts of her own profile, on « Moi » (R9)', () => {
   })
 })
 
-// --- Le bandeau du pseudo provisoire, sur « Moi » (choix 6 de la session, décision L3) ---
+// --- Le bandeau du pseudo provisoire, sur « Moi » (choix 6 du plan R9, décision L3) ---
 
 describe('the provisional handle banner on « Moi » (R9)', () => {
   const banner = fr.t(($) => $.profile.provisional.bannerHandle, { handle: provisionalHandle })

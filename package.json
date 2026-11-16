@@ -15,7 +15,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "check": "pnpm lint && node scripts/repo-layout.mjs && pnpm arch --check && pnpm typecheck && pnpm test && pnpm test:scripts",
-    "test:scripts": "node --test scripts/advisories.test.mjs scripts/repo-layout.test.mjs",
+    "test:scripts": "node --test scripts/advisories.test.mjs scripts/repo-layout.test.mjs scripts/legal-placeholders.test.mjs",
     "arch": "node scripts/architecture.mjs"
   },
   "devDependencies": {

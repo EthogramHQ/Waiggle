@@ -1251,15 +1251,17 @@ describe('the catalogue links (R6b)', () => {
   const opened = () =>
     [...mockPush.mock.calls, ...mockNavigate.mock.calls].map(([href]) => pathOf(href))
 
+  // R11 (« Moins de mots ») : les deux lignes d'aide sous ces liens quittent l'écran. Écrites en
+  // clair : leurs clés disparaîtront avec elles.
   it.each([
-    [TOOLS, fr.t(($) => $.moderation.toolsLinkHint), '/moderation/tools'],
-    [CATEGORIES, fr.t(($) => $.moderation.categoriesLinkHint), '/moderation/categories'],
-  ])('offers « %s » with its hint « %s », and opens %s', async (name, hint, path) => {
+    [TOOLS, 'Les autres outils à vérifier, et le catalogue', '/moderation/tools'],
+    [CATEGORIES, 'Les projets à ranger, et les catégories', '/moderation/categories'],
+  ])('offers « %s » without its old hint « %s », and opens %s', async (name, hint, path) => {
     mockNavigate.mockReset()
     await openModeration()
 
     const link = linkNamed(name)
-    expect(screen.getByText(containing(hint))).toBeTruthy()
+    expect(screen.queryByText(containing(hint))).toBeNull()
     await fireEvent.press(link)
 
     expect(opened()).toEqual([path])
@@ -1274,6 +1276,7 @@ describe('the catalogue links (R6b)', () => {
     // … sans aucun lien vers le catalogue.
     expect(screen.queryByRole('link', { name: TOOLS })).toBeNull()
     expect(screen.queryByRole('button', { name: TOOLS })).toBeNull()
-    expect(screen.queryByText(fr.t(($) => $.moderation.categoriesLinkHint))).toBeNull()
+    expect(screen.queryByRole('link', { name: CATEGORIES })).toBeNull()
+    expect(screen.queryByRole('button', { name: CATEGORIES })).toBeNull()
   })
 })

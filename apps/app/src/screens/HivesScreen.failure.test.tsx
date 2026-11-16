@@ -44,7 +44,9 @@ const openTab = async () => {
       <HivesScreen />
     </ToastProvider>,
   )
-  await waitFor(() => expect(shown(T.intro)).toBe(true))
+  // R11 (« Moins de mots ») : la phrase des ruches ne reste que sous l'état vide ; la fin du
+  // chargement se lit aux invitations ou à « Mes ruches ».
+  await waitFor(() => expect(shown(T.invitationsTitle) || shown(T.mine)).toBe(true))
 }
 
 describe('a gesture on an invitation that fails', () => {

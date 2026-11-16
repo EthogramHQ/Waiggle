@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeInviteCode, SignUpRequest } from './accounts'
+import { Me, normalizeInviteCode, SignUpRefusalCode, SignUpRequest } from './accounts'
 
 const valid = {
   name: 'Léa',
   email: 'lea@example.com',
   password: 'correct-horse-battery',
   inviteCode: 'miel-2026-noel',
+  // R11 : les deux cases de l'inscription, cochées.
+  acceptRules: true,
+  ageDeclared: true,
 }
 
 describe('SignUpRequest', () => {
@@ -38,6 +41,61 @@ describe('SignUpRequest', () => {
 
   it('refuses an invite code longer than 100 characters', () => {
     expect(SignUpRequest.safeParse({ ...valid, inviteCode: 'a'.repeat(101) }).success).toBe(false)
+  })
+
+  it('requires both boxes: the rules and the age, each on its own', () => {
+    const { acceptRules: _rules, ...withoutRules } = valid
+    const { ageDeclared: _age, ...withoutAge } = valid
+    expect(SignUpRequest.safeParse(withoutRules).success).toBe(false)
+    expect(SignUpRequest.safeParse(withoutAge).success).toBe(false)
+    expect(SignUpRequest.safeParse({ ...valid, acceptRules: false }).success).toBe(false)
+    expect(SignUpRequest.safeParse({ ...valid, ageDeclared: false }).success).toBe(false)
+  })
+
+  it('only takes the boolean true for a box, never "true" or 1', () => {
+    for (const value of ['true', 1, 'on']) {
+      expect(SignUpRequest.safeParse({ ...valid, acceptRules: value }).success).toBe(false)
+      expect(SignUpRequest.safeParse({ ...valid, ageDeclared: value }).success).toBe(false)
+    }
+  })
+})
+
+describe('SignUpRefusalCode', () => {
+  it('names the three refusals the app recognizes', () => {
+    expect(SignUpRefusalCode.options).toEqual([
+      'INVITE_CODE_INVALID',
+      'RULES_NOT_ACCEPTED',
+      'AGE_NOT_DECLARED',
+    ])
+  })
+})
+
+describe('Me', () => {
+  const me = {
+    id: 'lea-id',
+    name: 'Léa',
+    handle: 'lea',
+    email: 'lea@example.com',
+    emailVerified: true,
+    language: 'fr',
+    createdAt: '2026-10-12T08:30:00.000Z',
+    bio: '',
+    favoriteTools: [],
+    avatarUrl: null,
+    isAdmin: false,
+    suspension: null,
+    provisional: { name: false, handle: false },
+    hideFromSuggestions: false,
+    rulesAccepted: true,
+    rulesChanges: [],
+  }
+
+  it('says whether the current rules are accepted, and what changed', () => {
+    expect(Me.parse(me)).toEqual(me)
+    const later = { ...me, rulesAccepted: false, rulesChanges: ['rules.changes.example'] }
+    expect(Me.parse(later)).toEqual(later)
+    const { rulesAccepted: _, ...without } = me
+    expect(Me.safeParse(without).success).toBe(false)
   })
 })
 

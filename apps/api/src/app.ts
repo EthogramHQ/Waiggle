@@ -12,6 +12,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { secureHeaders } from 'hono/secure-headers'
+import { activityMiddleware } from './account/activity'
 import type { Auth } from './auth/auth'
 import { sessionMiddleware } from './auth/session'
 import type { Mailer } from './email/mailer'
@@ -27,6 +28,8 @@ import { followRoutes } from './routes/follows'
 import { hiveInvitationRoutes } from './routes/hive-invitations'
 import { hiveRoutes } from './routes/hives'
 import { meRoutes } from './routes/me'
+import { meCommentRoutes } from './routes/me-comments'
+import { meTesterMessageRoutes } from './routes/me-tester-messages'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
 import { moderationRoutes } from './routes/moderation'
@@ -35,6 +38,7 @@ import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
+import { rulesRoutes } from './routes/rules'
 import { searchRoutes } from './routes/search'
 import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
@@ -46,6 +50,7 @@ import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
 import { updateRoutes } from './routes/updates'
 import { visualRoutes } from './routes/visuals'
+import { rulesGuard } from './rules/guard'
 import { sameOriginWrites } from './security/same-origin'
 import { suspensionGuard } from './suspension/guard'
 import type { AppEnv } from './types'
@@ -326,6 +331,10 @@ export const createApp = ({
       c.req.path === UNVERIFIED_EMAIL_PATH ? next() : readSession(c, next),
     ),
   )
+  // R11 : la visite d'un membre connecté est notée (au plus une fois par jour), et un avertissement
+  // d'inactivité déjà parti est effacé (account/activity.ts). Juste après la session, avant les
+  // gardes de la suspension et de l'accord : une requête qu'elles refusent compte quand même.
+  app.use('/v1/*', activityMiddleware(db))
   // Les images aussi demandent de savoir qui regarde : elles sont réservées aux membres.
   app.use('/media/*', sessionMiddleware(auth))
   // Les réponses de /v1/… sont personnelles (profil, export…) : aucun cache intermédiaire
@@ -338,6 +347,11 @@ export const createApp = ({
   // toutes les routes, donc avant leur validateur et leur quota (suspension/guard.ts). Après
   // « no-store » (S14) : son refus n'est gardé par aucun cache non plus.
   app.use('/v1/*', suspensionGuard(db))
+  // R11 : un membre qui n'a pas accepté les règles en vigueur lit tout, mais n'écrit que ce que la
+  // garde de l'accord permet (rules/guard.ts). Après celle de la suspension : un compte suspendu
+  // reçoit d'abord `suspended`, le refus qui dit ce qui l'attend vraiment (accepter ne lui rendrait
+  // pas l'écriture).
+  app.use('/v1/*', rulesGuard(db))
 
   // La route de santé : `as const` garantit que status vaut exactement 'ok', comme l'exige le schéma.
   app.openapi(healthRoute, (c) => c.json({ status: 'ok' as const, version }, 200))
@@ -345,6 +359,8 @@ export const createApp = ({
   // Les routes du membre connecté et le service des images, rangés dans leurs propres fichiers.
   const limiter = createRateLimiter(db)
   app.route('/', meRoutes({ db, storage, limiter, publicApiUrl }))
+  // L'écran « Accepter » des règles (R11).
+  app.route('/', rulesRoutes({ db, limiter, publicApiUrl }))
   app.route('/', projectRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', visualRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', memberRoutes({ db, limiter, publicApiUrl }))
@@ -365,6 +381,10 @@ export const createApp = ({
   app.route('/', testerThreadRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
+  // « Mes commentaires » (R11) : la liste, et la suppression depuis les réglages.
+  app.route('/', meCommentRoutes({ db, limiter, publicApiUrl }))
+  // « Mes retours envoyés » (R11) : ses messages de testeur, coins fermés compris.
+  app.route('/', meTesterMessageRoutes({ db, publicApiUrl }))
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
   // « Proches à suivre » : la liste et « × » (tranche R4).
   app.route('/', suggestionRoutes({ db, limiter, publicApiUrl }))
@@ -378,7 +398,7 @@ export const createApp = ({
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl }))
+  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl, appUrl }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter }))
   app.route('/', mediaRoutes({ db, storage }))

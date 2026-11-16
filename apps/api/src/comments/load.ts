@@ -12,6 +12,9 @@ import {
   type CommentPage,
   type CommentReply,
   type Mention,
+  MY_DATA_PAGE_SIZE,
+  type MyCommentsPage,
+  type ProjectVisual,
   type Removal,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -37,6 +40,7 @@ import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
 import { avatarUrlOf } from '../profile/me'
+import { visibleMedia } from '../projects/media-visibility'
 import {
   inViewerHiveColumn,
   listedProject,
@@ -45,6 +49,7 @@ import {
   reservedProject,
   sharedWith,
 } from '../projects/visibility'
+import { toVisual } from '../projects/visual'
 import { removalsOf } from '../removals/load'
 
 type Reader = Pick<Database, 'select'>
@@ -852,4 +857,148 @@ export const commentsOfAuthor = async (db: Reader, authorId: string) => {
     hiddenAt: row.hiddenAt?.toISOString() ?? null,
     removal: removedAt === null ? null : (removals.get(removalId ?? '') ?? null),
   }))
+}
+
+/**
+ * La couverture de ces projets : la première photo de la galerie, sans celles que la modération a
+ * retirées (« à tous », projects/media-visibility.ts : pas même pour l'auteur, une couverture se
+ * montre comme les autres la voient). Une seule requête, par l'index project_media_project_idx
+ * (project_id, slot, position) ; aucune pour une liste vide. Lue par « Mes commentaires » et « Mes
+ * retours envoyés » (testers/my-messages.ts).
+ */
+export const coversOf = async (
+  db: Reader,
+  projectIds: string[],
+  publicApiUrl: string,
+): Promise<Map<string, ProjectVisual>> => {
+  const covers = new Map<string, ProjectVisual>()
+  if (projectIds.length === 0) return covers
+  const media = await db
+    .select()
+    .from(schema.projectMedia)
+    .where(
+      and(
+        inArray(schema.projectMedia.projectId, projectIds),
+        eq(schema.projectMedia.slot, 'gallery'),
+        visibleMedia(schema.projectMedia.removalId, null),
+      ),
+    )
+    .orderBy(asc(schema.projectMedia.position), asc(schema.projectMedia.createdAt))
+  for (const row of media) {
+    if (!covers.has(row.projectId)) covers.set(row.projectId, toVisual(row, publicApiUrl))
+  }
+  return covers
+}
+
+/**
+ * « Mes commentaires » (R11) : la page des commentaires et réponses que ce membre a écrits, du plus
+ * récent au plus ancien, `MY_DATA_PAGE_SIZE` par page, sur tous les projets. Quatre requêtes, quelle
+ * que soit la page :
+ * 1. ses commentaires. En SQL :
+ *   select … from project_comment where author_id = $membre and deleted_at is null
+ *     and (created_at, id) < ($date, $id) order by created_at desc, id desc limit 31
+ *   L'index project_comment_author_idx (author_id) trouve tous ses commentaires, puis PostgreSQL les
+ *   trie : un membre en écrit 60 par heure au plus et la liste se lit depuis les réglages (rare),
+ *   un index (author_id, created_at, id) de plus ne se justifie pas. Un commentaire supprimé n'a
+ *   plus d'auteur : il n'est jamais trouvé ici. La 31e ligne dit seulement qu'il y a une suite ;
+ * 2. les racines de la page qui ont des réponses : select root_id from project_comment where
+ *   root_id in (…) group by root_id, par l'index project_comment_root_created_idx ;
+ * 3. les projets de la page que ce membre voit (`projectVisibleTo` : la règle commune, blocages et
+ *   ruches comprises, plus le sien même privé) avec le nom de leur auteur : la clé primaire du
+ *   projet, puis celle de "user" ;
+ * 4. leurs photos de galerie : l'index project_media_project_idx (project_id, slot, position).
+ * Un projet qu'il ne voit plus donne `project: null` : ni titre, ni couverture, ni nom d'auteur ne
+ * sortent. Son commentaire reste lisible par lui, texte entier, masqué ou retiré compris : il en
+ * est l'auteur.
+ */
+export const myCommentsPage = async (
+  db: Reader,
+  viewerId: string,
+  cursor: CursorContent | null,
+  publicApiUrl: string,
+): Promise<MyCommentsPage> => {
+  const rows = await db
+    .select({
+      id: c.id,
+      projectId: c.projectId,
+      rootId: c.rootId,
+      body: c.body,
+      createdAt: c.createdAt,
+      editedAt: c.editedAt,
+      hiddenAt: c.hiddenAt,
+      removedAt: c.removedAt,
+    })
+    .from(c)
+    .where(
+      and(
+        eq(c.authorId, viewerId),
+        isNull(c.deletedAt),
+        cursor ? after(cursor, c.createdAt, c.id) : undefined,
+      ),
+    )
+    .orderBy(desc(c.createdAt), desc(c.id))
+    .limit(MY_DATA_PAGE_SIZE + 1)
+  const page = rows.slice(0, MY_DATA_PAGE_SIZE)
+
+  // 2. Les racines de la page qui ont au moins une réponse (liste vide : `in ()` vaut faux).
+  const rootIds = page.filter((row) => row.rootId === null).map((row) => row.id)
+  const answered = new Set(
+    (
+      await db
+        .select({ rootId: c.rootId })
+        .from(c)
+        .where(inArray(c.rootId, rootIds))
+        .groupBy(c.rootId)
+    ).map((row) => row.rootId),
+  )
+
+  // 3. Les projets de la page, seulement ceux que ce membre voit.
+  const projectIds = [...new Set(page.map((row) => row.projectId))]
+  const projects = new Map(
+    (
+      await db
+        .select({
+          id: schema.project.id,
+          title: schema.project.title,
+          authorName: schema.user.name,
+        })
+        .from(schema.project)
+        .innerJoin(schema.user, eq(schema.user.id, schema.project.authorId))
+        .where(and(inArray(schema.project.id, projectIds), projectVisibleTo(viewerId)))
+    ).map((project) => [project.id, project]),
+  )
+
+  // 4. Les couvertures.
+  const covers = await coversOf(db, [...projects.keys()], publicApiUrl)
+
+  const items = page.map((row) => {
+    const project = projects.get(row.projectId)
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      project: project
+        ? {
+            id: project.id,
+            title: project.title,
+            cover: covers.get(project.id) ?? null,
+            author: { name: project.authorName },
+          }
+        : null,
+      replyTo: row.rootId,
+      hasReplies: answered.has(row.id),
+      body: row.body,
+      createdAt: row.createdAt.toISOString(),
+      editedAt: row.editedAt?.toISOString() ?? null,
+      hidden: row.hiddenAt !== null,
+      removed: row.removedAt !== null,
+    }
+  })
+  const last = page.at(-1)
+  return {
+    items,
+    nextCursor:
+      rows.length > MY_DATA_PAGE_SIZE && last
+        ? encodeCursor({ at: last.createdAt.toISOString(), id: last.id })
+        : null,
+  }
 }

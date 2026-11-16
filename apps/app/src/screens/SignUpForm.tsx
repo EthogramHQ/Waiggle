@@ -3,6 +3,8 @@
 // compte » sur ordinateur. Un lien d'invitation (/sign-up?code=…) remplit tout seul le code.
 // R2 : « Créer mon compte » reste actif ; à l'envoi, chaque champ incomplet dit ce qui lui manque
 // et le premier reçoit le focus. Après l'envoi, le membre doit ouvrir le lien reçu par e-mail.
+// R11 : deux cases à cocher, « J'accepte les règles » et « J'ai 15 ans ou plus », avec le lien
+// « Lire les règles » à part ; sans elles, l'envoi dit ce qui manque au-dessus du bouton.
 import {
   InviteCode,
   NAME_MAX_LENGTH,
@@ -10,16 +12,19 @@ import {
   PASSWORD_MIN_LENGTH,
   SignUpRequest,
 } from '@ruche/contracts'
+import type { Translation } from '@ruche/i18n'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { signUp } from '../accounts/api'
 import type { AuthDraft } from '../accounts/authHandoff'
-import type { AuthErrorKey } from '../accounts/errors'
+import { isAccordError, type SignUpErrorKey } from '../accounts/errors'
 import { setPendingEmail } from '../accounts/pendingVerification'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { firstParam } from '../navigation/params'
-import { focusWithoutScroll } from '../ui/focus'
+import { Checkbox } from '../ui/Checkbox'
+import { FieldError } from '../ui/FieldError'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { HeldSpace } from '../ui/HeldSpace'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Notice } from '../ui/Notice'
@@ -34,8 +39,11 @@ import { useHydrated } from '../ui/theme/hydration'
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
 
-/** Les champs, dans l'ordre de l'écran : le focus va au premier qui manque. */
-const FIELDS = ['inviteCode', 'name', 'email', 'password'] as const
+/**
+ * Les champs, puis les deux cases (R11), dans l'ordre de l'écran : le focus va au premier qui
+ * manque. Un champ vide passe donc avant une case non cochée.
+ */
+const FIELDS = ['inviteCode', 'name', 'email', 'password', 'acceptRules', 'ageDeclared'] as const
 
 type Props = {
   /** Ce qui est déjà tapé, partagé avec l'onglet voisin (code, nom, adresse ; jamais le mot de passe). */
@@ -49,11 +57,17 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const [password, setPassword] = useState('')
+  // R11 : les deux accords, non cochés au départ. Comme le mot de passe, ils restent dans ce
+  // formulaire : la page des règles s'ouvre par-dessus (push) et le retour les retrouve.
+  const [acceptRules, setAcceptRules] = useState(false)
+  const [ageDeclared, setAgeDeclared] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
-  const [error, setError] = useState<AuthErrorKey | null>(null)
+  const [error, setError] = useState<SignUpErrorKey | null>(null)
   const [loading, setLoading] = useState(false)
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const retry = useRetryAt(retryAfter)
+  // L'identifiant de la ligne « Il manque… » (le même au pré-rendu web et dans le navigateur).
+  const missingId = useId()
   // useRef garde une valeur entre deux affichages sans redessiner : ici, les champs, pour y poser
   // le focus du clavier.
   const inputs = {
@@ -61,6 +75,8 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
     name: useRef<TextFieldInput>(null),
     email: useRef<TextFieldInput>(null),
     password: useRef<TextFieldInput>(null),
+    acceptRules: useRef<Focusable>(null),
+    ageDeclared: useRef<Focusable>(null),
   }
 
   // Le code d'un lien d'invitation (/sign-up?code=…). L'adresse de la page n'est connue que dans le
@@ -91,6 +107,9 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
       password,
       inviteCode: draft.inviteCode,
       language: i18n.language,
+      // Le contrat n'accepte que `true` : une case non cochée est refusée comme un champ vide.
+      acceptRules,
+      ageDeclared,
     })
     if (!parsed.success) {
       const errors = fieldErrorsFrom(parsed.error)
@@ -98,9 +117,13 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
       if (!draft.email.trim()) errors.email = 'emailRequired'
       if (!password) errors.password = 'passwordRequired'
       setFieldErrors(errors)
-      // Le focus va au premier champ à reprendre (web), sans faire sauter la page.
+      // Le focus va au premier champ ou à la première case à reprendre (web), sans faire sauter
+      // la page ; sur téléphone, le lecteur d'écran y va aussi.
       const first = FIELDS.find((field) => errors[field])
-      if (first) focusWithoutScroll(inputs[first].current)
+      if (first) {
+        focusWithoutScroll(inputs[first].current)
+        moveReaderTo(inputs[first].current)
+      }
       return
     }
     setFieldErrors({})
@@ -126,20 +149,47 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
   const fieldMessage = (key: FieldErrors[keyof FieldErrors]) =>
     key ? t(($) => $.auth.errors[key], lengths) : undefined
 
+  // Le message d'un refus de l'API : les deux accords (R11) sont avec les erreurs de l'API
+  // (`errors`), les autres avec celles du compte (`auth.errors`).
+  const errorMessage = (key: SignUpErrorKey) => {
+    if (isAccordError(key)) {
+      const accord = key
+      return t(($) => $.errors[accord])
+    }
+    const account = key
+    return t(($) => $.auth.errors[account], lengths)
+  }
+
+  // Une case refusée au dernier envoi, avec son message (une propriété facultative ne reçoit pas
+  // `undefined` : d'où l'objet vide quand tout va bien).
+  const boxError = (key: FieldErrors['acceptRules']) => {
+    const message = fieldMessage(key)
+    return message ? { error: message } : {}
+  }
+
+  // R11 : ce qui manque, dit au-dessus du bouton (planche R11-Inscription) : les règles, l'âge, ou
+  // les deux. Calculé au dernier envoi, comme les erreurs des cases : il ne change pas sous le doigt
+  // quand on coche, et part au prochain envoi.
+  const missingAccords: keyof Translation['rules']['missing'] | null = fieldErrors.acceptRules
+    ? fieldErrors.ageDeclared
+      ? 'both'
+      : 'rules'
+    : fieldErrors.ageDeclared
+      ? 'age'
+      : null
+
   const missing = Math.max(0, PASSWORD_MIN_LENGTH - Array.from(password).length)
 
   return (
     <>
-      <Stack gap="sm">
-        <Text variant="title2" heading={1}>
-          {t(($) => $.auth.signUp.title)}
-        </Text>
-        <Text tone="secondary">{t(($) => $.auth.signUp.subtitle)}</Text>
-      </Stack>
+      {/* R11 (« Moins de mots ») : le titre seul, sans sous-titre. */}
+      <Text variant="title2" heading={1}>
+        {t(($) => $.auth.signUp.title)}
+      </Text>
       {error ? (
         // À la fin de l'attente, « Trop d'essais » s'efface en gardant sa place (C6).
         <HeldSpace vacated={Boolean(retry.ended) && error === 'tooManyAttempts'}>
-          <Notice message={t(($) => $.auth.errors[error], lengths)} />
+          <Notice message={errorMessage(error)} />
         </HeldSpace>
       ) : null}
       {/* Le code est dans un groupe à lui, comme le nom : son aide commence alors au même bord
@@ -208,7 +258,35 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
           }
         />
       </Stack>
+      {/* R11 : les deux accords. Le libellé de chaque case est son nom lu ; le lien des règles est à
+          part, hors de la case (relecture du plan, D3) : dans le libellé, le lecteur d'écran ne
+          l'atteindrait pas, et le toucher cocherait la case. Il ouvre la page par-dessus. */}
+      <Stack gap="xs">
+        <Checkbox
+          ref={inputs.acceptRules}
+          label={t(($) => $.rules.accept)}
+          value={acceptRules}
+          onValueChange={setAcceptRules}
+          {...boxError(fieldErrors.acceptRules)}
+        />
+        <Row>
+          <TextLink label={t(($) => $.rules.read)} onPress={() => router.push('/rules')} />
+        </Row>
+        <Checkbox
+          ref={inputs.ageDeclared}
+          label={t(($) => $.rules.age)}
+          value={ageDeclared}
+          onValueChange={setAgeDeclared}
+          {...boxError(fieldErrors.ageDeclared)}
+        />
+      </Stack>
       <Stack gap="sm">
+        {/* Ce qui manque : une région toujours là, vide tant que rien ne manque, lue poliment après
+            l'erreur de la case qui reçoit le focus. */}
+        <FieldError
+          id={missingId}
+          message={missingAccords ? t(($) => $.rules.missing[missingAccords]) : undefined}
+        />
         {/* Inactif, le bouton dit pourquoi (RetryButton, jur-13). */}
         <RetryButton
           label={t(($) => $.auth.signUp.submit)}

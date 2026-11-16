@@ -84,11 +84,14 @@ describe('the sheet « Créer une ruche »', () => {
     expect(screen.getByRole('radio', { name: iconName('coffee') })).toBeTruthy()
   })
 
-  it('previews the honeycomb and « Ma ruche Famille » as the name is typed', async () => {
+  it('reads the preview as Ruche Famille as the name is typed, without « Ma ruche »', async () => {
     await openSheet()
 
     await write('Famille')
 
+    // R11 (« Moins de mots », U4) : « Ma ruche » quitte l'aperçu (texte en clair : sa clé disparaîtra).
+    expect(screen.queryByText('Ma ruche')).toBeNull()
+    expect(myHiveNamed('Famille')).toBe('Ruche Famille')
     expect(shown(myHiveNamed('Famille'))).toBe(true)
     expect(screen.getAllByLabelText(badge('Famille'))).not.toHaveLength(0)
   })

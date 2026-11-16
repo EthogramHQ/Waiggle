@@ -212,7 +212,11 @@ export function SuspendSheet({ memberId, open, onClose, fromReport, author }: Pr
             kind="signedOut"
             level={2}
             title={t(($) => $.states.signedOutTitle)}
-            message={body === 'expired' ? t(($) => $.states.expired) : t(($) => $.home.membersOnly)}
+            message={
+              body === 'expired'
+                ? t(($) => $.states.expired)
+                : t(($) => $.moderation.suspend.signedOut)
+            }
             // « Me connecter » ramène ici après la connexion (?next=) ; la feuille, posée sur sa
             // propre adresse, se ferme d'elle-même quand la page de connexion s'ouvre.
             actions={[signInAgain()]}

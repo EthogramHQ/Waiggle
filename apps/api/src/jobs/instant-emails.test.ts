@@ -346,6 +346,8 @@ describe('when nothing goes out', () => {
       // R10 : seules les invitations dans une ruche partent « tout de suite » par défaut ; Zoé n'en a
       // aucune, elle ne reçoit rien (instant-emails.hives.test.ts).
       hives: 'now',
+      // R11 : « Découvertes », dans le récap par défaut.
+      discoveries: 'digest',
     })
     expect(instantTo(zoeAccount.email)).toEqual([])
     // Témoin : Inès, qui l'a demandé pour les réponses et mentions, le reçoit.

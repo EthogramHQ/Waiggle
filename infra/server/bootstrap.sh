@@ -299,6 +299,24 @@ EOF
     systemctl restart docker
   fi
   systemctl enable --quiet docker
+
+  step "Journal du système : 6 mois"
+  # journald (le journal de systemd : connexions ssh, sudo, ruche-admin) garde ses lignes 6 mois
+  # (décision du 15/11/2026, relecture de sécurité : assez longtemps pour retrouver un accès
+  # suspect, pas davantage, la page Confidentialité annonce cette durée). MaxRetentionSec est l'âge
+  # maximal d'une ligne ; SystemMaxUse plafonne la taille pour ne jamais remplir le disque. Un
+  # fichier à part dans journald.conf.d : on ne touche pas au fichier de la distribution.
+  local journald=/etc/systemd/journald.conf.d/90-ruche.conf
+  local journald_wanted='# Écrit par infra/server/bootstrap.sh (étape base).
+[Journal]
+Storage=persistent
+MaxRetentionSec=6month
+SystemMaxUse=500M'
+  if [ "$(cat "$journald" 2>/dev/null)" != "$journald_wanted" ]; then
+    install -d -m 0755 /etc/systemd/journald.conf.d
+    printf '%s\n' "$journald_wanted" >"$journald"
+    systemctl restart systemd-journald
+  fi
   # Le groupe « docker » permet de piloter Docker sans sudo.
   usermod -aG docker "$name"
   docker --version

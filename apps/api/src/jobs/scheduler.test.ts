@@ -47,12 +47,12 @@ afterEach(() => {
 
 describe('starting the job scheduler', () => {
   // Tranche 7a : une quatrième tâche, l'alerte de modération ; R6b : une cinquième, le récap des
-  // « Autre » aux administrateurs.
-  it('plans the five tasks and stops pg-boss gracefully when asked', async () => {
+  // « Autre » aux administrateurs ; R11 : une sixième, les comptes inactifs.
+  it('plans the six tasks and stops pg-boss gracefully when asked', async () => {
     const scheduler = await start()
 
     expect(boss.start).toHaveBeenCalledOnce()
-    expect(boss.schedule).toHaveBeenCalledTimes(5)
+    expect(boss.schedule).toHaveBeenCalledTimes(6)
     expect(boss.stop).not.toHaveBeenCalled()
     await scheduler.stop()
     expect(boss.stop).toHaveBeenCalledWith({ graceful: true, timeout: 30_000 })
@@ -124,6 +124,33 @@ describe('the recap of the « other » items', () => {
     expect(boss.unschedule).toHaveBeenCalledWith('other-recap')
     expect(boss.schedule).not.toHaveBeenCalledWith(
       'other-recap',
+      expect.anything(),
+      null,
+      expect.anything(),
+    )
+  })
+})
+
+// R11 : les comptes inactifs, chaque nuit à 3 h 30 de Paris, après la purge. Elle envoie l'e-mail
+// d'avant la suppression : EMAIL_JOBS=off la coupe, et sans e-mail parti aucun compte ne part.
+describe('the inactive accounts task', () => {
+  it('runs every night at 3:30, Paris time, and catches up a missed night once', async () => {
+    await start()
+
+    expect(boss.schedule).toHaveBeenCalledWith(
+      'inactive-accounts',
+      '30 3 * * *',
+      null,
+      expect.objectContaining({ tz: 'Europe/Paris', missed: 'once' }),
+    )
+  })
+
+  it('is switched off with the other e-mails', async () => {
+    await startScheduler({ databaseUrl: 'postgres://test', deps, emailJobs: false })
+
+    expect(boss.unschedule).toHaveBeenCalledWith('inactive-accounts')
+    expect(boss.schedule).not.toHaveBeenCalledWith(
+      'inactive-accounts',
       expect.anything(),
       null,
       expect.anything(),

@@ -39,6 +39,20 @@ describe('Greeting', () => {
     expect(await headingLevelOnWeb(1)).toBe(1)
   })
 
+  it('makes the greeting the level-2 heading', async () => {
+    // R11 : sans titre à part, « Bonjour Inès ! » est le titre de la section.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Greeting hello={texts.hello} body={texts.body} />)
+      const heading = screen.getByRole('header', { name: texts.hello })
+      expect(heading.props['aria-level']).toBe(2)
+      expect(screen.getAllByRole('header')).toHaveLength(1)
+      expect(screen.getByText(texts.body)).toBeTruthy()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
   it('hides the mascot from screen readers', async () => {
     await renderWithProviders(<Greeting {...texts} />)
 

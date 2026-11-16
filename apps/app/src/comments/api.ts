@@ -10,6 +10,7 @@ import {
   CommentContext,
   CommentPage,
   CommentReply,
+  MyCommentsPage,
   type NewComment,
   type Project,
 } from '@ruche/contracts'
@@ -301,6 +302,86 @@ export const useHideComment = (projectId: string): HideState => {
   })
   return {
     setHidden: useMemo(() => asBoolean(mutation.mutateAsync), [mutation.mutateAsync]),
+    error: mutation.isError,
+    reason: reasonOf(mutation.error),
+  }
+}
+
+// --- Mes commentaires (R11) -----------------------------------------------------------------------
+
+/**
+ * La clé de « Mes commentaires » en cache : tous les commentaires et réponses du membre connecté,
+ * tous projets confondus (Réglages → Mes données, tranche R11).
+ */
+export const myCommentsQueryKey = ['me', 'comments'] as const
+
+/** Une page de « Mes commentaires » (GET /v1/me/comments), les plus récents d'abord. */
+export const getMyCommentsPage = async (cursor?: string): Promise<MyCommentsPage> => {
+  const query = cursor ? `?${new URLSearchParams({ cursor })}` : ''
+  const result = await request(`/v1/me/comments${query}`, {}, MyCommentsPage)
+  if (!result.ok) throw new ApiError(result.error)
+  return result.data
+}
+
+/**
+ * Hook : ses commentaires et réponses, page par page (30 par page, « Afficher la suite »), comme
+ * `useComments` pour le fil d'un projet. Un projet qu'on ne voit plus arrive avec `project: null` :
+ * l'écran ne nomme alors personne.
+ */
+export const useMyComments = () =>
+  useInfiniteQuery({
+    queryKey: myCommentsQueryKey,
+    queryFn: ({ pageParam }) => getMyCommentsPage(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+
+/**
+ * Supprime l'un de ses commentaires depuis « Mes commentaires » (DELETE /v1/me/comments/{id}) :
+ * une route à soi, qui marche aussi sur un projet qu'on ne voit plus (l'adresse du fil d'un projet
+ * répondrait 404). L'API répond 204, sans contenu.
+ */
+export const deleteMyComment = async (commentId: string): Promise<void> => {
+  const result = await requestWithoutBody(`/v1/me/comments/${encodeURIComponent(commentId)}`, {
+    method: 'DELETE',
+  })
+  // Déjà parti (supprimé depuis un autre appareil) : le but est atteint, la ligne s'en va aussi.
+  if (!result.ok && result.error !== 'notFound') throw new ApiError(result.error)
+}
+
+type MyComments = InfiniteData<MyCommentsPage>
+
+/**
+ * Hook : supprimer l'un de ses commentaires (après confirmation, demandée par l'écran). Une fois
+ * l'API d'accord, la ligne quitte « Mes commentaires » en cache, sans relire la liste (rien ne
+ * bouge ailleurs sous les yeux du membre) ; le fil du projet et son nombre de commentaires, s'ils
+ * sont en cache, se relisent à leur prochain affichage (`invalidateQueries`) : une racine qui a des
+ * réponses y devient « Commentaire supprimé », ce que seule l'API sait faire.
+ */
+export const useDeleteMyComment = (): Failure & {
+  remove: (comment: { id: string; projectId: string }) => Promise<boolean>
+} => {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: ({ id }: { id: string; projectId: string }) => deleteMyComment(id),
+    onSuccess: (_nothing, { id, projectId }) => {
+      queryClient.setQueryData<MyComments>(myCommentsQueryKey, (data) =>
+        data
+          ? {
+              ...data,
+              pages: data.pages.map((page) => ({
+                ...page,
+                items: page.items.filter((comment) => comment.id !== id),
+              })),
+            }
+          : data,
+      )
+      void queryClient.invalidateQueries({ queryKey: commentsQueryKey(projectId) })
+      void queryClient.invalidateQueries({ queryKey: projectQueryKey(projectId) })
+    },
+  })
+  return {
+    remove: useMemo(() => asBoolean(mutation.mutateAsync), [mutation.mutateAsync]),
     error: mutation.isError,
     reason: reasonOf(mutation.error),
   }

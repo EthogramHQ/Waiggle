@@ -46,6 +46,8 @@ jest.mock('../navigation/AppTabBar', () => ({ AppTabBar: () => null }))
 jest.mock('../profile/LanguageSync', () => ({ LanguageSync: () => null }))
 // R9 : la feuille du pseudo provisoire lit la session ; elle n'est pas le sujet de ce test.
 jest.mock('../profile/ProvisionalNameGate', () => ({ ProvisionalNameGate: () => null }))
+// R11 : la couche des règles lit la session aussi ; elle a ses propres tests (rules/RulesGate).
+jest.mock('../rules/RulesGate', () => ({ RulesGate: () => null }))
 // Ni lumière dessinée (WebGL), ni thème qui touche au navigateur : l'hôte donne seulement sa place.
 jest.mock('../ui/AmbientLight', () => ({ AmbientLight: () => null }))
 

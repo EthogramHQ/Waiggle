@@ -68,6 +68,12 @@
 	@mutable not path /_expo/static/* /assets/*
 	header @mutable Cache-Control "no-cache"
 
+	# Moteurs de recherche (R11) : seuls l'accueil, la connexion, l'inscription et les quatre pages
+	# publiques peuvent être trouvés ; toute autre adresse reçoit « noindex », pour un moteur qui ne
+	# lirait pas robots.txt (apps/app/public/robots.txt). « path / » ne vaut que pour l'accueil exact.
+	@noindex not path / /sign-in /sign-up /rules /privacy /legal /accessibility
+	header @noindex X-Robots-Tag "noindex"
+
 	# Trouver le fichier d'une adresse. « route » garde l'ordre d'écriture des règles.
 	route {
 		# 0. Le plan du site d'Expo Router (/_sitemap) et le catalogue des composants (/catalogue)
@@ -80,6 +86,9 @@
 		error @devtools 404
 		# 1. Le fichier lui-même (/_expo/static/js/…), ou la page du même nom :
 		#    /sign-in → sign-in.html, /account/delete → account/delete.html.
+		#    R11 : les quatre pages publiques, sans paramètre, sont trouvées ici sans règle à elles :
+		#    /rules → rules.html, /privacy → privacy.html, /legal → legal.html,
+		#    /accessibility → accessibility.html.
 		try_files {path} {path}.html {path}/index.html
 		# 2. Les pages à paramètre sont construites une seule fois, sous le nom du paramètre :
 		#    /projects/0192abcd → projects/[id].html. Les « [^/.]+ » n'acceptent ni barre ni point :
@@ -130,6 +139,8 @@
 	handle_errors 404 {
 		import app_security
 		header Cache-Control "no-cache"
+		# Une page introuvable ne doit jamais être indexée (ces réponses repartent de zéro).
+		header X-Robots-Tag "noindex"
 		rewrite * /+not-found.html
 		file_server
 	}

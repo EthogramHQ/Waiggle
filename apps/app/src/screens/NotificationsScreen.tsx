@@ -300,7 +300,6 @@ function MemberNotifications() {
               title={t(($) => $.notifications.emailColumn.title)}
               summary={preferences ? emailSummary(preferences, t, i18n.language) : null}
               detail={preferences ? hivesNowNote(preferences, t) : null}
-              note={t(($) => $.notifications.emailColumn.counts)}
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={openSettings}
             />

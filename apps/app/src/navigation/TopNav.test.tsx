@@ -25,12 +25,13 @@ jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
 // L'adresse de la page, que les tests de R3 font varier (les liens de la barre marquent l'actif).
 let mockPathname = '/'
 const mockPush = jest.fn()
+const mockSetParams = jest.fn()
 // La page qui porte la barre est-elle affichée ? Sur le web, Expo Router garde les pages quittées
 // montées dessous, avec la même adresse (R3, relecture de l'interface C9).
 let mockFocused = true
 jest.mock('expo-router', () => ({
   usePathname: () => mockPathname,
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), setParams: mockSetParams }),
   useIsFocused: () => mockFocused,
 }))
 
@@ -43,6 +44,7 @@ beforeEach(() => {
   mockPathname = '/'
   mockFocused = true
   mockPush.mockReset()
+  mockSetParams.mockReset()
   mockSession({ user: { id: 'u5', name: 'Inès' } })
   jest.mocked(useUnreadCount).mockReset().mockReturnValue(0)
   // Par défaut, le profil n'arrive jamais : la barre s'en passe (son nom vient de la session).
@@ -281,6 +283,32 @@ describe('the search of the top bar', () => {
     // Le champ, nommé pour les lecteurs d'écran, reçoit ce qu'on tape.
     const field = screen.getByLabelText(t(($) => $.search.label))
     expect(typeof field.props.onChangeText).toBe('function')
+  })
+
+  // R11 : comme le champ de la page, la barre n'écrit l'adresse qu'à la pause de la frappe, pour que
+  // l'historique et les journaux du serveur ne gardent pas chaque préfixe tapé.
+  it('updates the address only once typing pauses', async () => {
+    mockPathname = '/search'
+    await renderWithProviders(<TopNav />)
+    jest.useFakeTimers()
+    try {
+      const field = screen.getByLabelText(t(($) => $.search.label))
+      await fireEvent.changeText(field, 'c')
+      await fireEvent.changeText(field, 'ca')
+      await fireEvent.changeText(field, 'car')
+      await act(async () => {
+        jest.advanceTimersByTime(249)
+      })
+      expect(mockSetParams).not.toHaveBeenCalled()
+
+      await act(async () => {
+        jest.advanceTimersByTime(1)
+      })
+      expect(mockSetParams).toHaveBeenCalledTimes(1)
+      expect(mockSetParams).toHaveBeenCalledWith({ q: 'car' })
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('leaves the real field to the page shown, not to a page kept mounted below it', async () => {

@@ -142,11 +142,13 @@ beforeEach(() => {
 })
 
 describe('ToolsScreen', () => {
-  it('is titled « Outils » and says what the catalogue holds', async () => {
+  it('is titled « Outils », without a subtitle', async () => {
     await renderWithProviders(<ToolsScreen />)
 
     expect(screen.getByRole('header', { name: fr.t(($) => $.tools.title) })).toBeTruthy()
-    expect(screen.getByText(containing(fr.t(($) => $.tools.subtitle)))).toBeTruthy()
+    // R11 (« Moins de mots ») : ce que contient le catalogue est dit dans les Règles (jur-T12).
+    // Écrit en clair : sa clé disparaîtra.
+    expect(screen.queryByText(/Le catalogue des outils d’IA, de développement/)).toBeNull()
   })
 
   it('lists the ten most used tools first, then the whole catalogue from A to Z, in French', async () => {

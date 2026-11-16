@@ -73,6 +73,10 @@ export function UnsubscribeScreen() {
   // « Confirmer » a envoyé, pour que le message dise ce qui a été fait.
   const [choice, setChoice] = useState<DigestOnlyChoice>('digest')
   const [sentChoice, setSentChoice] = useState<DigestOnlyChoice>('digest')
+  // R11, lien du récap : couper tout le récap (coché d'avance) ou seulement les découvertes, et
+  // ce que « Confirmer » a envoyé, pour que le message dise ce qui a été fait.
+  const [recapChoice, setRecapChoice] = useState<'all' | 'discoveries'>('all')
+  const [sentDiscoveries, setSentDiscoveries] = useState(false)
   // Un envoi à la fois : deux touchers rapides n'envoient qu'une demande (l'état `sending`, lui,
   // n'est à jour qu'au dessin suivant).
   const busy = useRef(false)
@@ -102,6 +106,8 @@ export function UnsubscribeScreen() {
   const send = async (scope?: 'all') => {
     if (busy.current || !token || stepNow.current !== (scope ? 'done' : 'ask')) return
     if (scope && Date.now() - doneAt.current < ALL_OFF_GUARD_MS) return
+    // Seul le lien du récap a le choix « Couper les découvertes » (le jeton seul coupe tout).
+    const discoveries = !scope && kind === 'recap' && recapChoice === 'discoveries'
     busy.current = true
     setSending(true)
     setFailure(null)
@@ -110,7 +116,7 @@ export function UnsubscribeScreen() {
     const asked = !scope && kind === 'instant' ? choice : null
     const result = asked
       ? await unsubscribe(token, undefined, asked)
-      : await unsubscribe(token, scope)
+      : await unsubscribe(token, discoveries ? 'discoveries' : scope)
     busy.current = false
     setSending(false)
     if (result.ok || result.error === 'validation') {
@@ -119,6 +125,7 @@ export function UnsubscribeScreen() {
       stepNow.current = next
       doneAt.current = Date.now()
       if (asked) setSentChoice(asked)
+      if (result.ok) setSentDiscoveries(discoveries)
       focusMessage.current = true
       setStep(next)
     } else {
@@ -145,7 +152,9 @@ export function UnsubscribeScreen() {
         : t(($) => $.unsubscribe.doneInstantDigest)
       : kind === 'mentions'
         ? t(($) => $.unsubscribe.doneMentions)
-        : t(($) => $.unsubscribe.doneRecap)
+        : sentDiscoveries
+          ? t(($) => $.unsubscribe.doneDiscoveries)
+          : t(($) => $.unsubscribe.doneRecap)
   const heading = hydrated && !invalid && step === 'ask' ? question : pageTitle
   const manage = (
     <Stack align="center">
@@ -205,6 +214,25 @@ export function UnsubscribeScreen() {
             ))}
           </ListGroup>
         </>
+      ) : kind === 'recap' ? (
+        // Deux choix, « Couper tout le récap » coché d'avance ; les toucher n'envoie rien. La
+        // phrase des découvertes dit ce qu'elles sont : la page s'ouvre hors de l'appli.
+        <ListGroup radio label={t(($) => $.unsubscribe.askRecap)}>
+          {(['all', 'discoveries'] as const).map((value) => (
+            <ListRow
+              key={value}
+              label={
+                value === 'all'
+                  ? t(($) => $.unsubscribe.recapAll)
+                  : t(($) => $.unsubscribe.recapDiscoveries)
+              }
+              detail={value === 'discoveries' ? t(($) => $.unsubscribe.discoveriesHint) : undefined}
+              selected={recapChoice === value}
+              disabled={sending}
+              onPress={() => setRecapChoice(value)}
+            />
+          ))}
+        </ListGroup>
       ) : null}
       {failureNotice}
       <Button

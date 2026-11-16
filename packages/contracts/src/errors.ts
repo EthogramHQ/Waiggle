@@ -86,6 +86,10 @@ export const ErrorCode = z.enum([
   // Relecture du design de R10 : la 21e invitation du jour (429). Le quota court sur 24 h : l'appli
   // dit « demain », pas « dans quelques minutes » comme pour `rate_limited`.
   'hive_invitations_limited',
+  // Tranche R11 (la conformité) : une écriture d'un membre qui n'a pas accepté la version des
+  // règles en vigueur (403). Les lectures et les sorties (accepter, régler ses e-mails, se
+  // désinscrire, supprimer un contenu à soi) restent ouvertes, comme pour `suspended`.
+  'rules_required',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

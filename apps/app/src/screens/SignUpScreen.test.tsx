@@ -1,7 +1,7 @@
 // Tests de l'écran d'inscription. On remplace (« mock ») le module qui parle à l'API par de faux
 // appels : on teste l'écran seul, sans réseau, et on décide nous-mêmes de la réponse de l'API.
 // Depuis la refonte (tranche R2) : « Créer ton compte » et « Créer mon compte », le choix de la
-// langue, « Voir le code » annoncé comme un site externe, le bouton toujours actif (les champs
+// langue, « Le code source » (pied, R11) annoncé comme un site externe, le bouton toujours actif (les champs
 // incomplets sont signalés à l'envoi, le premier reçoit le focus), l'adresse absente de l'URL de
 // « Vérifie ta boîte mail » (jur-9), les onglets sur ordinateur, et « Trop d'essais » à heure fixe.
 import { sourceUrl } from '@ruche/brand'
@@ -58,6 +58,9 @@ const fillForm = async (password = 'correct-horse-battery', inviteCode = 'miel-2
   await fireEvent.changeText(screen.getByLabelText('Nom affiché'), 'Léa')
   await fireEvent.changeText(screen.getByLabelText('Adresse e‑mail'), 'lea@example.com')
   await fireEvent.changeText(screen.getByLabelText('Mot de passe'), password)
+  // R11 : sans les deux cases (les règles, l'âge), l'écran refuse l'envoi (SignUpForm.rules.test.tsx).
+  await fireEvent.press(screen.getByRole('checkbox', { name: fr.t(($) => $.rules.accept) }))
+  await fireEvent.press(screen.getByRole('checkbox', { name: fr.t(($) => $.rules.age) }))
   await fireEvent.press(screen.getByRole('button', { name: submitLabel }))
 }
 
@@ -86,7 +89,9 @@ describe('SignUpScreen', () => {
     expect(screen.getByLabelText('Encore 2 caractères')).toBeTruthy()
 
     await fireEvent.changeText(screen.getByLabelText('Mot de passe'), 'abeilles-dor')
-    expect(screen.getByLabelText('C’est bon, ton mot de passe est assez long.')).toBeTruthy()
+    // R11 (U4) : la phrase quitte l'écran mais reste le nom lu de la jauge pleine.
+    expect(screen.getByLabelText('Mot de passe assez long')).toBeTruthy()
+    expect(screen.queryByText('C’est bon, ton mot de passe est assez long.')).toBeNull()
   })
 
   it('shows the password on request, then hides it again', async () => {
@@ -128,6 +133,8 @@ describe('SignUpScreen', () => {
       password: 'correct-horse-battery',
       inviteCode: 'miel-2026-noel',
       language: 'fr',
+      acceptRules: true,
+      ageDeclared: true,
     })
     expect(paths()).toContain('/check-email')
     expect(JSON.stringify(visited(mockPush, mockReplace))).not.toContain('lea@example.com')
@@ -176,11 +183,12 @@ describe('SignUpScreen', () => {
 // --- Tranche R2 : les textes de la maquette, la langue, le code source, les champs incomplets ---
 
 describe('the sign-up page after the redesign (R2)', () => {
-  it('is titled « Créer ton compte », with its subtitle, and the button says « Créer mon compte »', async () => {
+  it('is titled « Créer ton compte », without a subtitle, and the button says « Créer mon compte »', async () => {
     await renderWithI18n(<SignUpScreen />)
 
     expect(screen.getByRole('header', { name: fr.t(($) => $.auth.signUp.title) })).toBeTruthy()
-    expect(screen.getByText(fr.t(($) => $.auth.signUp.subtitle))).toBeTruthy()
+    // R11 (« Moins de mots ») : écrit en clair, sa clé disparaîtra.
+    expect(screen.queryByText('Tes proches te reconnaîtront à ton nom affiché.')).toBeNull()
     expect(screen.getByRole('button', { name: submitLabel })).toBeTruthy()
   })
 
@@ -194,10 +202,12 @@ describe('the sign-up page after the redesign (R2)', () => {
     ).toBeTruthy()
   })
 
-  it('announces « Voir le code » as a link to an external site', async () => {
+  it('announces « Le code source » (pied, R11) as a link to an external site', async () => {
     await renderWithI18n(<SignUpScreen />)
 
-    const link = screen.getByRole('link', { name: containing(fr.t(($) => $.home.seeCode)) })
+    const link = screen.getByRole('link', {
+      name: containing(fr.t(($) => $.legal.links.sourceCode)),
+    })
     const external = fr.t(($) => $.common.externalSite)
     const props = link.props as Record<string, unknown>
     expect(

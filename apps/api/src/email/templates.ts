@@ -199,7 +199,30 @@ type Layout = {
   reason?: string
   links?: Link[]
   footer: string
+  /**
+   * R11 : la dernière ligne du pied, l'adresse de la page Confidentialité (`privacyLine`), en
+   * texte comme l'adresse de contact.
+   */
+  privacy?: string | undefined
 }
+
+/**
+ * R11 : la ligne du pied qui donne l'adresse de la page Confidentialité, fabriquée depuis
+ * l'adresse de l'appli (`appUrl/privacy`), jamais écrite en dur : l'appli de test ou de
+ * préproduction mène à sa propre page.
+ */
+export const privacyLine = (language: Language, appUrl: string) =>
+  fill(resources[language].translation.email.privacy, {
+    url: new URL('/privacy', appUrl).toString(),
+  })
+
+/**
+ * Le pied commun : chaque modèle reçoit l'adresse de l'appli en dernier paramètre, et chaque envoi
+ * du serveur la donne. Facultative pour les seuls tests des modèles écrits avant R11, qui ne la
+ * passent pas : sans elle, la ligne manque.
+ */
+const privacyOf = (language: Language, appUrl: string | undefined) =>
+  appUrl === undefined ? undefined : privacyLine(language, appUrl)
 
 /**
  * La seule feuille de style de l'e-mail : une « requête média » (@media), qui ne s'applique que
@@ -228,6 +251,7 @@ const render = ({
   reason,
   links = [],
   footer,
+  privacy,
 }: Layout) => {
   const buttons = [...(button ? [button] : []), ...moreButtons]
   // Le texte brut : chaque lien écrit en entier sous son libellé, pour les messageries sans HTML ;
@@ -264,6 +288,7 @@ const render = ({
     ...(reason ? [reason, ''] : []),
     ...links.flatMap((link) => [link.label, link.url, '']),
     footer,
+    ...(privacy === undefined ? [] : [privacy]),
   ].join('\n')
 
   const body = 'font-size:16px;line-height:1.5'
@@ -375,6 +400,7 @@ const render = ({
     ${reason ? p(reason, small) : ''}
     ${footerLinks}
     ${p(footer, small)}
+    ${privacy === undefined ? '' : p(privacy, small)}
   </div>
 </div>
 </body></html>`
@@ -385,6 +411,7 @@ const render = ({
 export const verificationEmail = (
   language: Language,
   { name, url }: { name: string; url: string },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -400,6 +427,7 @@ export const verificationEmail = (
       button: { label: fill(t.verify.button), url },
       notes: [fill(t.verify.ignore)],
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -412,6 +440,7 @@ export const verificationEmail = (
 export const existingAccountEmail = (
   language: Language,
   { name, signInUrl }: { name: string; signInUrl: string },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -426,6 +455,7 @@ export const existingAccountEmail = (
       button: { label: fill(t.existingAccount.button), url: signInUrl },
       notes: [fill(t.existingAccount.ignore)],
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -444,6 +474,7 @@ export const existingAccountEmail = (
 export const resetPasswordEmail = (
   language: Language,
   { url, hours }: { url: string; hours: number },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -472,6 +503,7 @@ export const resetPasswordEmail = (
       notes: [fill(t.resetPassword.ignore)],
       reason: fill(t.resetPassword.reason),
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -485,6 +517,7 @@ export const resetPasswordEmail = (
 export const passwordChangedEmail = (
   language: Language,
   { name, settingsUrl }: { name: string; settingsUrl: string },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -500,6 +533,7 @@ export const passwordChangedEmail = (
       notes: [],
       reason: fill(t.passwordChanged.reason),
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -525,6 +559,7 @@ export const passwordChangedEmail = (
 export const changeEmailConfirmationEmail = (
   language: Language,
   { name, newEmail, url }: { name: string; newEmail: string; url: string },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -548,6 +583,7 @@ export const changeEmailConfirmationEmail = (
       closing: [withBold(t.changeEmail.ignore, 'contactEmail', contactEmail)],
       notes: [],
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -561,6 +597,7 @@ export const changeEmailConfirmationEmail = (
 export const newEmailVerificationEmail = (
   language: Language,
   { url }: { url: string },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -578,6 +615,7 @@ export const newEmailVerificationEmail = (
       button: { label: fill(t.newEmail.button), textLabel: fill(t.newEmail.textLink), url },
       notes: [fill(t.newEmail.ignore)],
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -591,6 +629,7 @@ export const newEmailVerificationEmail = (
 export const emailChangedEmail = (
   language: Language,
   { name, newEmail }: { name: string; newEmail: string },
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -607,6 +646,7 @@ export const emailChangedEmail = (
       ],
       notes: [],
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -806,8 +846,10 @@ const thumbRow = (thumb: string, size: number, content: string) =>
  * rien n'est chargé à distance (A5). Le texte d'un membre (nom, titre, texte de remplacement d'une
  * image) passe par defangLinks, puis par l'échappement du HTML.
  */
-export const recapEmail = (language: Language, data: RecapData): EmailContent => {
+export const recapEmail = (language: Language, data: RecapData, appUrl?: string): EmailContent => {
   const t = resources[language].translation.email
+  // R11 : la dernière ligne du pied, l'adresse de la page Confidentialité (comme `render`).
+  const privacy = privacyOf(language, appUrl)
   const r = t.recap
   const link = linkPlaceholder(language)
   const clean = (value: string) => defangLinks(value, link)
@@ -988,6 +1030,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
     data.links.unsubscribe,
     '',
     fill(t.footer),
+    ...(privacy === undefined ? [] : [privacy]),
   ].join('\n')
 
   // ─── Le HTML ───
@@ -1161,6 +1204,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
       ${footerLink(t.changePreferences, data.links.manage)}
       ${footerLink(r.unsubscribe, data.links.unsubscribe)}
       <p style="margin:6px 0 0;${small}">${escapeHtml(fill(t.footer))}</p>
+      ${privacy === undefined ? '' : `<p style="margin:6px 0 0;${small}">${escapeHtml(privacy)}</p>`}
     </div>
   </div>
 </div>
@@ -1195,6 +1239,7 @@ export type ModerationAlertData = {
 export const moderationAlertEmail = (
   language: Language,
   { name, count, url }: ModerationAlertData,
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -1208,6 +1253,7 @@ export const moderationAlertEmail = (
       notes: [],
       reason: fill(t.moderationAlert.reason),
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -1234,7 +1280,11 @@ export type OtherRecapData = {
  * données ne leur laissent aucune place. Un nombre nul n'a pas de ligne. Un e-mail de service aux
  * administrateurs, comme l'alerte de modération : ni lien de désinscription, ni en-tête de liste.
  */
-export const otherRecapEmail = (language: Language, data: OtherRecapData): EmailContent => {
+export const otherRecapEmail = (
+  language: Language,
+  data: OtherRecapData,
+  appUrl?: string,
+): EmailContent => {
   const t = resources[language].translation.email
   const r = t.otherRecap
   const lines = [
@@ -1261,6 +1311,7 @@ export const otherRecapEmail = (language: Language, data: OtherRecapData): Email
       notes: [],
       reason: fill(r.reason),
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -1306,6 +1357,7 @@ const parisEnd = (language: Language, endsAt: Date) => {
 export const suspensionEmail = (
   language: Language,
   { endsAt, ground, explanation, afterReport }: SuspensionEmailData,
+  appUrl?: string,
 ): EmailContent => {
   const t = resources[language].translation.email.suspension
   return {
@@ -1335,6 +1387,7 @@ export const suspensionEmail = (
       after: [withBold(t.contest, 'contactEmail', contactEmail)],
       notes: [],
       footer: fill(resources[language].translation.email.footer),
+      privacy: privacyOf(language, appUrl),
     }),
   }
 }
@@ -1350,7 +1403,11 @@ export type MentionData = {
  * L'e-mail de mentions et de réponses, que le membre active lui-même : la seule sorte d'e-mail qui
  * montre un extrait du texte des autres. L'objet reste fixe (écran verrouillé).
  */
-export const mentionEmail = (language: Language, data: MentionData): EmailContent => {
+export const mentionEmail = (
+  language: Language,
+  data: MentionData,
+  appUrl?: string,
+): EmailContent => {
   const t = resources[language].translation.email
   const link = linkPlaceholder(language)
   return {
@@ -1373,6 +1430,58 @@ export const mentionEmail = (language: Language, data: MentionData): EmailConten
         { label: t.manage, url: data.links.manage },
       ],
       footer: fill(t.footer),
+      privacy: privacyOf(language, appUrl),
+    }),
+  }
+}
+
+// ─── Les comptes inactifs (R11) ──────────────────────────────────────────────────────────────────
+
+export type InactiveAccountData = {
+  /** Le nom du compte, désarmé par defangLinks (un nom peut contenir une adresse). */
+  name: string
+  /** La date de suppression, calculée par la tâche (inactiveDeletionDate) : jamais devancée. */
+  deleteOn: Date
+  /** L'adresse de l'appli : le bouton (la connexion, puis « Mes données ») et la Confidentialité. */
+  appUrl: string
+}
+
+/**
+ * L'e-mail d'un compte sans visite depuis près de 3 ans, un mois avant sa suppression (relecture
+ * juridique J3, sécurité S-C2). Un e-mail de service : il part même si le membre a coupé tous les
+ * autres, et ne porte ni lien de désinscription ni en-tête de désinscription. Il dit pourquoi, la
+ * date (à l'heure de Paris, comme la fin d'une suspension), que se connecter suffit, comment
+ * exporter ses données, ce qui part et ce qui reste chez les autres ; rien de promotionnel.
+ *
+ * Aucun jeton et aucun export joint : en 3 ans, l'adresse a pu être rendue puis redonnée à un
+ * inconnu. Le seul bouton mène à la connexion de l'appli, qui ramène ensuite à « Mes données »
+ * (`?next=/settings/data`, filtré par l'appli : navigation/next.ts) ; il faut donc le mot de passe.
+ * Tous les liens sont fabriqués depuis `appUrl`, jamais depuis un texte de membre.
+ */
+export const inactiveAccountEmail = (
+  language: Language,
+  { name, deleteOn, appUrl }: InactiveAccountData,
+): EmailContent => {
+  const t = resources[language].translation.email
+  const i = t.inactive
+  const { date } = parisEnd(language, deleteOn)
+  const signIn = new URL('/sign-in', appUrl)
+  signIn.searchParams.set('next', '/settings/data')
+  return {
+    subject: fill(i.subject, { date }),
+    ...render({
+      language,
+      heading: fill(i.heading),
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
+      // fill, même sans paramètre : render() écrit les paragraphes tels quels, et `{{appName}}`
+      // doit être rempli (relecture de R2).
+      paragraphs: [fill(i.body), fill(i.date, { date }), fill(i.keep)],
+      button: { label: fill(i.button), textLabel: fill(i.textLink), url: signIn.toString() },
+      closing: [fill(i.export), fill(i.goes), fill(i.remains)],
+      notes: [],
+      reason: fill(i.reason),
+      footer: fill(t.footer),
+      privacy: privacyLine(language, appUrl),
     }),
   }
 }

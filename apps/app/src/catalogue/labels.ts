@@ -37,7 +37,7 @@ const fr = {
   remove: 'Retirer',
   meter: 'Encore 3 caractères',
   meterEmpty: 'Au moins 12 caractères.',
-  meterDone: 'C’est bon, ton mot de passe est assez long.',
+  meterDone: 'Mot de passe assez long',
   longHint:
     'une-tres-longue-adresse-de-demonstration.example.org, un site hors de l’appli, dont la note passe sur plusieurs lignes',
   // Une note dont un morceau est un lien (Hint, prop `link`).
@@ -215,7 +215,7 @@ const en: typeof fr = {
   remove: 'Remove',
   meter: '3 more characters',
   meterEmpty: 'At least 12 characters.',
-  meterDone: 'Good, your password is long enough.',
+  meterDone: 'Password long enough',
   longHint:
     'a-very-long-demonstration-address.example.org, a site outside the app, whose note runs over several lines',
   hintLink: 'No longer have access to your address? Write to us at contact@example.org.',

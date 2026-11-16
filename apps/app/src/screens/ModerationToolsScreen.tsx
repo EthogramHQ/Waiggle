@@ -445,12 +445,7 @@ function AdminTools() {
   )
 
   return (
-    <Screen
-      header={<TopNav />}
-      onBack={back}
-      title={t(($) => $.moderation.catalogue.title)}
-      subtitle={t(($) => $.moderation.catalogue.subtitle)}
-    >
+    <Screen header={<TopNav />} onBack={back} title={t(($) => $.moderation.catalogue.title)}>
       <Stack gap="xl">
         <Stack gap="lg">
           <Segmented<Tab>

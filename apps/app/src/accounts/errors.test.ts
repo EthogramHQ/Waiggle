@@ -1,4 +1,5 @@
-import { authErrorKey } from './errors'
+import { fr } from '../testing/text'
+import { authErrorKey, isAccordError, signUpErrorKey } from './errors'
 
 // Better Auth renvoie un code d'erreur technique (en anglais) ; l'appli le traduit en message clair.
 describe('authErrorKey', () => {
@@ -47,5 +48,32 @@ describe('authErrorKey', () => {
       'invalidCredentials',
     )
     expect(authErrorKey({ status: 0 })).toBe('generic')
+  })
+})
+
+// Tranche R11 : l'inscription refusée faute de l'un des deux accords (contrat SignUpRefusalCode).
+describe('signUpErrorKey', () => {
+  it('recognises a sign-up sent without accepting the rules', () => {
+    const key = signUpErrorKey({ status: 400, code: 'RULES_NOT_ACCEPTED' })
+    expect(key).toBe('rulesNotAccepted')
+    // Son message est l'erreur de l'API déjà écrite, dans les deux langues.
+    expect(isAccordError(key)).toBe(true)
+    expect(fr.t(($) => $.errors.rulesNotAccepted)).toMatch(/règles/)
+  })
+
+  it('recognises a sign-up sent without declaring the age', () => {
+    const key = signUpErrorKey({ status: 400, code: 'AGE_NOT_DECLARED' })
+    expect(key).toBe('ageNotDeclared')
+    expect(isAccordError(key)).toBe(true)
+    expect(fr.t(($) => $.errors.ageNotDeclared)).toMatch(/15/)
+  })
+
+  it('keeps the other refusals of the account, and too many attempts first', () => {
+    // Témoins : le code d'invitation et le 429 gardent leurs messages du compte.
+    expect(signUpErrorKey({ status: 403, code: 'INVITE_CODE_INVALID' })).toBe('inviteInvalid')
+    expect(signUpErrorKey({ status: 429, code: 'RULES_NOT_ACCEPTED' })).toBe('tooManyAttempts')
+    expect(isAccordError(signUpErrorKey({ status: 500 }))).toBe(false)
+    // authErrorKey, que lisent les autres écrans du compte, ne connaît pas ces deux codes.
+    expect(authErrorKey({ status: 400, code: 'RULES_NOT_ACCEPTED' })).toBe('generic')
   })
 })

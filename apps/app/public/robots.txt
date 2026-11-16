@@ -1,0 +1,14 @@
+# Ce que les moteurs de recherche peuvent lire : l'accueil, la connexion, l'inscription et les
+# quatre pages publiques. Tout le reste (projets, membres, ruches, réglages…) est écarté ; l'en-tête
+# « X-Robots-Tag: noindex » de Caddy (infra/Caddyfile) le redit pour un moteur qui ne lirait pas ce
+# fichier. Un moteur retient la règle la plus précise : « Allow: /$ » ne vaut que pour l'accueil
+# (le « $ » veut dire « l'adresse s'arrête là »), « Disallow: / » pour tout le reste.
+User-agent: *
+Allow: /$
+Allow: /sign-in
+Allow: /sign-up
+Allow: /rules
+Allow: /privacy
+Allow: /legal
+Allow: /accessibility
+Disallow: /

@@ -170,6 +170,8 @@ export const memberCounterKeys = (userId: string) => ({
   toolsHour: `tools-hour:${userId}`,
   // Les nouveaux « Autre » (R6b, sec-A5) : 30 créations par jour, projets et profil ensemble.
   otherTools: `other-tools:${userId}`,
+  // Accepter les règles en vigueur depuis l'écran « Accepter » (R11) : 30 par heure.
+  rulesAccept: `rules-accept:${userId}`,
   // Marquer son fil lu (R4) : 600 par heure, une fois par ouverture du fil dans l'appli.
   feedReadHour: `feed-read-hour:${userId}`,
   // Lire « Proches à suivre » (R4) : 600 par heure.

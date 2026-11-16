@@ -9,8 +9,10 @@ import {
   type ApiResult,
   errorKeyFor,
   PROJECT_CALLS_LIMITED_CODE,
+  RULES_REQUIRED_CODE,
 } from './errors'
 import { reloadIfNewVersion } from './newVersion'
+import { queryClient } from './query-client'
 
 /**
  * Envoie une requête à l'API avec la session du membre.
@@ -76,6 +78,11 @@ const send = async (path: string, init: RequestInit): Promise<ApiResult<Response
   // ne lit pas le corps : un « 413 » peut venir de Caddy, en HTML.
   const code = AMBIGUOUS_STATUSES.has(res.status) ? await readErrorCode(res) : undefined
   const error = errorKeyFor(res.status, code)
+  // R11 : une écriture refusée faute d'accord aux règles (403 `rules_required`) veut dire que le
+  // profil gardé en cache est périmé (une nouvelle version des règles, ou un autre appareil). On
+  // le relit : il dit `rulesAccepted: false`, et la garde des règles remet l'écran « Accepter ».
+  // La clé `['me']` est celle de `profile/hooks.ts` (non importée ici : ce module est sous lui).
+  if (code === RULES_REQUIRED_CODE) void queryClient.invalidateQueries({ queryKey: ['me'] })
   return code === PROJECT_CALLS_LIMITED_CODE
     ? { ok: false, error, projectLimit: true }
     : { ok: false, error }

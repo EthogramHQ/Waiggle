@@ -2,8 +2,9 @@
 // de la semaine, et l'e-mail de mentions et de réponses si le membre l'active. R8 : un choix par
 // type (« Tout de suite », « Dans le récap », « Jamais »), « Dans le récap » par défaut pour tous
 // (décision de Louis du 12/11/2026 : aucun e-mail immédiat sans l'avoir demandé), et un seul e-mail
-// « tout de suite » qui regroupe les types réglés ainsi. Les e-mails de compte (vérification de
-// l'adresse, mot de passe) ne dépendent pas de ces réglages.
+// « tout de suite » qui regroupe les types réglés ainsi. R11 : le réglage « Découvertes » du récap,
+// et les durées de la suppression des comptes inactifs. Les e-mails de compte (vérification de
+// l'adresse, mot de passe, compte inactif) ne dépendent pas de ces réglages.
 import { z } from 'zod'
 
 /** Le récap part le dimanche à 10 h (R8), s'il y a du nouveau ; au plus 5 lignes, puis « et N autres ». */
@@ -69,6 +70,12 @@ export const EmailPreferences = z
     updates: DigestOnlyChoice,
     testers: EmailChoice,
     hives: EmailChoice,
+    /**
+     * R11 : « Découvertes », les parties du récap qui font découvrir (« Nouveaux projets de tes
+     * proches » et « Ils cherchent des testeurs »). Jamais un e-mail à part : dans le récap, ou
+     * rien. `never` retire ces deux parties ; le récap garde les autres.
+     */
+    discoveries: DigestOnlyChoice,
   })
   .meta({ id: 'EmailPreferences' })
 export type EmailPreferences = z.infer<typeof EmailPreferences>
@@ -76,6 +83,8 @@ export type EmailPreferences = z.infer<typeof EmailPreferences>
 /**
  * Les réglages par défaut, ceux d'un membre qui n'a jamais rien changé. R10 : « Ruches » vaut
  * « Tout de suite » par défaut (scénario, « Le réglage Ruches ») : une invitation attend une réponse.
+ * R11 : « Découvertes » vaut « Dans le récap » pour tous, inscrits d'avant compris (choix 8 du
+ * scénario : rien ne change pour eux sans leur choix).
  */
 export const DEFAULT_EMAIL_PREFERENCES: EmailPreferences = {
   weeklyRecap: true,
@@ -86,6 +95,7 @@ export const DEFAULT_EMAIL_PREFERENCES: EmailPreferences = {
   updates: 'digest',
   testers: 'digest',
   hives: 'now',
+  discoveries: 'digest',
 }
 
 /**
@@ -104,6 +114,7 @@ export const EmailPreferencesPatch = z
     z.strictObject({ updates: DigestOnlyChoice }),
     z.strictObject({ testers: EmailChoice }),
     z.strictObject({ hives: EmailChoice }),
+    z.strictObject({ discoveries: DigestOnlyChoice }),
   ])
   .meta({ id: 'EmailPreferencesPatch' })
 export type EmailPreferencesPatch = z.infer<typeof EmailPreferencesPatch>
@@ -127,19 +138,36 @@ export const UnsubscribeToken = z
   .regex(/^v1\.[A-Za-z0-9_-]{1,200}\.(recap|mentions|instant)\.[A-Za-z0-9_-]{43}$/)
 
 /**
+ * Ce qu'un lien de désinscription coupe, en plus de sa sorte (`scope`) : `all`, tout (le récap
+ * compris) ; `discoveries` (R11), seulement les découvertes du récap (« Couper les découvertes » de
+ * la page de désinscription du récap). Absent : la sorte du jeton seule.
+ */
+export const UnsubscribeScope = z.enum(['all', 'discoveries'])
+export type UnsubscribeScope = z.infer<typeof UnsubscribeScope>
+
+/**
  * Les paramètres de POST /v1/email/unsubscribe : le jeton, `scope=all` pour couper aussi le récap,
- * et pour un jeton `instant`, ce que deviennent les types « Tout de suite » : `digest` (« Dans le
- * récap ») ou `never`. Absent, c'est `digest` : le « Se désabonner » en un clic d'une messagerie
- * (List-Unsubscribe, RFC 8058) ne lit pas de page (décision de Louis du 12/11/2026). Jamais `now` :
- * un lien ne rallume rien. La route ne lit jamais le corps : une messagerie y envoie
- * « List-Unsubscribe=One-Click », en formulaire ou en multipart.
+ * `scope=discoveries` pour n'en couper que les découvertes (un jeton `recap` seulement : les
+ * autres e-mails n'en portent pas), et pour un jeton `instant`, ce que deviennent les types « Tout
+ * de suite » : `digest` (« Dans le récap ») ou `never`. Absent, c'est `digest` : le « Se
+ * désabonner » en un clic d'une messagerie (List-Unsubscribe, RFC 8058) ne lit pas de page
+ * (décision de Louis du 12/11/2026). Jamais `now` : un lien ne rallume rien. La route ne lit jamais
+ * le corps : une messagerie y envoie « List-Unsubscribe=One-Click », en formulaire ou en multipart.
  */
 export const UnsubscribeQuery = z.object({
   token: UnsubscribeToken,
-  scope: z.enum(['all']).optional(),
+  scope: UnsubscribeScope.optional(),
   choice: DigestOnlyChoice.optional(),
 })
 export type UnsubscribeQuery = z.infer<typeof UnsubscribeQuery>
+
+/**
+ * R11 : un compte sans visite depuis 3 ans est supprimé (décision de Louis du 15/11/2026), par le
+ * chemin complet d'une suppression demandée. Un e-mail de service le prévient 30 jours avant, même
+ * réglé sur « Jamais » ou désinscrit de tout : se connecter suffit à le garder.
+ */
+export const INACTIVE_ACCOUNT_YEARS = 3
+export const INACTIVE_NOTICE_DAYS = 30
 
 /**
  * Ce que l'export des données (RGPD) donne des e-mails : les réglages (valeurs par défaut

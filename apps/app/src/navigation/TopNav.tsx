@@ -107,11 +107,15 @@ const useQueryParam = (): string | undefined => {
   }
 }
 
+/** L'attente après la dernière frappe avant d'écrire l'adresse : celle de la page de recherche. */
+const ADDRESS_DELAY_MS = 250
+
 /**
  * Le vrai champ de la barre, sur la page de recherche. Ce qu'on tape fait foi : il est gardé dans
- * l'état local, et écrit dans l'adresse à chaque frappe. L'adresse revient ensuite, un instant
- * plus tard (l'« écho ») : sans précaution, une lettre tapée entre-temps serait effacée par l'écho
- * de la frappe d'avant. Seule une adresse changée sans nous (le bouton « Précédent » du
+ * l'état local, et écrit dans l'adresse à la pause de la frappe (R11 : l'historique et les journaux
+ * du serveur ne gardent pas chaque préfixe tapé ; même attente que la page de recherche).
+ * L'adresse revient ensuite, un instant plus tard (l'« écho ») : sans précaution, une lettre tapée
+ * entre-temps serait effacée par l'écho de l'écriture d'avant. Seule une adresse changée sans nous (le bouton « Précédent » du
  * navigateur, un lien vers une recherche) remplace ce qui est dans le champ.
  */
 function BarSearchField() {
@@ -124,6 +128,13 @@ function BarSearchField() {
   const [value, setValue] = useState('')
   // Les valeurs écrites dans l'adresse dont l'écho n'est pas encore revenu, dans l'ordre.
   const pending = useRef<string[]>([])
+  // Le minuteur de la pause, et le routeur lu par une ref : un routeur neuf à chaque rendu ne doit
+  // pas relancer l'attente.
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const routerRef = useRef(router)
+  routerRef.current = router
+  // La page quittée avant la fin de l'attente n'écrit plus rien.
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   useEffect(() => {
     if (!hydrated) return
@@ -141,7 +152,7 @@ function BarSearchField() {
   const write = (text: string) => {
     pending.current.push(text)
     // Un champ vide retire le paramètre, plutôt que de laisser « ?q= » dans l'adresse.
-    router.setParams({ q: text === '' ? undefined : text })
+    routerRef.current.setParams({ q: text === '' ? undefined : text })
   }
 
   return (
@@ -151,7 +162,8 @@ function BarSearchField() {
       value={value}
       onChangeText={(text) => {
         setValue(text)
-        write(text)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => write(text), ADDRESS_DELAY_MS)
       }}
       // Entrée ne fait rien de plus (la page cherche pendant qu'on tape) ; elle garde le focus
       // dans le champ, sur le web, au lieu de le rendre à la page.

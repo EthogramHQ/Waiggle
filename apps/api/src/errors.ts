@@ -68,6 +68,8 @@ const errorMessages = {
   pin_not_visible: 'pinNotVisible',
   // Relecture du design de R10 : le quota des invitations du jour a son propre message (« demain »).
   hive_invitations_limited: 'hiveInvitationsLimited',
+  // Tranche R11 : une écriture d'un membre qui n'a pas accepté la version des règles en vigueur.
+  rules_required: 'rulesRequired',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

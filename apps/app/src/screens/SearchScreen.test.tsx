@@ -246,18 +246,54 @@ describe('SearchScreen, the address', () => {
     expect(useSearch).toHaveBeenCalledWith('carn')
   })
 
-  it('writes the text into the address at each keystroke, without a new page in the history', async () => {
-    mockParams = {}
-    await renderSearch()
+  it('writes the text into the address once typing pauses, without a new page in the history', async () => {
+    jest.useFakeTimers()
+    try {
+      mockParams = {}
+      await renderSearch()
 
-    await fireEvent.changeText(field(), 'c')
-    await fireEvent.changeText(field(), 'ca')
+      await fireEvent.changeText(field(), 'c')
+      await act(async () => {
+        jest.advanceTimersByTime(250)
+      })
+      await fireEvent.changeText(field(), 'ca')
+      await act(async () => {
+        jest.advanceTimersByTime(250)
+      })
 
-    // setParams remplace l'adresse ; push ajouterait une page à l'historique par lettre (jur-J5).
-    expect(mockSetParams).toHaveBeenNthCalledWith(1, { q: 'c' })
-    expect(mockSetParams).toHaveBeenNthCalledWith(2, { q: 'ca' })
-    expect(mockPush).not.toHaveBeenCalled()
-    expect(mockNavigate).not.toHaveBeenCalled()
+      // setParams remplace l'adresse ; push ajouterait une page à l'historique par pause (jur-J5).
+      expect(mockSetParams).toHaveBeenNthCalledWith(1, { q: 'c' })
+      expect(mockSetParams).toHaveBeenNthCalledWith(2, { q: 'ca' })
+      expect(mockPush).not.toHaveBeenCalled()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('updates the address only once typing pauses', async () => {
+    jest.useFakeTimers()
+    try {
+      mockParams = {}
+      await renderSearch()
+
+      // R11 : l'historique et les journaux du serveur ne gardent pas chaque préfixe tapé.
+      await fireEvent.changeText(field(), 'c')
+      await fireEvent.changeText(field(), 'ca')
+      await fireEvent.changeText(field(), 'car')
+      await act(async () => {
+        jest.advanceTimersByTime(249)
+      })
+      expect(mockSetParams).not.toHaveBeenCalled()
+
+      await act(async () => {
+        jest.advanceTimersByTime(1)
+      })
+      expect(mockSetParams).toHaveBeenCalledTimes(1)
+      expect(mockSetParams).toHaveBeenCalledWith({ q: 'car' })
+    } finally {
+      jest.useRealTimers()
+    }
   })
 })
 

@@ -12,7 +12,8 @@
 //   dit pourquoi on ne peut plus répondre, au cadenas.
 //
 // Les gestes, par le menu « … » de chaque message :
-// - supprimer le sien, après une confirmation (`DeleteMessageDialog`, plus bas) ;
+// - supprimer le sien, après une confirmation (`testers/DeleteMessageDialog`, commune avec « Mes
+//   retours envoyés ») ;
 // - signaler celui de l'autre (page « Signaler ») ;
 // - pour l'auteur, sur un retour : « Marquer comme réglé » ou « Remettre à traiter » (au toucher,
 //   « Réglé » paraît sous le retour) ; jamais dans un coin fermé (l'API refuserait).
@@ -45,18 +46,16 @@ import { useSignInAgain } from '../navigation/signInAgain'
 import { removalBanner } from '../reports/removal'
 import {
   type CornerFailure,
-  useDeleteMessage,
   useMarkThreadRead,
   useSendMessage,
   useSettleFeedback,
   useThreadMessages,
 } from '../testers/corner-api'
+import { DeleteMessageDialog } from '../testers/DeleteMessageDialog'
 import { draftKey, useDraft } from '../testers/drafts'
-import { Button } from '../ui/Button'
 import { excerpt } from '../ui/CommentAction'
 import { CommentComposer } from '../ui/CommentComposer'
 import { partContestSubject } from '../ui/contestSubject'
-import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import { type Focusable, focusTarget, moveReaderTo } from '../ui/focus'
 import { Hint } from '../ui/Hint'
@@ -497,14 +496,16 @@ export function TesterThreadView({
         </Stack>
       )}
       <DeleteMessageDialog
-        projectId={projectId}
         testerId={testerId}
-        message={deleting}
-        otherName={otherName}
-        onDeleted={(message) => {
+        message={
+          deleting
+            ? { id: deleting.id, projectId, removed: deleting.removal != null, otherName }
+            : null
+        }
+        onDeleted={(messageId) => {
           confirmed.current = {
-            id: message.id,
-            index: shown.findIndex((one) => one.id === message.id),
+            id: messageId,
+            index: shown.findIndex((one) => one.id === messageId),
           }
         }}
         onClose={() => setDeleting(null)}
@@ -560,124 +561,4 @@ function OpenAtLatest() {
     requestAnimationFrame(() => scroll?.toEnd?.())
   }, [])
   return null
-}
-
-type DeleteProps = {
-  projectId: string
-  testerId: string
-  /** Le message dont on demande la suppression ; null : la fenêtre est fermée. */
-  message: TesterMessage | null
-  /** L'autre personne du fil, qui ne le verra plus non plus. */
-  otherName: string
-  /** L'API a supprimé le message ; la fenêtre se ferme ensuite d'elle-même. */
-  onDeleted: (message: TesterMessage) => void
-  /** Dans tous les cas : l'écran remet `message` à null. */
-  onClose: () => void
-  /** La fenêtre a fini de partir, une fois par ouverture (voir `DeleteUpdateDialog`). */
-  onGone: () => void
-}
-
-/**
- * « Supprimer ce message ? », avec les soins de `DeleteUpdateDialog` (R7a) : garde contre la double
- * tape, focus sur « Annuler », pas de fermeture pendant l'envoi, l'erreur après un envoi seulement,
- * et `onGone` à la fin du fondu (web) ou dès la fermeture (téléphone, où Android ne prévient pas).
- */
-function DeleteMessageDialog({
-  projectId,
-  testerId,
-  message,
-  otherName,
-  onDeleted,
-  onClose,
-  onGone,
-}: DeleteProps) {
-  const { t } = useTranslation()
-  const deletion = useDeleteMessage(projectId, testerId)
-  const signInAgain = useSignInAgain()
-  const visible = message !== null
-  const [removing, setRemoving] = useState(false)
-  // Deux appuis dans le même instant : le second est ignoré (une seule suppression envoyée).
-  const sendingRef = useRef(false)
-  const [sent, setSent] = useState(false)
-  const cancelRef = useRef<Focusable>(null)
-  // Le message de la dernière ouverture : le texte ne change pas pendant que la fenêtre s'en va.
-  const last = useRef(message)
-  if (message) last.current = message
-  const removed = (message ?? last.current)?.removal != null
-
-  const waitingForGone = useRef(false)
-  const wasVisible = useRef(false)
-  const arrived = () => {
-    if (!waitingForGone.current) return
-    waitingForGone.current = false
-    onGone()
-  }
-  const arrivedRef = useRef(arrived)
-  arrivedRef.current = arrived
-  useEffect(() => {
-    if (visible) {
-      waitingForGone.current = true
-      setSent(false)
-    } else if (wasVisible.current && Platform.OS !== 'web') {
-      arrivedRef.current()
-    }
-    wasVisible.current = visible
-  }, [visible])
-
-  const confirm = async () => {
-    if (!message || sendingRef.current) return
-    sendingRef.current = true
-    setRemoving(true)
-    setSent(true)
-    const ok = await deletion.remove(message.id)
-    sendingRef.current = false
-    setRemoving(false)
-    // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
-    if (!ok) return
-    onDeleted(message)
-    onClose()
-  }
-
-  return (
-    <Dialog
-      visible={visible}
-      guardTaps
-      title={t(($) => $.project.testers.thread.deleteTitle)}
-      message={
-        removed
-          ? t(($) => $.project.testers.thread.deleteBodyRemoved, { name: otherName })
-          : t(($) => $.project.testers.thread.deleteBody, { name: otherName })
-      }
-      initialFocusRef={cancelRef}
-      busy={removing}
-      onDismiss={() => {
-        if (!removing) onClose()
-      }}
-      onClosed={arrived}
-    >
-      {sent && deletion.error ? (
-        <Notice
-          message={
-            deletion.reason === 'expired'
-              ? t(($) => $.states.expired)
-              : t(($) => $.project.testers.thread.deleteError)
-          }
-          action={deletion.reason === 'expired' ? signInAgain(onClose) : undefined}
-        />
-      ) : null}
-      <Button
-        label={t(($) => $.project.testers.thread.deleteConfirm)}
-        variant="confirm"
-        onPress={() => void confirm()}
-        loading={removing}
-      />
-      <Button
-        ref={cancelRef}
-        label={t(($) => $.common.cancel)}
-        variant="secondary"
-        onPress={onClose}
-        disabled={removing}
-      />
-    </Dialog>
-  )
 }

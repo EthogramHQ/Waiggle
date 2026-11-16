@@ -165,6 +165,13 @@ type Props = {
    */
   footer?: ReactNode
   /**
+   * R11 (l'écran « Accepter ») : le pied ne colle en bas que s'il prend au plus cette part de la
+   * hauteur de la fenêtre (0.5 : la moitié). Un pied plus haut (petit téléphone, texte agrandi,
+   * téléphone couché) suit le contenu : collé, il ne laisserait presque rien à lire au-dessus de
+   * lui (WCAG 1.4.10). Sans cette prop, le pied colle toujours, comme avant.
+   */
+  footerMaxShare?: number
+  /**
    * Ce qui flotte en bas de l'écran pendant que la page défile (la capsule des réactions de la page
    * d'un projet, R5a). Screen le pose hors de la zone qui défile, centré, au-dessus de la zone sûre
    * du téléphone (et au-dessus de la barre d'onglets quand il y en a une) ; il mesure sa hauteur et
@@ -227,6 +234,7 @@ export function Screen({
   ambiance = 'light',
   scene,
   footer,
+  footerMaxShare,
   floating,
   overlay,
   backLabel,
@@ -314,7 +322,29 @@ export function Screen({
   // R7b (K12) : le pied peut aussi venir du contenu (`ScreenFooterSlot`, le compositeur d'un onglet).
   const canPinFooter = sizeClass !== 'wide' && !brand
   const footerSlot = useScreenFooterSlot(canPinFooter)
-  const pinnedFooter = (footer !== undefined || footerSlot.filled) && canPinFooter
+  // R11 : la hauteur du contenu du pied (ses boutons, sans le cadre du pied collé), mesurée une fois
+  // par hauteur de fenêtre (téléphone tourné : nouvelle mesure). Pas encore mesurée : collé, comme
+  // sur la planche. La mesure est gardée : un message qui paraît ensuite dans le pied (« Il manque
+  // deux choses… ») ne le décolle pas. Décollé, le pied passerait dans la zone qui défile, sous le
+  // pli : le bouton touché partirait sous le doigt et le focus serait perdu (essai à 390 × 844).
+  const [footerMeasure, setFooterMeasure] = useState<{ window: number; height: number } | null>(
+    null,
+  )
+  const measureFooter =
+    footerMaxShare === undefined
+      ? undefined
+      : (event: LayoutChangeEvent) => {
+          const { height } = event.nativeEvent.layout
+          setFooterMeasure((kept) =>
+            kept?.window === windowHeight ? kept : { window: windowHeight, height },
+          )
+        }
+  const footerFits =
+    footerMaxShare === undefined ||
+    footerMeasure === null ||
+    footerMeasure.window !== windowHeight ||
+    footerMeasure.height <= windowHeight * footerMaxShare
+  const pinnedFooter = (footer !== undefined || footerSlot.filled) && canPinFooter && footerFits
   // La place flottante (R5a) : sa hauteur mesurée (0 tant qu'elle ne l'est pas, ou sans place), la
   // distance entre elle et le bas de l'écran, et la réserve à laisser sous le contenu.
   const [measuredFloating, setMeasuredFloating] = useState(0)
@@ -446,7 +476,9 @@ export function Screen({
       {pinned ? null : notice}
       {children}
       {footer !== undefined && !pinnedFooter ? (
-        <View style={{ gap: space.md }}>{footer}</View>
+        <View style={{ gap: space.md }} onLayout={measureFooter}>
+          {footer}
+        </View>
       ) : null}
     </>
   )
@@ -723,7 +755,10 @@ export function Screen({
                     // Les boutons de la page font partie de son contenu : ils apparaissent avec lui,
                     // et ne prennent aucun clic tant qu'il n'est pas plein (S1).
                     <ScreenFade fade={fade}>
-                      <ScreenFooter width={maxWidthFor(width, false)}>
+                      <ScreenFooter
+                        width={maxWidthFor(width, false)}
+                        onContentLayout={measureFooter}
+                      >
                         {footer}
                         {footerSlot.filled ? <ScreenFooterOutlet slot={footerSlot.slot} /> : null}
                       </ScreenFooter>
@@ -883,10 +918,13 @@ export function PageHeading({
 export function ScreenFooter({
   children,
   width = layout.formWidth,
+  onContentLayout,
 }: {
   children: ReactNode
   /** La largeur maximale des boutons : celle du contenu de la page. */
   width?: number
+  /** R11 : la mesure du contenu, sans le cadre (voir `footerMaxShare` de Screen). */
+  onContentLayout?: ((event: LayoutChangeEvent) => void) | undefined
 }) {
   const { colors } = useTheme()
   const { padding } = useLayout()
@@ -903,7 +941,9 @@ export function ScreenFooter({
         borderTopColor: colors.line,
       }}
     >
-      <View style={{ width: '100%', maxWidth: width, gap: space.md }}>{children}</View>
+      <View style={{ width: '100%', maxWidth: width, gap: space.md }} onLayout={onContentLayout}>
+        {children}
+      </View>
     </View>
   )
 }

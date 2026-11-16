@@ -537,8 +537,6 @@ function AdminModeration() {
         <ListRow
           label={t(($) => $.moderation.toolsLink)}
           icon="wrench"
-          detail={t(($) => $.moderation.toolsLinkHint)}
-          hint={t(($) => $.moderation.toolsLinkHint)}
           trailing="chevron"
           href="/moderation/tools"
           onPress={(event) => {
@@ -549,8 +547,6 @@ function AdminModeration() {
         <ListRow
           label={t(($) => $.moderation.categoriesLink)}
           icon="shapes"
-          detail={t(($) => $.moderation.categoriesLinkHint)}
-          hint={t(($) => $.moderation.categoriesLinkHint)}
           trailing="chevron"
           href="/moderation/categories"
           onPress={(event) => {
@@ -707,14 +703,9 @@ function AdminModeration() {
   // Les dernières décisions, une ligne colorée chacune, à droite du détail (ordinateur).
   const recentColumn = (
     <Stack gap="md">
-      <Stack gap="xxs">
-        <Text variant="headline" heading={2}>
-          {t(($) => $.moderation.recent.title)}
-        </Text>
-        <Text variant="caption" tone="muted">
-          {t(($) => $.moderation.recent.order)}
-        </Text>
-      </Stack>
+      <Text variant="headline" heading={2}>
+        {t(($) => $.moderation.recent.title)}
+      </Text>
       {history.data ? (
         decisions.length > 0 ? (
           <Stack gap="sm" accessibilityRole="list">
@@ -803,7 +794,6 @@ function AdminModeration() {
       title={t(($) => $.moderation.title)}
       // Toute la largeur, pour les trois colonnes sur ordinateur (une colonne sur téléphone).
       width="page"
-      {...(phoneDetail ? null : { subtitle: t(($) => $.moderation.subtitle) })}
       titleAside={<StatusPill label={t(($) => $.moderation.adminOnly)} />}
       // Sur téléphone, l'historique a son bouton en haut de la file (planche R9-Moderation-Telephone).
       {...(!columns && tab !== 'history' && !phoneDetail

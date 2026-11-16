@@ -101,6 +101,8 @@ import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
+import { MyCommentsCatalogue } from './mes-commentaires'
+import { MyFeedbackCatalogue } from './mes-retours'
 import { UpdateFamiliesCatalogue } from './mises-a-jour'
 import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
@@ -117,6 +119,7 @@ import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
 import { AdminGesturesCatalogue } from './outils-gestes'
 import { ToolPageSheetsCatalogue } from './outils-page'
+import { LegalPagesCatalogue } from './pages-legales'
 import { HivePillsCatalogue } from './pastilles'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
@@ -413,7 +416,8 @@ export function CatalogueScreen() {
         <VisualEditorSample l={l} />
         {/* Sans couverture verticale : le bouton seul. */}
         <VisualEditorSample l={l} empty />
-        {/* La jauge vide (discrète), en cours, puis remplie. */}
+        {/* La jauge vide (discrète), en cours, puis remplie : sans phrase visible, mais sa place
+            est gardée et la phrase reste le nom de la barre de progression. */}
         <HoneyMeter value={0} max={12} label={l.meterEmpty} />
         <HoneyMeter value={9} max={12} label={l.meter} />
         <HoneyMeter value={12} max={12} label={l.meterDone} />
@@ -827,6 +831,12 @@ export function CatalogueScreen() {
       <ModerationSheetsCatalogue />
       {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
       <SuspensionCatalogue />
+      {/* Tranche R11 : le corps d'une page légale et les liens vers les quatre pages (pages-legales.tsx). */}
+      <LegalPagesCatalogue />
+      {/* Tranche R11 : la ligne de « Mes commentaires » (mes-commentaires.tsx). */}
+      <MyCommentsCatalogue />
+      {/* Tranche R11 : « Mes retours envoyés », la carte d'un projet et ses messages (mes-retours.tsx). */}
+      <MyFeedbackCatalogue />
       <RemovalR9Catalogue />
       {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
       <HiveCellsCatalogue />

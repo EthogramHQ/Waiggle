@@ -381,6 +381,19 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     created_at: 'date',
     updated_at: 'date',
     language: "la langue de l'interface, choisie dans une liste fermée (fr, en), jamais montrée",
+    // R11 : la dernière visite (posée par l'API, une fois par jour) et l'e-mail « compte inactif ».
+    last_active_at: 'date',
+    inactive_notice_at: 'date',
+  },
+  // R11 : les accords aux règles. Rien n'y est tapé par le membre : la version est celle du serveur
+  // (z.literal(RULES_VERSION)), la case d'âge un booléen toujours vrai. Dans l'export de son membre
+  // (`rulesAcceptances`), jamais signalable ni montrée à un autre.
+  rules_acceptance: {
+    user_id: 'identifiant',
+    version:
+      'la version en vigueur des règles, imposée par Zod (z.literal(RULES_VERSION)), jamais un texte libre ; exportée, jamais montrée à un autre',
+    accepted_at: 'date',
+    age_declared: 'booléen',
   },
   profile: {
     user_id: 'identifiant',
@@ -540,6 +553,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     instant_sent_at: 'date',
     // R10 : le réglage « Ruches » (l'e-mail d'une invitation, la partie du récap).
     email_hives: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
+    // R11 : le réglage « Découvertes » (les parties du récap qui font découvrir).
+    discoveries: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
   },
   // R10 : les ruches. Le nom est au registre (MEMBER_INPUTS) ; le reste est écrit par l'API ou
   // choisi dans une liste fermée par Zod et par le `check` de la table.

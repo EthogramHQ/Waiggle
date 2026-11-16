@@ -11,29 +11,23 @@ import {
   normalizeInviteCode,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  type SignUpRefusalCode,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
+import { fill, parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { eq } from 'drizzle-orm'
-import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
+import { accountDeletionHooks } from '../account/delete'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
 // L'e-mail de vérification part de auth/verification-resend.ts (tranche R2).
 import { existingAccountEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
-import { removeFromHive } from '../hives/write'
 import { describeError, writeAuthLog } from '../log'
 import type { FileStorage } from '../media/storage'
-import { releaseAvatarKey } from '../moderation/replaced'
-import { suspensionEmailKey } from '../moderation/suspend'
-import { mediaKeysOf } from '../projects/load'
-import { createRateLimiter, deleteAddressCounters, deleteMemberCounters } from '../rate-limit'
-import { voidReportsOfDepartedAuthors } from '../reports/queue'
-import { closeSuspensionsOfDeparted } from '../suspension/load'
-import { dropOrphanOthers } from '../tools/write'
+import { createRateLimiter } from '../rate-limit'
+import { acceptCurrentRules } from '../rules/accept'
 import { createEmailChange } from './change-email'
 import { createPasswordFlows, forgetResetLinks, RESET_LINK_LIFETIME_SECONDS } from './password'
 import { authSchemaOptions } from './schema-options'
@@ -85,6 +79,17 @@ const inviteDigest = (code: string) =>
 const isRightInviteCode = (sent: unknown, expected: string) =>
   typeof sent === 'string' && timingSafeEqual(inviteDigest(sent), inviteDigest(expected))
 
+/**
+ * R11 : le refus de l'inscription quand une des deux cases manque, ou null si les deux valent le
+ * booléen `true` (`SignUpRequest` du contrat : `z.literal(true)` pour chacune). Les règles d'abord,
+ * puis l'âge : l'ordre des cases à l'écran.
+ */
+const signUpRulesRefusal = (body: object): SignUpRefusalCode | null => {
+  if (!('acceptRules' in body) || body.acceptRules !== true) return 'RULES_NOT_ACCEPTED'
+  if (!('ageDeclared' in body) || body.ageDeclared !== true) return 'AGE_NOT_DECLARED'
+  return null
+}
+
 // Les quotas de Better Auth (fenêtres en secondes, comme il les attend). Règle générale : 100
 // requêtes par minute et par adresse IP. Règles plus strictes sur les routes sensibles : 5 essais
 // de connexion par quart d'heure rendent impossible de deviner un mot de passe en essayant des
@@ -134,9 +139,9 @@ export const createAuth = ({
   inviteCode,
   password,
 }: AuthOptions) => {
-  // Fichiers à effacer après la suppression d'un compte (identifiant du membre → ses fichiers :
-  // son avatar et les photos de tous ses projets).
-  const filesToDelete = new Map<string, string[]>()
+  // La suppression du compte par le membre (account/delete.ts) : ses deux rappels, avant et après
+  // l'effacement de la ligne par Better Auth.
+  const deletionHooks = accountDeletionHooks({ db, storage, secret })
   // Changer son adresse (tranche « adresse ») : les hooks et les envois de ce parcours, avec leurs
   // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes. Le secret sert
   // à chiffrer le jeton du second lien.
@@ -192,10 +197,14 @@ export const createAuth = ({
       onExistingUserSignUp: async ({ user }) => {
         await mailer.send({
           to: user.email,
-          ...existingAccountEmail(languageOf(user), {
-            name: user.name,
-            signInUrl: `${appUrl}/sign-in`,
-          }),
+          ...existingAccountEmail(
+            languageOf(user),
+            {
+              name: user.name,
+              signInUrl: `${appUrl}/sign-in`,
+            },
+            appUrl,
+          ),
         })
       },
       // Mot de passe oublié (tranche R2, A1) : le lien vaut une heure et ne sert qu'une fois ; une
@@ -268,139 +277,10 @@ export const createAuth = ({
       // disparaissent avec lui (suppression « en cascade » dans la base).
       deleteUser: {
         enabled: true,
-        // Juste avant la suppression : on note les fichiers de l'avatar et des photos de ses
-        // projets (leurs lignes vont disparaître avec le compte, on ne pourrait plus les retrouver).
-        beforeDelete: async (user) => {
-          const [row] = await db
-            .select({ avatarKey: schema.profile.avatarKey })
-            .from(schema.profile)
-            .where(eq(schema.profile.userId, user.id))
-          const projects = await db
-            .select({ id: schema.project.id })
-            .from(schema.project)
-            .where(eq(schema.project.authorId, user.id))
-          const keys = await mediaKeysOf(
-            db,
-            projects.map((p) => p.id),
-          )
-          // R7b : ses images du coin des testeurs sur les projets des autres (ses captures, en
-          // attente comprises) : leurs lignes partent avec lui (owner_id, cascade), pas leurs
-          // fichiers. Celles de ses propres projets sont déjà dans `keys` (mediaKeysOf) : un Set
-          // retire les doublons. Cette lecture par owner_id seul n'a pas d'index (celui de
-          // tester_media a project_id en tête) : elle parcourt la table une fois par suppression de
-          // compte, rare ; un index dédié coûterait à chaque envoi d'image.
-          const ownedImages = await db
-            .select({ storageKey: schema.testerMedia.storageKey })
-            .from(schema.testerMedia)
-            .where(eq(schema.testerMedia.ownerId, user.id))
-          const all = [...new Set([...keys, ...ownedImages.map((image) => image.storageKey)])]
-          // R9 : une photo de profil retirée par la modération porte la clé `withheld/<id>` ; le
-          // vrai fichier est gardé dans son retrait (hidden_value.storageKey). releaseAvatarKey
-          // rend la vraie clé, pour qu'il parte aussi du stockage et ne reste pas orphelin.
-          const avatarKey = row?.avatarKey
-            ? await releaseAvatarKey(db, user.id, row.avatarKey)
-            : null
-          filesToDelete.set(user.id, avatarKey ? [avatarKey, ...all] : all)
-          // Ses commentaires (tranche 5) : effacés, sauf ses racines auxquelles d'autres ont
-          // répondu, qui deviennent « Commentaire supprimé » (voir comments/erase.ts). Ici et pas
-          // après : une fois le compte parti, on ne saurait plus lesquels étaient les siens.
-          await eraseCommentsOf(db, user.id)
-          // R9 (sécurité P2) : les décisions qui visent son profil gardent son ancien nom et son
-          // ancien pseudo (pour un rétablissement). Une fois le compte parti, ces valeurs
-          // désigneraient un membre disparu : on les vide ici et pas après, car la base remet
-          // target_member_id à null à la suppression et on ne retrouverait plus les lignes. La
-          // décision elle-même reste (garde d'un an). La requête suit moderation_decision_target_idx.
-          await db
-            .update(schema.moderationDecision)
-            .set({ previousValue: null, provisionalValue: null })
-            .where(eq(schema.moderationDecision.targetMemberId, user.id))
-          // R10 : il quitte chacune de ses ruches, comme par « Quitter la ruche »
-          // (hives/write.ts, `removeFromHive`), avec les mêmes verrous et le même ordre (la ruche,
-          // puis sa ligne de membre, puis ses projets réservés) : s'il animait, l'animation passe
-          // au membre le plus ancien, qui lit « Tu animes maintenant la ruche Famille. » ; s'il
-          // était le dernier, la ruche est supprimée avec ses invitations (cascade). Ici, avant la
-          // suppression du compte, et pas en laissant faire la base : la cascade effacerait bien sa
-          // ligne de membre, mais l'animateur deviendrait nul (set null) sans successeur, et une
-          // ruche vide resterait. Ses projets réservés passent un instant en privé (sinon leur clé
-          // étrangère retiendrait une ruche vide), puis partent avec le compte.
-          // Ses ruches par l'index hive_member_user_idx (20 au plus : HIVE_LIMITS.joined). Une
-          // transaction par ruche, l'une après l'autre : chacune ne verrouille que sa ruche, et un
-          // geste simultané d'un autre membre sur l'une n'attend pas les autres.
-          // Ce qu'il laisse chez les autres reste lisible sans lui : ses invitations encore en
-          // attente gardent leur ruche, sans inviteur (inviter_id remis à null par la base) ; une
-          // épingle qu'il a posée reste à la ruche, sans « épinglé par » (pinned_by remis à null).
-          const memberships = await db
-            .select({ hiveId: schema.hiveMember.hiveId })
-            .from(schema.hiveMember)
-            .where(eq(schema.hiveMember.userId, user.id))
-          const leftAt = new Date()
-          for (const { hiveId } of memberships) {
-            await removeFromHive(db, hiveId, user.id, user.id, leftAt)
-          }
-        },
-        // Juste après : on efface les fichiers eux-mêmes du stockage, les compteurs anti-abus
-        // qui portent son identifiant, et les commentaires restés sans auteur (un commentaire
-        // publié pendant la suppression, entre beforeDelete et maintenant : voir comments/erase.ts).
-        //
-        // D'abord, une ligne dans les journaux : seulement l'identifiant (ni nom, ni adresse). Une
-        // sauvegarde restaurée ramènerait ce compte ; cette ligne dit qu'il faut le supprimer de
-        // nouveau (docs/ops/serveur.md, « Sauvegardes »). Écrite en premier, elle ne dépend pas du
-        // ménage qui suit : le compte est déjà parti.
-        afterDelete: async (user) => {
-          console.log(`Account deleted ${user.id}`)
-          const keys = filesToDelete.get(user.id) ?? []
-          filesToDelete.delete(user.id)
-          for (const key of keys) await storage.delete(key)
-          await deleteMemberCounters(db, user.id)
-          // Tranche R2, jur-6 : ses liens de mot de passe oublié encore valides, et tous les
-          // compteurs de son adresse (mot de passe oublié, renvoi du lien, correction de l'adresse :
-          // des empreintes, mais qui désignent toujours cette adresse).
-          await forgetResetLinks(db, user.id)
-          await deleteAddressCounters(db, secret, user.email)
-          await sweepOrphanComments(db)
-          // R6b (sec-A5) : les « Autre » que ses projets et son profil étaient seuls à citer. Les
-          // lignes de project_tool et profile_tool sont parties avec le compte (cascade) ; la purge
-          // de nuit rattrape une panne ici.
-          try {
-            await dropOrphanOthers(db)
-          } catch (error) {
-            console.error(
-              'Other tools not swept after deletion',
-              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
-            )
-          }
-          // Les signalements qui visaient ses contenus ou son profil (tranche 7a, règle 16) : la
-          // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
-          // « sans objet » (effacés 30 jours plus tard), ceux suivis d'un retrait restent un an. Ici,
-          // après la suppression, et pas dans beforeDelete : une suppression refusée ne touche à
-          // rien. Ceux qu'elle a faits restent, sans son nom (reporter_id remis à null par la base).
-          // Une panne ici ne doit pas faire échouer la suppression, déjà faite : la purge de nuit
-          // rattrape (reports/retention.ts).
-          try {
-            await voidReportsOfDepartedAuthors(db, new Date())
-          } catch (error) {
-            console.error(
-              'Reports not voided after deletion',
-              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
-            )
-          }
-          // Sa suspension en cours (tranche 7c, J1) : partir est permis, et n'efface pas la
-          // preuve. Elle est close à la date du départ, sans décision de levée, et gardée un an
-          // avec ses décisions. Ici, après la suppression : une suppression refusée laisse la
-          // suspension en cours. Le compteur de ses e-mails de suspension (S18) porte son
-          // identifiant : effacé aussi. Une panne ne fait pas échouer la suppression, déjà faite.
-          try {
-            await closeSuspensionsOfDeparted(db, new Date())
-            await db
-              .delete(schema.apiRateLimit)
-              .where(eq(schema.apiRateLimit.key, suspensionEmailKey(user.id)))
-          } catch (error) {
-            console.error(
-              'Suspension not closed after deletion',
-              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
-            )
-          }
-        },
+        // Les étapes de la suppression, avant et après l'effacement de la ligne du membre : une
+        // seule liste (account/delete.ts), la même que pour la tâche des comptes inactifs (R11,
+        // S-C2). Better Auth efface la ligne entre les deux rappels.
+        ...deletionHooks,
       },
     },
 
@@ -535,18 +415,40 @@ export const createAuth = ({
           return
         }
         if (ctx.path !== '/sign-up/email') return
+        // La langue du visiteur, pour les messages des refus ; le code, pour l'appli
+        // (accounts/errors.ts).
+        const visitorLanguage = () =>
+          resolveLanguage(
+            parseAcceptLanguage(
+              ctx.headers?.get('accept-language') ?? ctx.request?.headers.get('accept-language'),
+            ),
+          )
         if (inviteCode !== null) {
           const sent = 'inviteCode' in body ? body.inviteCode : undefined
           if (!isRightInviteCode(sent, inviteCode)) {
-            // Le message, dans la langue du visiteur ; le code, pour l'appli (accounts/errors.ts).
-            const header =
-              ctx.headers?.get('accept-language') ?? ctx.request?.headers.get('accept-language')
-            const language = resolveLanguage(parseAcceptLanguage(header))
             throw new APIError('FORBIDDEN', {
               code: 'INVITE_CODE_INVALID',
-              message: resources[language].translation.auth.errors.inviteInvalid,
+              message: resources[visitorLanguage()].translation.auth.errors.inviteInvalid,
             })
           }
+        }
+        // R11 : les deux cases, deux accords séparés (« J'accepte les règles », « J'ai 15 ans ou
+        // plus »). Lues ici, dans le hook `before`, avant que Better Auth ne cherche si l'adresse a
+        // déjà un compte (relecture de sécurité du plan) : l'adresse d'un inscrit reçoit le même
+        // refus qu'une adresse inconnue, et la réponse ne dit pas qui est inscrit. Seul le booléen
+        // `true` compte (`=== true`) : ni `"true"`, ni `1`, ni une case absente. S'il manque les
+        // deux, la case des règles d'abord, l'ordre de l'écran. La version acceptée n'est pas lue :
+        // le serveur écrit la sienne (rules/accept.ts, dans `create.after` plus bas).
+        const refusal = signUpRulesRefusal(body)
+        if (refusal !== null) {
+          const errors = resources[visitorLanguage()].translation.errors
+          throw new APIError('BAD_REQUEST', {
+            code: refusal,
+            // `fill` remplit `{{appName}}` (le nom de l'appli, @ruche/brand).
+            message: fill(
+              refusal === 'RULES_NOT_ACCEPTED' ? errors.rulesNotAccepted : errors.ageNotDeclared,
+            ),
+          })
         }
         const name = 'name' in body ? body.name : ''
         if (!DisplayName.safeParse(name).success) {
@@ -600,6 +502,16 @@ export const createAuth = ({
                 image: null,
               },
             }
+          },
+          // R11 : une fois le compte créé, l'accord donné par les deux cases (vérifiées par le hook
+          // `before` plus haut) : la version des règles du serveur, l'heure de l'API, l'âge
+          // déclaré. Better Auth lance ce rappel après sa transaction (queueAfterTransactionHook) :
+          // l'écriture passe par `db` sans attendre une transaction encore ouverte. Seule
+          // l'inscription par e-mail porte les cases : un compte créé par un autre chemin (aucun
+          // n'est ouvert aujourd'hui) n'a pas d'accord, et l'écran « Accepter » le lui demandera.
+          after: async (user, context) => {
+            if (context?.path !== '/sign-up/email') return
+            await acceptCurrentRules(db, user.id, new Date())
           },
         },
       },

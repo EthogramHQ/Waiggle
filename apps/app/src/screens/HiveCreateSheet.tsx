@@ -193,7 +193,7 @@ export function HiveCreateSheet() {
             {t(($) => $.hives.createSheet.preview)}
           </Text>
           <Surface variant="plain" padding="md">
-            {/* L'en-tête de la future page, lu d'un seul nom : « Ma ruche Famille ». */}
+            {/* L'en-tête de la future page, lu d'un seul nom : « Ruche Famille ». */}
             <Row
               gap="md"
               accessibilityRole="group"
@@ -201,9 +201,6 @@ export function HiveCreateSheet() {
             >
               <HiveBadge icon={icon} name={shownName} size={64} />
               <Stack gap="xxs" grow>
-                <Text variant="caption" weight={700} tone="accent">
-                  {t(($) => $.hives.myHive)}
-                </Text>
                 <Text
                   variant="title1"
                   // Un nom de 40 lettres sans espace, en grand, à 320 points : coupé plutôt que de

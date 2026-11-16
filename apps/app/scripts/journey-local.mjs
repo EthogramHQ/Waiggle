@@ -108,7 +108,7 @@ const command = (script) => `"${process.execPath}" "${script}"`
 const fromApi = createRequire(join(apiDir, 'package.json'))
 const tsx = pathToFileURL(fromApi.resolve('tsx/esm')).href
 
-// 4. La base, préparée avant l'API (tranche 7a). Le parcours a besoin d'un administrateur de la
+// 4. La base, préparée avant l'API (tranche 7a, R11). Le parcours a besoin d'un administrateur de la
 // modération ; aucune route de l'API ne donne ce rôle, et en production seul infra/grant-admin.sh
 // l'écrit, directement dans la table admin_member. Ici, impossible d'écrire dans la base pendant
 // que l'API tourne : PGlite n'accepte qu'un seul processus à la fois. On la crée donc avant (les
@@ -131,6 +131,26 @@ $fn$;
 create trigger journey_grant_admin after insert or update of email_verified on "user"
   for each row when (new.email_verified and new.email like 'admin-%@example.com')
   execute function journey_grant_admin();
+
+-- Tranche R11 : Inès, dont l'accord aux règles manque. Aucune route de l'API ne retire un accord, et
+-- la base est fermée à tout autre processus pendant que l'API tourne : le déclencheur refuse donc,
+-- lui-même, la ligne d'accord que l'inscription d'un compte « ines-… » écrit. « before insert »
+-- puis « return null » : PostgreSQL abandonne cette ligne sans erreur. Seule l'écriture faite à
+-- l'inscription est refusée, celle d'un compte dont l'adresse n'est pas encore vérifiée : plus tard,
+-- l'écran « Accepter » écrit son accord comme pour n'importe qui.
+create function journey_forget_rules() returns trigger language plpgsql as $fn$
+begin
+  if exists (
+    select 1 from "user"
+    where id = new.user_id and not email_verified and email like 'ines-%@example.com'
+  ) then
+    return null;
+  end if;
+  return new;
+end
+$fn$;
+create trigger journey_forget_rules before insert on rules_acceptance
+  for each row execute function journey_forget_rules();
 `
 writeFileSync(
   prepareScript,
@@ -225,6 +245,8 @@ const journey = spawn(process.execPath, [join(root, 'scripts', 'journey.mjs'), a
   env: {
     ...process.env,
     JOURNEY_INVITE_CODE: inviteCode,
+    // Le déclencheur de la base (plus haut) retire l'accord d'Inès : le parcours peut le jouer.
+    JOURNEY_RULES_TRIGGER: '1',
     JOURNEY_MAIL_CMD: command(mailScript),
     JOURNEY_MEDIA_CMD: command(mediaScript),
   },

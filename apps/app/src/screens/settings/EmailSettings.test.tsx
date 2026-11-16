@@ -84,6 +84,8 @@ const leaChoices: EmailPreferences = {
   testers: 'digest',
   // R10 : « Ruches » (Tout de suite par défaut) mis au récap, pour garder ce que ces tests vérifient.
   hives: 'digest',
+  // R11 : « Découvertes », le réglage par défaut (le contrat l'exige ; ces tests n'en parlent pas).
+  discoveries: 'digest',
 }
 
 const emailPath = '/v1/me/email-preferences'
@@ -430,7 +432,7 @@ describe('EmailSettings, the recap', () => {
     await renderWithProviders(<EmailSettings />)
 
     await screen.findByRole('button', { name: rowName('comments', 'digest') })
-    await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5))
+    await waitFor(() => expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(6))
     // Les cinq types « Dans le récap » (réactions, commentaires, abonnés, testeurs, et les ruches que
     // Léa y a mises) gardent leur choix ; « Tout de suite » et « Jamais » n'ont pas la phrase.
     expect(screen.getByRole('button', { name: rowName('reactions', 'digest') })).toBeTruthy()
@@ -448,7 +450,7 @@ describe('EmailSettings, the recap', () => {
     expect(screen.queryByText(TEXT.recapOff)).toBeNull() // le récap est activé
 
     await fireEvent.press(await recapSwitch())
-    expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(5)
+    expect(screen.getAllByText(TEXT.recapOff)).toHaveLength(6)
 
     await fireEvent.press(await recapSwitch())
     expect(screen.queryByText(TEXT.recapOff)).toBeNull()

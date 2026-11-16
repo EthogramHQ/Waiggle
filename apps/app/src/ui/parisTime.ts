@@ -46,3 +46,17 @@ export const parisDateTime = (iso: string, language: string, now = new Date()): 
     new Intl.DateTimeFormat(language, { ...options, timeZone: PARIS_TIME_ZONE }).format(when)
   return { date: format(day), time: format(hour), dateTime: format({ ...day, ...hour }) }
 }
+
+/**
+ * Un jour du calendrier (`AAAA-MM-JJ`, la version d'une page légale, R11) écrit court, à l'heure de
+ * Paris : « 1 nov. 2026 », « Nov 1, 2026 ». Le jour est lu à midi UTC, qui tombe le même jour à
+ * Paris : minuit UTC serait encore la veille dans un fuseau à l'ouest (New York). L'année s'écrit
+ * toujours : une version reste lisible d'une année à l'autre.
+ */
+export const parisDay = (day: string, language: string): string =>
+  new Intl.DateTimeFormat(language, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: PARIS_TIME_ZONE,
+  }).format(new Date(`${day}T12:00:00Z`))

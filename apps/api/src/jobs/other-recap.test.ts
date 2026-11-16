@@ -75,6 +75,7 @@ const en = resources.en.translation.email
 const subjects = [fill(fr.otherRecap.subject), fill(en.otherRecap.subject)]
 const TOOLS_URL = new URL('/moderation/tools', TEST_APP_URL).toString()
 const CATEGORIES_URL = new URL('/moderation/categories', TEST_APP_URL).toString()
+const PRIVACY_URL = new URL('/privacy', TEST_APP_URL).toString()
 
 beforeEach(async () => {
   // La fausse horloge avant l'API : la limite de débit garde la fonction Date.now qu'elle trouve.
@@ -219,9 +220,11 @@ describe('the recap of the « other » items', () => {
       expect([...new Set(hrefs)].sort()).toEqual([CATEGORIES_URL, TOOLS_URL].sort())
       expect(email.text).toContain(TOOLS_URL)
       expect(email.text).toContain(CATEGORIES_URL)
-      // Aucune autre adresse dans le texte : ni projet, ni page d'outil, ni membre.
+      // Aucune autre adresse dans le texte : ni projet, ni page d'outil, ni membre. Seule la
+      // Confidentialité (R11) s'ajoute, en texte, dans le pied.
       const urls = email.text.match(/https?:\/\/\S+/g) ?? []
-      for (const url of urls) expect([TOOLS_URL, CATEGORIES_URL], url).toContain(url)
+      for (const url of urls) expect([TOOLS_URL, CATEGORIES_URL, PRIVACY_URL], url).toContain(url)
+      expect(urls.at(-1)).toBe(PRIVACY_URL)
       expect(email.html).not.toMatch(/<img|unsubscribe/i)
     }
     expect(allRecaps()).toHaveLength(2)

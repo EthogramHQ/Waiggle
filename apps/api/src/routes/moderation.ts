@@ -128,9 +128,11 @@ type Deps = {
   mailer: Mailer
   /** R7b : pour l'adresse d'une image du coin des testeurs visée par un signalement ouvert. */
   publicApiUrl: string
+  /** R11 : l'adresse de l'appli, pour le pied de l'e-mail de suspension (page Confidentialité). */
+  appUrl: string
 }
 
-export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl }: Deps) => {
+export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl, appUrl }: Deps) => {
   const app = createRouter()
 
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
@@ -209,7 +211,7 @@ export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl }: De
       // Une suspension prévient le membre par e-mail, une fois la décision validée (tranche 7c) ;
       // un échec d'envoi est journalisé sans défaire la décision (moderation/suspend.ts).
       if (input.action === 'suspend') {
-        await sendSuspensionEmail({ db, mailer, limiter }, input.memberId, now)
+        await sendSuspensionEmail({ db, mailer, limiter, appUrl }, input.memberId, now)
       }
       return c.json(ModerationDecision.parse(result.decision), 201)
     }

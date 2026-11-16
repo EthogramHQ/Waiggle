@@ -92,6 +92,18 @@ import {
   readyPage,
 } from '../src/testing/hives.ts'
 import {
+  jardinProject,
+  myCommentsCursor,
+  myCommentsLastPage,
+  myCommentsPage,
+  myTesterMessagesCursor,
+  myTesterMessagesLastPage,
+  myTesterMessagesPage,
+  shownRulesChanges,
+  tableauProject,
+  withoutRules,
+} from '../src/testing/legal.ts'
+import {
   decisionHistory,
   decisionHistoryPageOf,
   meteoPreview,
@@ -2145,6 +2157,35 @@ const testerCornersAtStart = () => ({
 })
 /** Le fil d'un coin tel que l'API le rend : le plus récent en tête. */
 const newestFirst = (messages) => [...messages].reverse()
+
+// R11, « Mes commentaires » et « Mes retours envoyés » (Réglages, « Mes données ») : les listes de
+// testing/legal.ts, vues par Léa. Leurs dates sont de la mi-novembre ; on les décale d'un bloc vers
+// l'horloge des captures (le 20 octobre), en gardant leurs écarts : « il y a 2 h », « hier »,
+// « il y a 5 jours »… plutôt que des dates dans le futur.
+const r11FixtureNow = Date.parse('2026-11-14T20:00:00.000Z')
+const shotDateOf = (iso) =>
+  iso === null ? null : new Date(SHOT_NOW - (r11FixtureNow - Date.parse(iso))).toISOString()
+// Deux projets ont une couverture (la première photo), le troisième non : l'écran montre les deux.
+const myDataCovers = new Map([
+  [tableauProject.id, photo('8a1f0c52-3c1e-4c5b-9d43-2f6a1b7e1001')],
+  [jardinProject.id, photo('8a1f0c52-3c1e-4c5b-9d43-2f6a1b7e1002')],
+])
+const withShotProject = (project) =>
+  project ? { ...project, cover: myDataCovers.get(project.id) ?? project.cover } : null
+const myCommentsShot = (page) =>
+  page.items.map((one) => ({
+    ...one,
+    project: withShotProject(one.project),
+    createdAt: shotDateOf(one.createdAt),
+    editedAt: shotDateOf(one.editedAt),
+  }))
+const myTesterMessagesShot = (page) =>
+  page.items.map((one) => ({
+    ...one,
+    project: withShotProject(one.project),
+    createdAt: shotDateOf(one.createdAt),
+  }))
+
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
@@ -2174,6 +2215,13 @@ const fakeApi = (
   // 'animator' : les mêmes, Léa animatrice de Famille (ses réglages) ; 'none' : aucune ruche ni
   // invitation ; 'invited' : le premier lancement, aucune ruche, une invitation qui attend.
   hives = 'some',
+  // R11 : l'accord des règles. null : Léa a accepté la version en vigueur ; 'pending' : elle ne
+  // l'a jamais acceptée (inscrite avant R11), l'écran « Accepter » passe au-dessus de tout ;
+  // 'changed' : une nouvelle version, avec « Ce qui change ». POST /v1/me/rules l'accepte.
+  rules = null,
+  // R11 : « Mes commentaires » et « Mes retours envoyés ». 'some' : deux pages chacune (voir
+  // testing/legal.ts) ; 'none' : listes vides (« Tu n'as encore écrit aucun commentaire. »).
+  myData = 'some',
 ) => {
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
@@ -2190,7 +2238,9 @@ const fakeApi = (
   const reactions = structuredClone(reactionsOf)
   const added = {}
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
-  // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
+  // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API. R11 : `leaMe` porte
+  // l'accord des règles en vigueur (`rulesAccepted: true`, `rulesChanges: []`), et ses réglages
+  // d'e-mail (testing/email.ts) « Découvertes » dans le récap : chaque capture part de là.
   let me = structuredClone({
     ...leaMe,
     isAdmin: admin,
@@ -2201,6 +2251,20 @@ const fakeApi = (
       ? { handle: 'membre_4f2a', provisional: { name: false, handle: true } }
       : null),
   })
+  if (rules) me = withoutRules(me, rules === 'changed' ? shownRulesChanges : [])
+  // R11 : ce que Léa supprime dans ce navigateur, depuis « Mes commentaires » ou « Mes retours
+  // envoyés » : la ligne quitte la liste à la relecture, comme dans l'API.
+  const deletedMine = new Set()
+  const myLists = (first, last, shot) => ({
+    first: myData === 'none' ? [] : shot(first),
+    last: myData === 'none' ? [] : shot(last),
+    hasMore: myData !== 'none',
+  })
+  const mine = {
+    comments: myLists(myCommentsPage, myCommentsLastPage, myCommentsShot),
+    messages: myLists(myTesterMessagesPage, myTesterMessagesLastPage, myTesterMessagesShot),
+  }
+  const myMessageIds = new Set([...mine.messages.first, ...mine.messages.last].map((m) => m.id))
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
   // Les suggestions que Léa écarte dans ce navigateur (« × », R4) : elles quittent sa liste.
@@ -2265,6 +2329,11 @@ const fakeApi = (
       if (token === refusedToken || ![recapToken, mentionsToken, instantToken].includes(token)) {
         return json(400, { error: { code: 'unsubscribe_invalid', message: '' } })
       }
+      // R11 : « Couper les découvertes » (`scope=discoveries`) n'a de sens que pour le récap ; les
+      // liens des autres e-mails n'en portent pas, et l'API les refuse.
+      if (url.searchParams.get('scope') === 'discoveries' && token !== recapToken) {
+        return json(400, { error: { code: 'unsubscribe_invalid', message: '' } })
+      }
       return route.fulfill({ status: 204, body: '' })
     }
     if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
@@ -2295,6 +2364,46 @@ const fakeApi = (
         return json(400, { code: 'SAME_EMAIL', message: 'Email is the same' })
       }
       return json(200, { status: true })
+    }
+    // R11 : accepter la version des règles en vigueur (l'écran « Accepter ») ; l'API rend le profil,
+    // et l'écran laisse la place à la page demandée.
+    if (pathname === '/v1/me/rules' && method === 'POST') {
+      me = { ...me, rulesAccepted: true, rulesChanges: [] }
+      return json(200, me)
+    }
+    // R11, « Mes commentaires » et « Mes retours envoyés » : la première page, puis la suite par
+    // `?cursor=` ; ce que Léa a supprimé dans ce navigateur n'y est plus.
+    const myPage = (list, cursor) => {
+      const next = url.searchParams.get('cursor') === cursor
+      return json(200, {
+        items: (next ? list.last : list.first).filter((one) => !deletedMine.has(one.id)),
+        nextCursor: !next && list.hasMore ? cursor : null,
+      })
+    }
+    if (pathname === '/v1/me/comments' && method === 'GET') {
+      return myPage(mine.comments, myCommentsCursor)
+    }
+    const myCommentOf = pathname.match(/^\/v1\/me\/comments\/([^/]+)$/)
+    if (myCommentOf && method === 'DELETE') {
+      const known = [...mine.comments.first, ...mine.comments.last].some(
+        (one) => one.id === myCommentOf[1] && !deletedMine.has(one.id),
+      )
+      if (!known) return json(404, { error: { code: 'not_found', message: '' } })
+      deletedMine.add(myCommentOf[1])
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === '/v1/me/tester-messages' && method === 'GET') {
+      return myPage(mine.messages, myTesterMessagesCursor)
+    }
+    // Supprimer un de ses messages passe par la route du coin, même pour un coin fermé ou un projet
+    // qu'elle ne voit plus (ces projets n'ont pas de coin dans les captures : on répond ici).
+    const myMessageOf = pathname.match(/^\/v1\/projects\/[^/]+\/messages\/([^/]+)$/)
+    if (myMessageOf && method === 'DELETE' && myMessageIds.has(myMessageOf[1])) {
+      if (deletedMine.has(myMessageOf[1])) {
+        return json(404, { error: { code: 'not_found', message: '' } })
+      }
+      deletedMine.add(myMessageOf[1])
+      return route.fulfill({ status: 204, body: '' })
     }
     // Les réglages d'e-mail (tranche 6c) : lus, puis modifiés un par un ; l'API rend l'état complet.
     if (pathname === '/v1/me/email-preferences' && method === 'PATCH') {
@@ -4220,6 +4329,93 @@ const pages = [
     path: `/unsubscribe?token=${malformedToken}`,
     signedIn: false,
   },
+  // R11, planche R11-Decouvertes : sur le lien du récap, « Couper les découvertes » choisi puis
+  // confirmé ; la page dit que le récap garde le reste.
+  {
+    name: 'desinscription-recap',
+    path: `/unsubscribe?token=${recapToken}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page
+        .getByRole('radio', { name: new RegExp(`^${fr.unsubscribe.recapDiscoveries}`) })
+        .click()
+      await page.getByRole('button', { name: fr.unsubscribe.confirm }).click()
+      await page.getByText(fr.unsubscribe.doneDiscoveries).waitFor()
+    },
+  },
+  // R11, « La conformité » (planches R11-Pages et R11-Pages-Desktop) : les quatre pages publiques,
+  // lues sans compte et pré-rendues, entières (« En bref », les parties, le pied de liens).
+  { name: 'regles', path: '/rules', signedIn: false, fullPage: true },
+  // Sur ordinateur, le « Sommaire » suit la partie lue : Léa, connectée, a fait défiler les règles
+  // jusqu'à la troisième partie (les parties sont des titres de niveau 3, le titre de la page est
+  // de niveau 1).
+  {
+    name: 'regles-ordinateur',
+    path: '/rules',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('heading', { level: 3 }).nth(2).scrollIntoViewIfNeeded()
+    },
+  },
+  { name: 'confidentialite', path: '/privacy', signedIn: false, fullPage: true },
+  { name: 'mentions', path: '/legal', signedIn: false, fullPage: true },
+  { name: 'accessibilite', path: '/accessibility', signedIn: false, fullPage: true },
+  // R11, planche R11-Inscription : les quatre champs remplis, « Créer mon compte » touché sans
+  // cocher les deux cases ; le bouton reste actif et dit ce qui manque.
+  {
+    name: 'inscription-cases',
+    path: '/sign-up',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel(fr.auth.fields.inviteCode).fill('miel-2026-noel')
+      await page.getByLabel(fr.auth.fields.name).fill('Max Durand')
+      await page.getByLabel(fr.auth.fields.email).fill('max.durand@exemple.fr')
+      await page.getByLabel(fr.auth.fields.password, { exact: true }).fill('correct-horse-battery')
+      await page.getByRole('button', { name: fr.auth.signUp.submit }).click()
+      // Dans la région d'état, peut-être lue seulement par le lecteur d'écran : présente suffit.
+      await page.getByText(fr.rules.missing.both).first().waitFor({ state: 'attached' })
+    },
+  },
+  // R11, planche R11-Accepter : Léa n'a pas encore accepté les règles (inscrite avant R11) ; à
+  // l'ouverture de l'appli, l'écran « Accepter » passe au-dessus de l'accueil. Puis une nouvelle
+  // version : « Ce qui change » au-dessus de « En bref » (une clé inventée, testing/legal.ts).
+  { name: 'accepter', path: '/', signedIn: true, rules: 'pending', fullPage: true },
+  { name: 'accepter-changements', path: '/', signedIn: true, rules: 'changed', fullPage: true },
+  // R11, planches R11-Mes-Commentaires et R11-Mes-Retours (Réglages, « Mes données ») : les deux
+  // listes de testing/legal.ts, un projet qui n'est plus visible, un commentaire masqué par
+  // l'autrice du projet, un retiré par la modération, un coin fermé ; la fenêtre de suppression
+  // d'une racine qui a des réponses ; puis les deux listes vides.
+  { name: 'mes-commentaires', path: '/settings/data/comments', signedIn: true, fullPage: true },
+  {
+    name: 'mes-commentaires-supprimer',
+    path: '/settings/data/comments',
+    signedIn: true,
+    prepare: async (page) => {
+      // Le nom lu par le navigateur ramène l'insécable avant « : » à une espace ordinaire : chaque
+      // blanc du texte devient `\s+` dans l'expression.
+      const deleteOf = fr.myComments.deleteNamed.split('{{')[0].trim().split(/\s+/u).join('\\s+')
+      await page
+        .getByRole('button', { name: new RegExp(`^${deleteOf}`) })
+        .first()
+        .click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
+  {
+    name: 'mes-commentaires-vide',
+    path: '/settings/data/comments',
+    signedIn: true,
+    myData: 'none',
+    phoneOnly: true,
+  },
+  { name: 'mes-retours', path: '/settings/data/feedback', signedIn: true, fullPage: true },
+  {
+    name: 'mes-retours-vide',
+    path: '/settings/data/feedback',
+    signedIn: true,
+    myData: 'none',
+    phoneOnly: true,
+  },
   // Des contenus très longs : titre, description, outils, adresse de démo.
   { name: 'projet-long', path: `/projects/${longProject.id}`, signedIn: true, fullPage: true },
   { name: 'pas-a-moi', path: `/projects/${notMineProject.id}/edit`, signedIn: true },
@@ -4561,7 +4757,9 @@ const settle = async (page) => {
 //   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; options.notifications: 'none'
 //   aucune notification, 'many' la cloche à « 9+ », 'moderation' celles de la modération ;
 //   options.admin: true fait de Léa une administratrice (tranche 7a) ; options.email: 'changed'
-//   lui donne sa nouvelle adresse (tranche « adresse ») ; le reste va à newContext.
+//   lui donne sa nouvelle adresse (tranche « adresse ») ; options.rules: 'pending' ou 'changed'
+//   lui retire l'accord des règles (R11) ; options.myData: 'none' vide « Mes commentaires » et
+//   « Mes retours envoyés » ; le reste va à newContext.
 // - apiUrl : l'adresse de l'API simulée.
 const script = optionValue('--explore')
 if (script) {
@@ -4578,6 +4776,8 @@ if (script) {
       emailChoices,
       moderation,
       hives,
+      rules,
+      myData,
       ...options
     } = {},
   ) => {
@@ -4602,6 +4802,8 @@ if (script) {
         emailChoices,
         moderation,
         hives,
+        rules,
+        myData,
       ),
     )
     return context
@@ -4719,6 +4921,8 @@ async function layoutReport() {
             shot.emailChoices,
             shot.moderation,
             shot.hives,
+            shot.rules,
+            shot.myData,
           ),
         )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
@@ -4899,6 +5103,8 @@ const capture = async ({ shot, device, scheme }) => {
         shot.emailChoices,
         shot.moderation,
         shot.hives,
+        shot.rules,
+        shot.myData,
       ),
     )
     const page = await context.newPage()
