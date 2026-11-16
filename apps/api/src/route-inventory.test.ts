@@ -41,6 +41,14 @@
 // boucle, avec un membre sans l'accord et un corps invalide, la prouve route par route. Accepter
 // reste aussi permis
 // à un compte suspendu (S-B1) : la colonne « suspension » le dit, et ALLOWED_WRITES le contient.
+//
+// R12 (relecture de sécurité du plan, B3) : une cinquième classe, `visitor`, pour les routes
+// `/v1/public/*`, lues sans compte. Elles montrent le contenu d'un membre (un projet public, sa page
+// publique) : ce n'est pas la classe `public`, qui veut dire « sans contenu d'un membre ». Elles ne
+// lisent jamais la session : le blocage n'y joue pas (un visiteur n'a personne à bloquer), mais
+// chacune cite dans VISITOR_PROOFS le test qui prouve qu'un projet ou une page qui n'est pas public
+// y répond comme un identifiant inconnu. Leurs lectures entrent aussi dans les preuves des parties
+// retirées et des ruches, comme celles des membres.
 import { existsSync, readFileSync } from 'node:fs'
 import { ErrorResponse } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -51,7 +59,7 @@ import { ALLOWED_WRITES } from './suspension/guard'
 import { activity } from './testing/activity'
 import { createTestContext } from './testing/context'
 
-type RouteClass = 'hidesBlocked' | 'own' | 'admin' | 'public'
+type RouteClass = 'hidesBlocked' | 'own' | 'admin' | 'public' | 'visitor'
 /** Ce que la garde des comptes suspendus fait de la route (tranche 7c). */
 type DuringSuspension = 'allowed' | 'refused' | 'partial'
 /** Ce que la garde de l'accord aux règles fait de la route (tranche R11). */
@@ -231,7 +239,33 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'POST /v1/hives/:id/invitations': ['hidesBlocked', 'refused', 'refused'],
   'POST /v1/hive-invitations/:id/accept': ['own', 'allowed', 'allowed'],
   'DELETE /v1/hive-invitations/:id': ['own', 'allowed', 'allowed'],
+  // R12 : les lectures sans compte (routes/public.ts et voisines). Aucune ne lit la session : la
+  // garde d'une suspension ou de l'accord n'y voit personne, et les laisse passer. Le signalement
+  // d'un visiteur est une écriture sans session (même origine exigée, quota par adresse IP).
+  'GET /v1/public/projects/:id': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/projects/:id/updates': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/projects/:id/updates/:updateId': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/members/:id': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/showcase': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/reports/target': ['visitor', 'allowed', 'allowed'],
+  'POST /v1/public/reports': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/head': ['visitor', 'allowed', 'allowed'],
+  'GET /v1/public/sitemap': ['visitor', 'allowed', 'allowed'],
+  // R12 : « Mon profil public ». Un membre suspendu peut seulement fermer sa page (Q6) : la garde
+  // laisse entrer, la route refuse le reste (`partial`) ; sans l'accord aux nouvelles règles, rien.
+  'GET /v1/me/public-page': ['own', 'allowed', 'allowed'],
+  'PATCH /v1/me/public-page': ['own', 'partial', 'refused'],
+  // R12 : la vitrine. « À la une » (Explorer) suit les règles de blocage d'Explorer ; la modération
+  // la règle (ses écritures sont refusées à un administrateur suspendu, comme celles du catalogue) ;
+  // l'auteur la quitte par « Retirer de l'accueil », un DELETE sur son projet.
+  'GET /v1/showcase': ['hidesBlocked', 'allowed', 'allowed'],
+  'GET /v1/moderation/showcase': ['admin', 'allowed', 'allowed'],
+  'PUT /v1/moderation/showcase': ['admin', 'refused', 'refused'],
+  'DELETE /v1/projects/:id/showcase': ['own', 'allowed', 'allowed'],
 }
+
+/** Les routes lues sans compte (R12) : tout `/v1/public/*`, et rien d'autre. */
+const isVisitorPath = (route: string) => (route.split(' ')[1] ?? '').startsWith('/v1/public/')
 
 /** La classe « blocage » d'une route (première colonne). */
 const blockClass = (route: string) => ROUTES[route]?.[0]
@@ -420,6 +454,36 @@ const PROOFS: Record<string, { file: string; test: string }> = {
     file: 'hives.invitations.test.ts',
     test: 'answers the same 404 for an unknown, unverified or blocked invitee, before any 409',
   },
+  // R12 : « À la une » ne montre pas un projet de la vitrine que le membre ne voit pas (scénario,
+  // « À la une, pour les membres »).
+  'GET /v1/showcase': {
+    file: 'showcase.test.ts',
+    test: 'leaves out of « À la une » a showcase project of a member blocked either way',
+  },
+}
+
+/**
+ * R12 (relecture de sécurité du plan, B3) : chaque route `visitor` cite le test qui prouve qu'un
+ * projet, une mise à jour ou une page qui n'est pas public y répond exactement comme un identifiant
+ * inconnu, ou n'est pas dans la liste. La table état × surface les prouve presque toutes d'un coup.
+ */
+const VISITOR_MATRIX = {
+  file: 'public-visibility.matrix.test.ts',
+  test: 'hides a %s project from every visitor surface, with the response of an unknown id',
+}
+const VISITOR_PROOFS: Record<string, { file: string; test: string }> = {
+  'GET /v1/public/projects/:id': VISITOR_MATRIX,
+  'GET /v1/public/projects/:id/updates': VISITOR_MATRIX,
+  'GET /v1/public/projects/:id/updates/:updateId': VISITOR_MATRIX,
+  'GET /v1/public/members/:id': {
+    file: 'public-members.test.ts',
+    test: 'answers a closed page with the same 404 as an unknown, unverified or deleted member',
+  },
+  'GET /v1/public/showcase': VISITOR_MATRIX,
+  'GET /v1/public/reports/target': VISITOR_MATRIX,
+  'POST /v1/public/reports': VISITOR_MATRIX,
+  'GET /v1/public/head': VISITOR_MATRIX,
+  'GET /v1/public/sitemap': VISITOR_MATRIX,
 }
 
 /**
@@ -429,6 +493,11 @@ const PROOFS: Record<string, { file: string; test: string }> = {
  * photo de profil) n'y paraît plus pour les autres ; ou, avec `none`, dit pourquoi elle n'en montre
  * aucune. Le test cité montre la différence : un témoin voit la partie avant le retrait.
  */
+/** R12 : la vitrine, la tête des pages et la cible d'un signalement d'un visiteur, d'un coup. */
+const VISITOR_PARTS = {
+  file: 'public-visibility.matrix.test.ts',
+  test: 'shows a visitor no removed photo or avatar in the showcase, the head of a page or the report sheet',
+}
 const PART_PROOFS: Record<string, { file: string; test: string } | { none: string }> = {
   // R11 : la couverture du projet d'un autre, retirée par la modération, n'y paraît plus.
   'GET /v1/me/comments': {
@@ -545,6 +614,33 @@ const PART_PROOFS: Record<string, { file: string; test: string } | { none: strin
     file: 'hives.test.ts',
     test: 'never shows a removed avatar on any hive route that shows a member',
   },
+  // R12 : la vitrine des membres, et les lectures sans compte.
+  'GET /v1/showcase': {
+    file: 'showcase.test.ts',
+    test: 'shows the next photo as the cover of a showcase card when the first one is removed',
+  },
+  'GET /v1/public/projects/:id': {
+    file: 'public-projects.test.ts',
+    test: 'hides a removed description, prompt, tools, demo link, photo and portrait cover from a visitor',
+  },
+  'GET /v1/public/projects/:id/updates': {
+    file: 'public-projects.test.ts',
+    test: 'hides a removed update photo from a visitor, in the list, by its id and on the project',
+  },
+  'GET /v1/public/projects/:id/updates/:updateId': {
+    file: 'public-projects.test.ts',
+    test: 'hides a removed update photo from a visitor, in the list, by its id and on the project',
+  },
+  'GET /v1/public/members/:id': {
+    file: 'public-members.test.ts',
+    test: 'never shows a removed bio, removed favorite tools or a removed avatar to a visitor',
+  },
+  'GET /v1/public/showcase': VISITOR_PARTS,
+  'GET /v1/public/head': VISITOR_PARTS,
+  'GET /v1/public/reports/target': VISITOR_PARTS,
+  'GET /v1/public/sitemap': {
+    none: 'des adresses et des dates de modification, sans texte ni image d’un membre',
+  },
 }
 
 /**
@@ -634,6 +730,23 @@ const HIVE_PROOFS: Record<string, { file: string; test: string } | { none: strin
   'GET /v1/moderation/tools/:slug/impact': RESERVED_IN_CATALOGUE,
   'GET /v1/moderation/categories/pending': RESERVED_IN_CATALOGUE,
   'GET /v1/moderation/catalogue-changes': RESERVED_IN_CATALOGUE,
+  // R12 : la vitrine ne garde que des projets publics (`web`), jamais réservés à une ruche ; un
+  // projet qui devient réservé en sort dans la même transaction (visibility-web.test.ts).
+  'GET /v1/showcase': {
+    none: 'des projets publics (web) seulement ; passer en « Une ruche » sort de la vitrine',
+  },
+  'GET /v1/moderation/showcase': {
+    none: 'des projets publics (web) seulement, en vitrine ou candidats ; jamais un projet réservé',
+  },
+  // Les lectures sans compte : l'état « ruche » de la table état × surface.
+  'GET /v1/public/projects/:id': VISITOR_MATRIX,
+  'GET /v1/public/projects/:id/updates': VISITOR_MATRIX,
+  'GET /v1/public/projects/:id/updates/:updateId': VISITOR_MATRIX,
+  'GET /v1/public/members/:id': VISITOR_MATRIX,
+  'GET /v1/public/showcase': VISITOR_MATRIX,
+  'GET /v1/public/reports/target': VISITOR_MATRIX,
+  'GET /v1/public/head': VISITOR_MATRIX,
+  'GET /v1/public/sitemap': VISITOR_MATRIX,
 }
 
 /**
@@ -645,10 +758,14 @@ const showsProjects = (route: string) =>
   route === 'GET /v1/me/export' ||
   (route.startsWith('GET ') && blockClass(route) === 'admin')
 
-/** Les routes qui montrent le contenu d'un autre membre : les lectures « hidesBlocked », les fichiers. */
+/**
+ * Les routes qui montrent le contenu d'un autre membre : les lectures « hidesBlocked », les fichiers,
+ * et (R12) les lectures d'un visiteur.
+ */
 const showsOthers = (route: string) =>
   route === 'GET /media/:folder/:file' ||
-  (route.startsWith('GET ') && blockClass(route) === 'hidesBlocked')
+  (route.startsWith('GET ') &&
+    (blockClass(route) === 'hidesBlocked' || blockClass(route) === 'visitor'))
 
 /**
  * R9 (relecture de sécurité du plan, P7) : les tests qui prouvent chaque écriture permise « en
@@ -701,6 +818,14 @@ const SUSPENSION_PROOFS: Record<string, readonly { file: string; test: string }[
       test: 'lets a suspended member leave a hive and accept an invitation',
     },
   ],
+  // R12 (Q6) : un membre suspendu peut fermer sa page publique, jamais l'ouvrir ni en changer les
+  // cases.
+  'PATCH /v1/me/public-page': [
+    {
+      file: 'public-page.test.ts',
+      test: 'lets a suspended member close her public page, and refuses with 403 suspended anything else',
+    },
+  ],
 }
 
 /** Échappe un texte pour qu'une expression régulière le lise mot pour mot (« ( », « . »…). */
@@ -718,8 +843,9 @@ const hasTest = (file: string, title: string) => {
   const url = new URL(`./${file}`, import.meta.url)
   if (!existsSync(url)) return false
   const source = readFileSync(url, 'utf8')
+  // R12 : `it.each(STATES)('…')` aussi, la table nommée d'une constante (la table état × surface).
   const call = new RegExp(
-    String.raw`\bit(?:\.each\(\[[\s\S]*?\]\))?\(\s*(['"\x60])${literally(title)}\1`,
+    String.raw`\bit(?:\.each\((?:\[[\s\S]*?\]|[A-Za-z_$][\w$]*)\))?\(\s*(['"\x60])${literally(title)}\1`,
   )
   return call.test(source)
 }
@@ -761,6 +887,42 @@ describe('the inventory of routes', () => {
 
     expect(withoutProof.join('\n')).toBe('')
     expect(notHiding.join('\n')).toBe('')
+  })
+
+  it('classes every /v1/public route as visitor, with an existing proof', async () => {
+    const routes = await appRoutes()
+    const publicRoutes = routes.filter(isVisitorPath)
+    // Toute route /v1/public est `visitor`, et seulement elles.
+    const notVisitor = publicRoutes.filter((route) => blockClass(route) !== 'visitor')
+    const visitorElsewhere = Object.keys(ROUTES).filter(
+      (route) => blockClass(route) === 'visitor' && !isVisitorPath(route),
+    )
+    // Chacune cite sa preuve, et la preuve existe.
+    const visitors = Object.keys(ROUTES).filter((route) => blockClass(route) === 'visitor')
+    const withoutProof = visitors.filter((route) => {
+      const proof = VISITOR_PROOFS[route]
+      return proof === undefined || !hasTest(proof.file, proof.test)
+    })
+    const notVisitorProof = Object.keys(VISITOR_PROOFS).filter(
+      (route) => blockClass(route) !== 'visitor',
+    )
+
+    expect(notVisitor.join('\n')).toBe('')
+    expect(visitorElsewhere.join('\n')).toBe('')
+    expect(withoutProof.join('\n')).toBe('')
+    expect(notVisitorProof.join('\n')).toBe('')
+    // Témoins : les routes du plan sont montées, et un titre d'`it.each(STATES)` est bien trouvé.
+    expect(publicRoutes).toEqual(
+      expect.arrayContaining([
+        'GET /v1/public/projects/:id',
+        'GET /v1/public/projects/:id/updates',
+        'GET /v1/public/projects/:id/updates/:updateId',
+        'GET /v1/public/members/:id',
+        'GET /v1/public/showcase',
+      ]),
+    )
+    expect(hasTest(VISITOR_MATRIX.file, VISITOR_MATRIX.test)).toBe(true)
+    expect(hasTest(VISITOR_MATRIX.file, 'hides a project from every visitor surface')).toBe(false)
   })
 
   it('finds each cited test in its file, by its exact title', () => {
@@ -807,7 +969,8 @@ describe('the inventory of routes', () => {
     // exactement celles de la liste de la garde. Corriger son adresse avant de l'avoir vérifiée
     // (POST /v1/account/unverified-email) ne lit jamais la session : la garde n'y voit personne.
     const { RULES_ALLOWED_WRITES } = await import('./rules/guard')
-    const withoutSession = new Set(['POST /v1/account/unverified-email'])
+    // R12 : le signalement d'un visiteur non plus (`/v1/public/*` ne lit jamais la session).
+    const withoutSession = new Set(['POST /v1/account/unverified-email', 'POST /v1/public/reports'])
     const exits = Object.entries(ROUTES)
       .filter(([route, [, , withoutRules]]) => {
         const [method = '', path = ''] = route.split(' ')
@@ -840,8 +1003,10 @@ describe('the inventory of routes', () => {
     ])
     // D4 : exactement les écritures permises pendant une suspension, sans les trois qu'une route ne
     // permet qu'en partie ou réserve aux administrateurs, plus l'accord lui-même.
+    // R12 : fermer sa page publique pendant une suspension (`partial`), refusé sans l'accord.
     const partly = new Set([
       'PATCH /v1/me',
+      'PATCH /v1/me/public-page',
       'PATCH /v1/projects/:id',
       'POST /v1/moderation/decisions',
     ])
