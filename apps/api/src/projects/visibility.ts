@@ -5,18 +5,47 @@
 // aussi, pour le visiteur seulement. R10 : un projet « réservé » à une ruche (visibility = 'hive',
 // hive_id posé) se voit de son auteur et des membres ACTUELS de sa ruche, partout où ils regardent,
 // et de personne d'autre (scénario refonte.md, R10, « Qui le voit » ; plan de R10, choix 2).
-import { schema } from '@ruche/db'
+// R12 : la valeur `web` (« Public », visible aussi sans compte). Pour un membre connecté, un projet
+// `web` se comporte partout comme un projet `public` (« Membres ») : `MEMBER_VISIBLE` dit les deux
+// valeurs, et chaque règle ci-dessous les lit par lui. Ce qu'un visiteur sans compte peut lire est
+// une autre règle, plus étroite, écrite une seule fois en bas du fichier (`visitorVisibleProject`).
+import type { ProjectVisibility } from '@ruche/contracts'
+import { type Database, schema } from '@ruche/db'
 import { and, type Column, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { notBlockedWith } from '../blocks/visibility'
 
 /**
- * Un projet public et pas retiré par la modération, quel que soit le visiteur. Sert aux nombres,
- * qui sont les mêmes pour tous (commentaires, réactions) : un blocage ne les change pas. Pour
- * montrer des projets à quelqu'un, c'est `listedProjectFor`. `isNull` : « removed_at is null ».
- * Jamais un projet réservé à une ruche : sans lecteur, on ne sait pas s'il en est membre.
+ * Les visibilités qu'un membre connecté voit chez n'importe quel autre membre (R12, plan, choix 1) :
+ * « Membres » (`public`) et « Public » (`web`). `as const` : TypeScript garde les deux valeurs
+ * exactes (pas un simple `string[]`), et `satisfies` vérifie qu'elles existent bien dans le contrat.
  */
-export const listedProject = () =>
-  and(eq(schema.project.visibility, 'public'), isNull(schema.project.removedAt))
+export const MEMBER_VISIBLE = ['public', 'web'] as const satisfies readonly ProjectVisibility[]
+
+/** Cette visibilité, lue en base ou reçue, est-elle de celles que voient tous les membres ? */
+export const isMemberVisible = (visibility: string) =>
+  (MEMBER_VISIBLE as readonly string[]).includes(visibility)
+
+/**
+ * « visibility in ('public', 'web') », écrit en toutes lettres plutôt qu'en paramètres liés
+ * (`inArray` écrirait « in ($1, $2) »). Les index partiels de la migration 0025
+ * (project_public_published_idx, project_shared_published_idx) ne servent une requête que si
+ * PostgreSQL peut prouver que sa condition implique la leur ; avec des constantes, la preuve tient
+ * toujours, même quand PostgreSQL garde un plan générique d'une requête préparée (où les paramètres
+ * ne sont pas encore connus). `sql.raw` ne reçoit ici que les constantes de `MEMBER_VISIBLE`, écrites
+ * dans ce fichier : jamais une entrée du client.
+ */
+const memberVisibleSql = () =>
+  sql`${schema.project.visibility} in (${sql.raw(MEMBER_VISIBLE.map((v) => `'${v}'`).join(', '))})`
+
+/**
+ * Un projet visible de tous les membres (`public` ou `web`, R12) et pas retiré par la modération,
+ * quel que soit le visiteur. Sert aux nombres, qui sont les mêmes pour tous (commentaires,
+ * réactions) : un blocage ne les change pas. Pour montrer des projets à quelqu'un, c'est
+ * `listedProjectFor`. `isNull` : « removed_at is null ». Jamais un projet réservé à une ruche :
+ * sans lecteur, on ne sait pas s'il en est membre.
+ */
+export const listedProject = () => and(memberVisibleSql(), isNull(schema.project.removedAt))
 
 /**
  * Un projet réservé à une ruche, pas retiré, sans dire à qui (R10). Seul, il ne montre rien à
@@ -84,7 +113,7 @@ export const sharedWith = (project: {
   inViewerHive: boolean
 }) =>
   project.removedAt === null &&
-  (project.visibility === 'public' || (project.visibility === 'hive' && project.inViewerHive))
+  (isMemberVisible(project.visibility) || (project.visibility === 'hive' && project.inViewerHive))
 
 /**
  * « Sa ruche est l'une de celles de ce membre », à lire comme une colonne vrai / faux dans un
@@ -151,3 +180,38 @@ export const projectVisibleTo = (viewerId: string) =>
  */
 export const projectReachableBy = (viewerId: string) =>
   or(listedProject(), reservedProject(), eq(schema.project.authorId, viewerId))
+
+/**
+ * R12 : un projet qu'un visiteur SANS COMPTE peut lire (plan, choix 2 ; relecture de sécurité B3 :
+ * une seule condition pour toutes les surfaces publiques : page du projet, mises à jour, page
+ * publique de l'auteur, vitrine, plan du site, tête HTML, médias, cible d'un signalement). Il faut
+ * les trois :
+ * - `web` (« Public ») : ni « Membres », ni réservé à une ruche, ni privé ;
+ * - pas retiré par la modération (un auteur suspendu dont le projet n'est pas retiré reste lu :
+ *   décision de la session sur Q6, comme pour les membres) ;
+ * - un auteur au compte vérifié (`verifiedAuthor`), donc aussi un auteur qui existe encore : un
+ *   compte supprimé n'a plus de ligne dans "user", la sous-requête ne rend rien et la condition est
+ *   fausse.
+ * Aucun blocage : un visiteur n'a pas d'identité à bloquer. « = 'web' » en toutes lettres, pour la
+ * même raison que `memberVisibleSql` : l'index partiel project_web_published_idx (`visibility =
+ * 'web' and removed_at is null`) sert le plan du site et les projets d'une page publique.
+ */
+export const visitorVisibleProject = () =>
+  and(sql`${schema.project.visibility} = 'web'`, isNull(schema.project.removedAt), verifiedAuthor())
+
+/**
+ * La règle `visitorVisibleProject` pour un seul projet, connu par son identifiant (les routes
+ * `/v1/public/*`, les médias). Un identifiant mal formé répond « non » sans lire la base : la colonne
+ * est un uuid, et PostgreSQL refuserait la comparaison par une erreur. Sinon, une lecture de la clé
+ * primaire de project, plus celle de "user" (verifiedAuthor) ; l'identifiant entre comme paramètre
+ * lié. `limit 1` : on ne veut savoir qu'une chose, s'il existe une ligne.
+ */
+export const visibleToVisitor = async (db: Database, projectId: string): Promise<boolean> => {
+  if (!z.uuid().safeParse(projectId).success) return false
+  const [row] = await db
+    .select({ id: schema.project.id })
+    .from(schema.project)
+    .where(and(eq(schema.project.id, projectId), visitorVisibleProject()))
+    .limit(1)
+  return row !== undefined
+}

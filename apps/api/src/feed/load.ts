@@ -41,7 +41,8 @@ const loadPage = async (
     .where(
       and(
         // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur. L'index
-        // partiel project_public_published_idx (visibility = 'public') sert toujours : « removed_at
+        // partiel project_public_published_idx (R12 : visibility in ('public', 'web'), « Membres »
+        // et « Public », écrits en constantes par listedProject) sert toujours : « removed_at
         // is null » écarte au passage les quelques projets retirés qu'il contient. Tranche 7b :
         // ni celui d'un membre bloqué avec le visiteur (listedProjectFor), écarté par deux
         // « exists » sur member_block, chacun servi par un index (blocks/visibility.ts).

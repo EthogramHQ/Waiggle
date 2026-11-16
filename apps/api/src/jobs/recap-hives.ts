@@ -11,12 +11,12 @@
 // quel que soit le nombre de ses ruches : quatre pour les nouveautés, une pour les invitations.
 import { RECAP_MAX_LINES } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, gt, isNull, lte, ne, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, lte, ne, type SQL, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { notBlockedWith } from '../blocks/visibility'
 import type { RecapHive, RecapHiveInvitation, RecapHiveItem } from '../email/templates'
 import { invitationValidSince } from '../hives/load'
-import { listedVerifiedProjectFor } from '../projects/visibility'
+import { listedVerifiedProjectFor, MEMBER_VISIBLE } from '../projects/visibility'
 import { activeSuspensionSql } from '../suspension/load'
 import { hasReadableLines, updateOnCards } from '../updates/load'
 
@@ -61,7 +61,8 @@ type HiveEvent = {
  *   join hive on hive.id = hm.hive_id
  *   join project on project.hive_id = hm.hive_id and project.visibility = 'hive'   -- réservés
  *   -- ou : join hive_member mate on mate.hive_id = hm.hive_id
- *   --      join project on project.author_id = mate.user_id and project.visibility = 'public'
+ *   --      join project on project.author_id = mate.user_id
+ *   --        and project.visibility in ('public', 'web')                 -- « Membres », « Public »
  *   join "user" person on person.id = project.author_id
  *   where hm.user_id = $me and project.author_id <> $me
  *     and project.published_at > $since and project.published_at <= $now
@@ -94,7 +95,9 @@ export const hiveNewsOf = async (
         where s.user_id = ${p.authorId} and ${activeSuspensionSql('s', now)})`,
     )
   const reserved = and(eq(p.hiveId, hm.hiveId), eq(p.visibility, 'hive'))
-  const ofMate = and(eq(p.authorId, mate.userId), eq(p.visibility, 'public'))
+  // R12 : « Membres » ou « Public » (`MEMBER_VISIBLE`) : un projet public d'un membre de la ruche
+  // compte comme un projet « Membres ». `inArray` : « visibility in ($1, $2) ».
+  const ofMate = and(eq(p.authorId, mate.userId), inArray(p.visibility, [...MEMBER_VISIBLE]))
   const columns = (at: typeof p.publishedAt | typeof u.createdAt) => ({
     hiveId: hm.hiveId,
     hiveName: h.name,

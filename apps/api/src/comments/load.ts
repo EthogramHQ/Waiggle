@@ -777,7 +777,7 @@ export const loadCommentContext = async (
  *   inner join project on project.id = project_comment.project_id
  *   where project_comment.project_id in (…) and hidden_at is null and deleted_at is null
  *     and project_comment.removed_at is null and project_comment.author_id is not null
- *     and ((project.visibility = 'public' and project.removed_at is null)
+ *     and ((project.visibility in ('public', 'web') and project.removed_at is null)
  *       or (project.visibility = 'hive' and project.removed_at is null)
  *       or project_comment.author_id = project.author_id)
  *   group by project_comment.project_id
