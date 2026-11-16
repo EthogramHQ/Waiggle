@@ -42,7 +42,22 @@ export const en: Translation = {
     signIn: 'Sign in',
     haveAccount: 'I already have an account',
     publish: 'Publish a project',
-    membersOnly: 'Projects and profiles are only visible with an account.',
+    membersOnly: 'Nothing is public without your consent.',
+    showcase: 'Projects to discover',
+    showcaseNote: 'Their makers chose to make these projects public.',
+  },
+  visitor: {
+    signIn: 'Sign in',
+    signUp: 'Create an account',
+    commentsMembersOnly: 'Comments are for members only.',
+    reactions_one: '{{count}} reaction from a member',
+    reactions_other: '{{count}} reactions from members',
+    noProjects: 'No public project yet.',
+    accountRequired: {
+      title: 'Create your account to react',
+      follow: 'Follow its updates',
+      inviteOnly: '{{appName}} is invitation-only.',
+    },
   },
   legal: {
     version: 'Version of {{date}}',
@@ -56,6 +71,7 @@ export const en: Translation = {
       legal: 'Legal notice',
       accessibility: 'Accessibility',
       sourceCode: 'The source code',
+      report: 'Report content',
       contact: 'Contact us: {{contactEmail}}',
     },
     pages: {
@@ -479,6 +495,8 @@ export const en: Translation = {
         reportCopies:
           'If your content or your profile was reported, the copy of its text stays 30 days (a year if it was removed)',
         hiveInvitations: 'The invitations you sent stay valid, without your name',
+        searchCopies:
+          'The copies search engines might have kept of your public projects or your public page',
       },
     },
   },
@@ -524,7 +542,7 @@ export const en: Translation = {
         'It does not change with your name. {{min}} to {{max}} characters: letters without accents, digits and “_”.',
       bio: 'Bio',
       tools: 'Favorite tools',
-      toolsHint: 'Visible to all members on your page.',
+      toolsHint: 'Visible on your page.',
     },
     save: 'Save',
     saved: 'Profile saved.',
@@ -560,8 +578,28 @@ export const en: Translation = {
       bannerHandle: 'Your temporary handle is @{{handle}}. Choose another one.',
       bannerName: 'Your temporary name is “{{name}}”. Choose another one.',
     },
+    publicPage: {
+      title: 'My public profile',
+      toggle: 'Make my page public',
+      toggleHint: 'Visible to everyone, and findable on Google',
+      visitorSees: 'What a visitor sees',
+      nameAndPhoto: 'My name and photo',
+      nameAndPhotoHint: 'Always, if the page is public',
+      bio: 'My bio',
+      tools: 'My favourite tools',
+      projects: 'My public projects',
+      projectsCount: '{{count}} of {{total}}: the others stay between members',
+      projectsAll: '{{count}} of {{total}}',
+      projectsNone: 'No public project yet',
+      followerCount: 'My follower count',
+      never: 'Never shown: your hives, who follows you, your comments and your reactions.',
+      preview: 'See my page as a visitor',
+      suspended: 'While suspended, you can only close your public page.',
+      error: 'The change couldn’t be saved. Try again.',
+    },
   },
   project: {
+    webBadge: 'Public',
     form: {
       newTitle: 'New project',
       editTitle: 'Edit the project',
@@ -683,6 +721,10 @@ export const en: Translation = {
       audienceHiveEdit: 'Only members of {{hive}} see this project.',
       private: 'Private',
       privateHint: 'A draft: no other member can see it.',
+      web: 'Public',
+      webHint: 'Visible to everyone, and findable on Google',
+      audienceWeb:
+        'Anyone will be able to see it, even without an account. If you change your mind, search engines may keep showing it for a while.',
       audienceMembers:
         '{{appName}} members will see this project; your followers will find it in their feed and in their email recap, which stays in their inbox.',
       audienceMembersEdit:
@@ -792,6 +834,8 @@ export const en: Translation = {
       beforeAfterSwitch: 'Before / after',
       hintPublic:
         'Every member will be able to read it. This project’s followers and testers will be notified.',
+      hintWeb:
+        'Anyone will be able to read it, even without an account. This project’s followers and testers will be notified.',
       hintPrivate:
         'This project is private: no other member sees this update, and nobody is notified. If it becomes visible to members again, they will all see it, and its followers and testers will be able to find it in Activity.',
       statusPrefill: 'The project is now “{{status}}”.',
@@ -1185,6 +1229,7 @@ export const en: Translation = {
         'The project, its description, photos, prompts, updates and testers’ corner disappear right away, along with the other members’ comments, reactions and feedback. This can’t be undone.',
       deleteConfirmRemoved:
         'The project, its description, photos, prompts, updates and testers’ corner disappear right away, along with the other members’ comments, reactions and feedback. The moderation decision and the copy of the report are kept for up to a year after the decision. This can’t be undone.',
+      deleteConfirmWeb: 'Search engines may keep showing it for a while.',
       deleteConfirmButton: 'Delete',
       notFoundTitle: 'This project cannot be found',
       notFound: 'It may have been deleted, it may not be visible to you, or the link is wrong.',
@@ -1346,6 +1391,16 @@ export const en: Translation = {
     alreadyReportedPart: 'You’ve already reported this part. Moderation will look at it.',
     limitedLead:
       'You’ve reached the limit of {{max}} reports in 24 hours. For something urgent, write to us:',
+    visitor: {
+      email: 'Your email address, optional',
+      emailHint: 'To hear what happens to your report',
+      emailPlaceholder: 'name@example.com',
+      moderationReads: 'Moderation reads every report.',
+      sentBody: 'Moderation will look at it.',
+      sentBodyEmail: 'Moderation will look at it. An email will tell you once it has been handled.',
+      limited:
+        'Too many reports from this connection. Try again tomorrow, or write to us: {{contactEmail}}',
+    },
   },
   actionMenu: {
     label: 'More actions',
@@ -1397,6 +1452,7 @@ export const en: Translation = {
       follows: 'Your follows of each other are removed.',
       notTold: 'No message is sent to them.',
       moderation: 'The moderation isn’t told.',
+      publicProjects: 'Your public projects stay visible to everyone, even without an account.',
     },
     fullText: 'What blocking changes',
     alsoReport: 'Also report their profile',
@@ -1407,6 +1463,27 @@ export const en: Translation = {
     removed: 'Removed',
     empty: 'No reports pending.',
     emptyRemoved: 'No removed content.',
+    showcase: {
+      tab: 'Home showcase',
+      reportsTab: 'Reports',
+      title: 'On the home page',
+      count: '{{count}} of {{max}}',
+      freeSlot: 'A free spot',
+      remove: 'Remove',
+      removeNamed: 'Remove {{title}} from the home page',
+      candidates: 'Public projects',
+      search: 'Search a public project',
+      feature: 'Feature',
+      featureNamed: 'Feature {{title}}',
+      limit:
+        '{{max}} projects at most. Each maker is told in Activity and can take their project off the home page.',
+      full: 'The home page is full: remove one to feature another.',
+      empty: 'No public project yet.',
+      searchEmpty: 'No public project matches.',
+      changed: 'Edited since it was featured',
+      errorTitle: 'The showcase couldn’t load',
+      error: 'The change couldn’t be saved. Try again.',
+    },
     more: 'Show more',
     errorTitle: 'Moderation couldn’t load',
     kinds: {
@@ -1859,7 +1936,7 @@ export const en: Translation = {
     makePrivate: 'Make private',
     makePrivateTitle: 'Make “{{title}}” private?',
     makePrivateBody:
-      'Only you will see it. While suspended, you won’t be able to make it public again.',
+      'Only you will see it. While suspended, you won’t be able to make it visible again.',
     madePrivate: 'Project made private.',
     makePrivateError: 'The project couldn’t be made private. Try again.',
   },
@@ -1988,6 +2065,9 @@ export const en: Translation = {
     allCategories: 'All',
     categoryEmpty: 'No project in “{{name}}” for now.',
     seeAllProjects: 'See all projects',
+    featured: 'Featured',
+    featuredPrevious: 'Previous featured projects',
+    featuredNext: 'Next featured projects',
     categoriesError: 'The categories could not load.',
   },
   search: {
@@ -2405,11 +2485,13 @@ export const en: Translation = {
     membersOnly: 'Only {{appName}} members will be able to open it.',
     hiveOnly: 'Only members of {{hive}} will be able to open it.',
     privateOnly: 'This project is private: the link will only open for you.',
+    everyone: 'Anyone will be able to open it.',
     system: 'Share…',
     copy: 'Copy link',
     copiedMembers: 'Link copied: only {{appName}} members will be able to open it.',
     copiedHive: 'Link copied: only members of {{hive}} will be able to open it.',
     copiedPrivate: 'Link copied: it will only open for you.',
+    copiedEveryone: 'Link copied: anyone will be able to open it.',
     copyFailed: 'Could not copy the link. Try again.',
     systemFailed: 'Could not open sharing. Copy the link instead.',
   },
@@ -2674,6 +2756,51 @@ export const en: Translation = {
       reason:
         'You are receiving this email because your {{appName}} account has not been used for almost 3 years. It is a service email: it is sent even if you turned off the others, only once before the deletion.',
     },
+    visitorReport: {
+      greeting: 'Hello,',
+      kind: 'Content: {{kind}}',
+      reason: 'Reason: {{reason}}',
+      sentAt: 'Sent on {{date}} at {{time}}',
+      kinds: {
+        project: 'a project',
+        update: 'an update',
+        member: 'a profile',
+      },
+      ignore: 'If you didn’t report anything, ignore this email.',
+      reasonWhy:
+        'You are receiving this email because this address was given when reporting content on {{appName}}.',
+      received: {
+        subject: 'We received your report',
+        heading: 'We received your report',
+        body: 'Thank you. The {{appName}} moderation will look at what you reported.',
+        next: 'A second email will tell you what was decided. Your address will then be erased.',
+      },
+      decided: {
+        subject: 'Your report has been handled',
+        heading: 'Your report has been handled',
+        outcome: {
+          project: {
+            removed: 'The project you reported has been removed.',
+            dismissed: 'After review, the project you reported has not been removed.',
+          },
+          update: {
+            removed: 'The update you reported has been removed.',
+            dismissed: 'After review, the update you reported has not been removed.',
+          },
+          member: {
+            removed: 'Moderation took action on the profile you reported.',
+            dismissed: 'After review, nothing was changed on the profile you reported.',
+          },
+          part: {
+            removed: 'The part you reported has been removed.',
+            dismissed: 'After review, the part you reported has not been removed.',
+          },
+        },
+        contest: 'Disagree? Write to {{contactEmail}}; you can also go to court.',
+        erased:
+          'Your address is now erased: this is the last email from {{appName}} about this report.',
+      },
+    },
     privacy: 'Privacy: {{url}}',
   },
   notificationSettings: {
@@ -2710,7 +2837,7 @@ export const en: Translation = {
     nobodyTitle: 'You don’t follow anyone yet',
     nobodyBody: 'Follow members from their page: their new projects will show up here.',
     nobodyAction: 'Explore projects',
-    discoverEmpty: 'No public project yet.',
+    discoverEmpty: 'No project published yet.',
     testersEmpty: 'No project is looking for testers yet.',
     testersCaption: 'Projects to try: their makers are waiting for your feedback.',
     more: 'Show more',
@@ -2813,6 +2940,10 @@ export const en: Translation = {
     hiveAnimator: 'You now host the <b>{{hive}}</b> hive.',
     hiveDeleted: 'The <b>{{hive}}</b> hive has been deleted.',
     hivePrivateAgain: 'Your projects kept for the hive are private again.',
+    showcaseAdded: '<b>{{title}}</b> is on the {{appName}} home page',
+    showcaseLeave: 'Remove from the home page',
+    showcaseLeft: 'Your project left the home page. It stays public.',
+    showcaseLeaveError: 'The project couldn’t leave the home page. Try again.',
     emailColumn: {
       title: 'What you get by email',
       settings: 'Notification settings',
@@ -3043,5 +3174,8 @@ export const en: Translation = {
       'Accept the rules of {{appName}} first: this action is waiting for your agreement.',
     rulesNotAccepted: 'Accept the rules of {{appName}} to create your account.',
     ageNotDeclared: '{{appName}} is open from age 15.',
+    visitorReportQuota:
+      'Too many reports from this connection. Try again tomorrow, or write to us: {{contactEmail}}',
+    authorDeclined: 'The maker has taken this project off the home page.',
   },
 }

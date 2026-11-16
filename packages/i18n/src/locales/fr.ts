@@ -55,10 +55,34 @@ export const fr = {
     signIn: 'Me connecter',
     haveAccount: 'J’ai déjà un compte',
     publish: 'Publier un projet',
-    // R11 (« Moins de mots », planche R11-Pied) : l'ancienne phrase disait que rien n'était trouvé
-    // par un moteur de recherche, ce qui est faux (l'accueil et les quatre pages le sont). Écriture
-    // neutre ; R12 dira « Rien n’est public sans ton accord. »
-    membersOnly: 'Les projets et les profils ne se voient qu’avec un compte.',
+    // R12 (A14) : la phrase de l'accueil, de la feuille « Compte requis » et du cadenas de la
+    // connexion et de l'inscription. La clé garde son nom d'avant R12, lu par les écrans et leurs
+    // tests ; l'ancienne phrase (« Les projets et les profils ne se voient qu’avec un compte. ») est
+    // devenue fausse.
+    membersOnly: 'Rien n’est public sans ton accord.',
+    // R12 (Q9, Q10) : la vitrine de l'accueil, choisie par la modération parmi les projets publics.
+    showcase: 'Des projets à voir',
+    showcaseNote: 'Ces projets sont publics : leurs auteurs l’ont choisi.',
+  },
+  // R12 : ce que voit un visiteur sans compte sur un projet ou une page publique (planches
+  // R12-Visiteur-*). Jamais les commentaires, ni qui a réagi, ni qui suit.
+  visitor: {
+    signIn: 'Se connecter',
+    signUp: 'Créer un compte',
+    // À la place des commentaires : ni leur nombre, ni un extrait (A14).
+    commentsMembersOnly: 'Les commentaires sont réservés aux membres.',
+    reactions_one: '{{count}} réaction de membre',
+    reactions_other: '{{count}} réactions de membres',
+    // La page publique d'un membre sans projet public à montrer.
+    noProjects: 'Pas encore de projet public.',
+    // La feuille « Compte requis » (planche R12-Compte-Requis) : le titre suffit (Q11), puis la
+    // limite (Q12) ; « Rien n’est public sans ton accord. » est home.membersOnly. Les deux autres
+    // pastilles reprennent project.reactions.bravo et project.comments.addShort.
+    accountRequired: {
+      title: 'Pour réagir, crée ton compte',
+      follow: 'Suivre ses mises à jour',
+      inviteOnly: '{{appName}} s’ouvre sur invitation.',
+    },
   },
   // R11 : les quatre pages publiques (/rules, /privacy, /legal, /accessibility), lisibles sans compte.
   // Chaque page a un titre, un « En bref » (des puces courtes : `summary`, l'icône de chaque puce est
@@ -87,6 +111,8 @@ export const fr = {
       legal: 'Mentions légales',
       accessibility: 'Accessibilité',
       sourceCode: 'Le code source',
+      // R12 (planche R12-Visiteur-Desktop) : le pied de l'accueil, qui mène à l'adresse de contact.
+      report: 'Signaler un contenu',
       /** Le nom lu du lien de contact (l'adresse seule est affichée). */
       contact: 'Nous écrire : {{contactEmail}}',
     },
@@ -586,6 +612,9 @@ export const fr = {
           'Si tes contenus ou ton profil ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
         // R10, relecture juridique (C4) : une invitation envoyée garde sa ruche, sans inviteur.
         hiveInvitations: 'Les invitations que tu as envoyées restent valables, sans ton nom',
+        // R12 (relecture juridique du plan) : au conditionnel, l'écran s'affiche pour tous.
+        searchCopies:
+          'Les copies que les moteurs de recherche auraient gardées de tes projets publics ou de ta page publique',
       },
     },
   },
@@ -640,8 +669,9 @@ export const fr = {
         'Il ne change pas avec ton nom. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
       bio: 'Bio',
       tools: 'Outils favoris',
-      // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3).
-      toolsHint: 'Visibles de tous les membres sur ta page.',
+      // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3). R12 :
+      // « de tous les membres » est devenu faux pour une page publique.
+      toolsHint: 'Visibles sur ta page.',
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
@@ -682,8 +712,34 @@ export const fr = {
       bannerHandle: 'Ton pseudo provisoire est @{{handle}}. Choisis-en un autre.',
       bannerName: 'Ton nom provisoire est « {{name}} ». Choisis-en un autre.',
     },
+    // R12 (planche R12-Profil-Public) : la page publique, un choix à part de la visibilité des
+    // projets (A14). Le nom et la photo sont toujours montrés, le pseudo jamais (Q8).
+    publicPage: {
+      title: 'Mon profil public',
+      toggle: 'Rendre ma page publique',
+      toggleHint: 'Visible par tous, et trouvable sur Google',
+      visitorSees: 'Ce que voit un visiteur',
+      nameAndPhoto: 'Mon nom et ma photo',
+      // La case cochée et grisée ne dit pas pourquoi : l'aide le dit.
+      nameAndPhotoHint: 'Toujours, si la page est publique',
+      bio: 'Ma bio',
+      tools: 'Mes outils favoris',
+      projects: 'Mes projets publics',
+      // Sous « Mes projets publics » : combien de ses projets sont publics (planche).
+      projectsCount: '{{count}} sur {{total}} : les autres restent entre membres',
+      projectsAll: '{{count}} sur {{total}}',
+      projectsNone: 'Aucun projet public pour l’instant',
+      followerCount: 'Mon nombre d’abonnés',
+      never: 'Jamais montrés : tes ruches, qui te suit, tes commentaires et tes réactions.',
+      preview: 'Voir ma page comme un visiteur',
+      // Q6 : un membre suspendu peut fermer sa page, jamais l'ouvrir.
+      suspended: 'Pendant la suspension, tu peux seulement fermer ta page publique.',
+      error: 'Le changement n’a pas pu être enregistré. Réessaie.',
+    },
   },
   project: {
+    // R12 (Q19) : la pastille d'un projet public, à côté du statut et de la catégorie, pour tous.
+    webBadge: 'Public',
     // R6a : la feuille de publication et de modification (planches R6-*). Les textes marqués
     // « juridique » viennent de la relecture du plan (8/11/2026) et remplacent ceux des planches.
     // Les blocs `new`, `edit`, `fields`, `visuals` et `preview` disparaîtront avec l'ancien écran.
@@ -831,6 +887,13 @@ export const fr = {
       private: 'Privé',
       // juridique (jur-J6).
       privateHint: 'Un brouillon : aucun autre membre ne le voit.',
+      // R12 (F-Pub6, Q2 à Q4) : « Public », visible sans compte. L'API le garde sous `web`, car
+      // `public` y veut déjà dire « Membres de {{appName}} ». L'aide est celle de A14, mot pour mot ;
+      // la phrase du bas vaut pour un nouveau projet comme pour une modification.
+      web: 'Public',
+      webHint: 'Visible par tous, et trouvable sur Google',
+      audienceWeb:
+        'Tout le monde pourra le voir, même sans compte. Si tu changes d’avis, les moteurs de recherche peuvent le montrer encore quelque temps.',
       // R8 (juridique, relecture du plan) : le récap par e-mail en parle aussi.
       audienceMembers:
         'Les membres de {{appName}} verront ce projet ; tes abonnés le trouveront dans leur fil et dans leur récap par e‑mail, qui reste dans leur messagerie.',
@@ -955,6 +1018,9 @@ export const fr = {
       // juridique (P5), mot pour mot : qui la lira, qui est prévenu.
       hintPublic:
         'Tous les membres pourront la lire. Les abonnés et les testeurs de ce projet seront prévenus.',
+      // R12 (Q19) : la même aide pour un projet public, que tout le monde lit.
+      hintWeb:
+        'Tout le monde pourra la lire, même sans compte. Les abonnés et les testeurs de ce projet seront prévenus.',
       hintPrivate:
         'Ce projet est privé : aucun autre membre ne voit cette mise à jour, et personne n’est prévenu. S’il redevient visible des membres, tous la verront, et ses abonnés et testeurs pourront la retrouver dans Activité.',
       // Le statut changé dans « Modifier » préremplit la feuille (comme le Journal avant).
@@ -1418,6 +1484,8 @@ export const fr = {
       // Un projet retiré par la modération : la décision et la copie du signalement restent un an.
       deleteConfirmRemoved:
         'Le projet, sa description, ses photos, ses prompts, ses mises à jour et son coin des testeurs disparaissent tout de suite, avec les commentaires, les réactions et les retours des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
+      // R12 (relecture juridique du plan) : une phrase à part, pour un projet public seulement.
+      deleteConfirmWeb: 'Les moteurs de recherche peuvent le montrer encore quelque temps.',
       deleteConfirmButton: 'Supprimer',
       notFoundTitle: 'Ce projet est introuvable',
       // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
@@ -1607,6 +1675,23 @@ export const fr = {
     // Le quota, dès l'ouverture : la phrase, puis l'adresse en lien (ContactLink).
     limitedLead:
       'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous :',
+    // R12 (planches R12-Visiteur-Signaler, R12-Visiteur-Signale) : un visiteur sans compte signale
+    // un projet public, une de ses mises à jour ou une page publique ; pas de champ pour le nom
+    // (Q13). Le titre après l'envoi reste sentTitle (R9).
+    visitor: {
+      email: 'Ton adresse e‑mail, facultative',
+      emailHint: 'Pour recevoir la suite de ton signalement',
+      emailPlaceholder: 'prenom@exemple.fr',
+      // Dit qui lit, à la place de la phrase sur l'anonymat d'un membre (fausse pour un visiteur).
+      moderationReads: 'La modération lit chaque signalement.',
+      // Après l'envoi : avec une adresse, l'e-mail de la décision ; sans, la phrase de R9 sans la
+      // notification (choix b4 des planches).
+      sentBody: 'La modération va le regarder.',
+      sentBodyEmail: 'La modération va le regarder. Un e‑mail te dira quand il aura été traité.',
+      // Q14 : sans « tu » ciblé, l'adresse IP est partagée (même texte que errors.visitorReportQuota).
+      limited:
+        'Trop de signalements depuis cette connexion. Réessaie demain, ou écris-nous : {{contactEmail}}',
+    },
   },
   // Le menu « … » (tranche 7b) : les actions secondaires d'une page, au lieu d'un bouton chacune.
   actionMenu: {
@@ -1671,6 +1756,8 @@ export const fr = {
       follows: 'Vos abonnements de l’un à l’autre sont retirés.',
       notTold: 'Aucun message ne lui est envoyé.',
       moderation: 'La modération n’est pas prévenue.',
+      // R12 (Q19) : un projet public reste visible sans compte, donc aussi de la personne bloquée.
+      publicProjects: 'Tes projets publics restent visibles de tous, même sans compte.',
     },
     fullText: 'Ce que change le blocage',
     alsoReport: 'Signaler aussi son profil',
@@ -1681,6 +1768,29 @@ export const fr = {
     removed: 'Retirés',
     empty: 'Aucun signalement en attente.',
     emptyRemoved: 'Aucun contenu retiré.',
+    // R12 (planche R12-Vitrine) : l'onglet qui choisit la vitrine de l'accueil et « À la une »
+    // parmi les projets publics (Q9). L'auteur est prévenu dans Activité et peut la quitter.
+    showcase: {
+      tab: 'Vitrine de l’accueil',
+      reportsTab: 'Signalements',
+      title: 'Sur l’accueil',
+      count: '{{count}} sur {{max}}',
+      freeSlot: 'Une place libre',
+      remove: 'Retirer',
+      removeNamed: 'Retirer {{title}} de l’accueil',
+      candidates: 'Projets publics',
+      search: 'Chercher un projet public',
+      feature: 'Mettre en avant',
+      featureNamed: 'Mettre en avant {{title}}',
+      limit:
+        '{{max}} projets au plus. Chaque auteur est prévenu dans Activité et peut retirer son projet de l’accueil.',
+      full: 'L’accueil est plein : retires-en un pour en mettre un autre.',
+      empty: 'Aucun projet public pour l’instant.',
+      searchEmpty: 'Aucun projet public ne correspond.',
+      changed: 'Modifié depuis la mise en avant',
+      errorTitle: 'La vitrine n’a pas pu se charger',
+      error: 'Le changement n’a pas pu être enregistré. Réessaie.',
+    },
     more: 'Afficher la suite',
     errorTitle: 'La modération n’a pas pu se charger',
     // R7a : « Note (ancien journal) » pour les décisions d'avant l'effacement des notes.
@@ -2202,7 +2312,7 @@ export const fr = {
     makePrivate: 'Rendre privé',
     makePrivateTitle: 'Rendre « {{title}} » privé ?',
     makePrivateBody:
-      'Il ne sera plus visible que de toi. Pendant la suspension, tu ne pourras pas le rendre de nouveau public.',
+      'Il ne sera plus visible que de toi. Pendant la suspension, tu ne pourras pas le rendre de nouveau visible.',
     madePrivate: 'Projet passé en privé.',
     // R9 : l'échec de « Rendre privé », lu dans sa fenêtre, qui reste ouverte.
     makePrivateError: 'Le projet n’a pas pu passer en privé. Réessaie.',
@@ -2372,6 +2482,11 @@ export const fr = {
     categoryEmpty: 'Aucun projet dans « {{name}} » pour l’instant.',
     /** Sous une catégorie vide : retire le filtre (des-C4). */
     seeAllProjects: 'Voir tous les projets',
+    // R12 (planche R12-A-La-Une) : en tête d'Explorer, les projets de la vitrine de l'accueil ; ni
+    // sous-titre ni aide. Sans projet mis en avant, la rangée n'apparaît pas.
+    featured: 'À la une',
+    featuredPrevious: 'Projets à la une précédents',
+    featuredNext: 'Projets à la une suivants',
     categoriesError: 'Les catégories n’ont pas pu se charger.',
   },
   // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
@@ -2882,11 +2997,14 @@ export const fr = {
     membersOnly: 'Seuls les membres de {{appName}} pourront l’ouvrir.',
     hiveOnly: 'Seuls les membres de {{hive}} pourront l’ouvrir.',
     privateOnly: 'Ce projet est privé : le lien ne s’ouvrira que pour toi.',
+    // R12 (Q18) : un projet public, ou une page publique.
+    everyone: 'Tout le monde pourra l’ouvrir.',
     system: 'Partager…',
     copy: 'Copier le lien',
     copiedMembers: 'Lien copié : seuls les membres de {{appName}} pourront l’ouvrir.',
     copiedHive: 'Lien copié : seuls les membres de {{hive}} pourront l’ouvrir.',
     copiedPrivate: 'Lien copié : il ne s’ouvrira que pour toi.',
+    copiedEveryone: 'Lien copié : tout le monde pourra l’ouvrir.',
     copyFailed: 'Impossible de copier le lien. Réessaie.',
     // Le menu de l'appareil a échoué (pas une annulation) : on propose l'autre chemin.
     systemFailed: 'Impossible d’ouvrir le partage. Copie le lien à la place.',
@@ -3216,6 +3334,60 @@ export const fr = {
       reason:
         'Tu reçois cet e‑mail parce que ton compte {{appName}} n’a pas servi depuis près de 3 ans. C’est un e‑mail de service : il part même si tu as coupé les autres, une seule fois avant la suppression.',
     },
+    // R12 (Q14, planche R12-Visiteur-Signale) : les deux e-mails d'un visiteur qui a donné son
+    // adresse en signalant : l'accusé de réception, puis la décision ; deux au plus. Aucun texte ni
+    // lien venu d'un membre : la nature du contenu, le motif, la date. Personne n'est nommé
+    // (« Bonjour, ») : l'adresse n'est rattachée à aucun compte.
+    visitorReport: {
+      greeting: 'Bonjour,',
+      // Le rappel du signalement : {{kind}} est l'une des natures de `kinds`, {{reason}} un motif de
+      // `report.reasons`, {{date}} et {{time}} l'envoi à l'heure de Paris.
+      kind: 'Contenu : {{kind}}',
+      reason: 'Motif : {{reason}}',
+      sentAt: 'Envoyé le {{date}} à {{time}}',
+      kinds: {
+        project: 'un projet',
+        update: 'une mise à jour',
+        member: 'un profil',
+      },
+      ignore: 'Si tu n’as rien signalé, ignore cet e‑mail.',
+      reasonWhy:
+        'Tu reçois cet e‑mail parce que cette adresse a été donnée en signalant un contenu sur {{appName}}.',
+      received: {
+        subject: 'Ton signalement est bien arrivé',
+        heading: 'Ton signalement est bien arrivé',
+        body: 'Merci. La modération de {{appName}} va regarder ce que tu nous as signalé.',
+        next: 'Un second e‑mail te dira ce qui a été décidé. Ensuite, ton adresse sera effacée.',
+      },
+      decided: {
+        subject: 'Ton signalement a été traité',
+        heading: 'Ton signalement a été traité',
+        // L'issue seulement, comme la notification d'un membre (notifications.reportHandled) ;
+        // `part` quand le signalement visait une partie du contenu.
+        outcome: {
+          project: {
+            removed: 'Le projet que tu as signalé a été retiré.',
+            dismissed: 'Après examen, le projet que tu as signalé n’a pas été retiré.',
+          },
+          update: {
+            removed: 'La mise à jour que tu as signalée a été retirée.',
+            dismissed: 'Après examen, la mise à jour que tu as signalée n’a pas été retirée.',
+          },
+          member: {
+            removed: 'La modération est intervenue sur le profil que tu as signalé.',
+            dismissed: 'Après examen, rien n’a changé sur le profil que tu as signalé.',
+          },
+          part: {
+            removed: 'La partie que tu as signalée a été retirée.',
+            dismissed: 'Après examen, la partie que tu as signalée n’a pas été retirée.',
+          },
+        },
+        contest: 'Pas d’accord ? Écris à {{contactEmail}} ; tu peux aussi saisir la justice.',
+        // Q14 : l'adresse est effacée une fois cet e-mail envoyé.
+        erased:
+          'Ton adresse est maintenant effacée : c’est le dernier e‑mail de {{appName}} sur ce signalement.',
+      },
+    },
     // R11 : le pied commun des e-mails ajoute l'adresse de la page Confidentialité, en texte.
     privacy: 'Confidentialité : {{url}}',
   },
@@ -3260,7 +3432,7 @@ export const fr = {
     nobodyBody: 'Suis des membres depuis leur page : leurs nouveaux projets arriveront ici.',
     // R3 : « Découvrir » est devenu l'onglet Explorer ; le fil vide y mène.
     nobodyAction: 'Explorer les projets',
-    discoverEmpty: 'Aucun projet public pour l’instant.',
+    discoverEmpty: 'Aucun projet publié pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
     testersCaption:
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
@@ -3403,6 +3575,12 @@ export const fr = {
     hiveDeleted: 'La ruche <b>{{hive}}</b> a été supprimée.',
     // Option 7 des planches : la seconde ligne du retrait et de la suppression.
     hivePrivateAgain: 'Tes projets réservés à la ruche sont redevenus privés.',
+    // R12 (planche R12-Vitrine, encart) : un projet mis sur l'accueil par la modération ; son auteur
+    // peut l'en retirer (Q9). Signé de {{appName}}, jamais de l'administrateur.
+    showcaseAdded: '<b>{{title}}</b> est sur l’accueil de {{appName}}',
+    showcaseLeave: 'Retirer de l’accueil',
+    showcaseLeft: 'Ton projet a quitté l’accueil. Il reste public.',
+    showcaseLeaveError: 'Le projet n’a pas pu quitter l’accueil. Réessaie.',
     // R8 : la colonne de droite sur ordinateur.
     emailColumn: {
       title: 'Ce que tu reçois par e‑mail',
@@ -3667,6 +3845,13 @@ export const fr = {
     // que la version en cours des règles n'est pas acceptée (`rules_required`, comme `suspended`).
     rulesNotAccepted: 'Accepte les règles de {{appName}} pour créer ton compte.',
     ageNotDeclared: '{{appName}} est ouvert à partir de 15 ans.',
+    // Tranche R12 (Q14) : le quota des signalements d'un visiteur, par adresse IP
+    // (`visitor_report_quota`) ; sans « tu » ciblé, l'adresse est partagée.
+    visitorReportQuota:
+      'Trop de signalements depuis cette connexion. Réessaie demain, ou écris-nous : {{contactEmail}}',
+    // R12 (relecture juridique du plan) : la mise en avant d'un projet que son auteur a retiré de
+    // l'accueil (`author_declined`).
+    authorDeclined: 'L’auteur a retiré ce projet de l’accueil.',
     rulesRequired: 'Accepte d’abord les règles de {{appName}} : cette action attend ton accord.',
   },
 } as const
