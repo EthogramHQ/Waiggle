@@ -184,9 +184,31 @@ export const CoverPlaceProvider = CoverPlaceContext.Provider
  * Les boutons de verre en haut d'une photo : `start` à gauche (Retour), `end` à droite (Partager,
  * « … »). La rangée ne prend pas le doigt entre les boutons (`box-none`) : on peut encore faire
  * glisser la photo entre eux.
+ *
+ * `children` (R12) : une barre entière, qui range elle-même ses boutons, posée à la place de
+ * `start` et `end` (la barre d'un visiteur, `VisitorBar`, sur la photo d'un projet public). Elle
+ * prend toute la largeur, avec les mêmes marges et la même place laissée en haut (barre d'état).
  */
-export function CoverControls({ start, end }: { start?: ReactNode; end?: ReactNode }) {
+export function CoverControls({
+  start,
+  end,
+  children,
+}: {
+  start?: ReactNode
+  end?: ReactNode
+  children?: ReactNode
+}) {
   const place = useContext(CoverPlaceContext)
+  if (children) {
+    return (
+      <View
+        pointerEvents="box-none"
+        style={{ padding: space.lg, paddingTop: (place?.top ?? 0) + space.lg }}
+      >
+        {children}
+      </View>
+    )
+  }
   return (
     <View
       pointerEvents="box-none"

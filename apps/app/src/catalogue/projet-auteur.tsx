@@ -36,6 +36,8 @@ const fr = {
   followed: 'Déjà suivie à l’ouverture',
   failed: 'Le dernier geste a échoué (session expirée)',
   disabled: 'Compte suspendu, l’abonnement retiré : à sa place, inactive',
+  noLink:
+    'Vu par un visiteur (R12), la page de l’auteur non publique : ni lien, ni pseudo, ni pastille',
   expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
   signIn: 'Me reconnecter',
   sampleTitle: 'Décollage !',
@@ -61,6 +63,7 @@ const en: typeof fr = {
   followed: 'Already followed at opening',
   failed: 'The last gesture failed (session expired)',
   disabled: 'Suspended account, follow removed: in place, inactive',
+  noLink: 'Seen by a visitor (R12), the author page not public: no link, no handle, no chip',
   expired: 'Your session has expired. Sign in again to continue.',
   signIn: 'Sign in again',
   sampleTitle: 'Lift-off!',
@@ -268,6 +271,14 @@ function LineStates({ l }: { l: Labels }) {
       </Captioned>
       <Captioned caption={l.disabled}>
         <AuthorLine {...line} follow={{ ...notFollowed, disabled: true }} />
+      </Captioned>
+      <Captioned caption={l.noLink}>
+        <AuthorLine
+          name={line.name}
+          avatar={line.avatar}
+          openLabel={line.openLabel}
+          handle={null}
+        />
       </Captioned>
     </Stack>
   )

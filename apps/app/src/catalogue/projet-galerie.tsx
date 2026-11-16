@@ -22,6 +22,7 @@ import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
+import { VisitorBar } from '../ui/VisitorBar'
 
 const fr = {
   title: 'Galerie de photos',
@@ -29,6 +30,8 @@ const fr = {
     'La galerie de la page projet : les photos glissent l’une après l’autre et s’arrêtent toujours sur une photo entière. Des points et « 1 sur 3 » disent où l’on en est ; rien pour une seule photo. Sur ordinateur, des flèches de verre et les flèches du clavier (le focus dans la galerie) ; le lecteur d’écran entend « Photo 2 sur 3 » et passe d’une photo à l’autre sans glisser.',
   three: 'Trois photos : les boutons de verre sur téléphone, la capsule à cheval sur ordinateur',
   two: 'Deux photos',
+  visitor:
+    'Un visiteur (R12) : sa barre sur la photo, le logo à gauche, « Se connecter » à droite (un toucher quitte le catalogue)',
   one: 'Une seule photo : ni points, ni « 1 sur 1 », ni flèches',
   none: 'Sans photo : la lumière miel et le titre',
   shown: 'Photo montrée (onIndexChange) : {{index}}',
@@ -56,6 +59,8 @@ const en: typeof fr = {
     'The gallery of the project page: photos glide one after the other and always stop on a whole photo. Dots and “1 of 3” tell where you are; nothing for a single photo. On computers, glass arrows and the arrow keys (with the focus in the gallery); screen readers hear “Photo 2 of 3” and move from photo to photo without swiping.',
   three: 'Three photos: the glass buttons on phones, the straddling capsule on computers',
   two: 'Two photos',
+  visitor:
+    'A visitor (R12): their bar over the photo, the logo on the left, “Sign in” on the right (a tap leaves the catalogue)',
   one: 'A single photo: no dots, no “1 of 1”, no arrows',
   none: 'No photo: the honey light and the title',
   shown: 'Photo shown (onIndexChange): {{index}}',
@@ -133,6 +138,18 @@ export function GalleryCatalogue() {
         <ThemeProvider key={scheme} appearance={scheme}>
           <Stack gap="md">
             <WithOverlay l={l} caption={`${l.three} — ${l[scheme]}`} />
+            {/* R12 : la barre d'un visiteur posée sur la photo, une rangée entière (CoverControls
+                avec `children`), comme sur la page d'un projet public vue sur téléphone. */}
+            <Example caption={`${l.visitor} — ${l[scheme]}`}>
+              <PhotoGallery
+                photos={PHOTOS}
+                overlay={
+                  <CoverControls>
+                    <VisitorBar homeHref="/fr/" next="/fr/projects/p-decollage" variant="phone" />
+                  </CoverControls>
+                }
+              />
+            </Example>
             <Example caption={`${l.two} — ${l[scheme]}`}>
               <PhotoGallery photos={PHOTOS.slice(0, 2)} />
             </Example>
