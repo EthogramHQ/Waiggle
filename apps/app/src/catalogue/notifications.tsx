@@ -75,6 +75,13 @@ const fr = {
   newNowhere: 'Nouvelle, sans destination',
   noPhoto: 'Projet sans photo',
   longTitle: 'Uncarnetdedégustationdecafésdespécialitéavecunassistantquiproposelamouture',
+  onHome: ' est sur l’accueil de Waiggle',
+  leaveHome: 'Retirer de l’accueil',
+  leftHome: 'Ton projet a quitté l’accueil. Il reste public.',
+  leaveHomeError: 'Le projet n’a pas pu quitter l’accueil. Réessaie.',
+  gestureOffered: 'Un geste sous la ligne (R12)',
+  gestureFailed: 'Le geste a échoué, il reste, l’erreur dessous',
+  gestureDone: 'Le geste a réussi, le message à sa place',
 }
 
 const en: typeof fr = {
@@ -125,6 +132,13 @@ const en: typeof fr = {
   newNowhere: 'New, leading nowhere',
   noPhoto: 'Project without a photo',
   longTitle: 'Acoffeetastingnotebookforspecialtycoffeewithanassistantthatsuggeststhegrind',
+  onHome: ' is on the Waiggle home page',
+  leaveHome: 'Take off the home page',
+  leftHome: 'Your project left the home page. It stays public.',
+  leaveHomeError: 'The project could not leave the home page. Try again.',
+  gestureOffered: 'A gesture under the row (R12)',
+  gestureFailed: 'The gesture failed: it stays, the error below',
+  gestureDone: 'The gesture worked: the message in its place',
 }
 
 type Labels = typeof fr
@@ -311,6 +325,7 @@ function PlusRows({ l }: { l: Labels }) {
 
 /** Les bords : une nouvelle sans destination, un projet sans photo, un titre sans espace. */
 function EdgeRows({ l, scheme }: { l: Labels; scheme: Scheme }) {
+  const rocket = cover(sample('text', 'textSecondary', 'honey'), l.rocket)
   return (
     <Stack gap="md">
       <Example caption={`${l.newNowhere} — ${l[scheme]}`}>
@@ -334,6 +349,48 @@ function EdgeRows({ l, scheme }: { l: Labels; scheme: Scheme }) {
             thumb={{ kind: 'project', image: null, title: l.longTitle }}
             isNew={false}
             onPress={noop}
+          />
+        </Stack>
+      </Example>
+      {/* R12 : un geste qui écrit sur place (« Retirer de l'accueil »), puis ce qu'il a donné
+          (`actionNotice`) : l'échec sous le geste, qui reste ; la réussite à sa place. */}
+      <Example caption={`${l.gestureOffered} — ${l[scheme]}`}>
+        <Stack gap="xs" accessibilityRole="list">
+          <NotificationCard
+            leading={{ kind: 'icon', icon: 'star', tone: 'honey' }}
+            parts={[strong(l.rocket), plain(l.onHome)]}
+            when={minutesAgo(5)}
+            thumb={{ kind: 'project', image: rocket, title: l.rocket }}
+            isNew
+            onPress={noop}
+            action={{ label: l.leaveHome, onPress: noop }}
+          />
+        </Stack>
+      </Example>
+      <Example caption={`${l.gestureFailed} — ${l[scheme]}`}>
+        <Stack gap="xs" accessibilityRole="list">
+          <NotificationCard
+            leading={{ kind: 'icon', icon: 'star', tone: 'honey' }}
+            parts={[strong(l.rocket), plain(l.onHome)]}
+            when={minutesAgo(5)}
+            thumb={{ kind: 'project', image: rocket, title: l.rocket }}
+            isNew={false}
+            onPress={noop}
+            action={{ label: l.leaveHome, onPress: noop }}
+            actionNotice={{ message: l.leaveHomeError, tone: 'error' }}
+          />
+        </Stack>
+      </Example>
+      <Example caption={`${l.gestureDone} — ${l[scheme]}`}>
+        <Stack gap="xs" accessibilityRole="list">
+          <NotificationCard
+            leading={{ kind: 'icon', icon: 'star', tone: 'honey' }}
+            parts={[strong(l.rocket), plain(l.onHome)]}
+            when={minutesAgo(5)}
+            thumb={{ kind: 'project', image: rocket, title: l.rocket }}
+            isNew={false}
+            onPress={noop}
+            actionNotice={{ message: l.leftHome, tone: 'success' }}
           />
         </Stack>
       </Example>
