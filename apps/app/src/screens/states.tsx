@@ -41,7 +41,8 @@ export function LoadingScreen({
   fade?: boolean
 }) {
   const { t } = useTranslation()
-  const back = useGoBack('/')
+  // Sans page d'avant, « Revenir » mène au Fil (`/feed`, plan R12, décision 9).
+  const back = useGoBack('/feed')
   // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
   // « Revenir » apparaît sous le squelette (rien ne bouge au-dessus), pour ne jamais laisser le
   // membre sans issue.
@@ -108,14 +109,14 @@ export function SignedOutScreen({
 /**
  * Le chargement a échoué. « Réessayer » relance la demande (`onRetry`, par exemple le `refetch` de
  * React Query) : la page repasse alors par l'état de chargement, signe que la demande est partie.
- * « Revenir » ramène à la page précédente, ou à `fallback`.
+ * « Revenir » ramène à la page précédente, ou à `fallback` (par défaut le Fil, `/feed`).
  * Une session expirée en cours de route (refus « unauthorized ») n'est pas une erreur à réessayer :
  * on propose de se reconnecter, comme à un visiteur.
  */
 export function LoadErrorScreen({
   error,
   onRetry,
-  fallback = '/',
+  fallback = '/feed',
   width = 'form',
 }: {
   error: unknown
@@ -160,7 +161,8 @@ export function SessionErrorScreen({
   withBack?: boolean
 }) {
   const { t } = useTranslation()
-  const back = useGoBack('/')
+  // Sans page d'avant, « Revenir » mène au Fil (`/feed`).
+  const back = useGoBack('/feed')
   return (
     // Les textes de la page en panne (« Cette page n'a pas pu se charger ») et du message de
     // « Mon compte » (« Impossible de charger ton compte… ») : deux clés de plus faisaient dépasser
@@ -208,8 +210,9 @@ export function NotFoundState({
 }) {
   const { t } = useTranslation()
   const router = useRouter()
-  // Sans page précédente (un lien ouvert dans un nouvel onglet), « Retour » mène au fil.
-  const back = useGoBack('/')
+  // Sans page précédente (un lien ouvert dans un nouvel onglet), « Retour » mène au fil (`/feed`).
+  // « Retour à l'accueil », plus bas, mène bien à l'accueil (`/`) : la vitrine, pour tous.
+  const back = useGoBack('/feed')
   if (variant === 'project') {
     return (
       <Screen
@@ -237,8 +240,8 @@ export function NotFoundState({
             {
               label: t(($) => $.project.page.notFoundAction),
               // replace : la page introuvable ne reste pas dans l'historique, un retour depuis le
-              // fil n'y ramène pas.
-              onPress: () => router.replace('/'),
+              // fil n'y ramène pas. « Retour au fil » : `/feed` (plan R12, décision 9).
+              onPress: () => router.replace('/feed'),
             },
           ]}
         />

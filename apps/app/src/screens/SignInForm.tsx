@@ -93,8 +93,10 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
     busy.current = false
     setLoading(false)
     // replace (et non push) : le bouton « retour » ne ramènera pas sur l'écran de connexion.
+    // Sans page à suivre, le Fil (`/feed`, plan R12, décision 9) : un membre qui vient de se
+    // connecter arrive sur le Fil, pas sur l'accueil des visiteurs.
     if (result.ok) {
-      router.replace(next ?? '/')
+      router.replace(next ?? '/feed')
       return
     }
     setError(result.error)

@@ -62,7 +62,7 @@ export function TopBarCatalogue() {
   const l = i18n.language === 'en' ? en : fr
   const schemes = ['day', 'night'] as const
   const links = [
-    { key: 'feed' as const, label: t(($) => $.nav.feed), href: '/' },
+    { key: 'feed' as const, label: t(($) => $.nav.feed), href: '/feed' },
     { key: 'explore' as const, label: t(($) => $.nav.explore), href: '/explore' },
     { key: 'hives' as const, label: t(($) => $.nav.hives), href: '/hives' },
   ]
