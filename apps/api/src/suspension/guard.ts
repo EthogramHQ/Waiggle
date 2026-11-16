@@ -112,7 +112,7 @@ export const suspendedProfileChange = (
  * `{ "visibility": "private" }`. Les droits sur le projet restent vérifiés par la route : le projet
  * d'une autre répond 403, comme à tout membre.
  *
- * R12 (décision de la session sur Q6) : un suspendu peut aussi rendre MOINS visible un projet
+ * R12 (décision du 16/11/2026, plan R12) : un suspendu peut aussi rendre MOINS visible un projet
  * « Public » (`web`, lu sans compte) : vers « Membres » (`{ "visibility": "public" }`) ou vers une
  * de ses ruches (`{ "visibility": "hive", "hiveId": … }`), jamais l'inverse. `current` : la
  * visibilité enregistrée du projet, lue par la route (null s'il n'est pas à lui ou n'existe pas :

@@ -188,7 +188,7 @@ export const projectReachableBy = (viewerId: string) =>
  * les trois :
  * - `web` (« Public ») : ni « Membres », ni réservé à une ruche, ni privé ;
  * - pas retiré par la modération (un auteur suspendu dont le projet n'est pas retiré reste lu :
- *   décision de la session sur Q6, comme pour les membres) ;
+ *   décision du 16/11/2026, plan R12, comme pour les membres) ;
  * - un auteur au compte vérifié (`verifiedAuthor`), donc aussi un auteur qui existe encore : un
  *   compte supprimé n'a plus de ligne dans "user", la sous-requête ne rend rien et la condition est
  *   fausse.
