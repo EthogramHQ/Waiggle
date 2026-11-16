@@ -18,8 +18,10 @@ import {
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
 } from '@ruche/contracts'
+import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Platform } from 'react-native'
 import { useSession } from '../accounts/api'
 import { useMemberSession } from '../accounts/session'
 import type { ApiErrorKey } from '../api/errors'
@@ -42,6 +44,7 @@ import {
   moveReaderTo,
 } from '../ui/focus'
 import { Icon } from '../ui/Icon'
+import { ListGroup, ListRow, type PressEvent } from '../ui/ListGroup'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
@@ -215,6 +218,8 @@ function LockedProfile({ me }: { me: Me }) {
             ))}
           </Stack>
         ) : null}
+        {/* Un compte suspendu peut encore fermer sa page publique (Q6) : l'entrée reste. */}
+        <PublicPageLink />
       </Sheet>
       {/* La feuille du nom provisoire, ouverte par le bouton ci-dessus et par lui seul. */}
       {provisionalKind ? (
@@ -226,6 +231,32 @@ function LockedProfile({ me }: { me: Me }) {
         />
       ) : null}
     </Screen>
+  )
+}
+
+/**
+ * « Mon profil public » (tranche R12) : la ligne qui mène aux réglages de la page publique
+ * (/settings/public-page). Une page à part, avec son propre retour : le profil se règle ici, ce
+ * que les inconnus en voient se règle là-bas.
+ */
+function PublicPageLink() {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const href = '/settings/public-page'
+  return (
+    <ListGroup>
+      <ListRow
+        label={t(($) => $.profile.publicPage.title)}
+        icon="globe-simple"
+        trailing="chevron"
+        href={href}
+        onPress={(event?: PressEvent) => {
+          // Sur le web, la ligne est un vrai lien : le routeur change de page sans recharger.
+          if (Platform.OS === 'web') event?.preventDefault?.()
+          router.push(href)
+        }}
+      />
+    </ListGroup>
   )
 }
 
@@ -606,6 +637,7 @@ function ProfileForm({ me }: { me: Me }) {
           error={toolsError || undefined}
           inputRef={inputs.tools}
         />
+        <PublicPageLink />
       </Sheet>
     </Screen>
   )
