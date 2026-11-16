@@ -527,6 +527,18 @@ describe('« Rendre privé » for a suspended author', () => {
     expect(updateProject).not.toHaveBeenCalled()
   })
 
+  // R12 (relecture du plan, UI B4 ; Q6) : un projet public (`web`) se rend aussi moins visible.
+  it('offers « Rendre privé » to a suspended author of a public project', async () => {
+    await askToMakePrivate({ ...recipesProject, visibility: 'web', hive: null })
+
+    await fireEvent.press(
+      dialogTitled(T.makePrivateTitle).getByRole('button', { name: T.makePrivate }),
+    )
+
+    await waitFor(() => expect(updateProject).toHaveBeenCalledTimes(1))
+    expect(updateProject).toHaveBeenCalledWith(id, { visibility: 'private' })
+  })
+
   it('does not offer « Rendre privé » on a project already private', async () => {
     await openProject({ ...recipesProject, visibility: 'private' })
     await screen.findByText(containing(fr.t(($) => $.suspension.title)))
