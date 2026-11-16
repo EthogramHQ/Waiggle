@@ -30,7 +30,7 @@ import { isActiveAdmin } from '../reports/admin'
 import { decide } from '../reports/decide'
 import { loadDecisionHistory } from '../reports/history'
 import { loadQueuePage, loadRemovedPage, voidReportsOfGoneTargets } from '../reports/queue'
-import { sendVisitorDecisions, takeClosedVisitorReports } from '../reports/visitor'
+import { closeVisitorReports } from '../reports/visitor'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -151,9 +151,10 @@ export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl, appU
   // R12 : efface les adresses de visiteurs des signalements clos, puis envoie leur décision
   // (reports/visitor.ts). Un incident ici ne défait jamais la décision déjà prise : il est noté, sans
   // adresse, et la purge de nuit effacera ce qui reste.
-  const closeVisitorReports = async () => {
+  // La même clôture que la purge de nuit (closeVisitorReports).
+  const closeVisitorReportsSafely = async () => {
     try {
-      await sendVisitorDecisions(mailer, appUrl, await takeClosedVisitorReports(db))
+      await closeVisitorReports(db, { mailer, appUrl })
     } catch (error) {
       console.error('Closing visitor reports failed', {
         error: error instanceof Error ? error.name : 'unknown',
@@ -170,7 +171,7 @@ export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl, appU
     // ne s'affiche plus (règle 29).
     await voidReportsOfGoneTargets(db, new Date())
     // R12 : un visiteur qui avait donné son adresse reçoit aussi la clôture « sans objet » (décision 3).
-    await closeVisitorReports()
+    await closeVisitorReportsSafely()
     return c.json(
       ModerationQueuePage.parse(await loadQueuePage(db, user.id, cursor, publicApiUrl)),
       200,
@@ -231,7 +232,7 @@ export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl, appU
       }
       // R12 : la décision clôt peut-être des signalements de visiteurs : leur adresse est effacée,
       // puis chacun reçoit l'issue (retiré ou non), sans rien du contenu ni de l'explication.
-      await closeVisitorReports()
+      await closeVisitorReportsSafely()
       return c.json(ModerationDecision.parse(result.decision), 201)
     }
     switch (result.error) {

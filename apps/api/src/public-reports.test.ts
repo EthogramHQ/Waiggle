@@ -21,10 +21,12 @@ import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
 import { asc, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nightlyPurge } from './jobs/nightly-purge'
 import { visitorReportAckKey } from './rate-limit'
 import { activity } from './testing/activity'
 import {
   createTestContext,
+  TEST_APP_URL,
   TEST_AUTH_SECRET,
   TEST_VISITOR_IP,
   type TestContext,
@@ -564,6 +566,48 @@ describe('the e-mails of a visitor', () => {
     const rows = await storedReports()
     expect(rows.map((row) => row.status)).toEqual(['removed', 'dismissed', 'void'])
     expect(rows.map((row) => row.reporterEmail)).toEqual([null, null, null])
+  })
+
+  // Relecture juridique R12, point 2 : l'accusé promet la décision. Un signalement classé « sans
+  // objet » par la purge de nuit (la cible a disparu avant que personne n'ouvre la file) la reçoit
+  // aussi, avant l'effacement de l'adresse.
+  it('sends the decision to a visitor before the nightly purge erases the address of a report gone without object', async () => {
+    const address = 'voisine@example.org'
+    expect((await reportProject(project, address)).status).toBe(204)
+    // Inès supprime son projet ; personne n'ouvre la file avant 3 h.
+    later()
+    expect((await act.send('DELETE', `/v1/projects/${project}`, ines)).status).toBe(204)
+    const before = ctx.mailer.sent.length
+
+    await nightlyPurge(ctx.db, new Date(Date.now() + 60 * 60 * 1000), ctx.storage, {
+      mailer: ctx.mailer,
+      appUrl: TEST_APP_URL,
+    })
+
+    const [decided, ...more] = decisions(address, before)
+    expect(decided, 'the decision e-mail').toBeDefined()
+    expect(more).toEqual([])
+    expect(decided?.text).toContain(fill(t.decided.outcome.project.removed))
+    expect(decided?.text).toContain(contactEmail)
+    expect((await storedReports()).map((row) => [row.status, row.reporterEmail])).toEqual([
+      ['void', null],
+    ])
+  })
+
+  it('erases the address in the nightly purge without an e-mail when the e-mail jobs are off', async () => {
+    const address = 'voisine@example.org'
+    expect((await reportProject(project, address)).status).toBe(204)
+    later()
+    expect((await act.send('DELETE', `/v1/projects/${project}`, ines)).status).toBe(204)
+    const before = ctx.mailer.sent.length
+
+    // EMAIL_JOBS=off : l'ordonnanceur ne donne pas de messagerie à la purge.
+    await nightlyPurge(ctx.db, new Date(Date.now() + 60 * 60 * 1000), ctx.storage)
+
+    expect(ctx.mailer.sent.slice(before)).toEqual([])
+    expect((await storedReports()).map((row) => [row.status, row.reporterEmail])).toEqual([
+      ['void', null],
+    ])
   })
 
   it('erases the address even when the decision e-mail fails', async () => {

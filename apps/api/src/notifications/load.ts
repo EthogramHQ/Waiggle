@@ -148,8 +148,12 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  * maintenant, puisqu'il est après la date notée et repartirait au passage suivant. Cette borne
  * haute ne change pas l'index de chaque source : elle écarte des lignes déjà trouvées par lui (ou
  * resserre l'intervalle lu dans project_comment_root_created_idx, qui porte la date).
+ *
+ * `keepOnShowcase` (R12, la page d'Activité seulement) : la notice « sur l'accueil » d'un projet
+ * encore dans la vitrine reste montrée au-delà de `since` (voir catalogueSources). Ni la cloche ni
+ * les e-mails ne le demandent.
  */
-const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
+const sources = (me: string, since: Date, now: Date, until?: Date, keepOnShowcase = false): SQL => {
   const after = utc(since)
   const upTo = until ? utc(until) : null
   /**
@@ -459,7 +463,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
 
     ${hiveSources(me, during, now)}
 
-    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during)}`}
+    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during, keepOnShowcase)}`}
   `
 }
 
@@ -529,7 +533,11 @@ const hiveSources = (me: string, during: (column: string) => SQL, now: Date): SQ
  *       encore au catalogue. Les deux sortes de la base n'en font qu'une pour l'appli (`merged`).
  * Aucun filtre de blocage : la notification n'est le geste d'aucun membre (signée par l'équipe).
  */
-const catalogueSources = (me: string, during: (column: string) => SQL): SQL => sql`
+const catalogueSources = (
+  me: string,
+  during: (column: string) => SQL,
+  keepOnShowcase: boolean,
+): SQL => sql`
     select 'project_category', 'project_category:' || cn.id, cn.created_at,
       cn.project_id, null, null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, cn.id
@@ -556,12 +564,24 @@ const catalogueSources = (me: string, during: (column: string) => SQL): SQL => s
     --     Montrée tant que le projet est encore à lui, public (« web ») et pas retiré : redevenu
     --     « Membres » ou retiré, elle disparaît ; supprimé, la trace part avec lui (« cascade »).
     --     Index showcase_notice_member_idx (member_id, created_at desc), puis la clé du projet.
+    --     Relecture juridique R12, point 1 : dans la page d'Activité (keepOnShowcase), la ligne
+    --     reste au-delà des 90 jours tant que le projet est encore dans la vitrine (par la clé
+    --     primaire de showcase) : c'est la voie vers « Retirer de l'accueil », et la mise en avant
+    --     n'a pas de fin. La purge de nuit la garde autant (jobs/nightly-purge.ts). Jamais dans la
+    --     cloche : un geste de plus de 90 jours n'y est plus nouveau. Le « or » ôte à l'index la
+    --     borne de date ; il lit encore les seules notices du membre (une par projet mis en avant).
     select 'showcase_added', 'showcase_added:' || sn.id, sn.created_at,
       sn.project_id, null, null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, sn.id
     from showcase_notice sn
     join project on project.id = sn.project_id
-    where sn.member_id = ${me} and ${during('sn.created_at')}
+    where sn.member_id = ${me}
+      and ${
+        keepOnShowcase
+          ? sql`(${during('sn.created_at')}
+              or (select 1 from showcase s where s.project_id = sn.project_id limit 1) is not null)`
+          : during('sn.created_at')
+      }
       and project.author_id = ${me} and project.visibility = 'web' and project.removed_at is null`
 
 /**
@@ -1695,7 +1715,7 @@ export const loadNotificationPage = async (
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total, ${moderationColumns}
-      from (${sources(me, notificationCutoff(now), now)}) u
+      from (${sources(me, notificationCutoff(now), now, undefined, true)}) u
       ${cursor ? sql`where (date_trunc('milliseconds', at), key) < (${utc(cursor.at)}, ${cursor.key})` : sql``}
       order by at desc, key desc
       limit ${NOTIFICATION_PAGE_SIZE + 1}
