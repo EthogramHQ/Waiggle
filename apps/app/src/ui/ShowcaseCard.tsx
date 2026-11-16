@@ -55,6 +55,13 @@ const SIZES = {
   fill: { width: undefined, height: 300 },
 } as const
 
+/**
+ * La place d'une carte de bande (R12, onglet « Vitrine de l'accueil ») : `ShowcaseSlot` et
+ * `ShowcaseFreeSlot` prennent la même, pour que la place libre et la colonne d'une carte gardent la
+ * largeur et la hauteur de la carte.
+ */
+export const SHOWCASE_CARD_SIZE = SIZES.carousel
+
 /** La photo de l'auteur, à la hauteur de la ligne de son nom (caption). */
 const AVATAR_SIZE = 18
 
