@@ -33,7 +33,7 @@ import { Text } from './Text'
 import { TAP_GUARD_MS } from './tapGuard'
 import { useTextScale } from './textScale'
 import { placeholderCopy } from './theme/document'
-import { fontName } from './theme/fonts'
+import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -219,7 +219,7 @@ export function SearchField({
             left: 0,
             right: 0,
             minWidth: 0,
-            fontFamily: fontName(body.family, body.weight),
+            fontFamily: fontStack(body.family, fontName(body.family, body.weight)),
             fontSize: body.size,
             lineHeight: body.lineHeight,
             color: colors.text,

@@ -33,7 +33,7 @@ import {
 import { comboboxLinks, describedBy, invalid } from './aria'
 import { Icon } from './Icon'
 import { Text, type Tone } from './Text'
-import { fontName } from './theme/fonts'
+import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -456,7 +456,7 @@ export function TextField({
             style={{
               flex: 1,
               minWidth: 0,
-              fontFamily: fontName(body.family, body.weight),
+              fontFamily: fontStack(body.family, fontName(body.family, body.weight)),
               fontSize: body.size,
               lineHeight: body.lineHeight,
               color: colors.text,

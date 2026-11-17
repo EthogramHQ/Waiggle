@@ -57,7 +57,7 @@ import { highlightRanges } from './HighlightedText'
 import type { ImageSource } from './image'
 import { Text, type TextTone } from './Text'
 import { TextField } from './TextField'
-import { fontName } from './theme/fonts'
+import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Un membre proposé : de quoi le reconnaître, la photo déjà prête (ou aucune). */
@@ -163,7 +163,9 @@ function Marked({
   /** La graisse des lettres trouvées. */
   bold: FontWeight
 }) {
-  const mark: TextStyle = { fontFamily: fontName(textStyles[variant].family, bold) }
+  const mark: TextStyle = {
+    fontFamily: fontStack(textStyles[variant].family, fontName(textStyles[variant].family, bold)),
+  }
   const parts: (string | ReactElement)[] = prefix ? [prefix] : []
   let from = 0
   for (const [start, end] of highlightRanges(text, [query])) {

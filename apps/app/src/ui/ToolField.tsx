@@ -48,7 +48,7 @@ import { usePill } from './SearchField'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
 import { placeholderCopy } from './theme/document'
-import { fontName } from './theme/fonts'
+import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
@@ -516,7 +516,7 @@ export function ToolField({
               minHeight: layout.touchTarget,
               paddingVertical: space.xs,
               paddingRight: space.md,
-              fontFamily: fontName(body.family, body.weight),
+              fontFamily: fontStack(body.family, fontName(body.family, body.weight)),
               fontSize: body.size,
               lineHeight: body.lineHeight,
               color: colors.text,

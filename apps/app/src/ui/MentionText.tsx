@@ -32,7 +32,7 @@ import { useTranslation } from 'react-i18next'
 import { Text as NativeText, Platform, type TextStyle } from 'react-native'
 import { enterActivates } from './keyboard'
 import { Text, type TextTone } from './Text'
-import { fontName } from './theme/fonts'
+import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -91,7 +91,7 @@ export function MentionText({
   const pill: TextStyle = {
     backgroundColor: colors.mentionPill,
     color: colors.text,
-    fontFamily: fontName('text', 600),
+    fontFamily: fontStack('text', fontName('text', 600)),
     ...pillShape,
     // Quand le navigateur l'amène en vue (Tab), il garde cet air autour d'elle : collée au bord d'une
     // liste, son anneau de focus serait coupé. Cette propriété CSS manque aux types de React Native.
