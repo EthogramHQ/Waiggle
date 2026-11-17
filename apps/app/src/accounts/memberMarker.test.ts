@@ -20,6 +20,7 @@ import { mockSession } from '../testing/render'
 import { useSession } from './api'
 import {
   clearMemberMarker,
+  hasMemberMarker,
   MEMBER_MARKER,
   setMemberMarker,
   useMemberMarkerSync,
@@ -68,15 +69,19 @@ const clearWrites = () => writes.filter(clears)
 
 /** Le temps d'un test : le web, et un document dont on note les écritures de cookie. */
 let restorePlatform: () => void = () => {}
+/** Ce que rend `document.cookie` à la lecture, choisi par chaque test (vide par défaut). */
+let cookieJar = ''
 beforeEach(() => {
   writes = []
+  cookieJar = ''
   const replaced = jest.replaceProperty(Platform, 'OS', 'web')
   restorePlatform = () => replaced.restore()
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
     value: {
+      // Les cookies que le navigateur rendrait à la lecture (R16 : `hasMemberMarker` les lit).
       get cookie() {
-        return ''
+        return cookieJar
       },
       set cookie(value: string) {
         writes.push(value)
@@ -198,5 +203,51 @@ describe('the member marker, following the session (UI C3)', () => {
     await rerender({})
 
     expect(setWrites()).toHaveLength(2)
+  })
+})
+
+// R16 (plan, choix 3 ; relecture de sécurité C1) : la barre du haut lit le marqueur pour garder sa
+// place pendant que la session se charge, sur le web seulement. Le motif est celui de Caddy, strict :
+// `(^|;)\s*waiggle_member=1\s*(;|$)`. Aucune écriture nouvelle : seul `useMemberMarkerSync` pose et
+// efface. Le marqueur ne décide d'aucun contenu (C2).
+describe('reading the member marker (R16)', () => {
+  it('tells whether the member marker is set, on the web only', () => {
+    for (const cookies of [
+      'waiggle_member=1',
+      'theme=night; waiggle_member=1',
+      'waiggle_member=1; theme=night',
+      'a=b;waiggle_member=1 ;c=d',
+    ]) {
+      cookieJar = cookies
+      expect([cookies, hasMemberMarker()]).toEqual([cookies, true])
+    }
+    for (const cookies of [
+      '',
+      'theme=night',
+      'waiggle_member=',
+      'waiggle_member=0',
+      'waiggle_member=10',
+      'waiggle_member=1x',
+      'xwaiggle_member=1',
+      'waiggle_members=1',
+      'other=waiggle_member=1',
+    ]) {
+      cookieJar = cookies
+      expect([cookies, hasMemberMarker()]).toEqual([cookies, false])
+    }
+    // Lire n'écrit rien.
+    expect(writes).toEqual([])
+
+    // Ailleurs que sur le web : jamais, même si un document en avait un.
+    cookieJar = 'waiggle_member=1'
+    restorePlatform()
+    jest.replaceProperty(Platform, 'OS', 'ios')
+    expect(hasMemberMarker()).toBe(false)
+  })
+
+  it('finds no marker on the web without a document (the prerender on the server)', () => {
+    Reflect.deleteProperty(globalThis, 'document')
+
+    expect(hasMemberMarker()).toBe(false)
   })
 })

@@ -11,7 +11,7 @@ import { Checkbox } from './Checkbox'
 import { ListGroup, ListRow } from './ListGroup'
 import { Pressed } from './Pressed'
 import { RadioMark } from './Radio'
-import { SkeletonCard } from './Skeleton'
+import { Shape, SkeletonCard, SkeletonSurface } from './Skeleton'
 import { Switch } from './Switch'
 import { Text } from './Text'
 
@@ -151,11 +151,44 @@ describe('the skeleton shapes', () => {
   it('can be seen on the page and on a card, at 1.5:1 at least', async () => {
     // Avant : le fond groupé, 1,1:1 sur la page comme sur la carte.
     await renderWithProviders(<SkeletonCard />)
-    const shapes = fills(screen.getByRole('progressbar'))
+    // R16 : le squelette se cache 160 ms avant de se montrer ; ses formes sont posées dès le début.
+    // La carte vide elle-même (`skeletonCard`, la matière d'une carte) n'est pas une forme : ses
+    // formes se mesurent aussi contre elle.
+    const shapes = fills(screen.getByRole('progressbar', { includeHiddenElements: true })).filter(
+      (color) => color !== day.skeletonCard,
+    )
     expect(shapes.length).toBeGreaterThan(0)
     for (const color of shapes) {
       expect(contrastRatio(color, day.surface)).toBeGreaterThanOrEqual(1.5)
       expect(contrastRatio(color, day.background, day.background)).toBeGreaterThanOrEqual(1.5)
+      expect(contrastRatio(color, day.skeletonCard)).toBeGreaterThanOrEqual(1.5)
     }
   })
+
+  // R16 (scénario, « La couleur et le mouvement » : « Une carte vide garde la matière d'une carte
+  // réelle sans photo (crème ou feuille, coins et bord), pas une dalle grise » ; plan, choix 7).
+  it.each(['day', 'night'] as const)(
+    'lays the empty card in the matter of a card, not a grey slab, its shapes visible on it (%s)',
+    async (scheme) => {
+      const palette = palettes[scheme]
+      await renderWithProviders(
+        <View testID="card">
+          <SkeletonSurface>
+            <Shape height={14} width="80%" />
+          </SkeletonSurface>
+        </View>,
+        'fr',
+        scheme,
+      )
+
+      const colors = fills(screen.getByTestId('card', { includeHiddenElements: true }))
+      // La carte vide : crème de jour, la feuille (`surface`) de nuit, le rôle `skeletonCard`.
+      expect(colors).toContain(palette.skeletonCard)
+      const shapes = colors.filter((color) => color !== palette.skeletonCard)
+      expect(shapes.length).toBeGreaterThan(0)
+      for (const color of shapes) {
+        expect(contrastRatio(color, palette.skeletonCard)).toBeGreaterThanOrEqual(1.5)
+      }
+    },
+  )
 })

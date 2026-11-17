@@ -11,8 +11,9 @@
 // la photo, le nom, le pseudo et la bio rangés à gauche. Sans `layout`, l'en-tête de R14, centré.
 import { screen } from '@testing-library/react-native'
 import { type StyleProp, StyleSheet, type TextStyle } from 'react-native'
+import { emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { renderWithProviders } from '../testing/render'
-import { MemberHeader } from './MemberHeader'
+import { MemberHeader, MemberHeaderSkeleton } from './MemberHeader'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
@@ -119,5 +120,21 @@ describe('MemberHeader, as the profile column of a computer (R15)', () => {
     expect(textAlignOf(screen.getByRole('header', { name: 'Léa Moreau' }))).not.toBe('center')
     expect(textAlignOf(screen.getByText('@lea_moreau'))).not.toBe('center')
     expect(textAlignOf(screen.getByText(BIO))).not.toBe('center')
+  })
+})
+
+// R16 (plan, choix 4) : l'en-tête vide de la page d'un membre (sa photo et son nom à venir).
+describe('MemberHeaderSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <MemberHeaderSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
   })
 })

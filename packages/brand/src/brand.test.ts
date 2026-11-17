@@ -107,6 +107,30 @@ describe('controls and skeletons', () => {
     }
   })
 
+  // R16 (scénario, « Une carte vide garde la matière d'une carte réelle sans photo » ; plan, choix
+  // 7) : les lignes et les ronds se posent aussi sur la carte vide (`skeletonCard`, crème de jour,
+  // la feuille de nuit), et s'y voient comme sur la page.
+  it.each(schemes)('keeps the skeleton shapes visible on an empty card (%s)', (scheme) => {
+    const palette = palettes[scheme]
+    expect(contrastRatio(palette.skeleton, palette.skeletonCard)).toBeGreaterThanOrEqual(1.5)
+  })
+
+  it('measures the skeleton shapes on the page, on a card and on an empty card', () => {
+    const measured = contrastPairs
+      .filter(({ text }) => text === 'skeleton')
+      .map(({ on, min }) => `${on} ${min}`)
+    expect(measured).toEqual(
+      expect.arrayContaining(['background 1.5', 'surface 1.5', 'skeletonCard 1.5']),
+    )
+  })
+
+  it('lets the glow pass once every 3 seconds, a little later on each next column', () => {
+    // La planche R16-Lueur : un passage de 1,8 s, une pause de 1,2 s, 150 ms d'une colonne à l'autre.
+    expect(durations.skeletonGlow + durations.skeletonPause).toBe(3000)
+    expect(durations.skeletonStagger).toBeGreaterThan(0)
+    expect(durations.skeletonStagger).toBeLessThan(durations.skeletonGlow)
+  })
+
   it('keeps the skeleton shapes visible on every stop of the day honey light', () => {
     for (const { color } of honeyLight.day) {
       expect(contrastRatio(palettes.day.skeleton, color), color).toBeGreaterThanOrEqual(1.5)

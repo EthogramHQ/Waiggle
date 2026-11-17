@@ -43,7 +43,14 @@ it('SkeletonList lays the feed cards in the columns of the feed grid on a large 
     </ContentWidthContext.Provider>,
   )
 
-  const loading = screen.getByLabelText(fr.t(($) => $.common.loading)) as unknown as Node
+  // R16 : le squelette se cache 160 ms avant de se montrer, mais pose ses rangées dès le premier
+  // rendu ; on les compte donc sans attendre, éléments cachés compris.
+  const loading = screen.getByLabelText(
+    fr.t(($) => $.common.loading),
+    {
+      includeHiddenElements: true,
+    },
+  ) as unknown as Node
   // Une seule rangée de trois cartes, comme le Fil chargé.
   expect(rowsIn(loading)).toEqual([3])
 })
@@ -55,6 +62,13 @@ it('keeps one card per row on a phone', async () => {
     </ContentWidthContext.Provider>,
   )
 
-  const loading = screen.getByLabelText(fr.t(($) => $.common.loading)) as unknown as Node
+  // R16 : le squelette se cache 160 ms avant de se montrer, mais pose ses rangées dès le premier
+  // rendu ; on les compte donc sans attendre, éléments cachés compris.
+  const loading = screen.getByLabelText(
+    fr.t(($) => $.common.loading),
+    {
+      includeHiddenElements: true,
+    },
+  ) as unknown as Node
   expect(rowsIn(loading)).toEqual([1, 1, 1])
 })

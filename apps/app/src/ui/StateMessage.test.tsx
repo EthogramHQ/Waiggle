@@ -15,6 +15,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet, View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
+import { Button } from './Button'
 import { StateMessage } from './StateMessage'
 
 // R7b, K10 : l'écran peut poser le focus sur l'état (son titre, sinon son premier paragraphe).
@@ -224,5 +225,74 @@ describe('StateMessage, aligned on the left (R3)', () => {
     expect(screen.getByRole('header', { name: title })).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Revenir au fil' }))
     expect(back).toHaveBeenCalledTimes(1)
+  })
+})
+
+// R16 (scénario : « les indicateurs qui tournent et les « Chargement… » écrits disparaissent (un
+// lecteur d'écran entend toujours « Chargement ») » ; plan, choix 12) : l'attente d'une liste ou
+// d'une feuille dessine elle-même des rangées vides, dans un seul `progressbar` nommé
+// « Chargement… », au lieu de l'indicateur qui tourne et du mot écrit. Le squelette se montre après
+// 160 ms (ui/Skeleton.tsx) : `findByRole` l'attend.
+describe('StateMessage while loading (R16)', () => {
+  /** Les nœuds dessinés sous un élément, lui compris. */
+  const under = (node: Node): Node[] => [
+    node,
+    ...node.children.flatMap((child) => (typeof child === 'string' ? [] : under(child))),
+  ]
+
+  /** Une forme dessinée : une vue d'une hauteur fixe, en points. */
+  const isShape = (node: Node) => {
+    const { height } = (StyleSheet.flatten(node.props.style as never) ?? {}) as {
+      height?: unknown
+    }
+    return typeof height === 'number' && height > 0
+  }
+
+  /** Les indicateurs qui tournent dessinés à l'écran (l'élément natif `ActivityIndicator`). */
+  const spinners = () =>
+    under(screen.root as unknown as Node).filter(
+      (node) => (node as unknown as { type: unknown }).type === 'ActivityIndicator',
+    )
+
+  it('finds the spinner of a busy button (témoin of the spinner search)', async () => {
+    // Les boutons occupés gardent leur indicateur (plan R16, choix 12).
+    await renderWithProviders(<Button label="Publier" onPress={() => {}} loading />)
+
+    expect(spinners().length).toBeGreaterThan(0)
+  })
+
+  it('draws empty rows, with no spinning indicator', async () => {
+    await renderWithProviders(
+      <StateMessage kind="loading" message={fr.t(($) => $.common.loading)} />,
+    )
+
+    const bar = (await screen.findByRole('progressbar', {
+      name: fr.t(($) => $.common.loading),
+    })) as unknown as Node
+    // Des rangées vides : plusieurs formes dessinées dans l'attente…
+    expect(under(bar).filter(isShape).length).toBeGreaterThan(1)
+    // … et plus d'indicateur qui tourne, nulle part.
+    expect(spinners()).toEqual([])
+  })
+
+  it('is read once as « Chargement… », as a single progressbar, without writing it', async () => {
+    await renderWithProviders(
+      <StateMessage kind="loading" message={fr.t(($) => $.common.loading)} />,
+    )
+
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeBusy()
+    expect(screen.getAllByRole('progressbar', { includeHiddenElements: true })).toHaveLength(1)
+    // Rien d'écrit : le mot n'est plus que le nom lu de l'attente.
+    expect(screen.queryByText(/./, { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('is read « Chargement… » too when no message is given (sheets)', async () => {
+    await renderWithProviders(<StateMessage kind="loading" level={2} />)
+
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeBusy()
   })
 })

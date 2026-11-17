@@ -6,7 +6,7 @@
 // pages qui la montent, sur téléphone comme sur ordinateur, et n'y propose plus « Publier ».
 import { layout, palettes, space } from '@ruche/brand'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { Dimensions, StyleSheet } from 'react-native'
+import { Dimensions, Platform, StyleSheet } from 'react-native'
 import { createI18n } from '../i18n'
 import { useUnreadCount } from '../notifications/api'
 import { getMe } from '../profile/api'
@@ -33,6 +33,14 @@ jest.mock('expo-router', () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({ push: mockPush, replace: jest.fn(), setParams: mockSetParams }),
   useIsFocused: () => mockFocused,
+}))
+
+// R16 : la page est-elle hydratée ? Vrai par défaut (comme sur téléphone) ; faux pour la page web
+// pré-rendue. Le préfixe `mock` permet à Jest de lire cette variable dans le remplacement du module.
+let mockHydrated = true
+jest.mock('../ui/theme/hydration', () => ({
+  ...jest.requireActual('../ui/theme/hydration'),
+  useHydrated: () => mockHydrated,
 }))
 
 const { t } = createI18n('fr')
@@ -340,6 +348,126 @@ describe('the top bar while the session loads', () => {
       return style?.height === capsule || style?.minHeight === capsule
     })
     expect(holders).toEqual([])
+  })
+})
+
+// R16 (scénario, « La garde de session et les pages lisibles sans compte » et « La page ne bouge
+// plus en arrivant » ; plan, choix 3 ; relecture de sécurité C1 et C2) : sur le web, garder la place
+// de la capsule pendant le chargement faisait sauter les pages lisibles sans compte (63 points,
+// deux fois, pour un visiteur). La barre ne la garde donc plus que si le cookie `waiggle_member=1`
+// existe (posé pour un membre, R12), lu une fois la page hydratée : avant, elle rend exactement la
+// page pré-rendue, qui ne connaît pas les cookies. Le repère ne décide d'aucun contenu : une fois
+// la session lue, un visiteur ne voit ni lien ni capsule, repère ou non. Sur téléphone et tablette,
+// rien ne change (les tests ci-dessus).
+describe('the top bar while the session loads, on the web (R16)', () => {
+  type Node = { props: Record<string, unknown>; children: (Node | string)[] }
+  const everyNode = (node: Node): Node[] => [
+    node,
+    ...node.children.flatMap((child) => (typeof child === 'string' ? [] : everyNode(child))),
+  ]
+  /** Les vues qui gardent la place de la capsule (sa hauteur, sans la marge du haut de la bande). */
+  const holders = () => {
+    const capsule = layout.topBarHeight.regular - space.lg
+    return everyNode(screen.root as unknown as Node).filter((node) => {
+      const style = StyleSheet.flatten(node.props.style as never) as
+        | Record<string, unknown>
+        | undefined
+      return style?.height === capsule || style?.minHeight === capsule
+    })
+  }
+
+  /** Ce que rend `document.cookie` à la lecture. */
+  let cookieJar = ''
+  beforeEach(() => {
+    cookieJar = ''
+    mockHydrated = true
+    jest.replaceProperty(Platform, 'OS', 'web')
+    // Un faux document : ses cookies, et ce que le thème de la page y touche (couleurs, attributs).
+    const style = { setProperty: () => {}, colorScheme: '', backgroundColor: '' }
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: {
+        get cookie() {
+          return cookieJar
+        },
+        set cookie(_value: string) {},
+        documentElement: { style, setAttribute: () => {}, removeAttribute: () => {} },
+        body: { style },
+      },
+    })
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('keeps no place for the bar while the session loads when the member marker is absent', async () => {
+    mockSession(null, true)
+    await renderWithProviders(<TopNav />)
+
+    expect(holders()).toEqual([])
+  })
+
+  it('keeps the place of the bar while the session loads when the member marker is set', async () => {
+    cookieJar = 'theme=night; waiggle_member=1'
+    mockSession(null, true)
+    await renderWithProviders(<TopNav />)
+
+    expect(holders()).toHaveLength(1)
+    // Rien à lire ni à toucher dans la place gardée.
+    expect(screen.queryAllByRole('button', { includeHiddenElements: true })).toEqual([])
+    expect(screen.queryAllByRole('link', { includeHiddenElements: true })).toEqual([])
+  })
+
+  it('keeps the bar’s place while the session loads only when the waiggle_member cookie is 1', async () => {
+    mockSession(null, true)
+    for (const [cookies, kept] of [
+      ['waiggle_member=1', 1],
+      ['a=b;waiggle_member=1 ;c=d', 1],
+      ['', 0],
+      ['waiggle_member=0', 0],
+      ['waiggle_member=10', 0],
+      ['xwaiggle_member=1', 0],
+    ] as const) {
+      cookieJar = cookies
+      const view = await renderWithProviders(<TopNav />)
+      expect([cookies, holders().length]).toEqual([cookies, kept])
+      await view.unmount()
+    }
+  })
+
+  it('keeps no place for a marker of another value', async () => {
+    cookieJar = 'waiggle_member=yes'
+    mockSession(null, true)
+    await renderWithProviders(<TopNav />)
+
+    expect(holders()).toEqual([])
+  })
+
+  it('renders like the prerendered page until it hydrates, whatever the marker', async () => {
+    // Avant l'hydratation, la barre ne lit pas le cookie : son premier rendu est celui du serveur,
+    // qui ne le connaît pas (sinon React signalerait un écart et redessinerait toute la page).
+    mockHydrated = false
+    mockSession(null, true)
+    cookieJar = 'waiggle_member=1'
+    const marked = await renderWithProviders(<TopNav />)
+    const withMarker = JSON.stringify(marked.toJSON())
+    await marked.unmount()
+    cookieJar = ''
+    const unmarked = await renderWithProviders(<TopNav />)
+
+    expect(JSON.stringify(unmarked.toJSON())).toBe(withMarker)
+  })
+
+  it('shows no link and no capsule to a visitor once the session is read, even with the member marker', async () => {
+    // Un repère fabriqué (n'importe qui peut l'écrire) ne montre rien d'un membre.
+    cookieJar = 'waiggle_member=1'
+    mockSession(null, false)
+    await renderWithProviders(<TopNav />)
+
+    expect(holders()).toEqual([])
+    expect(screen.queryAllByRole('link', { includeHiddenElements: true })).toEqual([])
+    expect(screen.queryAllByRole('button', { includeHiddenElements: true })).toEqual([])
   })
 })
 

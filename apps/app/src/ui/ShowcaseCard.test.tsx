@@ -3,8 +3,9 @@
 // miel sinon ; un toucher ouvre le projet.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
+import { drawnSizes, emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { renderWithProviders } from '../testing/render'
-import { ShowcaseCard } from './ShowcaseCard'
+import { SHOWCASE_CARD_SIZE, ShowcaseCard, ShowcaseCardSkeleton } from './ShowcaseCard'
 
 const onPress = jest.fn()
 beforeEach(() => onPress.mockClear())
@@ -83,5 +84,33 @@ describe('ShowcaseCard (R12)', () => {
     )
 
     expect(screen.getByText('Marie-Bénédicte de La Fontaine').props.numberOfLines).not.toBe(1)
+  })
+})
+
+// R16 (scénario, « Sur l'accueil du visiteur, la vitrine garde sa place avec quatre cartes vides ») :
+// la carte vide de la vitrine, à la place d'une carte de bande.
+describe('ShowcaseCardSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <ShowcaseCardSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
+  })
+
+  it('takes the place of a showcase card in its band', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <ShowcaseCardSkeleton />
+      </PieceHost>,
+    )
+
+    expect(drawnSizes().widths).toContain(SHOWCASE_CARD_SIZE.width)
+    expect(drawnSizes().heights).toContain(SHOWCASE_CARD_SIZE.height)
   })
 })

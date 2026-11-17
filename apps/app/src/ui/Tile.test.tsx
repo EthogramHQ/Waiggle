@@ -2,8 +2,9 @@
 // sa page nommé par son titre, comme la carte d'un projet ; et la tuile « + Ajouter », un bouton.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
+import { emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { renderWithProviders } from '../testing/render'
-import { AddTile, ProjectTile } from './Tile'
+import { AddTile, ProjectTile, TileSkeleton } from './Tile'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -93,5 +94,21 @@ describe('AddTile', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Ajouter un projet' }))
 
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
+// R16 (plan, choix 4) : la tuile vide de la mosaïque d'un membre.
+describe('TileSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <TileSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
   })
 })
