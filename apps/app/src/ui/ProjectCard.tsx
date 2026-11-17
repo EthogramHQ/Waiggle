@@ -57,7 +57,7 @@
 //
 // R16 (« Les squelettes ») : `ProjectCardSkeleton`, la carte vide qui tient sa place pendant le
 // chargement, à sa hauteur, avec son panneau en bas (voir en fin de fichier).
-import { layout, pressScale, radii, space } from '@ruche/brand'
+import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import {
   type ComponentProps,
@@ -833,7 +833,7 @@ export function ProjectCardSkeleton({
    */
   author?: boolean
 }): ReactNode {
-  const { colors } = useTheme()
+  const { colors, scheme } = useTheme()
   const wide = useLayout().sizeClass === 'wide'
   const gridCards = useContext(GridCardsContext)
   const gridColumn = useContext(GridColumnContext)
@@ -846,13 +846,20 @@ export function ProjectCardSkeleton({
     >
       {/* Le panneau en bas, à la marge du verre de la vraie carte. */}
       <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: INSET }}>
-        {/* Le verre, plein : la matière d'une feuille, sans flou (rien derrière à flouter). */}
+        {/* Le verre, plein : la matière d'une feuille, sans flou (rien derrière à flouter), bordé
+            du filet du vrai verre (`panelBorder`). De nuit, la feuille (`sheet`) a la couleur de la
+            carte vide (`skeletonCard`) : le panneau s'y confondait. La planche R16-Fil-1440-Nuit le
+            veut un peu plus clair : le fond groupé de la nuit (`surfaceGrouped`). Le jour garde la
+            feuille crème (le fond groupé y est gris). Aucun rôle ne dit encore « le panneau d'une
+            carte vide » : ce choix par thème attend le sien dans colors.ts (R16). */}
         <View
           style={{
             gap: ROW_GAP,
             padding: compact ? COMPACT_PANEL_PADDING : PANEL_PADDING,
             borderRadius: radii.panel,
-            backgroundColor: colors.sheet,
+            borderWidth: borders.hairline,
+            borderColor: colors.panelBorder,
+            backgroundColor: scheme === 'night' ? colors.surfaceGrouped : colors.sheet,
           }}
         >
           {author && !compact ? (
