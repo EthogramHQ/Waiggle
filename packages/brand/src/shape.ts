@@ -102,6 +102,11 @@ export const layout = {
   // Hauteur des boutons et des champs : xl pour l'action principale d'un écran de marque, small
   // pour un petit bouton dessiné (sa zone à toucher, autour, fait quand même 44).
   controlHeight: { xl: 56, regular: 52, compact: 44, small: 36 },
+  // R13 : la place que la barre du haut réserve avant d'être mesurée (sa capsule et la marge au-dessus).
+  // Dans la page pré-rendue, aucun script ne la mesure encore : sans cette réserve, la barre se posait
+  // sur le titre jusqu'au démarrage de l'appli (audit de design du 17/11/2026, 4.3). La mesure garde
+  // le dernier mot ; cette valeur doit rester celle qu'elle trouve (ScreenTopBar.test.tsx).
+  topBarHeight: 79,
   fab: 64, // le bouton rond flottant (« Publier »)
   // R10 : l'alvéole d'une ruche (HiveBadge, planches R10), un hexagone pointe en haut, à trois
   // tailles : la ligne compacte de « Tes ruches » (small), la ligne de l'onglet Ruches et
