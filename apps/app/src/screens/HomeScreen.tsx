@@ -4,8 +4,9 @@
 //
 // R12 : le Fil a sa propre adresse (`/feed`), et l'accueil `/` est la vitrine (ShowcaseScreen.tsx).
 // Cet écran n'est plus que le Fil d'un membre connecté : les nouveaux projets des personnes suivies
-// et les notes des projets suivis. Sans session (ou pendant sa lecture), il montre l'accueil d'un
-// visiteur sans vitrine, celui de R11 (`VisitorHome`, rangé avec la vitrine, pas recopié ici) (R3 : « Découvrir » est devenu l'onglet Explorer, et les raccourcis « Publier »,
+// et les notes des projets suivis. R16 : sans session, « Réservé aux membres », et pendant sa
+// lecture, le squelette du Fil (la garde commune, `SessionGate`) ; l'accueil d'un visiteur vit à
+// `/` (ShowcaseScreen.tsx) (R3 : « Découvrir » est devenu l'onglet Explorer, et les raccourcis « Publier »,
 // « Mes projets », « Réglages » sont passés dans la barre d'onglets et la barre du haut). Le fil se
 // lit 20 par 20, et un bouton annonce les nouveautés sans jamais faire bouger ce qu'on lit.
 //
@@ -34,12 +35,12 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SessionGate } from '../accounts/SessionGate'
 import type { SessionData } from '../accounts/session'
-import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { type FeedNews as News, useFeedNews, useFollowingFeed, useMarkFeedRead } from '../feed/api'
-import { FeedError, FeedList, FeedNews } from '../feed/FeedList'
-import { FeedSide } from '../feed/FeedSide'
+import { FeedError, FeedList, FeedNews, FeedSkeleton } from '../feed/FeedList'
+import { FeedSide, FeedSideSkeleton } from '../feed/FeedSide'
 import { FirstRun } from '../feed/FirstRun'
 import { firstOfOthers } from '../feed/items'
 import { useReadBefore } from '../feed/readBefore'
@@ -64,8 +65,9 @@ import { ALL_HIVES, HivePills } from '../ui/HivePills'
 import { Logo } from '../ui/Logo'
 import { Notice } from '../ui/Notice'
 import { PublishDance } from '../ui/PublishDance'
+import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
-import { SkeletonList } from '../ui/Skeleton'
+import { LoadingShownContext } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { useScreenFocused } from '../ui/screenFocus'
 import { ScreenScrollContext } from '../ui/scrollLight'
@@ -73,20 +75,115 @@ import { TabPanel } from '../ui/Tabs'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast, useToastShown } from '../ui/theme/toast'
-import { VisitorHome } from './ShowcaseScreen'
-import { SessionErrorScreen } from './states'
 
 export function HomeScreen() {
-  // Le membre connecté, ou personne ; l'écran se redessine à la connexion / déconnexion. Pendant
-  // la lecture de la session, l'accueil des visiteurs (c'est aussi la page pré-rendue du web).
-  const { state, session, retry } = useMemberSession()
-  // La lecture a échoué (trop de demandes, panne) : peut-être un membre, on ne lui propose pas de
-  // créer un compte (voir accounts/session.ts). Pas de « Retour » : il ramènerait ici.
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" withBack={false} />
-  return session ? <MemberHome session={session} /> : <VisitorHome />
+  // R16 (plan, choix 14 ; sécurité, plan 2, A1) : la garde de session commune. Pendant la lecture
+  // de la session (c'est aussi la page pré-rendue du web), le squelette du Fil, jamais l'accueil
+  // des visiteurs, qui apparaîtrait un instant à un membre ; un visiteur lit « Réservé aux
+  // membres » (l'accueil des visiteurs vit à `/`) ; une lecture ratée (trop de demandes, panne)
+  // propose « Réessayer », sans « Retour » : il ramènerait ici.
+  //
+  // Un seul squelette (scénario : « Le Fil n'a plus qu'un squelette, au lieu de deux qui se
+  // suivent ») : celui de la session s'est-il montré ? Le Fil qui prend sa suite montre alors le
+  // sien tout de suite, aux mêmes places, sans les 160 ms où `Loading` reste invisible (les cartes
+  // vides disparaîtraient un instant). Un `ref` : le savoir ne redessine rien.
+  const sessionSkeletonShown = useRef(false)
+  const onSessionSkeletonShown = useCallback(() => {
+    sessionSkeletonShown.current = true
+  }, [])
+  return (
+    <SessionGate
+      width="page"
+      withBack={false}
+      loading={
+        <LoadingShownContext.Provider value={onSessionSkeletonShown}>
+          <FeedWaiting />
+        </LoadingShownContext.Provider>
+      }
+    >
+      {(session) => <MemberHome session={session} skeletonShown={sessionSkeletonShown.current} />}
+    </SessionGate>
+  )
 }
 
-function MemberHome({ session }: { session: SessionData }) {
+/** Un geste qui ne fait rien : la place vide du bouton des nouveautés, dans le squelette. */
+const noop = () => undefined
+
+/**
+ * Le haut du Fil. Sur téléphone (R3, F-Nav10) : le logo à gauche, à la place de « Bonjour Léa ! »,
+ * et la cloche à droite ; le bandeau d'une suspension en dessous. Publier, ses projets et ses
+ * réglages sont dans la barre d'onglets, en bas (« + » et « Moi »). Sur ordinateur, la barre du haut.
+ * `bell` faux pendant la lecture de la session : la cloche lirait l'API sans savoir qui la lit (le
+ * logo, plus haut qu'elle, tient seul la hauteur de la rangée).
+ */
+function FeedHeader({ compact, bell }: { compact: boolean; bell: boolean }) {
+  // openSuspension : sur l'accueil, le bandeau d'un compte suspendu s'ouvre déplié. Sur téléphone,
+  // la barre du haut ne montre que ce bandeau ; sur ordinateur, elle porte aussi « Publier un
+  // projet » (masqué pour un compte suspendu), la cloche et la photo.
+  const topNav = <TopNav openSuspension />
+  if (!compact) return topNav
+  return (
+    <Stack gap="md">
+      <Row justify="between" align="center">
+        <Logo />
+        {bell ? <NotificationBell /> : null}
+      </Row>
+      {topNav}
+    </Stack>
+  )
+}
+
+/**
+ * R16 : le Fil pendant la lecture de la session, aux places du Fil qui arrive (planches R16-Fil) :
+ * la même page large, le même haut, la place vide du bouton des nouveautés, quatre cartes vides
+ * dans les colonnes du Fil et, sur ordinateur, la colonne avec ses vrais titres et ses lignes vides.
+ * Rien n'y lit l'API : on ne sait pas encore qui regarde.
+ */
+function FeedWaiting() {
+  const { t } = useTranslation()
+  const { sizeClass, columns } = useLayout()
+  const compact = sizeClass === 'compact'
+  const panelId = useId()
+  const idleNews = <FeedNews news={NO_NEWS} onPress={noop} />
+  // Le filtre, réduit à « Tout » tant qu'on ne connaît pas ses ruches (voir MemberHome).
+  const main = (
+    <TabPanel id={panelId} label={t(($) => $.hives.pills.all)}>
+      <FeedSkeleton news={compact ? idleNews : null} />
+    </TabPanel>
+  )
+  return (
+    <Screen
+      width="wide"
+      header={<FeedHeader compact={compact} bell={false} />}
+      title={compact ? undefined : t(($) => $.feed.title)}
+      titleHidden
+      keepAsideInView
+      titleAside={compact ? undefined : idleNews}
+      pageTitle={t(($) => $.nav.feed)}
+      sticky={
+        <>
+          {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
+          <HivePills hives={[]} value={ALL_HIVES} onChange={noop} panelId={panelId} />
+        </>
+      }
+    >
+      {columns ? (
+        <Columns sideWidth="panel" sticky main={main} side={<FeedSideSkeleton />} />
+      ) : (
+        main
+      )}
+    </Screen>
+  )
+}
+
+function MemberHome({
+  session,
+  skeletonShown,
+}: {
+  session: SessionData
+  /** Le squelette de la lecture de la session s'est montré : le Fil montre le sien tout de suite. */
+  skeletonShown: boolean
+}) {
   const { t } = useTranslation()
   const router = useRouter()
   const { sizeClass, columns } = useLayout()
@@ -124,11 +221,23 @@ function MemberHome({ session }: { session: SessionData }) {
   // « Tu es à jour » ne saute pas quand le fil est relu (voir feed/readBefore.ts).
   const readBefore = useReadBefore(firstPage)
   const firstRun = useFirstRun(firstPage)
+  // La colonne principale attend : ses ruches (une ruche demandée par l'adresse : on ne montre pas
+  // « Tout » pour le remplacer aussitôt ; sans elle, les pastilles arrivées après le Fil
+  // s'inséraient au-dessus des cartes, relecture du design de R10), puis « Tout ». Le Fil d'une
+  // ruche attend dans HiveFeed, qui le lit. Une lecture ratée ne retient rien : son message prend la
+  // place.
+  const mainLoading = hiveChoice.waiting || (!chosen && !feed.data && !feed.isError)
+  // Un squelette est à l'écran, et le suivant prend sa place : celui de la session, puis celui du
+  // Fil ; ou celui des ruches, puis celui du Fil de la ruche demandée. Le suivant se montre alors
+  // tout de suite, sans les 160 ms où `Loading` reste invisible (les cartes vides disparaîtraient un
+  // instant). Retombé une fois la colonne arrivée (dans un effet : le squelette suivant, monté par
+  // ce rendu-là, l'a déjà lu) ; une pastille choisie plus tard repart de l'attente ordinaire.
+  const [continued, setContinued] = useState(skeletonShown)
+  const onMainSkeletonShown = useCallback(() => setContinued(true), [])
+  useEffect(() => {
+    if (!mainLoading) setContinued(false)
+  }, [mainLoading])
 
-  // openSuspension : sur l'accueil, le bandeau d'un compte suspendu s'ouvre déplié. Sur téléphone,
-  // la barre du haut ne montre que ce bandeau ; sur ordinateur, elle porte aussi « Publier un
-  // projet » (masqué pour un compte suspendu), la cloche et la photo.
-  const topNav = <TopNav openSuspension />
   const onExplore = () => router.push('/explore')
   // Afficher les nouveautés : relire le fil montré (« Tout », ou celui de la ruche choisie).
   const showNews = () =>
@@ -148,10 +257,12 @@ function MemberHome({ session }: { session: SessionData }) {
   // 1 440 et à 1 920 (planche R15-Fil-1920).
 
   // R10 : les pastilles, seulement pour un membre d'au moins une ruche. Elles commandent le
-  // panneau du Fil (`panelId`), posé autour de la colonne principale.
+  // panneau du Fil (`panelId`), posé autour de la colonne principale. R16 (planches R16-Fil) : le
+  // filtre est déjà là pendant la lecture de ses ruches, réduit à « Tout » : les cartes ne
+  // descendent plus quand ses ruches arrivent (69 points sur téléphone). Sans ruche, il part.
   const panelId = useId()
   const pills =
-    hiveChoice.hives.length > 0 ? (
+    hiveChoice.hives.length > 0 || hiveChoice.waiting ? (
       <HivePills
         hives={hiveChoice.hives}
         value={chosen?.id ?? ALL_HIVES}
@@ -170,38 +281,43 @@ function MemberHome({ session }: { session: SessionData }) {
       id={pills ? panelId : undefined}
       label={chosen ? (chosen.name ?? t(($) => $.hives.unnamed)) : t(($) => $.hives.pills.all)}
     >
-      {chosen ? (
-        // Une liste neuve par ruche (`key`) : sa date « Tu es à jour » et sa mémoire des cartes
-        // déjà vues sont celles de cette ruche.
-        <HiveFeed
-          key={chosen.id}
-          hiveId={chosen.id}
-          news={compact ? newsButton : null}
-          onExplore={onExplore}
-          hideMascot={published.noticeUp}
-        />
-      ) : hiveChoice.waiting ? (
-        // Ses ruches pas encore lues : le squelette du Fil. Une ruche demandée par l'adresse : on ne
-        // montre pas « Tout » pour le remplacer aussitôt, sous les yeux. Relecture du design de R10 :
-        // sans ruche demandée non plus, les pastilles arrivées après le Fil s'inséraient au-dessus
-        // des cartes et les faisaient descendre sous le doigt. Une lecture ratée ne retient pas le
-        // Fil : il se montre, sans pastilles.
-        <SkeletonList count={3} shape="feed" />
-      ) : (
-        <FollowingFeed
-          feed={feed}
-          items={items}
-          readBefore={readBefore}
-          firstRun={firstRun}
-          name={name}
-          news={compact ? newsButton : null}
-          onExplore={onExplore}
-          hideMascot={published.noticeUp}
-          // Toujours posé (il ne dessine rien sans invitation) : une invitation refusée garde sa
-          // place jusqu'à la prochaine visite, même quand la liste relue ne l'a plus.
-          invitations={<FeedInvitations invitations={hiveChoice.invitations} />}
-        />
-      )}
+      {/* R16 : un seul squelette pour toute l'attente (ses ruches, puis le Fil montré), qui fond
+          vers le Fil quand il arrive (`Reveal`, 180 ms). */}
+      <Reveal
+        loading={mainLoading}
+        skeleton={
+          <NoteShown onShown={onMainSkeletonShown}>
+            <FeedSkeleton news={compact ? newsButton : null} shown={continued} />
+          </NoteShown>
+        }
+      >
+        {chosen ? (
+          // Une liste neuve par ruche (`key`) : sa date « Tu es à jour » et sa mémoire des cartes
+          // déjà vues sont celles de cette ruche.
+          <HiveFeed
+            key={chosen.id}
+            hiveId={chosen.id}
+            skeletonShown={continued}
+            news={compact ? newsButton : null}
+            onExplore={onExplore}
+            hideMascot={published.noticeUp}
+          />
+        ) : (
+          <FollowingFeed
+            feed={feed}
+            items={items}
+            readBefore={readBefore}
+            firstRun={firstRun}
+            name={name}
+            news={compact ? newsButton : null}
+            onExplore={onExplore}
+            hideMascot={published.noticeUp}
+            // Toujours posé (il ne dessine rien sans invitation) : une invitation refusée garde sa
+            // place jusqu'à la prochaine visite, même quand la liste relue ne l'a plus.
+            invitations={<FeedInvitations invitations={hiveChoice.invitations} />}
+          />
+        )}
+      </Reveal>
     </TabPanel>
   )
   // Les projets déjà en carte dans le fil : la colonne de droite ne les propose pas une seconde fois.
@@ -219,22 +335,7 @@ function MemberHome({ session }: { session: SessionData }) {
         width="wide"
         // R6a : la danse de publication, par-dessus tout l'écran.
         overlay={published.dance ? <PublishedDance {...published.dance} /> : null}
-        // Sur téléphone (R3, F-Nav10), le haut du Fil : le logo à gauche, à la place de « Bonjour
-        // Léa ! », et la cloche à droite ; le bandeau d'une suspension en dessous. Publier, ses
-        // projets et ses réglages sont dans la barre d'onglets, en bas (« + » et « Moi »).
-        header={
-          compact ? (
-            <Stack gap="md">
-              <Row justify="between" align="center">
-                <Logo />
-                <NotificationBell />
-              </Row>
-              {topNav}
-            </Stack>
-          ) : (
-            topNav
-          )
-        }
+        header={<FeedHeader compact={compact} bell />}
         // Sur ordinateur, le titre « Fil » n'est plus affiché (« Moins de mots », 16/11/2026 : l'onglet
         // allumé de la barre du haut le dit déjà) ; il reste le titre de niveau 1 lu, et le focus s'y
         // pose toujours (`titleRef`). Le bouton des nouveautés et les pastilles des ruches passent en
@@ -276,7 +377,14 @@ function MemberHome({ session }: { session: SessionData }) {
             sticky
             main={main}
             side={
-              <FeedSide withSuggestions={firstRun === false} shownProjectIds={shownProjectIds} />
+              <FeedSide
+                // R16 : « Proches à suivre » garde sa place pendant que le Fil charge (le cas
+                // ordinaire : le membre suit déjà quelqu'un) ; il part au premier lancement, où la
+                // colonne principale les montre déjà.
+                withSuggestions={firstRun !== true}
+                shownProjectIds={shownProjectIds}
+                skeletonShown={continued}
+              />
             }
           />
         ) : (
@@ -553,14 +661,12 @@ function FollowingFeed({
   invitations,
 }: FollowingFeedProps) {
   // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
-  // les cartes déjà lues (voir FeedList).
+  // les cartes déjà lues (voir FeedList). R16 : l'attente est le squelette de MemberHome (`Reveal`),
+  // posé à la place de ce composant ; rien ici en attendant.
   if (!feed.data) {
     return feed.isError ? (
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
-    ) : (
-      // Le squelette du fil : trois cartes, un seul « Chargement… » pour un lecteur d'écran.
-      <SkeletonList count={3} shape="feed" />
-    )
+    ) : null
   }
   const list = (
     <FeedList
@@ -660,6 +766,8 @@ const useHiveParam = (): string | undefined => {
 
 type HiveFeedProps = {
   hiveId: string
+  /** R16 : son squelette prend la suite d'un autre encore à l'écran (voir `continued`). */
+  skeletonShown: boolean
   /** Le haut du fil (la phrase de la ruche), sur téléphone ; null sur ordinateur. */
   news: ReactNode
   onExplore: () => void
@@ -671,25 +779,42 @@ type HiveFeedProps = {
  * à jour » se pose d'après sa dernière visite de la ruche (`lastReadAt` de la première page), figée
  * pour la visite comme celle de « Tout ». Un fil vide finit sur « Tu es à jour ».
  */
-function HiveFeed({ hiveId, news, onExplore, hideMascot }: HiveFeedProps) {
+function HiveFeed({ hiveId, skeletonShown, news, onExplore, hideMascot }: HiveFeedProps) {
   const feed = useHiveFeed(hiveId)
   const firstPage = feed.data?.pages[0]
   const readBefore = useReadBefore(firstPage)
-  if (!feed.data) {
-    return feed.isError ? (
-      <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
-    ) : (
-      <SkeletonList count={3} shape="feed" />
-    )
-  }
+  // R16 : le même squelette que « Tout », qui fond vers le Fil de la ruche quand il arrive.
   return (
-    <FeedList
-      feed={feed}
-      items={feed.data.pages.flatMap((page) => page.items)}
-      news={news}
-      upToDate={{ readBefore: readBefore ?? null, onExplore, hideMascot }}
-    />
+    <Reveal
+      loading={!feed.data && !feed.isError}
+      skeleton={<FeedSkeleton news={news} shown={skeletonShown} />}
+    >
+      {feed.data ? (
+        <FeedList
+          feed={feed}
+          items={feed.data.pages.flatMap((page) => page.items)}
+          news={news}
+          upToDate={{ readBefore: readBefore ?? null, onExplore, hideMascot }}
+        />
+      ) : (
+        <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+      )}
+    </Reveal>
   )
+}
+
+/**
+ * R16 : le squelette de la colonne principale s'est montré. `Reveal` le sait déjà (pour son fondu,
+ * par `LoadingShownContext`) ; MemberHome le note aussi, pour que le squelette suivant prenne sa
+ * suite sans attendre (voir `continued`). Ce composant passe le signal aux deux.
+ */
+function NoteShown({ onShown, children }: { onShown: () => void; children: ReactNode }) {
+  const toReveal = useContext(LoadingShownContext)
+  const both = useCallback(() => {
+    toReveal?.()
+    onShown()
+  }, [toReveal, onShown])
+  return <LoadingShownContext.Provider value={both}>{children}</LoadingShownContext.Provider>
 }
 
 /** Les refus d'une invitation dont l'appli a le message propre ; les autres disent « Réessaie. ». */
