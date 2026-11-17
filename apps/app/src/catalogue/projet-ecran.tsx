@@ -5,7 +5,8 @@
 // - le bouton du haut (`backLabel`) : l'icône seule sur téléphone, l'icône et « Retour » sur
 //   ordinateur ;
 // - les rangées de Columns, séparées par un trait (la galerie | l'en-tête, puis la description |
-//   les commentaires), dans l'ordre de lecture.
+//   les commentaires), dans l'ordre de lecture ;
+// - R15 : les deux largeurs fixes de la colonne de côté de Columns, `panel` et `profile`.
 // La capsule montrée ici est une silhouette (des icônes et des nombres) : la vraie,
 // ui/ReactionCapsule.tsx, a sa propre section. Les cadres imitent un écran de téléphone : la place
 // flottante s'y pose comme dans Screen, par le même composant (ScreenFloating).
@@ -48,6 +49,12 @@ const fr = {
   header: 'Statut, titre, auteur, « Tester la démo », la recette',
   description: 'Description, prompt de départ, mises à jour, « Signaler ce projet »',
   comments: 'Commentaires',
+  panel: 'Colonne de côté « panel » (340), à droite',
+  cards: 'Les cartes du Fil, toute la place qui reste',
+  panelSide: 'Le panneau : ruches, proches à suivre, testeurs',
+  profile: 'Colonne de côté « profile » (360), à gauche',
+  mosaic: 'La mosaïque des projets',
+  profileSide: 'Le profil du membre',
 }
 
 const en: typeof fr = {
@@ -72,6 +79,12 @@ const en: typeof fr = {
   header: 'Status, title, author, “Try the demo”, the recipe',
   description: 'Description, starting prompt, updates, “Report this project”',
   comments: 'Comments',
+  panel: 'Side column “panel” (340), on the right',
+  cards: 'The Feed cards, all the room left',
+  panelSide: 'The panel: hives, people to follow, testers',
+  profile: 'Side column “profile” (360), on the left',
+  mosaic: 'The project mosaic',
+  profileSide: 'The member’s profile',
 }
 
 type Labels = typeof fr
@@ -134,6 +147,23 @@ export function ProjectFrameCatalogue() {
                   { main: <Block text={l.gallery} tall />, side: <Block text={l.header} tall /> },
                   { main: <Block text={l.description} />, side: <Block text={l.comments} /> },
                 ]}
+              />
+            </Example>
+            {/* R15 : les deux largeurs fixes de la colonne de côté, côte à côte sur un grand écran,
+                l'une sous l'autre ailleurs (chacune sur toute la largeur). */}
+            <Example caption={`${l.panel} — ${l[scheme]}`}>
+              <Columns
+                sideWidth="panel"
+                main={<Block text={l.cards} tall />}
+                side={<Block text={l.panelSide} />}
+              />
+            </Example>
+            <Example caption={`${l.profile} — ${l[scheme]}`}>
+              <Columns
+                sideWidth="profile"
+                sideFirst
+                main={<Block text={l.mosaic} tall />}
+                side={<Block text={l.profileSide} />}
               />
             </Example>
           </Stack>
