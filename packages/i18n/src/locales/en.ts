@@ -173,7 +173,7 @@ export const en: Translation = {
           },
           device: {
             title: 'On your device',
-            body: '{{appName}} uses no audience-measurement or advertising cookie, and loads no tool from another site.\n\nStored on your device:\n\n- your sign-in session (a cookie on the web), 7 days after your last visit;\n- on the web, a marker with no identifier that says you are signed in, to open the Feed for you; 7 days after your last visit, erased when you sign out;\n- the chosen theme;\n- the help already seen;\n- the dates of the last suspension seen, if there was one;\n- the address waiting for verification, erased when you sign in or close the tab.\n\nWithout an account, no cookie is set.\n\nThe ambient light follows the mouse and the tilt of the device, but neither is ever kept.',
+            body: '{{appName}} uses no audience-measurement or advertising cookie, and loads no tool from another site.\n\nStored on your device:\n\n- your sign-in session (a cookie on the web), 7 days after your last visit;\n- on the web, a small marker that only says you are signed in, not who you are, so the Feed opens straight away and the page doesn’t jump while it loads; 7 days after your last visit, erased when you sign out;\n- the chosen theme;\n- the help already seen;\n- the dates of the last suspension seen, if there was one;\n- the address waiting for verification, erased when you sign in or close the tab.\n\nWithout an account, no cookie is set.\n\nThe ambient light follows the mouse and the tilt of the device, but neither is ever kept.',
           },
           servers: {
             title: 'Backups and logs',

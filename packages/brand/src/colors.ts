@@ -73,9 +73,14 @@ const day = {
   // Le liseré d'un contrôle choisi, autour du miel : le miel seul fait 1,6:1 sur le blanc et ne
   // dessinerait pas le rond ; ce brun ambré le détache du fond.
   controlChecked: '#B87700',
-  // Les formes d'un squelette (chargement). De jour, une ombre transparente, qui assombrit ce qu'il
-  // y a dessous (la page, une carte, la lumière miel) et s'y voit donc partout, à 1,5:1 environ.
-  skeleton: 'rgba(28,27,25,0.22)',
+  // Les formes d'un squelette (chargement, R16, planche R16-Lueur). De jour, le brun des pastilles
+  // de statut à 33 % : transparent, il assombrit ce qu'il y a dessous (la page, une carte, la lumière
+  // miel) et s'y voit partout, à 1,5:1 au moins (1,52 sur l'arrêt le plus foncé de la lumière, #F2A900 ; 30 % n'y faisait que 1,46), sans virer au kaki comme l'encre grise d'avant.
+  skeleton: 'rgba(106,67,0,0.33)',
+  // La lueur qui traverse une carte vide : le miel à 38 % au cœur de sa bande.
+  skeletonGlow: 'rgba(255,194,26,0.38)',
+  // La carte vide : la matière d'une carte sans photo, la crème du jour, pas une dalle grise.
+  skeletonCard: '#FFF0C2',
 
   // Messages
   danger: '#D92D20', // fond du bouton de suppression définitive
@@ -219,9 +224,13 @@ const night = {
   controlBorder: '#766F62',
   // La nuit, le miel se détache seul du fond sombre (11:1) : le liseré reste du miel.
   controlChecked: '#FFC933',
-  // La nuit, une forme pleine, un peu plus claire que la page : un blanc transparent se perdrait
-  // dans le cœur clair de la lanterne (1,1:1), une forme pleine s'y détache.
-  skeleton: '#3F3930',
+  // La nuit, le miel à 22 % : il se détache de la page, des cartes et des groupes (1,66 à 1,74:1),
+  // là où l'ancienne forme pleine tombait à 1,45:1 sur un groupe.
+  skeleton: 'rgba(255,201,51,0.22)',
+  // La lueur de nuit, plus discrète : le miel à 16 %.
+  skeletonGlow: 'rgba(255,201,51,0.16)',
+  // La carte vide de nuit : la surface des cartes (la crème de nuit tirait au kaki sur la lumière).
+  skeletonCard: '#1A1712',
 
   danger: '#D92D20',
   dangerPressed: '#B42318',
@@ -509,6 +518,7 @@ export const contrastPairs: readonly ContrastPair[] = [
   // arrêt du dégradé est mesuré à part (brand.test.ts) : un couple ne sait pas viser le seul jour.
   { text: 'skeleton', on: 'background', min: 1.5 },
   { text: 'skeleton', on: 'surface', min: 1.5 },
+  { text: 'skeleton', on: 'skeletonCard', min: 1.5 },
 ]
 
 /**
