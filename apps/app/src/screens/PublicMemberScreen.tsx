@@ -24,6 +24,10 @@
 // d'un visiteur (« Se connecter » n'a pas de sens pour lui), ni lien vers un projet, ni « Signaler
 // ce profil ». « Retour » le ramène aux réglages.
 //
+// R14 : ses projets en mosaïque de cartes (`ProjectMosaic`), comme sur la page d'un membre : le plus
+// récent en grande carte, les suivants en cartes compactes, avec ce que la page publique sait de
+// chacun (photo, titre, accroche, statut).
+//
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import { PROJECT_LIST_MAX, type PublicMember } from '@ruche/contracts'
 import { type Href, useRouter } from 'expo-router'
@@ -40,14 +44,13 @@ import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
 import { LegalLinks } from '../ui/LegalLinks'
 import { MemberHeader } from '../ui/MemberHeader'
+import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectGrid } from '../ui/ProjectGrid'
+import { ProjectMosaic } from '../ui/ProjectMosaic'
 import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
 import { Row } from '../ui/Stack'
 import { TextLink } from '../ui/TextLink'
-import { ProjectTile } from '../ui/Tile'
-import { TileMosaic } from '../ui/TileMosaic'
-import { useTapGuard } from '../ui/tapGuard'
 import { useLayout } from '../ui/theme/layout'
 import { VisitorBar } from '../ui/VisitorBar'
 import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
@@ -120,10 +123,8 @@ function PublicMemberView({
   const lang = usePageLanguage()
   const goBack = useGoBack(fallback)
   const back = onClose ?? goBack
-  // Deux colonnes de tuiles sur téléphone, quatre ailleurs, comme la page d'un membre.
+  // Sur téléphone, « Partager » va dans la barre d'un visiteur ; ailleurs, en haut à droite.
   const phone = useLayout().sizeClass === 'compact'
-  // Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas deux pages.
-  const guard = useTapGuard()
 
   // L'aperçu s'ouvre à la place de l'écran des réglages : le bouton touché disparaît, et le focus
   // tombait sur la page entière (le lecteur d'écran ne disait rien, Tab repartait du haut). À
@@ -214,12 +215,18 @@ function PublicMemberView({
             // Cochés, mais aucun projet public : la phrase de la grille, sans mosaïque.
             <ProjectGrid empty={t(($) => $.visitor.noProjects)}>{null}</ProjectGrid>
           ) : (
-            <TileMosaic columns={phone ? 2 : 4}>
-              {projects.map((project) => (
-                <ProjectTile
-                  key={project.id}
+            // R14 : la même mosaïque que pour un membre, avec ce que la page publique sait de
+            // chaque projet (`PublicProjectCard`) : la photo, le titre, l'accroche et le statut.
+            // Ni auteur (on est sur sa page), ni réactions, ni « Tester » : la page publique du
+            // projet les montre. Pas de photo qui grandit non plus : un visiteur passe d'une page
+            // publique à l'autre comme avant. La carte a sa garde contre la double tape.
+            <ProjectMosaic
+              items={projects}
+              render={(project, size) => (
+                <ProjectCard
                   title={project.title}
-                  author={member.name}
+                  pitch={project.pitch}
+                  size={size}
                   image={
                     project.cover
                       ? {
@@ -229,17 +236,17 @@ function PublicMemberView({
                         }
                       : null
                   }
-                  // Le statut, comme sur la planche (« Testable », « Idée ») : lu après le titre.
-                  badge={t(($) => $.project.status[project.status])}
-                  // Dans l'aperçu, la tuile est seulement dessinée : rien ne fait quitter l'aperçu.
+                  status={{
+                    label: t(($) => $.project.status[project.status]),
+                    strong: project.status === 'testable',
+                  }}
+                  // Dans l'aperçu, la carte est seulement dessinée : rien ne fait quitter l'aperçu.
                   {...(preview
                     ? null
-                    : {
-                        onPress: guard(() => router.push(publicPath('project', lang, project.id))),
-                      })}
+                    : { onPress: () => router.push(publicPath('project', lang, project.id)) })}
                 />
-              ))}
-            </TileMosaic>
+              )}
+            />
           )}
         </>
       ) : null}

@@ -10,6 +10,10 @@
 // projet remonté par sa mise à jour (la prop `update`, posée par la liste du fil) montre la carte
 // entière : « Mis à jour · v1.2 », sa première ligne, « et 2 autres changements » et sa date.
 // Ailleurs, une mise à jour de moins de `UPDATED_BADGE_DAYS` jours pose le repère seul.
+// R14 : sur la page d'un membre, la mosaïque choisit la taille de chaque carte (`size`) ; la carte
+// ne répète pas le nom de l'auteur (`owner`, on est sur sa page) et montre la première photo de la
+// galerie à toute largeur (`galleryCover`), celle qui grandit jusqu'à la page du projet. Partout, la
+// carte rebondit au Retour du navigateur quand on revient du projet qu'elle a ouvert (`bounceStyle`).
 import { type ProjectSummary, UPDATED_BADGE_DAYS, type UpdateSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext } from 'react'
@@ -17,7 +21,7 @@ import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
 import { useOpenDemo } from '../navigation/links'
 import { type Measurable, useCoverSource } from '../ui/coverTransition'
-import { ProjectCard } from '../ui/ProjectCard'
+import { ProjectCard, type ProjectCardSize } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
@@ -93,6 +97,20 @@ type Props = {
    * épinglé d'une ruche (relecture du plan, interface 13 : l'épingle par `ProjectCard badge`).
    */
   badge?: string
+  /**
+   * R14 : la carte est sur la page de son auteur (la mosaïque d'un membre) : ni son nom, ni sa
+   * photo, ni la date qui se lit dans leur rangée. Tout le reste est inchangé.
+   */
+  owner?: boolean
+  /** R14 : la grande carte (par défaut, celle du Fil) ou la compacte, choisie par la mosaïque. */
+  size?: ProjectCardSize
+  /**
+   * R14 : la première photo de la galerie (`cover`) à toute largeur, jamais la photo verticale du
+   * téléphone. La mosaïque d'un membre ouvre le projet en faisant grandir la photo de la carte
+   * jusqu'à celle de la page, qui est la première de la galerie : sans cela, l'image changerait
+   * en plein vol. Le Fil garde sa règle (la verticale sur téléphone, plus haute).
+   */
+  galleryCover?: boolean
 }
 
 export function SummaryCard({
@@ -102,13 +120,16 @@ export function SummaryCard({
   coverRef,
   update,
   badge,
+  owner = false,
+  size,
+  galleryCover = false,
 }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const openDemo = useOpenDemo()
   const toSource = useMediaSources()
   const wide = useLayout().sizeClass === 'wide'
-  const visual = wide ? project.cover : (project.portraitCover ?? project.cover)
+  const visual = wide || galleryCover ? project.cover : (project.portraitCover ?? project.cover)
   // La démo, recopiée dans une constante : le rappel de « Tester » la lit plus tard, et TypeScript
   // ne garde pas le « non nul » vérifié ici jusque dans une fonction.
   const { demoUrl } = project
@@ -136,18 +157,24 @@ export function SummaryCard({
       title={project.title}
       pitch={project.pitch}
       category={category}
-      author={{
-        name: project.author.name,
-        avatar: toSource(project.author.avatarUrl),
-        onPress: () =>
-          router.push({ pathname: '/members/[id]', params: { id: project.author.id } }),
-      }}
+      author={
+        owner
+          ? undefined
+          : {
+              name: project.author.name,
+              avatar: toSource(project.author.avatarUrl),
+              onPress: () =>
+                router.push({ pathname: '/members/[id]', params: { id: project.author.id } }),
+            }
+      }
+      size={size}
       image={
         visual
           ? { source: toSource(visual.url), thumbhash: visual.thumbhash, label: project.title }
           : null
       }
-      when={<RelativeTime date={at} />}
+      // La date se lit dans la rangée de l'auteur : sans auteur, rien à dater.
+      when={owner ? undefined : <RelativeTime date={at} />}
       status={{
         label: t(($) => $.project.status[project.status]),
         strong: project.status === 'testable',
@@ -171,6 +198,9 @@ export function SummaryCard({
       }
       overlay={overlay}
       coverRef={coverRef ?? ownCoverRef}
+      // R14 : le léger rebond de la carte quand on revient, par le Retour du navigateur, du projet
+      // qu'elle a ouvert ; à 1 (immobile) le reste du temps.
+      bounceStyle={cover.bounceStyle}
       updated={updated}
     />
   )
