@@ -15,7 +15,12 @@
 // - la page est pleine 400 ms après le début au plus tard, même si l'animation ne finit pas
 //   (jur-RF5), et ne prend aucun clic tant qu'elle n'est pas pleine (S1) ;
 // - « Réduire les animations » garde le fondu : ce n'est pas un déplacement ;
-// - sur iOS et Android, rien : la pile garde son glissement natif.
+// - sur iOS et Android, rien : la pile garde son glissement natif ;
+// - R14 : au retour d'un projet ouvert par une carte de la page, pas de fondu, « Réduire les
+//   animations » compris. La page, restée dans la pile, est déjà là au même endroit ; la refondre
+//   montrait une page vide entre les deux. Ses cartes le disent par un drapeau de la page
+//   (`useCoverReturn`, ui/coverTransition.tsx), que `Screen` pose une fois pour tous ses fondus ;
+//   le retour suivant, par un autre chemin, refond.
 //
 // Le contenu reste présent et lisible par le lecteur d'écran pendant le fondu : seule l'opacité
 // change, le focus du clavier n'est pas touché.
@@ -30,6 +35,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
+import { CoverReturnScope, useCoverReturn } from './coverTransition'
 import { useScreenShownCount } from './screenFocus'
 
 /**
@@ -71,6 +77,8 @@ type Props = {
 export function ScreenFade({ children, fade = true, style }: Props) {
   const web = Platform.OS === 'web'
   const count = useScreenShownCount()
+  // Le drapeau de la page (R14) : une de ses cartes a ouvert un projet depuis la dernière arrivée.
+  const back = useCoverReturn()
   // L'état garde le dernier nombre vu, pour reconnaître une arrivée (un nombre qui monte) au rendu
   // même qui la montre. Au montage : une route neuve (0) attend invisible, sauf sur la première page
   // de la visite ; une route déjà affichée (1 et plus) est là, sans fondu.
@@ -83,7 +91,10 @@ export function ScreenFade({ children, fade = true, style }: Props) {
     // Une arrivée : la page fond, sauf la première arrivée d'une page montée sans attendre (la
     // première de la visite). Un « setState » pendant le rendu : React recommence aussitôt ce rendu
     // avec le nouvel état, avant de rien poser à l'écran.
-    phase = count > state.seen && (state.seen > 0 || state.phase === 'waiting') ? 'armed' : 'rest'
+    // R14 : le retour d'un projet ouvert par une carte de la page arrive sans fondu. Le drapeau est
+    // seulement lu ici (un rendu peut se jouer deux fois) ; il retombe dans l'effet plus bas.
+    const arrival = count > state.seen && (state.seen > 0 || state.phase === 'waiting')
+    phase = arrival && !back.opened ? 'armed' : 'rest'
     setState({ seen: count, phase })
   }
   const active = web && fade && phase !== 'rest'
@@ -99,6 +110,16 @@ export function ScreenFade({ children, fade = true, style }: Props) {
   useLayoutEffect(() => {
     if (count > 0) pageShownBefore = true
   }, [count])
+
+  // R14 : le drapeau de la page retombe à chaque arrivée (un nombre qui change), une fois que tous
+  // ses fondus l'ont lu : ils se rendent tous avant le premier de ces effets. Pas au montage : un
+  // fondu monté pendant la visite du projet (passage en colonnes) ne l'efface pas avant le retour.
+  const lastCount = useRef(count)
+  useLayoutEffect(() => {
+    if (count === lastCount.current) return
+    lastCount.current = count
+    back.opened = false
+  }, [count, back])
 
   // L'arrivée : l'animation part de 0, avant la première image. Rien sans fondu (téléphone,
   // `fade={false}`).
@@ -166,7 +187,8 @@ export function ScreenFade({ children, fade = true, style }: Props) {
   return (
     <View pointerEvents={active ? 'none' : 'auto'} style={[style, hidden ? styles.hidden : null]}>
       <Animated.View style={[styles.fill, active ? styles.stack : null, web ? animated : null]}>
-        {children}
+        {/* Les cartes du contenu lèvent le drapeau de la page (toujours posé : même arbre). */}
+        <CoverReturnScope value={back}>{children}</CoverReturnScope>
       </Animated.View>
       {active ? (
         <View

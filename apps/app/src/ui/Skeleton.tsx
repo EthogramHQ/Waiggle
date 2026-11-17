@@ -4,6 +4,7 @@
 // - SkeletonCard : une carte, un grand bloc et deux lignes (à 80 % et 55 % de la largeur).
 // - SkeletonList : plusieurs cartes l'une sous l'autre.
 // - `shape="feed"` (R4) : la forme d'une carte du fil, de sa hauteur, avec son panneau en bas.
+// - `shape="compact"` (R14) : la forme d'une petite carte de la mosaïque d'un membre, de sa hauteur.
 // Les formes « respirent » (leur opacité monte et descend doucement) pour dire que ça avance. Avec
 // « Réduire les animations », elles restent immobiles : une animation sans fin à côté du contenu
 // s'arrête à la demande (WCAG 2.2.2).
@@ -20,7 +21,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import { PROJECT_CARD_HEIGHT } from './ProjectCard'
+import { PROJECT_CARD_COMPACT_HEIGHT, PROJECT_CARD_HEIGHT } from './ProjectCard'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -129,6 +130,41 @@ function FeedCardShapes() {
   )
 }
 
+/**
+ * R14 : les formes d'une carte compacte (la mosaïque d'un membre) : un bloc de la hauteur d'une
+ * `ProjectCard size="compact"` (lue sur la carte, jamais recopiée) et, en bas, son verre plus serré
+ * avec ce qu'elle montre : le titre, puis le statut et les réactions.
+ */
+function CompactCardShapes() {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={{
+        height: PROJECT_CARD_COMPACT_HEIGHT,
+        justifyContent: 'flex-end',
+        padding: space.sm,
+        borderRadius: radii.sheet,
+        backgroundColor: colors.skeleton,
+      }}
+    >
+      <View
+        style={{
+          gap: space.sm,
+          padding: space.md,
+          borderRadius: radii.panel,
+          backgroundColor: colors.sheet,
+        }}
+      >
+        <Shape height={TITLE} width="80%" />
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Shape height={LINE * 2} width="45%" round />
+          <Shape height={LINE * 2} width="25%" round />
+        </View>
+      </View>
+    </View>
+  )
+}
+
 /** Les formes d'une carte, sans nom : la carte nommée ou la liste les enveloppe. */
 function CardShapes() {
   return (
@@ -164,11 +200,11 @@ function Loading({ children }: { children: ReactNode }) {
 
 /**
  * La forme des cartes : `card`, la carte simple (un bloc et deux lignes) ; `feed`, la carte du fil
- * (R4), de sa hauteur, avec son panneau.
+ * (R4), de sa hauteur, avec son panneau ; `compact`, la petite carte de la mosaïque d'un membre (R14).
  */
-type SkeletonShape = 'card' | 'feed'
+type SkeletonShape = 'card' | 'feed' | 'compact'
 
-const shapes = { card: CardShapes, feed: FeedCardShapes } as const
+const shapes = { card: CardShapes, feed: FeedCardShapes, compact: CompactCardShapes } as const
 
 export function SkeletonCard({ shape = 'card' }: { shape?: SkeletonShape }) {
   const Shapes = shapes[shape]

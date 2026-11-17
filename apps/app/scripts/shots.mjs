@@ -2137,6 +2137,8 @@ const leaPublicSettings = {
 // La page publique d'un membre (`PublicMember`) : son nom et sa photo, puis ce qu'il a coché ; une
 // case décochée donne un champ absent. Inès montre tout, abonnés compris ; Léa suit ses réglages.
 const publicMemberOf = (id, leaSettings) => {
+  // R14 : les pages publiques à 1, 3 et 5 projets (déclarées plus bas, lues à la requête).
+  if (publicMosaicMembers.has(id)) return publicMosaicMembers.get(id)
   if (id === ines.id) {
     return {
       id: ines.id,
@@ -2527,6 +2529,89 @@ const withExamples = (examples, handler) => {
       }),
     )
 }
+
+// R14, « Les projets d'un membre » : la mosaïque de la page d'un membre (une grande carte, puis des
+// compactes), à 1, 2, 3, 4 et 5 projets, pour voir chaque forme de rangée sans case vide. Les
+// projets sont ceux de Tante Odile (`odileMemberPage`, 4 projets, page `membre-mosaique`), plus un
+// cinquième ; chaque nombre a sa propre page de membre (`odile-<n>-id`), copie de la sienne : une
+// page, une réponse, sans option de plus à `fakeApi`.
+// « Biscotte au parc » reçoit une photo verticale (`portraitCover`) différente de la première photo
+// de la galerie (`cover`) : un dégradé magenta, haut, contre le rouge des autres. La mosaïque doit
+// montrer `cover` à toutes les largeurs (la photo qui grandit jusqu'à la page du projet) : un
+// rectangle magenta sur une carte de la page d'un membre serait la photo fausse.
+const portraitOnlyPhoto = photo('44444444-4444-4444-8444-444444444444', 900, 1600)
+const mosaicProjects = [
+  { ...odileMemberPage.projects[0], portraitCover: portraitOnlyPhoto },
+  ...odileMemberPage.projects.slice(1),
+  // Le cinquième : testable, avec une démo et une photo d'une autre couleur (le vert de la
+  // deuxième photo du projet aux photos de Léa).
+  {
+    ...odileMemberPage.projects[3],
+    id: '6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1f90',
+    title: 'Le minuteur des confitures',
+    pitch: 'Il dit quand la confiture nappe la cuillère, selon le fruit et le sucre.',
+    status: 'testable',
+    primaryCategory: 'cooking',
+    cover: projectWithPhotos.visuals[1],
+    demoUrl: 'https://confitures.example.com',
+    reactionTotal: 3,
+  },
+]
+// R14, « toutes les pastilles » : un projet privé (« Privé »), d'un compte d'exemples
+// (« Exemple »), mis à jour il y a six jours (« Mis à jour · v1.3 »), testable (« Tester »), à
+// trois chiffres de réactions (248) : tout ce que la vitre d'une carte peut porter à la fois, sur la
+// grande carte et sur les deux compactes, avec et sans photo. La vraie API ne donne un projet privé
+// qu'à son auteur : ici, c'est une scène de mise en page, pas une histoire de droits.
+const allBadges = (project, fields) => ({
+  ...project,
+  author: { ...project.author, example: true },
+  visibility: 'private',
+  hive: null,
+  status: 'testable',
+  demoUrl: 'https://exemple.example.com',
+  latestUpdate: recentUpdate,
+  version: 'v1.3',
+  reactionTotal: 248,
+  ...fields,
+})
+const allBadgesProjects = [
+  allBadges(mosaicProjects[3], { id: '6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1f91' }),
+  allBadges(mosaicProjects[1], { id: '6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1f92', reactionTotal: 999 }),
+  allBadges(mosaicProjects[4], { id: '6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1f93', reactionTotal: 105 }),
+]
+/** La page de Tante Odile, copiée sous l'identifiant `odile-<clé>-id`, avec ces projets. */
+const mosaicMemberOf = (key, projects, fields = {}) => ({
+  ...odileMemberPage,
+  id: `odile-${key}-id`,
+  projects,
+  ...fields,
+})
+const mosaicMembers = new Map(
+  [
+    mosaicMemberOf('1', mosaicProjects.slice(0, 1)),
+    mosaicMemberOf('2', mosaicProjects.slice(0, 2)),
+    mosaicMemberOf('3', mosaicProjects.slice(0, 3)),
+    mosaicMemberOf('5', mosaicProjects),
+    mosaicMemberOf('pastilles', allBadgesProjects, { example: true }),
+  ].map((one) => [one.id, one]),
+)
+// R14 : la page d'Inès vue par un membre (`membre-exemple`) montre aussi ses projets, ceux de sa page
+// publique, en mosaïque (avant, elle n'en avait aucun et la page montrait l'état vide).
+const inesProjects = () => [summaryOf(webLaunchProject), croquettesCard]
+// R14 : la page publique d'un membre (le visiteur, `visiteur-membre-<n>`) à 1, 3 et 5 projets
+// (celle d'Inès en a 2) : les cartes de la vitrine, sous le nom de Tante Odile.
+const publicMosaicMembers = new Map(
+  [1, 3, 5].map((count) => [
+    `odile-public-${count}-id`,
+    {
+      id: `odile-public-${count}-id`,
+      name: odile.name,
+      avatarUrl: null,
+      bio: odileMemberPage.bio,
+      projects: publicPool.slice(0, count).map(publicCardOf),
+    },
+  ]),
+)
 
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
@@ -3231,9 +3316,13 @@ const fakeApi = (
       return json(200, blockedMemberPage(blocked.get(member[1])))
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
-    if (pathname === `/v1/members/${ines.id}`) return json(200, inesMember)
-    // R10 : Tante Odile, ses projets en tuiles (dont deux réservés à Famille).
+    if (pathname === `/v1/members/${ines.id}`) {
+      return json(200, { ...inesMember, projects: inesProjects() })
+    }
+    // R10 : Tante Odile, ses projets (dont deux réservés à Famille) ; en mosaïque depuis R14.
     if (pathname === `/v1/members/${odileMemberPage.id}`) return json(200, odileMemberPage)
+    // R14 : ses copies à 1, 2, 3 et 5 projets, et celle de « toutes les pastilles ».
+    if (member && mosaicMembers.has(member[1])) return json(200, mosaicMembers.get(member[1]))
     // Tranche 7c : Sam, auteur du commentaire signalé de la file, et Karim, déjà suspendu. Leur
     // page dit à un administrateur seul où en est la modération (`Member.moderation`) ; la page
     // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
@@ -4990,7 +5079,21 @@ const pages = [
     notifications: 'hives',
     fullPage: true,
   },
-  { name: 'membre-tuiles', path: `/members/${odileMemberPage.id}`, signedIn: true, fullPage: true },
+  // R14 : la page de Tante Odile en mosaïque (avant R14, `membre-tuiles` : des tuiles), à 4 projets ;
+  // puis la mosaïque à 1, 2, 3 et 5 projets, et « toutes les pastilles » (privé, exemple, mis à
+  // jour, 248 réactions) sur la grande carte et les compactes.
+  {
+    name: 'membre-mosaique',
+    path: `/members/${odileMemberPage.id}`,
+    signedIn: true,
+    fullPage: true,
+  },
+  ...['1', '2', '3', '5', 'pastilles'].map((key) => ({
+    name: `membre-mosaique-${key}`,
+    path: `/members/odile-${key}-id`,
+    signedIn: true,
+    fullPage: true,
+  })),
   // R10 : l'onglet Projets vu par l'animatrice (Léa anime Famille), le « … » de la première tuile
   // ouvert (« Retirer l'épingle » sur le projet épinglé, « Épingler » ailleurs) ; et la feuille
   // « Partager » d'un projet réservé à Famille.
@@ -5030,6 +5133,13 @@ const pages = [
     fullPage: true,
   },
   { name: 'visiteur-membre', path: `/fr/members/${ines.id}`, signedIn: false, fullPage: true },
+  // R14 : la mosaïque de la page publique d'un membre à 1, 3 et 5 projets (Inès en a 2).
+  ...[1, 3, 5].map((count) => ({
+    name: `visiteur-membre-${count}`,
+    path: `/fr/members/odile-public-${count}-id`,
+    signedIn: false,
+    fullPage: true,
+  })),
   // R12b, « Les exemples » : Inès devient un compte d'exemples (`examples: true`). La pastille
   // « Exemple » sur les cartes de la vitrine, d'« À la une » et du Fil ; la pastille et la phrase
   // « Projet fictif… » sur la page d'un de ses projets et sur sa page, pour un visiteur comme pour

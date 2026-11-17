@@ -42,9 +42,29 @@
 // « Exemple » juste après son statut, dans la rangée du bas. Comme le statut, elle est hors du lien
 // de la carte : un lecteur d'écran la lit à son tour, sur le web comme sur téléphone (un lien de
 // téléphone ne se lit que par son nom et son indice, jamais par les textes qu'il contient).
+//
+// R14 (« Les projets d'un membre ») : deux tailles et un auteur facultatif.
+// - `size="compact"`, la petite carte de la mosaïque d'un membre (`ProjectMosaic`) : moins haute
+//   (`PROJECT_CARD_COMPACT_HEIGHT`, deux compactes empilées font une grande), un verre plus serré,
+//   le titre, le statut, les pastilles et les réactions. Ni catégorie, ni « Tester », ni la ligne
+//   d'une mise à jour (son repère seul, dans la rangée du bas) ; l'accroche, sur deux lignes,
+//   seulement sans photo (sur la lumière miel, elle remplit la carte ; sur une photo, elle la
+//   cacherait). La carte grandit avec le texte agrandi : sa hauteur est un minimum.
+// - sans `author` (on est sur la page du membre : son nom n'a pas à revenir sur chaque carte), ni
+//   rangée de l'auteur ni sa place dans le verre.
+// Dans une case de la mosaïque (`CardStretchContext`), la carte s'étire à la hauteur de la case :
+// les cartes d'une rangée prennent la hauteur de la plus haute.
 import { layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
-import { type ReactNode, type Ref, useId, useState } from 'react'
+import {
+  type ComponentProps,
+  createContext,
+  type ReactNode,
+  type Ref,
+  useContext,
+  useId,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -71,6 +91,27 @@ import { UpdateFamilyBadge } from './UpdateFamilyBadge'
 /** La hauteur d'une carte du fil, en points (le squelette du fil prend la même : `Skeleton`). */
 export const PROJECT_CARD_HEIGHT = 476
 
+/** R14 : l'écart entre deux cartes d'une mosaïque (`ProjectMosaic`), en rangée comme en colonne. */
+export const PROJECT_CARD_GAP = space.lg
+
+/**
+ * R14 : la hauteur d'une carte compacte (230 points). Deux compactes empilées, avec l'écart entre
+ * elles, ont exactement la hauteur d'une grande carte : le bloc d'en tête de la mosaïque (la grande
+ * carte, deux compactes à côté) tombe juste, sans vide sous l'une ou l'autre colonne.
+ */
+export const PROJECT_CARD_COMPACT_HEIGHT = (PROJECT_CARD_HEIGHT - PROJECT_CARD_GAP) / 2
+
+/**
+ * R14 : vrai dans une case qui étire sa carte à sa propre hauteur (une case de `ProjectMosaic`, qui
+ * prend la hauteur de la plus haute carte de sa rangée). Un contexte React transmet une valeur à
+ * tous les composants posés dessous, sans la passer de props en props : l'écran qui dessine la carte
+ * (`SummaryCard`) n'a rien à savoir. Ailleurs (le fil), la carte garde sa hauteur.
+ */
+export const CardStretchContext = createContext(false)
+
+/** Les deux tailles de la carte : celle du fil (`full`) et la petite de la mosaïque (`compact`). */
+export type ProjectCardSize = 'full' | 'compact'
+
 /**
  * Ce que la carte montre d'une mise à jour (R7a), des textes déjà prêts (`SummaryCard`) :
  * - `full` (« Abonnements ») : `label` (« Mis à jour · v1.2 ») à la place de la date de l'auteur,
@@ -93,16 +134,20 @@ export type ProjectCardUpdate =
 type Props = {
   title: string
   pitch: string
-  /** L'auteur ; avec `onPress`, son nom et sa photo mènent à sa page (un lien à part). */
-  author: { name: string; avatar: ImageSource | null; onPress?: () => void }
+  /**
+   * L'auteur ; avec `onPress`, son nom et sa photo mènent à sa page (un lien à part). Absent (R14,
+   * la page du membre lui-même) : ni rangée de l'auteur, ni date, ni place gardée dans le verre.
+   */
+  author?: { name: string; avatar: ImageSource | null; onPress?: () => void } | undefined
   /** La photo de couverture ; sans elle, la lumière miel. */
   image?: CoverImage | null
   /**
    * Quand : un texte (« 12 oct. ») ou un nœud déjà prêt, `RelativeTime` dans le fil. Sur le web,
    * `RelativeTime` est une vue (un texte et sa version complète, cachée à l'œil) : il se pose ici,
-   * à côté des autres textes, jamais dans un texte.
+   * à côté des autres textes, jamais dans un texte. Elle se lit dans la rangée de l'auteur : sans
+   * auteur, rien.
    */
-  when: ReactNode
+  when?: ReactNode
   status: { label: string; strong: boolean }
   /**
    * « Tester ↗ », s'il y a une démo : un lien vers un site externe, posé à côté du lien de la carte
@@ -123,8 +168,19 @@ type Props = {
   reactionTotal?: number
   /** Toute la carte devient un lien vers le projet ; son nom est le titre du projet. */
   onPress?: () => void
-  /** La hauteur de la carte ; elle grandit si le texte agrandi ne tient pas dedans. */
+  /**
+   * La hauteur de la carte ; elle grandit si le texte agrandi ne tient pas dedans. Par défaut, celle
+   * de sa taille (`PROJECT_CARD_HEIGHT`, `PROJECT_CARD_COMPACT_HEIGHT`).
+   */
   height?: number
+  /** R14 : la grande carte du fil (par défaut) ou la petite de la mosaïque d'un membre. */
+  size?: ProjectCardSize
+  /**
+   * R14 : le style animé du rebond de la carte au Retour du navigateur (`bounceStyle` de
+   * `useCoverSource`), posé sur une vue à lui : l'enfoncement et l'inclinaison gardent chacun la
+   * leur (un même style animé ne garderait qu'une transformation).
+   */
+  bounceStyle?: ComponentProps<typeof Animated.View>['style']
   /**
    * Un contrôle posé sur la photo, en haut à gauche (`FollowButton variant="chip"`). Il est rendu à
    * côté du lien de la carte, pas dedans : un bouton dans un lien serait ambigu pour les lecteurs
@@ -150,9 +206,13 @@ type Props = {
   now?: Date
 }
 
-/** La marge entre le bord de la carte et le verre, puis celle du verre autour de son contenu. */
+/**
+ * La marge entre le bord de la carte et le verre, puis celle du verre autour de son contenu ; plus
+ * serrée sur la carte compacte, qui ne fait que 136 points de large à 320 (deux par rangée).
+ */
 const INSET = space.sm
 const PANEL_PADDING = space.lg
+const COMPACT_PANEL_PADDING = space.md
 /** L'écart entre les rangées du verre (`gap` du panneau). */
 const ROW_GAP = space.sm
 
@@ -219,9 +279,11 @@ export function ProjectCard({
   example = false,
   reactionTotal = 0,
   onPress,
-  height = PROJECT_CARD_HEIGHT,
+  height: givenHeight,
+  size = 'full',
+  bounceStyle,
   overlay,
-  category,
+  category: givenCategory,
   coverRef,
   updated,
   now,
@@ -229,6 +291,14 @@ export function ProjectCard({
   const { t } = useTranslation()
   const { colors } = useTheme()
   const web = Platform.OS === 'web'
+  const compact = size === 'compact'
+  const height = givenHeight ?? (compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
+  const panelPadding = compact ? COMPACT_PANEL_PADDING : PANEL_PADDING
+  // R14 : la carte compacte ne montre ni la catégorie ni « Tester » (la page du projet les a) ;
+  // le reste du dessin les ignore donc comme s'ils étaient absents.
+  const category = compact ? undefined : givenCategory
+  // Dans une case de la mosaïque, chaque étage de la carte grandit jusqu'à la hauteur de la case.
+  const grow = useContext(CardStretchContext) ? ({ flexGrow: 1 } as const) : null
   const [measures, measure] = useMeasures(height)
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
   // carte juste à côté) n'ouvre pas une deuxième page.
@@ -243,8 +313,9 @@ export function ProjectCard({
         onPress()
       })
     : undefined
-  const openAuthor = author.onPress ? guard(author.onPress) : undefined
-  const test = tryIt?.onPress ? guard(tryIt.onPress) : undefined
+  const openAuthor = author?.onPress ? guard(author.onPress) : undefined
+  const shownTryIt = compact ? undefined : tryIt
+  const test = shownTryIt?.onPress ? guard(shownTryIt.onPress) : undefined
   // L'accroche décrit le lien de la carte sur le web (lue après son nom) : useId donne le même
   // identifiant au pré-rendu et dans le navigateur.
   const pitchId = useId()
@@ -256,8 +327,14 @@ export function ProjectCard({
     ? t(($) => $.card.category, { category: category.label })
     : null
   // R7a : la mise à jour entière (`full`) remplace l'accroche ; recopiée dans une constante, que
-  // TypeScript garde rétrécie jusque dans le dessin.
-  const change = updated?.kind === 'full' ? updated : null
+  // TypeScript garde rétrécie jusque dans le dessin. R14 : la carte compacte n'en garde que le
+  // repère (voir `mark`).
+  const change = !compact && updated?.kind === 'full' ? updated : null
+  // Le repère « Mis à jour » posé dans la rangée du bas, à côté du statut : celui d'une `badge`, et
+  // celui d'une `full` qui n'a pas de rangée de l'auteur où se poser (carte compacte ou sans auteur).
+  const mark = updated && !(change && author) ? updated.label : null
+  // R14 : sur une carte compacte avec photo, pas d'accroche (elle couvrirait la photo).
+  const showPitch = !compact || !image
   // Sa ligne décrit le lien à la place de l'accroche, avec sa famille (« Nouveau : Un compte à
   // rebours… »), puis « et 2 autres changements » : la pastille de famille ne la dit qu'en couleur.
   const changeId = useId()
@@ -275,7 +352,10 @@ export function ProjectCard({
   // Ce qui décrit le lien : sur le web, les textes que désigne `aria-describedby` (le navigateur
   // les lit à la suite) ; sur téléphone, l'indice du lien. L'accroche, elle, est déjà un texte de
   // la carte (son `nativeID`) : l'indice du téléphone ne la reprend pas, comme avant R7a.
-  const describedIds = [change ? changeId : pitchId, categoryDescription ? categoryId : null]
+  const describedIds = [
+    change ? changeId : showPitch ? pitchId : null,
+    categoryDescription ? categoryId : null,
+  ]
     .filter(Boolean)
     .join(' ')
   const hint = [changeDescription, categoryDescription].filter(Boolean).join('. ')
@@ -301,7 +381,7 @@ export function ProjectCard({
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
 
   // Les bords des rangées posées sur le verre : ceux du contenu du verre.
-  const edge = INSET + PANEL_PADDING
+  const edge = INSET + panelPadding
   // La rangée de l'auteur se pose au-dessus du titre, qui est mesuré : elle attend sa mesure
   // (invisible le temps d'un rendu) pour ne jamais se dessiner sur le titre.
   const authorBottom = edge + measures.bottom + ROW_GAP + (measures.title ?? 0) + ROW_GAP
@@ -317,6 +397,7 @@ export function ProjectCard({
         // Le verre ne monte jamais sous la colonne du haut (catégorie, « Suivre ») : à texte
         // agrandi sur une carte basse, la carte grandit plutôt (relecture de design R3, C2).
         paddingTop: INSET + (topColumn && measures.top > 0 ? measures.top + ROW_GAP : 0),
+        ...grow,
       }}
     >
       {/* La photo remplit la carte, même agrandie par le texte. Elle décore : le lien porte déjà
@@ -346,23 +427,28 @@ export function ProjectCard({
           />
         </View>
       ) : null}
-      <Surface variant="panel" padding="lg" gap="sm">
-        {/* La place de la rangée de l'auteur, posée par-dessus. */}
-        <View style={{ height: measures.author }} />
+      <Surface variant="panel" padding={compact ? 'md' : 'lg'} gap="sm">
+        {/* La place de la rangée de l'auteur, posée par-dessus ; sans auteur, aucune. */}
+        {author ? <View style={{ height: measures.author }} /> : null}
         <View onLayout={measure('title')} style={{ gap: ROW_GAP }}>
           {/* Sans photo, la catégorie se pose au-dessus du titre (mesurée avec lui : la rangée de
               l'auteur reste au-dessus d'elle). */}
           {hasPhoto ? null : categoryTag}
-          <Text variant="title3" numberOfLines={2}>
+          {/* Le titre de la compacte, plus petit (celui des petites cartes, `TesterCard`) : à 390
+              points, une compacte n'a que 110 points de texte, où le titre du fil se coupait au
+              milieu d'un mot (« Décollage » / « ! », essai du catalogue). Trois lignes : sans
+              accroche, le titre est le seul texte qui nomme une compacte avec photo, et deux
+              lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
+          <Text variant={compact ? 'headline' : 'title3'} numberOfLines={compact ? 3 : 2}>
             {title}
           </Text>
           {change ? (
             <UpdateChange line={change.line} more={change.more} />
-          ) : (
+          ) : showPitch ? (
             <Text variant="callout" tone="secondary" numberOfLines={2} nativeID={pitchId}>
               {pitch}
             </Text>
-          )}
+          ) : null}
         </View>
         {/* La place de la rangée du bas (« Tester », statut, total), posée par-dessus. */}
         <View style={{ height: measures.bottom }} />
@@ -387,7 +473,7 @@ export function ProjectCard({
       onPressOut={() => {
         scale.value = spring(1)
       }}
-      style={{ borderRadius: radii.sheet }}
+      style={{ borderRadius: radii.sheet, ...grow }}
     >
       {body}
     </Pressable>
@@ -395,8 +481,8 @@ export function ProjectCard({
     body
   )
 
-  // --- La rangée de l'auteur ------------------------------------------------------------------
-  const who = (
+  // --- La rangée de l'auteur (sans auteur, aucune) --------------------------------------------
+  const who = author ? (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
       <Avatar name={author.name} source={author.avatar} label={author.name} size={28} />
       <View style={{ flexShrink: 1, minWidth: 0 }}>
@@ -405,8 +491,8 @@ export function ProjectCard({
         </Text>
       </View>
     </View>
-  )
-  const authorRow = (
+  ) : null
+  const authorRow = author ? (
     <View
       onLayout={measure('author')}
       // box-none : la rangée laisse passer le doigt hors de ses liens, vers la carte dessous. En
@@ -448,7 +534,7 @@ export function ProjectCard({
         )}
       </View>
     </View>
-  )
+  ) : null
 
   // --- Le total des réactions -----------------------------------------------------------------
   const reactionsLabel = t(($) => $.card.reactions, { count: reactionTotal })
@@ -498,8 +584,8 @@ export function ProjectCard({
   // La pastille miel commune (`TestLink`), à la hauteur d'une zone à toucher (`compact`) comme sur
   // la planche du fil. Son nom lu, « Tester Carnet de cafés » (plusieurs cartes, plusieurs
   // « Tester »), et son avertissement de site externe viennent d'elle.
-  const tester = tryIt ? (
-    <TestLink title={title} label={tryIt.label} onPress={test} size="compact" />
+  const tester = shownTryIt ? (
+    <TestLink title={title} label={shownTryIt.label} onPress={test} size="compact" />
   ) : null
 
   // --- La rangée du bas : « Tester », le statut, la pastille, le total -------------------------
@@ -536,9 +622,11 @@ export function ProjectCard({
           <StatusPill label={badge} />
         </View>
       ) : null}
-      {updated?.kind === 'badge' ? (
+      {/* R14 : la carte compacte, ou sans auteur, y pose aussi le repère d'une mise à jour entière
+          (sa ligne et « et 2 autres » restent à la page du projet). */}
+      {mark ? (
         <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
-          <StatusPill label={updated.label} />
+          <StatusPill label={mark} />
         </View>
       ) : null}
       {total ? (
@@ -556,67 +644,73 @@ export function ProjectCard({
     // l'auteur, la carte, « Tester », puis l'emplacement (« Suivre Nora »).
     // Autour, la vue qui s'incline sous la souris (sur ordinateur) : une vue à part, car
     // l'enfoncement et l'inclinaison sont deux transformations animées, et un même style animé
-    // n'en garderait qu'une.
-    <Animated.View {...tilt.handlers} style={[{ alignSelf: 'stretch' }, tilt.cardStyle]}>
-      <Animated.View style={[{ alignSelf: 'stretch' }, pressStyle]}>
-        {/* La rangée de l'auteur vient avant le lien dans l'arbre, mais se dessine au-dessus de lui
-          (zIndex). box-none : le calque laisse passer le doigt hors de la rangée. */}
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: 'absolute',
-            left: edge,
-            right: edge,
-            bottom: authorBottom,
-            zIndex: 1,
-            opacity: measures.title === null ? 0 : 1,
-          }}
-        >
-          {authorRow}
-        </View>
-        {cardLayer}
-        <View
-          pointerEvents="box-none"
-          style={{ position: 'absolute', left: edge, right: edge, bottom: edge, zIndex: 1 }}
-        >
-          {bottomRow}
-        </View>
-        {topColumn ? (
-          // La colonne du haut de la photo : la catégorie, puis l'emplacement dessous (« Suivre
-          // Nora »). box-none : la colonne laisse passer le doigt hors du contrôle, vers la carte
-          // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
+    // n'en garderait qu'une. R14 : tout autour, celle du rebond au Retour du navigateur, pour la
+    // même raison ; toujours là, même sans rebond, pour que l'arbre garde sa forme (une vue ajoutée
+    // en route remonterait la carte, et le lien perdrait son focus).
+    <Animated.View style={[{ alignSelf: 'stretch' }, grow, bounceStyle]}>
+      <Animated.View {...tilt.handlers} style={[{ alignSelf: 'stretch' }, grow, tilt.cardStyle]}>
+        <Animated.View style={[{ alignSelf: 'stretch' }, grow, pressStyle]}>
+          {/* La rangée de l'auteur vient avant le lien dans l'arbre, mais se dessine au-dessus de
+            lui (zIndex). box-none : le calque laisse passer le doigt hors de la rangée. */}
+          {authorRow ? (
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                left: edge,
+                right: edge,
+                bottom: authorBottom,
+                zIndex: 1,
+                opacity: measures.title === null ? 0 : 1,
+              }}
+            >
+              {authorRow}
+            </View>
+          ) : null}
+          {cardLayer}
           <View
-            onLayout={measure('top')}
             pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              top: INSET,
-              left: INSET,
-              right: INSET,
-              zIndex: 1,
-              gap: space.xs,
-            }}
+            style={{ position: 'absolute', left: edge, right: edge, bottom: edge, zIndex: 1 }}
           >
-            {hasPhoto ? categoryTag : null}
-            {overlay}
+            {bottomRow}
           </View>
-        ) : null}
-        {changeDescription || categoryDescription ? (
-          // La description du lien, lue seulement par lui (`aria-describedby` lit aussi un texte
-          // caché) : cachée à l'œil et au parcours du lecteur d'écran, qui ne l'entend pas deux fois.
-          <View style={hiddenFrame} {...decorative}>
-            {changeDescription ? (
-              <Text variant="caption" nativeID={changeId}>
-                {changeDescription}
-              </Text>
-            ) : null}
-            {categoryDescription ? (
-              <Text variant="caption" nativeID={categoryId}>
-                {categoryDescription}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
+          {topColumn ? (
+            // La colonne du haut de la photo : la catégorie, puis l'emplacement dessous (« Suivre
+            // Nora »). box-none : la colonne laisse passer le doigt hors du contrôle, vers la carte
+            // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
+            <View
+              onLayout={measure('top')}
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                top: INSET,
+                left: INSET,
+                right: INSET,
+                zIndex: 1,
+                gap: space.xs,
+              }}
+            >
+              {hasPhoto ? categoryTag : null}
+              {overlay}
+            </View>
+          ) : null}
+          {changeDescription || categoryDescription ? (
+            // La description du lien, lue seulement par lui (`aria-describedby` lit aussi un texte
+            // caché) : cachée à l'œil et au parcours du lecteur d'écran, qui ne l'entend pas deux fois.
+            <View style={hiddenFrame} {...decorative}>
+              {changeDescription ? (
+                <Text variant="caption" nativeID={changeId}>
+                  {changeDescription}
+                </Text>
+              ) : null}
+              {categoryDescription ? (
+                <Text variant="caption" nativeID={categoryId}>
+                  {categoryDescription}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </Animated.View>
       </Animated.View>
     </Animated.View>
   )
