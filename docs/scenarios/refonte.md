@@ -4158,7 +4158,8 @@ premier écran (audit de design du 17/11, section 2). Louis a choisi un gabarit 
 
 ### Explorer
 
-- Étant donné Explorer sur un écran de 1 100 points et plus
+- Étant donné Explorer sur un écran de 1 536 points et plus (en dessous, Explorer reste celui
+  d'aujourd'hui : « Récents » sur trois colonnes à 1 280)
   Alors « Ils cherchent des testeurs » et « Outils populaires » passent dans un panneau à droite,
   en lignes ;
   Et « À la une » puis « Récents » prennent la colonne principale, « Récents » sur quatre à cinq
