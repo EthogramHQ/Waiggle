@@ -46,6 +46,14 @@ type Props = {
 const CONTENTS_WIDTH = 260
 
 /**
+ * La largeur du document sur ordinateur : le sommaire, l'écart, puis le texte à `readableWidth`.
+ * L'écran la donne à `Screen`, pour que son retour et son titre s'alignent sur le bloc (R15) ; sans
+ * le sommaire (`wide` faux), le texte seul, à `readableWidth`.
+ */
+export const legalDocumentWidth = (wide: boolean) =>
+  wide ? CONTENTS_WIDTH + space.xxxl + readableWidth : readableWidth
+
+/**
  * La partie lue est la dernière dont le titre est passé au-dessus de cette part de la fenêtre
  * (sous la barre fixe) : un titre qui arrive dans le premier tiers de l'écran est déjà « lu ».
  */
@@ -146,10 +154,16 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
     // Toute la colonne s'arrête à `readableWidth`, la borne des paragraphes du Markdown : le cadre
     // de l'« En bref » s'aligne sur le texte complet, et ses puces gardent une ligne confortable
     // (relecture de design de R11 : à 1440 px, un cadre de 988 px, des puces de 105 caractères).
+    // R15 (« Ce qui reste étroit ») : seule, la colonne est centrée dans la page. `width: '100%'`
+    // avant `maxWidth` : centrée sans largeur, une colonne prendrait celle de son texte le plus
+    // long ; ainsi elle remplit l'écran d'un téléphone comme avant, et s'arrête à `readableWidth`
+    // au milieu d'un écran plus large.
     <View
       style={[
         { gap: space.xxl, maxWidth: readableWidth },
-        wide ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } : { alignSelf: 'stretch' },
+        wide
+          ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }
+          : { width: '100%', alignSelf: 'center' },
       ]}
     >
       <VersionBadge label={t(($) => $.legal.version, { date: parisDay(version, i18n.language) })} />
@@ -189,8 +203,21 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
       ? ({ position: 'sticky', top: stickTop + space.lg } as unknown as ViewStyle)
       : null
 
+  // R15 (« Ce qui reste étroit ») : le sommaire et le texte forment un seul bloc, centré dans la
+  // page. Sa largeur ne dépend pas de l'écran : le sommaire, l'écart, puis le texte à
+  // `readableWidth` ; à 1 920 ou 2 560 points, il reste le même, au milieu. `width: '100%'` le
+  // laisse rétrécir dans une page plus étroite que lui (le texte cède alors sa place, comme avant).
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.xxxl }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: space.xxxl,
+        width: '100%',
+        maxWidth: legalDocumentWidth(true),
+        alignSelf: 'center',
+      }}
+    >
       <View
         role="navigation"
         aria-label={t(($) => $.legal.contents)}

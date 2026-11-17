@@ -37,6 +37,13 @@ type Props = {
   children: ReactNode
 }
 
+/**
+ * La largeur des Réglages sur ordinateur : la colonne des rubriques, l'écart, puis un formulaire.
+ * L'écran la donne à `Screen`, pour que son retour, son titre et la carte du compte s'alignent sur
+ * le bloc (R15).
+ */
+export const settingsColumnsWidth = layout.settingsNavWidth + space.xxl + layout.formWidth
+
 export function SettingsColumns({ nav, title, current, children }: Props) {
   const titleRef = useRef<View>(null)
   // useEffect sans dépendance qui change : une seule fois, à l'affichage de la page.
@@ -46,8 +53,21 @@ export function SettingsColumns({ nav, title, current, children }: Props) {
     focusWithoutScroll(titleRef.current)
   }, [current])
 
+  // R15 (« Ce qui reste étroit ») : la colonne et la rubrique forment un bloc de largeur fixe,
+  // centré dans la page au lieu d'être calé à gauche. Sa borne est la somme de ses parties (la
+  // colonne, l'écart, un formulaire) : à 1 920 ou 2 560 points, il ne s'élargit pas. `width:
+  // '100%'` lui fait remplir une page plus étroite, où la rubrique rétrécit comme avant.
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.xxl }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: space.xxl,
+        width: '100%',
+        maxWidth: settingsColumnsWidth,
+        alignSelf: 'center',
+      }}
+    >
       {/* La colonne : une carte blanche, de la largeur d'une colonne latérale. */}
       <View style={{ width: layout.settingsNavWidth, flexShrink: 0 }}>
         <Surface variant="grouped" padding="sm">

@@ -19,7 +19,7 @@ import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { languageOfPath, publicPath } from '../publicPath'
-import { LegalDocument } from '../ui/LegalDocument'
+import { LegalDocument, legalDocumentWidth } from '../ui/LegalDocument'
 import { LegalLinks } from '../ui/LegalLinks'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
@@ -48,7 +48,7 @@ export function LegalPageScreen({ page }: Props) {
   const openOutside = useOpenOutside()
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={doc.title} width="page">
+    <Screen header={<TopNav />} onBack={back} title={doc.title} width={legalDocumentWidth(wide)}>
       <Stack gap="xxl">
         <LegalDocument
           version={doc.version}

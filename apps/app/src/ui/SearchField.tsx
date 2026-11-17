@@ -94,8 +94,16 @@ export const usePill = (focused: boolean, grow: boolean) => {
     // Rétrécit dans une rangée au lieu de la pousser hors de l'écran (texte agrandi).
     flexShrink: 1,
     minWidth: 0,
-    ...(grow ? { flexGrow: 1, flexBasis: GROW_BASIS } : null),
+    // R15 (« Le gabarit large ») : la barre du haut suit l'écran ouvert, jusqu'à 1 920 points ; le
+    // champ qui y prend la place qui reste s'arrête à `searchFieldMax` (560). Au-delà, une pilule de
+    // 1 000 points laissait le texte d'attente seul à gauche d'une bande vide. Le plafond vit ici,
+    // dans la pilule commune : le champ et le lien (SearchLink) s'arrêtent au même point.
+    ...(grow ? { flexGrow: 1, flexBasis: GROW_BASIS, maxWidth: layout.searchFieldMax } : null),
     margin: borders.strong - width,
+    // Arrêté à 560, il laisse de la place dans la rangée : sa marge de droite « auto » la prend,
+    // et ce qui le suit (la cloche, la photo, « Publier ») reste au bord droit de la barre, comme
+    // quand le champ remplissait tout. Sans place de reste, elle vaut 0 : rien ne change.
+    ...(grow ? { marginRight: 'auto' as const } : null),
     paddingLeft: space.md,
     borderRadius: radii.pill,
     backgroundColor: colors.surface,

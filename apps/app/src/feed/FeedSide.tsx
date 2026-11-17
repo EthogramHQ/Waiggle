@@ -53,9 +53,10 @@ export function FeedSide({ withSuggestions, shownProjectIds }: Props) {
     <Stack gap="xxl" align="stretch">
       {/* R10 (F-Fil11) : ses ruches d'abord, puis les proches à suivre et les testeurs. */}
       <YourHives hives={mine.data?.hives ?? []} />
-      {/* stacked : la colonne n'a que 320 points ; en rangée, le nom n'y avait qu'une centaine de
-          points, et un nom long prenait trois lignes (relecture design A1). Empilée, la ligne pose
-          la photo et le nom, puis le projet, puis « Suivre » et « × ». */}
+      {/* stacked : la colonne est étroite (340 points depuis R15, le panneau) ; en rangée, le nom
+          n'y avait qu'une centaine de points, et un nom long prenait trois lignes (relecture
+          design A1). Empilée, la ligne pose la photo et le nom, puis le projet, puis « Suivre »
+          et « × ». */}
       {withSuggestions ? <PeopleToFollow max={SIDE_SUGGESTIONS} stacked /> : null}
       <Testers exclude={shownProjectIds} />
     </Stack>

@@ -76,6 +76,7 @@ import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { GridCardsContext } from './ProjectGrid'
 import { RelativeTime } from './RelativeTime'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
@@ -83,6 +84,7 @@ import { Tag } from './Tag'
 import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
+import { useLayout } from './theme/layout'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 import { useTilt } from './tilt'
@@ -173,7 +175,10 @@ type Props = {
    * de sa taille (`PROJECT_CARD_HEIGHT`, `PROJECT_CARD_COMPACT_HEIGHT`).
    */
   height?: number
-  /** R14 : la grande carte du fil (par défaut) ou la petite de la mosaïque d'un membre. */
+  /**
+   * R14 : la grande carte du fil (par défaut) ou la petite de la mosaïque d'un membre. R15 : sans
+   * elle, la compacte dans une grille de compactes (`GridCardsContext`) sur ordinateur.
+   */
   size?: ProjectCardSize
   /**
    * R14 : le style animé du rebond de la carte au Retour du navigateur (`bounceStyle` de
@@ -238,26 +243,25 @@ const decorative = {
 } as const
 
 /**
- * Les hauteurs mesurées : les deux rangées posées sur le verre, le titre, la carte entière, et la
- * colonne du haut de la photo (catégorie, « Suivre » ; 0 sans elle).
+ * Les hauteurs mesurées : les deux rangées posées sur le verre, le titre et la colonne du haut de la
+ * photo (catégorie, « Suivre » ; 0 sans elle). La carte entière ne l'est plus (R15 : sa couverture
+ * grandit avec elle, voir le corps).
  */
 type Measures = {
   author: number
   bottom: number
   title: number | null
-  card: number
   top: number
 }
 
 /** Hook : une mesure (`onLayout`) qui ne redessine que si la hauteur a changé. */
-const useMeasures = (height: number) => {
+const useMeasures = () => {
   // Avant toute mesure, les rangées valent une zone à toucher (leur hauteur au texte ordinaire) :
   // le verre a déjà la bonne forme au pré-rendu du web, et rien ne saute ensuite.
   const [measures, setMeasures] = useState<Measures>({
     author: layout.touchTarget,
     bottom: layout.touchTarget,
     title: null,
-    card: height,
     top: 0,
   })
   const measure = (key: keyof Measures) => (event: LayoutChangeEvent) => {
@@ -280,7 +284,7 @@ export function ProjectCard({
   reactionTotal = 0,
   onPress,
   height: givenHeight,
-  size = 'full',
+  size: givenSize,
   bounceStyle,
   overlay,
   category: givenCategory,
@@ -291,6 +295,16 @@ export function ProjectCard({
   const { t } = useTranslation()
   const { colors } = useTheme()
   const web = Platform.OS === 'web'
+  // R15 (planches R15-Membre-1920) : sur ordinateur, le titre d'une compacte en `heading` (22) ; sur
+  // téléphone et tablette, `headline` (18), où une compacte n'a que 110 à 230 points de texte.
+  const wide = useLayout().sizeClass === 'wide'
+  // Sans taille donnée, la grille décide (relecture de design de R15, planche R15-Explorer-1920) :
+  // sous `GridCardsContext` à `compact` (« Récents » d'Explorer), sur ordinateur, la compacte, et
+  // non la grande carte du Fil resserrée (470 points de haut : aucune rangée entière dans une
+  // fenêtre de 940). Sur téléphone et tablette, « Récents » garde ses grandes cartes, une ou deux
+  // par rangée, avec « Tester ».
+  const gridCards = useContext(GridCardsContext)
+  const size: ProjectCardSize = givenSize ?? (gridCards === 'compact' && wide ? 'compact' : 'full')
   const compact = size === 'compact'
   const height = givenHeight ?? (compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
   const panelPadding = compact ? COMPACT_PANEL_PADDING : PANEL_PADDING
@@ -298,8 +312,11 @@ export function ProjectCard({
   // le reste du dessin les ignore donc comme s'ils étaient absents.
   const category = compact ? undefined : givenCategory
   // Dans une case de la mosaïque, chaque étage de la carte grandit jusqu'à la hauteur de la case.
-  const grow = useContext(CardStretchContext) ? ({ flexGrow: 1 } as const) : null
-  const [measures, measure] = useMeasures(height)
+  // Une compacte choisie par sa grille aussi (R15) : les cartes d'une rangée de « Récents » ont la
+  // même hauteur, celle de la plus haute, au lieu de bas en escalier (un titre de trois lignes).
+  const stretched = useContext(CardStretchContext) || (compact && givenSize === undefined)
+  const grow = stretched ? ({ flexGrow: 1 } as const) : null
+  const [measures, measure] = useMeasures()
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
   // carte juste à côté) n'ouvre pas une deuxième page.
   const guard = useTapGuard()
@@ -389,7 +406,6 @@ export function ProjectCard({
   // --- Le calque du lien : la photo, le verre, le titre et l'accroche -------------------------
   const body = (
     <View
-      onLayout={measure('card')}
       style={{
         minHeight: height,
         justifyContent: 'flex-end',
@@ -400,10 +416,16 @@ export function ProjectCard({
         ...grow,
       }}
     >
-      {/* La photo remplit la carte, même agrandie par le texte. Elle décore : le lien porte déjà
-          le nom du projet. */}
+      {/* La photo remplit la carte, même agrandie par le texte ou étirée dans sa rangée. Elle
+          décore : le lien porte déjà le nom du projet.
+          R15 : sa hauteur n'est plus mesurée. Elle part de la hauteur minimale de la carte et
+          grandit (`grow`) jusqu'au bas du cadre posé sur toute la carte. Une hauteur mesurée par
+          `onLayout` restait périmée sur le web : react-native-web ne remesure une vue que si sa
+          boîte de contenu change (un `ResizeObserver`, qui ignore les marges intérieures), et la
+          carte grandit justement par sa marge du haut quand la colonne de « Suivre » arrive. Dans
+          « Récents », la photo s'arrêtait 52 points au-dessus du bas de la carte. */}
       <View ref={coverRef} style={{ position: 'absolute', inset: 0 }} {...decorative}>
-        <ProjectCover height={measures.card} image={image ?? null} shadow="card" />
+        <ProjectCover height={height} grow image={image ?? null} shadow="card" />
       </View>
       {tilt.active ? (
         // Le reflet qui suit la souris : une lueur blanche, rognée au rayon de la photo, posée
@@ -439,7 +461,10 @@ export function ProjectCard({
               milieu d'un mot (« Décollage » / « ! », essai du catalogue). Trois lignes : sans
               accroche, le titre est le seul texte qui nomme une compacte avec photo, et deux
               lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
-          <Text variant={compact ? 'headline' : 'title3'} numberOfLines={compact ? 3 : 2}>
+          <Text
+            variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
+            numberOfLines={compact ? 3 : 2}
+          >
             {title}
           </Text>
           {change ? (

@@ -184,7 +184,10 @@ function ShowcaseHome({ items, member }: ShowcaseHomeProps) {
   )
 
   return (
-    <Screen width="page" header={header}>
+    // R15 : le gabarit large, comme le Fil : sur un grand écran, les quatre cartes de la vitrine
+    // se partagent presque toute la fenêtre (1 728 points à 1 920) au lieu de 1 280, et la barre du
+    // haut d'un membre a la même largeur ici et sur son Fil. Sous 1 280 points, rien ne change.
+    <Screen width="wide" header={header}>
       {/* L'accroche est le titre de la page, en affiche : plus grande sur ordinateur. */}
       <Text variant={compact ? 'title1' : 'poster'} heading={1}>
         {t(($) => $.home.tagline)}

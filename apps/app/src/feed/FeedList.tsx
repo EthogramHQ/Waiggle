@@ -93,7 +93,9 @@ export function DiscoverFeed({
     feed.isError ? (
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} section={errorMessage} />
     ) : (
-      <SkeletonList count={3} />
+      // La forme des cartes qui arrivent, dans leurs colonnes (R15) : celle du Fil, ou la compacte
+      // dans « Récents » sur ordinateur (le squelette lit la grille, comme la carte).
+      <SkeletonList count={3} shape="feed" />
     )
   ) : (
     <FeedList
@@ -173,8 +175,8 @@ type FeedListProps = {
   news?: ReactNode
   /** Ce qui se pose sur la photo de la carte d'un projet. */
   overlay?: ((project: ProjectSummary) => ReactNode) | undefined
-  /** Le nombre de colonnes de la grille, imposé par l'écran (voir ProjectGrid). */
-  columns?: number | undefined
+  // R15 : plus de nombre de colonnes imposé par l'écran. La grille (ui/ProjectGrid) compte seule
+  // ses colonnes d'après la largeur de la colonne où la liste est posée (relecture du plan R15, C2).
 } & (
   | {
       /** Le message d'un fil vide (Explorer, sans « Tu es à jour »). */
@@ -237,7 +239,6 @@ export function FeedList({
   emptyAction,
   overlay,
   upToDate,
-  columns,
 }: FeedListProps) {
   const { t } = useTranslation()
   // La lumière suit la carte du milieu de l'écran (R4). Ce hook s'appelle ici, dans un enfant de
@@ -303,17 +304,17 @@ export function FeedList({
         // vide n'est pas dessinée (elle dirait « rien de neuf » au-dessus de « Tu es à jour ») ; un
         // fil vide finit donc sur la sphère seule.
         <>
-          {segment(items.slice(0, sphereAt ?? items.length), cardOf, columns)}
+          {segment(items.slice(0, sphereAt ?? items.length), cardOf)}
           {sphereAt !== null ? (
             <UpToDate
               onExplore={upToDate.onExplore}
               {...(upToDate.hideMascot ? { hideMascot: true } : null)}
             />
           ) : null}
-          {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
+          {sphereAt !== null ? segment(items.slice(sphereAt), cardOf) : null}
         </>
       ) : (
-        <ProjectGrid empty={empty} emptyAction={emptyAction} {...(columns ? { columns } : null)}>
+        <ProjectGrid empty={empty} emptyAction={emptyAction}>
           {items.map(cardOf)}
         </ProjectGrid>
       )}
@@ -335,13 +336,9 @@ export function FeedList({
 }
 
 /** Une des deux grilles autour de « Tu es à jour » ; rien quand elle n'a aucun élément. */
-function segment(
-  items: FeedItem[],
-  cardOf: (item: FeedItem) => ReactNode,
-  columns: number | undefined,
-) {
+function segment(items: FeedItem[], cardOf: (item: FeedItem) => ReactNode) {
   if (items.length === 0) return null
-  return <ProjectGrid {...(columns ? { columns } : null)}>{items.map(cardOf)}</ProjectGrid>
+  return <ProjectGrid>{items.map(cardOf)}</ProjectGrid>
 }
 
 type FeedErrorProps = {

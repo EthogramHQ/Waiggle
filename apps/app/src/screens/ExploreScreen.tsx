@@ -10,6 +10,13 @@
 //   suit pas porte la pastille « Suivre Nora ». R6b : sous son titre, une rangée de pastilles
 //   (« Toutes », puis chaque catégorie qui a des projets) le filtre ; le filtre vit dans l'adresse
 //   (`/explore?category=animals`), pour qu'on puisse la partager ou y revenir.
+//
+// R15 (« L'ordinateur en grand », planche R15-Explorer-1920) : la page prend le gabarit large
+// (`Screen width="wide"`). Dès `breakpoints.xwide` (1 536 points), deux colonnes : à gauche « À la
+// une » et « Récents » ; à droite, un
+// panneau qui reste en place au défilement, avec « Ils cherchent des testeurs » et « Outils
+// populaires » en lignes, lu après « Récents » (comme le panneau du Fil). En dessous, la page
+// d'avant, sections l'une sous l'autre ; sur téléphone, celle de R12.
 import { CategoryCode, type ProjectSummary } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
@@ -27,17 +34,23 @@ import { TopNav } from '../navigation/TopNav'
 import { useMemberShowcase } from '../showcase/api'
 import { useTools } from '../tools/api'
 import { Carousel } from '../ui/Carousel'
+import { Columns } from '../ui/Columns'
 import { FilterPills } from '../ui/FilterPills'
 import { FollowButton } from '../ui/FollowButton'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import { InitialTile, tileVariantOf } from '../ui/InitialTile'
+import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
+import { GridCardsContext } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { SearchLink } from '../ui/SearchLink'
 import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
+import { SidePanel } from '../ui/SidePanel'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { Tag } from '../ui/Tag'
 import { TesterCard } from '../ui/TesterCard'
+import { TesterRow } from '../ui/TesterRow'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
@@ -48,9 +61,17 @@ import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 /** Le nombre d'outils de « Outils populaires » : les autres sont dans « Tous les outils ». */
 const POPULAR_TOOLS = 10
 
+/**
+ * R15 : dans le panneau, moins de lignes que dans les carrousels (planche R15-Explorer-1920 :
+ * quatre projets, six outils). Le panneau reste en place au défilement seulement s'il tient dans la
+ * fenêtre : à 1 920 × 1 080, les dix outils l'en empêcheraient.
+ */
+const PANEL_TESTERS = 4
+const PANEL_TOOLS = 6
+
 export function ExploreScreen() {
   const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="wide" />
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen />
@@ -60,7 +81,12 @@ export function ExploreScreen() {
 function MemberExplore({ userId }: { userId: string }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const compact = useLayout().sizeClass === 'compact'
+  const { sizeClass, xwide } = useLayout()
+  const compact = sizeClass === 'compact'
+  // R15 : le panneau dès 1 536 points. `useLayout` donne une largeur de 0 tant que la page web n'est
+  // pas hydratée (`useHydrated`) : la page pré-rendue, qui ne connaît pas la fenêtre, est donc celle
+  // sans panneau, et le premier affichage du navigateur la reprend sans écart.
+  const withPanel = xwide
   // Les abonnements faits ou défaits ici, auteur par auteur, depuis l'ouverture de la page. Ils
   // l'emportent sur ce que dit le fil : après « Suivre Nora », le fil relu dit que Nora est suivie,
   // et sa pastille doit rester là, « Tu suis Nora », sous le doigt qui vient de la toucher (et
@@ -95,9 +121,19 @@ function MemberExplore({ userId }: { userId: string }) {
     )
   }
 
+  // « Récents » : sa grille compte ses colonnes d'après la largeur que lui donne sa colonne
+  // (`ui/ProjectGrid`).
+  // Les cartes de « Récents » comptent avec la largeur d'une compacte (R15) : quatre à cinq colonnes
+  // à côté du panneau, là où le Fil, plus bas dans l'appli, garde ses grandes cartes.
+  const recent = (
+    <GridCardsContext.Provider value="compact">
+      <Recent viewerId={userId} overlay={chipOf} />
+    </GridCardsContext.Provider>
+  )
+
   return (
     <Screen
-      width="page"
+      width="wide"
       header={<TopNav />}
       title={t(($) => $.explore.title)}
       // « Moins de mots » (16/11/2026) : l'onglet Explorer allumé dit déjà où l'on est ; le titre
@@ -117,10 +153,33 @@ function MemberExplore({ userId }: { userId: string }) {
           }}
         />
       ) : null}
-      <Featured />
-      <Testers />
-      <PopularTools />
-      <Recent viewerId={userId} overlay={chipOf} />
+      {withPanel ? (
+        // Le panneau à droite, lu après « Récents » (comme celui du Fil) ; il reste en place au
+        // défilement (`sticky`) ; plus haut que la fenêtre, une fois son pied atteint.
+        <Columns
+          sideWidth="panel"
+          sticky
+          main={
+            <Stack gap="xl">
+              <Featured />
+              {recent}
+            </Stack>
+          }
+          side={
+            <SidePanel>
+              <Testers rows />
+              <PopularTools rows />
+            </SidePanel>
+          }
+        />
+      ) : (
+        <>
+          <Featured />
+          <Testers />
+          <PopularTools />
+          {recent}
+        </>
+      )}
     </Screen>
   )
 }
@@ -330,8 +389,12 @@ function Featured() {
  * « Ils cherchent des testeurs » : la première page des projets testables, en carrousel. Seule la
  * première page : le carrousel ne demande jamais la suite (relecture juridique, jur-J7). Seuls les
  * projets qui ont une démo y entrent : « Tester » doit mener quelque part.
+ *
+ * `rows` (R15, le panneau des grands écrans) : les premiers en lignes (`TesterRow`), comme dans le
+ * panneau du Fil, au lieu du carrousel. Le chargement, la panne et l'absence de projet se disent de
+ * la même façon.
  */
-function Testers() {
+function Testers({ rows = false }: { rows?: boolean }) {
   const { t } = useTranslation()
   const router = useRouter()
   const openDemo = useOpenDemo()
@@ -374,6 +437,36 @@ function Testers() {
       </Stack>
     )
   }
+  const coverOf = (project: ProjectSummary) =>
+    project.cover
+      ? {
+          source: toSource(project.cover.url),
+          thumbhash: project.cover.thumbhash,
+          label: project.title,
+        }
+      : null
+  const openProject = (id: string) => router.push({ pathname: '/projects/[id]', params: { id } })
+  if (rows) {
+    return (
+      <Stack gap="md" align="stretch">
+        {title}
+        <ListGroup>
+          {projects.slice(0, PANEL_TESTERS).map(({ project, demoUrl }) => (
+            <TesterRow
+              key={project.id}
+              title={project.title}
+              author={project.author.name}
+              example={project.author.example === true}
+              image={coverOf(project)}
+              // La démo passe par la page d'avertissement des liens externes, comme sur la carte.
+              onTest={() => openDemo(demoUrl, project.id)}
+              onOpen={() => openProject(project.id)}
+            />
+          ))}
+        </ListGroup>
+      </Stack>
+    )
+  }
   return (
     <Carousel
       label={t(($) => $.explore.carousel)}
@@ -389,19 +482,11 @@ function Testers() {
           author={project.author.name}
           // R12b : « Exemple » sur un projet du compte d'exemples de l'équipe.
           example={project.author.example === true}
-          image={
-            project.cover
-              ? {
-                  source: toSource(project.cover.url),
-                  thumbhash: project.cover.thumbhash,
-                  label: project.title,
-                }
-              : null
-          }
+          image={coverOf(project)}
           // La démo passe par la page d'avertissement des liens externes (« Tu quittes… »).
           onTest={() => openDemo(demoUrl, project.id)}
-          // Le titre ouvre la page du projet (décision de Louis du 31/10/2026).
-          onOpen={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
+          // Le titre ouvre la page du projet (décision du 31/10/2026).
+          onOpen={() => openProject(project.id)}
         />
       ))}
     </Carousel>
@@ -412,23 +497,32 @@ function Testers() {
  * « Outils populaires » : les dix outils les plus cités par les projets publics (l'API les range du
  * plus cité au moins cité), avec leur nombre sur ordinateur, et le lien « Tous les outils ».
  * Sans outil (aucun projet public n'en cite), la section ne s'affiche pas.
+ *
+ * `rows` (R15, le panneau des grands écrans) : les six premiers en lignes, chacun avec sa tuile et
+ * son nombre de projets, menant à sa page ; « Tous les outils » passe sous la liste (la largeur du
+ * panneau ne le tient pas à côté du titre).
  */
-function PopularTools() {
+function PopularTools({ rows = false }: { rows?: boolean }) {
   const { t } = useTranslation()
   const router = useRouter()
   const compact = useLayout().sizeClass === 'compact'
   const tools = useTools()
-  const list = tools.data?.tools.slice(0, POPULAR_TOOLS) ?? []
+  const list = tools.data?.tools.slice(0, rows ? PANEL_TOOLS : POPULAR_TOOLS) ?? []
   const title = (
     <Text variant="heading" heading={2}>
       {t(($) => $.explore.popularTools)}
     </Text>
   )
-  const header = (
+  const allTools = (
+    <TextLink label={t(($) => $.explore.allTools)} onPress={() => router.push('/tools')} />
+  )
+  const header = rows ? (
+    title
+  ) : (
     // Le titre à gauche, « Tous les outils » au bout de la ligne ; à 200 %, le lien passe dessous.
     <Stack direction="row" gap="md" align="center" justify="between" wrap>
       {title}
-      <TextLink label={t(($) => $.explore.allTools)} onPress={() => router.push('/tools')} />
+      {allTools}
     </Stack>
   )
 
@@ -441,10 +535,42 @@ function PopularTools() {
           message={t(($) => $.explore.toolsError)}
           action={{ label: t(($) => $.common.retry), onPress: () => void tools.refetch() }}
         />
+        {rows ? allTools : null}
       </Stack>
     ) : null
   }
   if (list.length === 0) return null
+  if (rows) {
+    return (
+      <Stack gap="md" align="stretch">
+        {header}
+        <ListGroup>
+          {list.map((tool) => {
+            // « 41 projets » : un outil populaire est cité par au moins un projet.
+            const projects = t(($) => $.tools.projects, { count: tool.projectCount })
+            return (
+              <ListRow
+                key={tool.slug}
+                label={tool.name}
+                // Le nom d'un lien cache le texte qu'il contient : il dit aussi le nombre affiché.
+                spokenLabel={t(($) => $.tools.withCount, { label: tool.name, projects })}
+                leading={<InitialTile name={tool.name} variant={tileVariantOf(tool.slug)} />}
+                detail={projects}
+                detailRight
+                href={`/tags/${encodeURIComponent(tool.slug)}`}
+                onPress={(event) => {
+                  // Sur le web, le routeur ouvre la page sans que le navigateur la recharge.
+                  event?.preventDefault?.()
+                  router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } })
+                }}
+              />
+            )
+          })}
+        </ListGroup>
+        {allTools}
+      </Stack>
+    )
+  }
   return (
     <Carousel
       variant="chips"

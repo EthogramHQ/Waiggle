@@ -17,8 +17,9 @@
 //   --read            des captures faites pour être lues une à une : à l'échelle 1 (au lieu de
 //                     2), et les pages longues coupées en tranches d'environ 1 600 pixels de haut
 //                     (nom-1, nom-2…), plus faciles à regarder qu'une image de 10 000 pixels.
-//   --layout          mesure la mise en page à 9 largeurs (rapport dans <dossier>/layout/). Avec
-//                     --only, le rapport garde les sections et les images des autres pages.
+//   --layout          mesure la mise en page à 9 largeurs, 10 avec 2 560 pour les pages des très
+//                     grands écrans (rapport dans <dossier>/layout/). Avec --only, le rapport
+//                     garde les sections et les images des autres pages.
 //   --shard i/n       seulement la part i sur n des captures (--shard 1/2 puis --shard 2/2) : la
 //                     CI les prend en deux tâches parallèles. Le travail k de la liste va à la
 //                     part (k % n) + 1 (voir shard.ts). Chaque part construit le site et vérifie
@@ -27,6 +28,9 @@
 //   --serial          une capture à la fois, au lieu de trois (voir « La file » plus bas) : plus
 //                     lent, mais utile pour savoir si un défaut vient du parallélisme (une page
 //                     qui n'a pas fini son animation parce que la machine est trop chargée).
+//   --devices a,b     seulement ces fenêtres, par leur nom : telephone, ordinateur (1 440), et,
+//                     pour les pages qui les ont (`bigScreens`), ordinateur-1920, ordinateur-2560.
+//   --schemes a       seulement ces thèmes : jour, nuit.
 //
 // Exemples : pnpm --filter @ruche/app shots -- --list
 //            pnpm --filter @ruche/app shots -- --no-build --only projet,compte --read --out C:/tmp/a
@@ -174,10 +178,14 @@ const known = [
   '--explore',
   '--serial',
   '--shard',
+  '--devices',
+  '--schemes',
 ]
 for (const [i, arg] of args.entries()) {
   // « -- » vient de « pnpm … shots -- --list » ; une valeur suit son option.
-  const isValue = ['--only', '--out', '--explore', '--shard'].includes(args[i - 1])
+  const isValue = ['--only', '--out', '--explore', '--shard', '--devices', '--schemes'].includes(
+    args[i - 1],
+  )
   if (arg !== '--' && !isValue && !known.includes(arg)) {
     fail(`Option inconnue : ${arg}. Options possibles : ${known.join(', ')}.`)
   }
@@ -191,10 +199,17 @@ try {
 } catch (error) {
   fail(error.message)
 }
-const only = optionValue('--only')
-  ?.split(',')
-  .map((name) => name.trim())
-  .filter(Boolean)
+// Une liste de noms séparés par des virgules (« jour,nuit »), ou undefined sans l'option.
+const listOption = (flag) =>
+  optionValue(flag)
+    ?.split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+const only = listOption('--only')
+// R15 : ne prendre que certaines fenêtres ou certains thèmes (les très grands écrans, de jour, pour
+// regarder une mise en page sans refaire les 2 × 2 autres captures de chaque page).
+const onlyDevices = listOption('--devices')
+const onlySchemes = listOption('--schemes')
 // Un dossier relatif se lit depuis l'endroit où la commande a été tapée : pnpm lance le script
 // depuis apps/app, mais garde ce point de départ dans INIT_CWD.
 const outArg = optionValue('--out')
@@ -3734,7 +3749,16 @@ const pages = [
   // R4 : « fil » est lu jusqu'au 18/10, donc « Tu es à jour » coupe le fil en deux ; « fil-a-jour »
   // n'a rien de neuf (la sphère en tête) ; « fil-vide » est le premier lancement (« Ton fil
   // t'attend » et les proches à suivre).
-  { name: 'fil', path: '/feed', signedIn: true, feed: 'read-midway', fullPage: true },
+  // R15 : `bigScreens`, aussi à 1 920 et 2 560 (le Fil, Explorer, une étiquette, la page d'un
+  // membre à 4 et 5 projets, une page légale, les Réglages).
+  {
+    name: 'fil',
+    path: '/feed',
+    signedIn: true,
+    feed: 'read-midway',
+    fullPage: true,
+    bigScreens: true,
+  },
   // RF : le Fil défilé de 700 points. Sur ordinateur, la barre du haut reste fixée et le contenu
   // passe dessous ; sur téléphone, rien ne change (pas de barre du haut).
   {
@@ -3796,7 +3820,7 @@ const pages = [
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
   // R3-Explorer-Nuit).
-  { name: 'explorer', path: '/explore', signedIn: true },
+  { name: 'explorer', path: '/explore', signedIn: true, bigScreens: true },
   { name: 'explorer-nuit', path: '/explore', signedIn: true, fullPage: true },
   // R6b : « Récents » filtré par la pastille « Animaux » (une carte), puis une catégorie sans projet
   // dans ce fil : le message vide traduit, avec le nom de la catégorie.
@@ -4226,7 +4250,7 @@ const pages = [
     },
   },
   // Tranche R2 : la page « Réglages » (qui remplace « Mon compte ») et chacune de ses rubriques.
-  { name: 'reglages', path: '/settings', signedIn: true, fullPage: true },
+  { name: 'reglages', path: '/settings', signedIn: true, fullPage: true, bigScreens: true },
   // R8, planche R8-Reglages : le récap coupé (les types « Dans le récap » le disent), et les
   // commentaires ouverts sur leurs trois choix.
   {
@@ -4805,8 +4829,18 @@ const pages = [
     phoneOnly: true,
     textScale: 2,
   },
-  { name: 'etiquette', path: '/tags/claude-code', signedIn: true, fullPage: true },
+  {
+    name: 'etiquette',
+    path: '/tags/claude-code',
+    signedIn: true,
+    fullPage: true,
+    bigScreens: true,
+  },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
+  // R15 : une étiquette pleine (les 60 projets de Lovable), pour voir les rangées de tuiles qui
+  // suivent la place (4 à 1 280, 5 à 1 920) ; `etiquette` n'a que deux projets. Le premier écran
+  // suffit.
+  { name: 'outil', path: '/tags/lovable', signedIn: true, bigScreens: true },
   // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
   // adresse qui ne mène nulle part. R12 : la page réservée aux membres prend le nom
   // `visiteur-projet-membres` ; `visiteur-projet` est désormais un projet public (plus bas).
@@ -4867,7 +4901,7 @@ const pages = [
   },
   // R11, « La conformité » (planches R11-Pages et R11-Pages-Desktop) : les quatre pages publiques,
   // lues sans compte et pré-rendues, entières (« En bref », les parties, le pied de liens).
-  { name: 'regles', path: '/rules', signedIn: false, fullPage: true },
+  { name: 'regles', path: '/rules', signedIn: false, fullPage: true, bigScreens: true },
   // Sur ordinateur, le « Sommaire » suit la partie lue : Léa, connectée, a fait défiler les règles
   // jusqu'à la troisième partie (les parties sont des titres de niveau 3, le titre de la page est
   // de niveau 1).
@@ -5087,12 +5121,15 @@ const pages = [
     path: `/members/${odileMemberPage.id}`,
     signedIn: true,
     fullPage: true,
+    bigScreens: true,
   },
   ...['1', '2', '3', '5', 'pastilles'].map((key) => ({
     name: `membre-mosaique-${key}`,
     path: `/members/odile-${key}-id`,
     signedIn: true,
     fullPage: true,
+    // R15 : à 5 projets aussi, sur les très grands écrans (la planche R15-Membre-1920).
+    bigScreens: key === '5',
   })),
   // R10 : l'onglet Projets vu par l'animatrice (Léa anime Famille), le « … » de la première tuile
   // ouvert (« Retirer l'épingle » sur le projet épinglé, « Épingler » ailleurs) ; et la feuille
@@ -5329,10 +5366,30 @@ const devices = [
   { name: 'telephone', viewport: { width: 390, height: 844 } },
   { name: 'ordinateur', viewport: { width: 1440, height: 900 } },
 ]
+// R15 (« L'ordinateur en grand ») : deux très grands écrans, en plus des deux fenêtres habituelles,
+// pour les seules pages qui le demandent (`bigScreens: true`) : les écrans de cartes, dont la mise
+// en page change au-delà de 1 536 points, et deux blocs étroits qui doivent rester centrés. Pas
+// pour toutes les pages : chaque fenêtre ajoute deux captures (jour, nuit) par page.
+// `scale: 1` : une image de 2 560 points prise à l'échelle 2 ferait 5 120 pixels de large, et
+// Chromium laisse des zones non peintes dans une image trop grande (voir PART plus bas) ; à
+// l'échelle 1, elle est déjà plus large qu'une capture d'ordinateur habituelle.
+const bigScreens = [
+  { name: 'ordinateur-1920', viewport: { width: 1920, height: 1080 }, scale: 1 },
+  { name: 'ordinateur-2560', viewport: { width: 2560, height: 1440 }, scale: 1 },
+]
+const knownDevices = [...devices, ...bigScreens].map((device) => device.name)
 const schemes = [
   { name: 'jour', colorScheme: 'light' },
   { name: 'nuit', colorScheme: 'dark' },
 ]
+for (const [flag, names, valid] of [
+  ['--devices', onlyDevices, knownDevices],
+  ['--schemes', onlySchemes, schemes.map((scheme) => scheme.name)],
+]) {
+  const unknown = (names ?? []).filter((name) => !valid.includes(name))
+  if (unknown.length > 0)
+    fail(`${flag} : nom inconnu (${unknown.join(', ')}). Les noms : ${valid}.`)
+}
 
 // 5. Les pages choisies (--only), la liste (--list), puis la construction et le serveur.
 if (only) {
@@ -5696,7 +5753,8 @@ async function layoutReport() {
           `- **${width} px** : ${notes.length > 0 ? notes.join(' — ') : 'rien à signaler'}`,
         )
       }
-      for (const width of shot.layoutWidths ?? widths) {
+      // R15 : les pages des très grands écrans (`bigScreens`) se mesurent aussi à 2 560.
+      for (const width of shot.layoutWidths ?? (shot.bigScreens ? [...widths, 2560] : widths)) {
         try {
           await withDeadline(measureWidth(width), PAGE_DEADLINE, `${shot.name} à ${width} px`)
         } catch (error) {
@@ -5766,16 +5824,20 @@ const scale = read ? 1 : 2
 // est en tête de la liste : il commence tôt au lieu de finir seul, après tous les autres.
 // Une page peut changer la fenêtre du téléphone (`phone`, la barre à 320 points) et se passer de
 // l'ordinateur (`phoneOnly`).
+// R15 : une page `bigScreens` ajoute les très grands écrans ; --devices et --schemes ne gardent que
+// les fenêtres et les thèmes nommés.
 const devicesFor = (shot) =>
-  devices
+  [...devices, ...(shot.bigScreens ? bigScreens : [])]
     .filter((device) => !shot.phoneOnly || device.name === 'telephone')
+    .filter((device) => !onlyDevices || onlyDevices.includes(device.name))
     .map((device) =>
       shot.phone && device.name === 'telephone' ? { ...device, viewport: shot.phone } : device,
     )
+const schemesFor = schemes.filter((scheme) => !onlySchemes || onlySchemes.includes(scheme.name))
 // Avec --shard, seule la part demandée de cette liste (le catalogue, en tête, se partage entre les
 // parts, au lieu de rester tout entier dans la première).
 const allJobs = selected.flatMap((shot) =>
-  devicesFor(shot).flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
+  devicesFor(shot).flatMap((device) => schemesFor.map((scheme) => ({ shot, device, scheme }))),
 )
 const jobs = shardOf(allJobs, shard)
 if (shard)
@@ -5795,7 +5857,7 @@ const capture = async ({ shot, device, scheme }) => {
     colorScheme: scheme.colorScheme,
     locale: 'fr-FR',
     timezoneId: SHOT_TIMEZONE,
-    deviceScaleFactor: scale,
+    deviceScaleFactor: device.scale ?? scale,
   })
   try {
     await installShotClock(context)

@@ -4124,3 +4124,75 @@ Pour un membre ; un visiteur passe d'une page publique à l'autre comme aujourd'
 La page d'un outil, l'onglet Projets d'une ruche et « Récents » d'Explorer gardent leur forme. Le
 projet épinglé (en grand même s'il n'est pas le plus récent), la bannière et la colonne du profil
 sur ordinateur viennent plus tard (R15 et suivantes).
+
+## R15 — L'ordinateur en grand
+
+Le contenu n'a que deux largeurs, 520 et 1 280 points. Sur un écran de 1 920, un tiers de la largeur
+ne sert à rien (320 points vides de chaque côté), et sur les écrans étroits, les trois quarts ; aucune
+grille ne gagne de colonne, et sur Explorer à 1 920 × 1 080, aucune carte de « Récents » n'est sur le
+premier écran (audit de design du 17/11, section 2). Louis a choisi un gabarit large, plafonné à
+1 920, sans colonne de navigation à gauche, avec trois planches à 1 920 d'abord (décision 11 du
+17/11). Les cartes et les grilles s'élargissent ; le texte qui se lit et les formulaires restent
+étroits.
+
+### Le gabarit large
+
+- Étant donné un écran de cartes (le Fil, Explorer, la page d'une étiquette ou d'un outil, la page
+  d'un membre, l'accueil du visiteur)
+  Quand la fenêtre s'élargit
+  Alors le contenu garde des marges de 32 points jusqu'à 1 536, puis de 5 % de la fenêtre, et ne
+  dépasse jamais 1 920 : 1 376 à 1 440, 1 728 à 1 920, 1 920 à 2 560.
+- La barre du haut suit la largeur de l'écran ouvert ; son champ de recherche ne dépasse pas 560.
+- Le texte courant (description, pages légales, commentaires) reste à 560 points au plus, quelle
+  que soit la largeur.
+- Sous 1 280, rien ne change.
+
+### Des colonnes qui suivent la place
+
+- Les grilles de cartes comptent leurs colonnes selon la place, plus selon le type d'appareil : une
+  carte ne descend pas sous sa largeur minimale, et une colonne de plus apparaît dès qu'elle tient.
+- Le Fil, à 1 920 : trois colonnes de cartes à côté de son panneau (Tes ruches, Proches à suivre,
+  Ils cherchent des testeurs), qui reste en place au défilement.
+- La page d'une étiquette ou d'un outil : cinq à six colonnes de tuiles à 1 920.
+- L'accueil du visiteur : ses quatre cartes s'élargissent ; rien d'autre ne change.
+
+### Explorer
+
+- Étant donné Explorer sur un écran de 1 536 points et plus (en dessous, Explorer reste celui
+  d'aujourd'hui : « Récents » sur trois colonnes à 1 280)
+  Alors « Ils cherchent des testeurs » et « Outils populaires » passent dans un panneau à droite,
+  en lignes ;
+  Et « À la une » puis « Récents » prennent la colonne principale, « Récents » sur quatre à cinq
+  colonnes ;
+  Et à 1 920 × 1 080, au moins quatre cartes de « Récents » sont entières sur le premier écran.
+
+### La page d'un membre
+
+- Étant donné la page de Léa sur un écran de 1 100 points et plus
+  Alors son profil (photo, nom, pseudo, bio, outils favoris, abonnés, Suivre ou Modifier mon
+  profil) est une colonne à gauche, qui reste en place au défilement, sous une bannière floue tirée
+  de sa photo ;
+  Et la mosaïque de ses projets (R14) occupe la droite.
+- Avec quatre projets, la dernière petite carte n'est plus seule sur sa rangée, étirée en bandeau :
+  les petites cartes se répartissent sans carte isolée.
+- Sur téléphone et tablette, la page reste celle de R14.
+
+### Ce qui reste étroit
+
+- Les Réglages, les pages légales et l'Activité gardent leur largeur, mais leur bloc est centré
+  dans la page au lieu d'être calé à gauche.
+- La page d'un projet, ses mises à jour, le coin des testeurs, la connexion, les feuilles (Publier,
+  Modifier) et les états (vide, erreur, introuvable) ne changent pas.
+
+### Les cibles (mesurées avant et après par le même passage)
+
+- Part de la fenêtre occupée par le contenu des écrans de cartes : 67 % → 90 % à 1 920, 50 % → 75 %
+  à 2 560.
+- Cartes de « Récents » entières sur le premier écran d'Explorer à 1 920 × 1 080 : 0 → 4 au moins.
+- Aucune ligne de texte courant au-delà de 90 caractères ; aucun défilement horizontal de 320 à
+  2 560.
+
+### Le reste ne change pas
+
+Recherche, Outils et Ruches restent étroits (leurs grilles viennent plus tard, avec leurs planches).
+Le projet épinglé n'est pas dans cette tranche.

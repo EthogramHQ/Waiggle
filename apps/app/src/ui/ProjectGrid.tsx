@@ -1,19 +1,23 @@
-// Une liste de cartes de projets, en grille : une colonne sur téléphone, deux sur tablette, trois
-// sur ordinateur, ou le nombre que l'écran impose (`columns` : le Fil, dont la colonne principale
-// est plus étroite à côté de sa colonne latérale, R4). Sans projet, un message (donné par l'écran)
+// Une liste de cartes de projets, en grille. Le nombre de colonnes vient de la place (R15, « Des
+// colonnes qui suivent la place ») : autant de cartes qu'il en tient côte à côte sans descendre sous
+// `layout.cardMin.feed`, dans la largeur de la colonne où la grille est posée. Cette largeur, l'écran
+// (`Screen`) ou la colonne principale de `Columns` la publient (`useContentWidth()`) : la grille la
+// lit, sans qu'aucun écran ne fasse le calcul (relecture du plan R15, C2). Un écran peut encore
+// imposer son nombre (`columns`), sans plafond. Sans projet, un message (donné par l'écran)
 // remplace la grille, ou rien sans message (les deux grilles du Fil, autour de « Tu es à jour »).
 //
 // Les cases d'une rangée ont la hauteur de la plus haute carte, et chaque case l'offre à sa carte :
 // une carte de note, plus basse qu'une carte de projet, s'étire à sa hauteur (sa couverture prend
 // la place qui reste) au lieu de laisser un vide dessous (relecture de design de R4, A2).
-import { space } from '@ruche/brand'
-import { Children, type ReactNode } from 'react'
+import { layout, space } from '@ruche/brand'
+import { Children, createContext, type ReactNode, useContext } from 'react'
 import { View } from 'react-native'
 import { Button } from './Button'
 import { Stack } from './Stack'
 import { Surface } from './Surface'
 import { Text } from './Text'
-import { useLayout } from './theme/layout'
+import { useLargeText } from './textScale'
+import { columnsFor, useContentWidth, useLayout } from './theme/layout'
 
 type Props = {
   children: ReactNode
@@ -26,22 +30,64 @@ type Props = {
    */
   emptyAction?: { label: string; onPress: () => void } | undefined
   /**
-   * Le nombre de colonnes, imposé par l'écran (un entier de 1 à 3) ; sans lui, il suit la largeur.
-   * C'est l'écran qui le choisit (2 en `wide` et 1 sinon, pour le Fil) : la grille ne sait pas ce
-   * qui est posé à côté d'elle.
+   * Le nombre de colonnes, imposé par l'écran (un entier, 1 au moins) ; sans lui, il suit la place.
+   * R15 : facultatif, et le plus souvent inutile, puisque la grille connaît la largeur de sa
+   * colonne ; reste pour un écran qui veut un nombre précis (une colonne dans un aperçu).
    */
   columns?: number
 }
 
-const columnsFor = { compact: 1, medium: 2, wide: 3 } as const
-
-// Une valeur donnée par l'écran reste raisonnable : entière, entre 1 et 3 (une valeur absurde
-// ne casse pas la grille en rangées vides ou en boucle sans fin).
+// Une valeur donnée par l'écran reste raisonnable : entière, et 1 au moins (une valeur absurde,
+// 0 ou `NaN`, ne casse pas la grille en rangées vides ou en boucle sans fin). Plus de plafond de 3
+// depuis R15 : un grand écran peut demander cinq colonnes.
 const boundedColumns = (columns: number) =>
-  Number.isFinite(columns) ? Math.min(3, Math.max(1, Math.round(columns))) : 1
+  Number.isFinite(columns) ? Math.max(1, Math.round(columns)) : 1
+
+/**
+ * R15 : la famille des cartes des grilles posées dessous. `feed` (par défaut) : les cartes du Fil,
+ * plus larges sur un très grand écran ; `compact` : jamais moins que `cardMin.compact`, quelle que
+ * soit la fenêtre (« Récents » d'Explorer, quatre à cinq colonnes à côté de son panneau). Un
+ * « contexte » React : une valeur posée par un parent, que les grilles lisent sans qu'elle passe par
+ * chaque composant entre les deux (ici, la grille est posée par le fil, que l'écran ne fait que placer).
+ */
+export type GridCards = 'feed' | 'compact'
+export const GridCardsContext = createContext<GridCards>('feed')
+
+/**
+ * Hook : le nombre de colonnes d'une grille de cartes posée ici, et la ligne cachée qui mesure le
+ * texte agrandi (`probe`, à poser dans la grille). Partagé par `ProjectGrid` et le squelette du fil
+ * (`SkeletonList`), qui dessine ainsi ses formes dans les mêmes colonnes que les cartes qui
+ * arrivent (relecture de design de R15 : une seule carte de 1 364 de large, puis trois colonnes).
+ */
+export function useGridColumns(imposed?: number) {
+  // La largeur de la fenêtre (0 avant l'hydratation du web) : à partir de `breakpoints.xwide`, une
+  // carte du Fil ne descend plus sous `cardMin.feedWide` (trois colonnes de 436 à 1 920 à côté du
+  // panneau, et non quatre plus serrées : planche R15-Fil-1920).
+  const { xwide } = useLayout()
+  // La largeur de la colonne où la grille est posée ; 0 avant l'hydratation, donc une colonne : la
+  // page du téléphone, celle du pré-rendu, qui ne connaît pas la fenêtre.
+  const room = useContentWidth()
+  // Le texte très agrandi (sur le web, lu par une ligne cachée, `probe`, posée dans la liste) : les
+  // cartes prennent la largeur de grand écran, sinon leurs titres se coupent au premier mot (à 200 %,
+  // trois cartes de 327 à côté du panneau, à 1 440 ; deux de 498 avec cette règle).
+  const { large, probe } = useLargeText()
+  const family = useContext(GridCardsContext)
+  const cardMin = large
+    ? layout.cardMin.feedWide
+    : family === 'compact'
+      ? layout.cardMin.compact
+      : xwide
+        ? layout.cardMin.feedWide
+        : layout.cardMin.feed
+  // Sans nombre imposé : autant de cartes d'au moins `cardMin` qu'il en tient dans la place, l'écart
+  // entre deux cartes compris (`columnsFor`, une colonne au moins).
+  const columns =
+    imposed === undefined ? columnsFor(room, cardMin, space.lg) : boundedColumns(imposed)
+  return { columns, probe }
+}
 
 export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: Props) {
-  const { sizeClass } = useLayout()
+  const { columns, probe } = useGridColumns(imposed)
   // Children.toArray : la liste des cartes, sans les « trous » (null, false) laissés par l'écran,
   // chacune avec sa clé.
   const cards = Children.toArray(children)
@@ -64,7 +110,6 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
   // rangée est complétée par des cases vides, pour que ses cartes gardent la même largeur. Une
   // rangée étire ses cases à la hauteur de la plus haute (le réglage par défaut d'une rangée) ; une
   // carte qui veut s'étirer avec sa case le peut (`flexGrow` de sa vue la plus extérieure).
-  const columns = imposed === undefined ? columnsFor[sizeClass] : boundedColumns(imposed)
   const rows: ReactNode[][] = []
   for (let i = 0; i < cards.length; i += columns) rows.push(cards.slice(i, i + columns))
   return (
@@ -81,6 +126,7 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
           ))}
         </View>
       ))}
+      {probe}
     </View>
   )
 }

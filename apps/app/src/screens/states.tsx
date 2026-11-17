@@ -22,7 +22,9 @@ import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 
 /** form : un écran étroit (profil, formulaire) ; page : une page large (projet, membre). */
-type Width = 'form' | 'page'
+// R15 : `wide` pour les écrans de cartes (Fil, Explorer, étiquette, membre) ; sans lui, la barre du
+// haut s'élargissait d'un coup à l'arrivée de la page, de 1 280 à la largeur du grand écran.
+type Width = 'form' | 'page' | 'wide'
 
 /**
  * Pendant le chargement : le squelette de la page (Miel 2), des formes pleines à la place du
@@ -65,7 +67,7 @@ export function LoadingScreen({
   return (
     <Screen header={<TopNav />} width={width} fade={fade}>
       <Stack gap="xl" align="stretch">
-        <SkeletonList count={width === 'page' ? 3 : 2} shape={shape} />
+        <SkeletonList count={width === 'form' ? 2 : 3} shape={shape} />
         {slow ? (
           <Stack align="start">
             <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
