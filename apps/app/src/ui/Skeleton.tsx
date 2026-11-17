@@ -3,7 +3,8 @@
 // ce qui arrive : la page ne saute pas quand le contenu les remplace.
 // - SkeletonCard : une carte, un grand bloc et deux lignes (à 80 % et 55 % de la largeur).
 // - SkeletonList : plusieurs cartes l'une sous l'autre.
-// - `shape="feed"` (R4) : la forme d'une carte du fil, de sa hauteur, avec son panneau en bas.
+// - `shape="feed"` (R4) : la forme d'une carte du fil, de sa hauteur, avec son panneau en bas ;
+//   R15, rangées dans les colonnes de la grille du fil (`ProjectGrid`).
 // - `shape="compact"` (R14) : la forme d'une petite carte de la mosaïque d'un membre, de sa hauteur.
 // Les formes « respirent » (leur opacité monte et descend doucement) pour dire que ça avance. Avec
 // « Réduire les animations », elles restent immobiles : une animation sans fin à côté du contenu
@@ -11,7 +12,7 @@
 // Pour un lecteur d'écran, les formes ne disent rien : l'ensemble est nommé « Chargement… » et
 // marqué occupé, une seule fois, même pour une liste de plusieurs cartes.
 import { durations, layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useContext, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
 import Animated, {
@@ -22,6 +23,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { PROJECT_CARD_COMPACT_HEIGHT, PROJECT_CARD_HEIGHT } from './ProjectCard'
+import { GridCardsContext, useGridColumns } from './ProjectGrid'
+import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -225,10 +228,45 @@ export function SkeletonList({
   const Shapes = shapes[shape]
   return (
     <Loading>
-      {Array.from({ length: count }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: des formes identiques, jamais réordonnées.
-        <Shapes key={index} />
-      ))}
+      {shape === 'feed' ? (
+        <FeedGridShapes count={count} />
+      ) : (
+        Array.from({ length: count }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: des formes identiques, jamais réordonnées.
+          <Shapes key={index} />
+        ))
+      )}
     </Loading>
+  )
+}
+
+/**
+ * Les cartes du fil qui chargent, rangées comme les cartes qui arrivent (relecture de design de
+ * R15) : dans les colonnes de `ProjectGrid`, au même écart, une rangée après l'autre. Avant, une
+ * seule carte de 1 364 points de large à 1 920, puis le Fil en trois colonnes : tout sautait. Sous
+ * une grille de compactes (« Récents » d'Explorer, sur ordinateur), la forme d'une compacte, comme
+ * la carte (`ProjectCard`). La dernière rangée se complète de cases vides, comme dans la grille.
+ */
+function FeedGridShapes({ count }: { count: number }) {
+  const { columns, probe } = useGridColumns()
+  const compactCards = useContext(GridCardsContext) === 'compact'
+  const wide = useLayout().sizeClass === 'wide'
+  const Shapes = compactCards && wide ? CompactCardShapes : FeedCardShapes
+  const rows = Math.ceil(count / columns)
+  return (
+    <View style={{ gap: space.lg }}>
+      {Array.from({ length: rows }, (_, row) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: des rangées identiques, jamais réordonnées.
+        <View key={row} style={{ flexDirection: 'row', gap: space.lg }}>
+          {Array.from({ length: columns }, (_, column) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: une case est une place dans la rangée.
+            <View key={column} style={{ flex: 1 }}>
+              {row * columns + column < count ? <Shapes /> : null}
+            </View>
+          ))}
+        </View>
+      ))}
+      {probe}
+    </View>
   )
 }

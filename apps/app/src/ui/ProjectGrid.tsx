@@ -53,7 +53,13 @@ const boundedColumns = (columns: number) =>
 export type GridCards = 'feed' | 'compact'
 export const GridCardsContext = createContext<GridCards>('feed')
 
-export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: Props) {
+/**
+ * Hook : le nombre de colonnes d'une grille de cartes posée ici, et la ligne cachée qui mesure le
+ * texte agrandi (`probe`, à poser dans la grille). Partagé par `ProjectGrid` et le squelette du fil
+ * (`SkeletonList`), qui dessine ainsi ses formes dans les mêmes colonnes que les cartes qui
+ * arrivent (relecture de design de R15 : une seule carte de 1 364 de large, puis trois colonnes).
+ */
+export function useGridColumns(imposed?: number) {
   // La largeur de la fenêtre (0 avant l'hydratation du web) : à partir de `breakpoints.xwide`, une
   // carte du Fil ne descend plus sous `cardMin.feedWide` (trois colonnes de 436 à 1 920 à côté du
   // panneau, et non quatre plus serrées : planche R15-Fil-1920).
@@ -73,6 +79,15 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
       : xwide
         ? layout.cardMin.feedWide
         : layout.cardMin.feed
+  // Sans nombre imposé : autant de cartes d'au moins `cardMin` qu'il en tient dans la place, l'écart
+  // entre deux cartes compris (`columnsFor`, une colonne au moins).
+  const columns =
+    imposed === undefined ? columnsFor(room, cardMin, space.lg) : boundedColumns(imposed)
+  return { columns, probe }
+}
+
+export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: Props) {
+  const { columns, probe } = useGridColumns(imposed)
   // Children.toArray : la liste des cartes, sans les « trous » (null, false) laissés par l'écran,
   // chacune avec sa clé.
   const cards = Children.toArray(children)
@@ -95,10 +110,6 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
   // rangée est complétée par des cases vides, pour que ses cartes gardent la même largeur. Une
   // rangée étire ses cases à la hauteur de la plus haute (le réglage par défaut d'une rangée) ; une
   // carte qui veut s'étirer avec sa case le peut (`flexGrow` de sa vue la plus extérieure).
-  // Sans nombre imposé : autant de cartes d'au moins `cardMin` qu'il en tient dans la place, l'écart
-  // entre deux cartes compris (`columnsFor`, une colonne au moins).
-  const columns =
-    imposed === undefined ? columnsFor(room, cardMin, space.lg) : boundedColumns(imposed)
   const rows: ReactNode[][] = []
   for (let i = 0; i < cards.length; i += columns) rows.push(cards.slice(i, i + columns))
   return (

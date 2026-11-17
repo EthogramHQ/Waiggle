@@ -93,7 +93,9 @@ export function DiscoverFeed({
     feed.isError ? (
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} section={errorMessage} />
     ) : (
-      <SkeletonList count={3} />
+      // La forme des cartes qui arrivent, dans leurs colonnes (R15) : celle du Fil, ou la compacte
+      // dans « Récents » sur ordinateur (le squelette lit la grille, comme la carte).
+      <SkeletonList count={3} shape="feed" />
     )
   ) : (
     <FeedList
