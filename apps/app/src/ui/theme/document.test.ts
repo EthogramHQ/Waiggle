@@ -221,6 +221,8 @@ describe('the wait bee drawing', () => {
     expect(waitBeeMarkup).toContain(beeViewBox)
     for (const path of [bee.ink, bee.honey, bee.wing]) expect(waitBeeMarkup).toContain(path)
     // Aucun texte : rien à lire pour un lecteur d'écran, rien à traduire.
-    expect(waitBeeMarkup.replace(/<[^>]*>/g, '').trim()).toBe('')
+    // Aucun texte entre deux balises : après chaque « > », seuls des blancs ou une autre balise.
+    // (Pas de `replace` des balises : l'analyse de sécurité y lit un nettoyage de HTML incomplet.)
+    expect(waitBeeMarkup).not.toMatch(/>\s*[^<\s]/)
   })
 })

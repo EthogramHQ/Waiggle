@@ -170,11 +170,9 @@ describe('the wait bee and the page without JavaScript', () => {
     // Décorative : cachée aux lecteurs d'écran, sans texte, dessinée (l'abeille du lancement).
     expect(waitTag?.[0]).toContain('aria-hidden="true"')
     expect(waitElement()).toContain('<svg')
-    expect(
-      waitElement()
-        .replace(/<[^>]*>/g, '')
-        .trim(),
-    ).toBe('')
+    // Aucun texte entre deux balises : après chaque « > », seuls des blancs ou une autre balise.
+    // (Pas de `replace` des balises : l'analyse de sécurité y lit un nettoyage de HTML incomplet.)
+    expect(waitElement()).not.toMatch(/>\s*[^<\s]/)
   })
 
   it('shows the page without JavaScript from a noscript in the body, never in the head', () => {
