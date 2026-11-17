@@ -10,10 +10,11 @@
 // - `SkeletonGlow` : la lueur miel qui traverse lentement une carte vide (planche R16-Lueur) ;
 // - `Loading` : le seul élément lu d'une zone qui charge, « Chargement… », occupé ; il enveloppe les
 //   pièces (qui n'ont ni rôle ni nom), une fois pour toute la zone ;
-// - `SkeletonRows` : des rangées vides (une liste, une feuille qui charge).
+// - `SkeletonRows` : des lignes vides de liste (une liste, une feuille qui charge) ;
+// - `SkeletonPage` : la forme d'une page entière qui arrive, faite des pièces des composants.
 // Et les formes toutes faites d'avant, gardées pour les écrans qui ne changent pas : `SkeletonCard`,
 // `SkeletonList` (`card`, `feed` : la carte du fil rangée dans les colonnes du Fil, `compact` : la
-// petite carte de la mosaïque d'un membre).
+// petite carte de la mosaïque d'un membre ; ces deux-là dessinent `ProjectCardSkeleton`).
 //
 // Quand on le voit (R16) : une page qui arrive en moins de 160 ms ne montre aucun squelette. `Loading`
 // pose sa place tout de suite, mais reste invisible et caché aux lecteurs d'écran pendant ce délai,
@@ -33,28 +34,24 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
-import { PROJECT_CARD_COMPACT_HEIGHT, PROJECT_CARD_HEIGHT } from './ProjectCard'
-import { GridCardsContext, useGridColumns } from './ProjectGrid'
+// Les pièces vides des composants, qui assemblent elles-mêmes les pièces de base de ce fichier : ces
+// fichiers importent celui-ci, et celui-ci les importe à son tour. Sans effet : de part et d'autre,
+// rien n'est lu au chargement du module, seulement au rendu, quand tous sont chargés.
+import { Columns } from './Columns'
+import { ListGroup, ListRowSkeleton, TextLineShape } from './ListGroup'
+import { MemberHeaderSkeleton } from './MemberHeader'
+import { ProjectCardSkeleton } from './ProjectCard'
+import { ProjectCoverSkeleton } from './ProjectCover'
+import { useGridColumns } from './ProjectGrid'
 import { skeletonGlowMark } from './theme/document'
 import { useHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { fade, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
-/** La hauteur du grand bloc d'une carte, puis celle d'une ligne, en points. */
+/** La hauteur du grand bloc d'une carte simple, puis celle d'une ligne, en points. */
 const BLOCK = 90
 const LINE = 14
-/**
- * Les formes de la carte du fil : la photo de l'auteur (28, comme dans la carte), une ligne de titre,
- * la pastille « Tester » (la hauteur d'un contrôle compact, et sa largeur à peu près).
- */
-const AVATAR = 28
-const TITLE = 22
-const PILL = layout.controlHeight.compact
-const PILL_WIDTH = 96
-/** La photo d'une rangée vide (celle d'une ligne de liste) et la hauteur de la rangée. */
-const ROW_AVATAR = 40
-const ROW_HEIGHT = 64
 
 // ---------------------------------------------------------------------------------------------
 // La lueur (planche R16-Lueur ; plan, choix 6)
@@ -316,10 +313,16 @@ const hiddenFromReaders = {
 export function Loading({
   children,
   shown = false,
+  label,
 }: {
   children: ReactNode
   /** Montré tout de suite, sans attendre les 160 ms. */
   shown?: boolean
+  /**
+   * Le nom lu de l'attente, quand l'appelant a le sien (la carte du membre reçoit `loadingLabel` de
+   * son écran) ; sans lui, « Chargement… » dans la langue de l'appli.
+   */
+  label?: string
 }) {
   const { t } = useTranslation()
   const hydrated = useHydrated()
@@ -344,7 +347,7 @@ export function Loading({
     <Animated.View
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={t(($) => $.common.loading)}
+      accessibilityLabel={label ?? t(($) => $.common.loading)}
       {...(Platform.OS === 'web' ? { 'aria-busy': true } : { accessibilityState: { busy: true } })}
       {...(visible ? null : hiddenFromReaders)}
       style={[{ gap: space.xxl }, style]}
@@ -357,71 +360,6 @@ export function Loading({
 // ---------------------------------------------------------------------------------------------
 // Les formes toutes faites
 // ---------------------------------------------------------------------------------------------
-
-/**
- * Les formes d'une carte du fil (R4) : une carte vide de la hauteur d'une `ProjectCard` et, en bas,
- * un panneau plein à la place du verre, avec les rangées de la carte (l'auteur, le titre,
- * l'accroche, « Tester » et le statut). Quand les cartes arrivent, rien ne saute.
- */
-function FeedCardShapes({ column = 0 }: { column?: number }) {
-  const { colors } = useTheme()
-  return (
-    <SkeletonSurface height={PROJECT_CARD_HEIGHT} column={column}>
-      <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: space.sm }}>
-        {/* Le verre, plein : la matière d'une feuille, sans flou (rien derrière à flouter). */}
-        <View
-          style={{
-            gap: space.md,
-            padding: space.lg,
-            borderRadius: radii.panel,
-            backgroundColor: colors.sheet,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <Shape height={AVATAR} width={AVATAR} round />
-            <Shape height={LINE} width="40%" />
-          </View>
-          <Shape height={TITLE} width="70%" />
-          <Shape height={LINE} width="90%" />
-          <Shape height={LINE} width="60%" />
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Shape height={PILL} width={PILL_WIDTH} round />
-            <Shape height={LINE * 2} width={PILL_WIDTH} round />
-          </View>
-        </View>
-      </View>
-    </SkeletonSurface>
-  )
-}
-
-/**
- * R14 : les formes d'une carte compacte (la mosaïque d'un membre) : une carte vide de la hauteur
- * d'une `ProjectCard size="compact"` (lue sur la carte, jamais recopiée) et, en bas, son verre plus
- * serré avec ce qu'elle montre : le titre, puis le statut et les réactions.
- */
-function CompactCardShapes({ column = 0 }: { column?: number }) {
-  const { colors } = useTheme()
-  return (
-    <SkeletonSurface height={PROJECT_CARD_COMPACT_HEIGHT} column={column}>
-      <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: space.sm }}>
-        <View
-          style={{
-            gap: space.sm,
-            padding: space.md,
-            borderRadius: radii.panel,
-            backgroundColor: colors.sheet,
-          }}
-        >
-          <Shape height={TITLE} width="80%" />
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Shape height={LINE * 2} width="45%" round />
-            <Shape height={LINE * 2} width="25%" round />
-          </View>
-        </View>
-      </View>
-    </SkeletonSurface>
-  )
-}
 
 /** Les formes d'une carte simple (un bloc et deux lignes), dans une carte vide de coins de tuile. */
 function CardShapes({ column = 0 }: { column?: number }) {
@@ -437,54 +375,41 @@ function CardShapes({ column = 0 }: { column?: number }) {
 }
 
 /**
- * Des rangées vides, celles d'une liste (la photo, puis le nom et une ligne de plus), dans une carte
- * vide aux coins d'un groupe de réglages. Pour une liste ou une feuille qui charge (`StateMessage
- * kind="loading"`, `LoadingScreen shape="list"`), sans `Loading` autour : l'appelant le pose.
+ * Des lignes vides, celles d'une liste : les lignes vides de `ListGroup` (`ListRowSkeleton` : la
+ * photo, puis le nom et une précision), dans le groupe blanc et ses filets d'une vraie liste. Une
+ * liste qui charge a ainsi la matière et la hauteur de la liste qui arrive (planche R16-Explorer-
+ * Listes). Pour une liste ou une feuille qui charge (`StateMessage kind="loading"`, `LoadingScreen
+ * shape="list"`), sans `Loading` autour : l'appelant le pose.
  */
 export function SkeletonRows({ count = 5 }: { count?: number }) {
-  const { colors } = useTheme()
   return (
-    <SkeletonSurface radius="group">
+    <ListGroup>
       {Array.from({ length: count }, (_, index) => (
-        <View
-          // biome-ignore lint/suspicious/noArrayIndexKey: des rangées identiques, jamais réordonnées.
-          key={index}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: space.md,
-            minHeight: ROW_HEIGHT,
-            paddingHorizontal: space.lg,
-            // Le filet entre deux rangées, comme dans une liste (`ListGroup`).
-            ...(index > 0
-              ? { borderTopWidth: borders.hairline, borderTopColor: colors.surfaceBorder }
-              : null),
-          }}
-        >
-          <Shape height={ROW_AVATAR} width={ROW_AVATAR} round />
-          <View style={{ flex: 1, gap: space.sm }}>
-            <Shape height={LINE} width={index % 2 === 0 ? '55%' : '40%'} />
-            <Shape height={LINE} width={index % 2 === 0 ? '80%' : '70%'} />
-          </View>
-        </View>
+        // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+        <ListRowSkeleton key={index} />
       ))}
-    </SkeletonSurface>
+    </ListGroup>
   )
 }
 
 /**
  * La forme des cartes : `card`, la carte simple (un bloc et deux lignes) ; `feed`, la carte du fil
  * (R4), de sa hauteur, avec son panneau ; `compact`, la petite carte de la mosaïque d'un membre (R14).
+ * Les deux dernières sont la carte de projet vide (`ProjectCardSkeleton`, ProjectCard.tsx), dessinée
+ * par la carte elle-même : quand elle change, son squelette change avec elle.
  */
 export type SkeletonShape = 'card' | 'feed' | 'compact'
 
-const shapes = { card: CardShapes, feed: FeedCardShapes, compact: CompactCardShapes } as const
+/** Une carte vide de cette forme, à ce rang dans sa rangée (le retard de sa lueur). */
+function ShapedCard({ shape, column = 0 }: { shape: SkeletonShape; column?: number }) {
+  if (shape === 'card') return <CardShapes column={column} />
+  return <ProjectCardSkeleton size={shape === 'compact' ? 'compact' : 'full'} column={column} />
+}
 
 export function SkeletonCard({ shape = 'card' }: { shape?: SkeletonShape }) {
-  const Shapes = shapes[shape]
   return (
     <Loading>
-      <Shapes />
+      <ShapedCard shape={shape} />
     </Loading>
   )
 }
@@ -501,12 +426,11 @@ export function SkeletonCards({
   shape?: SkeletonShape
 }) {
   if (shape === 'feed') return <FeedGridShapes count={count} />
-  const Shapes = shapes[shape]
   return (
     <View style={{ gap: space.xxl }}>
       {Array.from({ length: count }, (_, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: des formes identiques, jamais réordonnées.
-        <Shapes key={index} />
+        <ShapedCard key={index} shape={shape} />
       ))}
     </View>
   )
@@ -527,20 +451,21 @@ export function SkeletonList({
 }
 
 /**
- * R16 : la forme d'une page qui arrive (plan, choix 5 et 11) : le Fil et une grille de cartes (4
- * cartes dans les colonnes du Fil), un membre (son en-tête, puis 4 petites cartes), un projet (la
- * galerie, le titre, l'auteur, la description), une liste (5 rangées), un formulaire (3 champs et
- * le bouton). Sans `Loading` autour : `LoadingScreen` le pose, une fois pour toute la page. Ces
- * formes de base attendent les pièces de chaque composant (`ProjectCardSkeleton`,
- * `MemberHeaderSkeleton`…), que les écrans poseront à leur place.
+ * R16 : la forme d'une page qui arrive (plan, choix 5 et 11), faite des pièces vides de chaque
+ * composant, pour que la page vide ait la forme et la matière de celle qui arrive :
+ * - `feed` et `grid` : 4 cartes de projet vides (`ProjectCardSkeleton`) dans les colonnes du Fil ;
+ * - `member` : l'en-tête vide d'un membre (`MemberHeaderSkeleton`), puis la mosaïque de 4 petites
+ *   cartes ; sur ordinateur, l'en-tête en colonne à gauche, comme la vraie page (`Columns`) ;
+ * - `project` : le haut de la page d'un projet, la galerie vide (`ProjectCoverSkeleton`) et, à côté
+ *   sur ordinateur, dessous ailleurs, l'en-tête : statut, titre, auteur, accroche et actions ;
+ * - `list` : 5 lignes vides d'une liste (`SkeletonRows`) ;
+ * - `form` : 3 champs et le bouton.
+ * Sans `Loading` autour : `LoadingScreen` le pose, une fois pour toute la page.
  */
 export type SkeletonPageShape = 'feed' | 'project' | 'member' | 'grid' | 'list' | 'form'
 
 /** Les cartes d'une page vide : comme sur les planches de R16, quatre. */
 const PAGE_CARDS = 4
-/** La galerie d'un projet, et la photo d'un membre, en points. */
-const GALLERY = 320
-const MEMBER_AVATAR = 96
 /** Les champs d'un formulaire vide. */
 const FORM_FIELDS = 3
 /** La largeur du bouton d'un formulaire vide. */
@@ -558,32 +483,9 @@ export function SkeletonPage({ shape }: { shape: SkeletonPageShape | SkeletonSha
     case 'list':
       return <SkeletonRows />
     case 'member':
-      return (
-        <View style={{ gap: space.xxl }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
-            <Shape height={MEMBER_AVATAR} width={MEMBER_AVATAR} round />
-            <View style={{ flex: 1, gap: space.sm }}>
-              <Shape height={TITLE} width="50%" />
-              <Shape height={LINE} width="70%" />
-            </View>
-          </View>
-          <FeedGridShapes count={PAGE_CARDS} compact />
-        </View>
-      )
+      return <MemberPageShapes />
     case 'project':
-      return (
-        <View style={{ gap: space.lg }}>
-          <SkeletonSurface height={GALLERY} />
-          <Shape height={TITLE} width="60%" />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <Shape height={AVATAR} width={AVATAR} round />
-            <Shape height={LINE} width="30%" />
-          </View>
-          <Shape height={LINE} width="95%" />
-          <Shape height={LINE} width="90%" />
-          <Shape height={LINE} width="70%" />
-        </View>
-      )
+      return <ProjectTopShapes />
     case 'form':
       return (
         <View style={{ gap: space.xl }}>
@@ -606,13 +508,12 @@ export function SkeletonPage({ shape }: { shape: SkeletonPageShape | SkeletonSha
  * seule carte de 1 364 points de large à 1 920, puis le Fil en trois colonnes : tout sautait. Sous
  * une grille de compactes (« Récents » d'Explorer, sur ordinateur), la forme d'une compacte, comme
  * la carte (`ProjectCard`). La dernière rangée se complète de cases vides, comme dans la grille.
- * R16 : chaque carte passe sa colonne à sa lueur, qui traverse ainsi la rangée.
+ * R16 : chaque case dessine la carte de projet vide (`ProjectCardSkeleton`), qui choisit sa taille
+ * comme la vraie carte (la compacte sous une grille de compactes sur ordinateur) quand `compact` ne
+ * l'impose pas ; elle reçoit sa colonne, et sa lueur traverse ainsi la rangée.
  */
 function FeedGridShapes({ count, compact = false }: { count: number; compact?: boolean }) {
   const { columns, probe } = useGridColumns()
-  const compactCards = useContext(GridCardsContext) === 'compact'
-  const wide = useLayout().sizeClass === 'wide'
-  const Shapes = compact || (compactCards && wide) ? CompactCardShapes : FeedCardShapes
   const rows = Math.ceil(count / columns)
   return (
     <View style={{ gap: space.lg }}>
@@ -622,12 +523,130 @@ function FeedGridShapes({ count, compact = false }: { count: number; compact?: b
           {Array.from({ length: columns }, (_, column) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: une case est une place dans la rangée.
             <View key={column} style={{ flex: 1 }}>
-              {row * columns + column < count ? <Shapes column={column} /> : null}
+              {row * columns + column < count ? (
+                <ProjectCardSkeleton
+                  column={column}
+                  {...(compact ? { size: 'compact' as const } : null)}
+                />
+              ) : null}
             </View>
           ))}
         </View>
       ))}
       {probe}
+    </View>
+  )
+}
+
+/**
+ * La page vide d'un membre (planches R16-Membre-1440 et 390) : son en-tête vide, puis la mosaïque
+ * de ses projets, 4 petites cartes. Sur ordinateur, comme la vraie page (MemberScreen, R15) :
+ * l'en-tête en colonne à gauche, de la largeur du profil, et la mosaïque à droite ; ailleurs,
+ * l'en-tête centré au-dessus. La forme se décide comme la page, par la classe de taille : avant
+ * l'hydratation, toutes deux prennent celle du téléphone, et rien ne saute à l'arrivée.
+ */
+function MemberPageShapes() {
+  const column = useLayout().sizeClass === 'wide'
+  const mosaic = <FeedGridShapes count={PAGE_CARDS} compact />
+  if (column) {
+    return (
+      <Columns
+        sideFirst
+        sideWidth="profile"
+        side={<MemberHeaderSkeleton layout="column" />}
+        main={mosaic}
+      />
+    )
+  }
+  return (
+    <View style={{ gap: space.xxl }}>
+      <MemberHeaderSkeleton />
+      {mosaic}
+    </View>
+  )
+}
+
+/** Les pastilles du statut et de la catégorie, au-dessus du titre d'un projet. */
+const PROJECT_BADGES = [72, 56] as const
+/** La pastille d'un statut (celle de la carte) : un peu plus basse qu'un contrôle. */
+const BADGE_HEIGHT = 22
+/** La photo de l'auteur, sous le titre. */
+const AUTHOR_PHOTO = 32
+/** Les actions de l'en-tête : « Suivre » l'auteur, puis « Suivre ce projet » et « Rejoindre les testeurs ». */
+const FOLLOW_WIDTH = 72
+const PROJECT_ACTIONS = [128, 152] as const
+
+/**
+ * L'en-tête vide d'un projet (planche R16-Projet-1440), aux places de l'en-tête qui arrive : les
+ * pastilles du statut, le titre et sa date, l'auteur (sa photo, son nom, son pseudo, « Suivre » à
+ * droite), deux lignes d'accroche, « Tester la démo » (le grand bouton), l'adresse de la démo, puis
+ * les deux actions plus discrètes. Les lignes ont la hauteur des lignes écrites (`TextLineShape`).
+ */
+function ProjectHeaderShapes() {
+  return (
+    <View style={{ gap: space.lg }}>
+      <View style={{ gap: space.sm }}>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          {PROJECT_BADGES.map((width) => (
+            <Shape key={width} height={BADGE_HEIGHT} width={width} round />
+          ))}
+        </View>
+        <TextLineShape variant="title2" width="70%" />
+        <TextLineShape variant="caption" width="45%" />
+      </View>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.sm,
+          minHeight: layout.touchTarget,
+        }}
+      >
+        <Shape height={AUTHOR_PHOTO} width={AUTHOR_PHOTO} round />
+        <View style={{ flexGrow: 1, flexShrink: 1 }}>
+          <TextLineShape variant="callout" width="35%" />
+          <TextLineShape variant="caption" width="25%" />
+        </View>
+        <Shape height={layout.controlHeight.small} width={FOLLOW_WIDTH} round />
+      </View>
+      <View>
+        <TextLineShape variant="body" width="90%" />
+        <TextLineShape variant="body" width="55%" />
+      </View>
+      <View style={{ gap: space.sm }}>
+        <Shape height={layout.controlHeight.regular} width="80%" round />
+        <TextLineShape variant="caption" width="55%" />
+      </View>
+      <View style={{ gap: space.sm, alignItems: 'flex-start' }}>
+        {PROJECT_ACTIONS.map((width) => (
+          <Shape key={width} height={layout.controlHeight.small} width={width} round />
+        ))}
+      </View>
+    </View>
+  )
+}
+
+/**
+ * Le haut vide de la page d'un projet (planche R16-Projet-1440) : la galerie vide
+ * (`ProjectCoverSkeleton`, qui prend la hauteur de la galerie qui arrive) et l'en-tête vide. Sur
+ * ordinateur, comme la vraie page (ProjectPage, R5a) : la galerie à gauche, l'en-tête dans la
+ * colonne de droite (`Columns sideWidth="wide"`) ; ailleurs, l'un sous l'autre. Le bas de la page
+ * (description, recette, commentaires) est la pièce de la page elle-même (`ProjectPageSkeleton`).
+ */
+function ProjectTopShapes() {
+  const wide = useLayout().sizeClass === 'wide'
+  if (wide) {
+    return (
+      <Columns
+        sideWidth="wide"
+        rows={[{ main: <ProjectCoverSkeleton />, side: <ProjectHeaderShapes /> }]}
+      />
+    )
+  }
+  return (
+    <View style={{ gap: space.xl }}>
+      <ProjectCoverSkeleton />
+      <ProjectHeaderShapes />
     </View>
   )
 }

@@ -17,7 +17,7 @@ import { Icon } from './Icon'
 import type { ImageSource } from './image'
 import { type PressEvent, TextLineShape } from './ListGroup'
 import { linkProps } from './SettingsNav'
-import { Shape } from './Skeleton'
+import { Loading, Shape } from './Skeleton'
 import { Surface } from './Surface'
 import { Text } from './Text'
 
@@ -121,23 +121,19 @@ function NameShapes() {
 }
 
 /**
- * R16 (plan, choix 12) : la carte attend son profil. Elle garde son attente à elle, nommée par
- * l'écran (`loadingLabel`, « Chargement… ») plutôt que par `Loading` (ui/Skeleton.tsx), qui dit
- * toujours le même mot : un `progressbar` occupé, autour des formes du nom et du lien.
+ * R16 (plan, choix 12) : la carte attend son profil. Son attente est celle de toutes les zones qui
+ * chargent (`Loading`, ui/Skeleton.tsx : un `progressbar` occupé, invisible et caché aux lecteurs
+ * pendant 160 ms, puis montré en fondu), nommée par l'écran (`loadingLabel`, « Chargement… »),
+ * autour des formes du nom et du lien. Un profil lu en moins de 160 ms ne montre donc rien d'autre
+ * que le nom ; les formes gardent la place dès le premier rendu.
  */
 function PendingName({ label }: { label: string }) {
   return (
-    <View
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel={label}
-      // Occupé : `aria-busy` sur le web (react-native-web ignore accessibilityState), l'état
-      // « busy » sur téléphone.
-      {...(Platform.OS === 'web' ? { 'aria-busy': true } : { accessibilityState: { busy: true } })}
-      style={{ gap: space.xxs }}
-    >
-      <NameShapes />
-    </View>
+    <Loading label={label}>
+      <View style={{ gap: space.xxs }}>
+        <NameShapes />
+      </View>
+    </Loading>
   )
 }
 
