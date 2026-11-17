@@ -1,9 +1,10 @@
 // Tests de la carte d'un projet posée dans une grille de compactes (relecture de design de R15,
 // planche R15-Explorer-1920) : sous `GridCardsContext` à `compact` (« Récents » d'Explorer), une
-// carte sans taille donnée devient, sur ordinateur, la compacte de la mosaïque : ni « Tester », ni
-// catégorie, ni accroche sur une photo ; l'auteur, la pastille posée dessus (« Suivre Nora ») et le
-// statut restent. Sur téléphone, « Récents » garde ses grandes cartes, « Tester » compris. Une
-// taille donnée par l'écran l'emporte toujours.
+// carte sans taille donnée devient, sur ordinateur, la compacte de la mosaïque : ni catégorie, ni
+// accroche sur une photo ; l'auteur, la pastille posée dessus (« Suivre Nora »), le statut et
+// « Tester » restent (décision du 17/11/2026 : « Tester » est l'action de chaque carte d'Explorer).
+// Sur téléphone, « Récents » garde ses grandes cartes. Une taille donnée par l'écran l'emporte
+// toujours, et la case d'une mosaïque (taille « compact » donnée) reste sans « Tester ».
 import { act, screen } from '@testing-library/react-native'
 import { Dimensions, StyleSheet, Text } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -53,11 +54,11 @@ it('ProjectCard becomes the compact card in a compact grid on a computer', async
   setWindow(1920, 940)
   await renderWithProviders(inCompactGrid())
 
-  // La compacte : ni « Tester » ni accroche sur la photo.
-  expect(screen.queryByRole('link', { name: testName })).toBeNull()
+  // La compacte : pas d'accroche sur la photo.
   expect(screen.queryByText(card.pitch)).toBeNull()
-  // Ce qu'elle garde dans Explorer : le lien du projet, l'auteur, la pastille et le statut.
+  // Ce qu'elle garde dans Explorer : le lien du projet, « Tester », l'auteur, la pastille et le statut.
   expect(screen.getByRole('link', { name: card.title })).toBeTruthy()
+  expect(screen.getByRole('link', { name: testName })).toBeTruthy()
   expect(screen.getByText(card.author.name)).toBeTruthy()
   expect(screen.getByText(CHIP)).toBeTruthy()
   expect(screen.getByText(card.status.label)).toBeTruthy()
@@ -100,6 +101,13 @@ it('keeps the size the screen gives, even in a compact grid on a computer', asyn
   await renderWithProviders(inCompactGrid('full'))
 
   expect(screen.getByRole('link', { name: testName })).toBeTruthy()
+})
+
+it('leaves Tester out of a compact card whose size the screen gives, as in a member mosaic', async () => {
+  setWindow(1920, 940)
+  await renderWithProviders(inCompactGrid('compact'))
+
+  expect(screen.queryByRole('link', { name: testName })).toBeNull()
 })
 
 it('keeps the large card outside a compact grid on a computer', async () => {
