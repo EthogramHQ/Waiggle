@@ -46,6 +46,7 @@ import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
+import { CoverReturnScope, useCoverReturn } from './coverTransition'
 import { useFloatingClaim } from './floatingSpace'
 import { type Focusable, focusTarget, holdsFocus } from './focus'
 import { hiddenFrame } from './HiddenHeading'
@@ -257,6 +258,8 @@ export function Screen({
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
+  // Le drapeau du retour sans fondu (R14), partagé par tous les fondus de l'écran (plus bas).
+  const coverReturn = useCoverReturn()
   const { padding, sizeClass, card, width: windowWidth, height: windowHeight } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
@@ -562,7 +565,7 @@ export function Screen({
   const tabPage = pageTitle === null ? undefined : (pageTitle ?? title)
   const tabTitle = tabPage ? `${shorten(tabPage)} | ${appName}` : appName
 
-  return (
+  const page = (
     // NoticeScope : les messages d'un même groupe (une seule « session expirée ») se comptent par
     // écran ; la page restée montée sous celle-ci a les siens (ui/Notice.tsx).
     <NoticeScope>
@@ -819,6 +822,10 @@ export function Screen({
       </ScreenAmbient>
     </NoticeScope>
   )
+  // CoverReturnScope (R14) : un seul drapeau « une carte de la page a ouvert un projet » pour tous
+  // les fondus de l'écran (en-tête, contenu, pied, place collée) : au retour, aucun ne se rejoue,
+  // pas seulement celui qui porte la carte (ui/ScreenFade.tsx).
+  return <CoverReturnScope value={coverReturn}>{page}</CoverReturnScope>
 }
 
 /**

@@ -28,6 +28,13 @@
 // Sur le web, l'API View Transitions du navigateur n'est pas utilisée : la page du projet ne dessine
 // sa photo qu'une fois le projet lu, et le navigateur photographie la page juste après la navigation,
 // donc l'écran de chargement. La même mesure sert partout.
+//
+// R14 (« Entrer dans un projet et en sortir »), le retour sans page vide :
+// - la page de la carte, restée dans la pile sous le projet, ne rejoue pas son fondu au retour
+//   (`useCoverReturn`, lu par ui/ScreenFade) : elle est déjà là, au même endroit ;
+// - par le Retour du navigateur (web), la page du projet disparaît sans passer par `leave` : rien
+//   ne se replie, alors la carte d'origine le marque d'un léger rebond (`bounceStyle`) et reprend
+//   le focus du clavier, sans faire défiler.
 import { durations, type Radius, radii, springs } from '@ruche/brand'
 import {
   createContext,
@@ -48,7 +55,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated'
 import { type Focusable, focusWithoutScroll } from './focus'
-import { fade, useCalmMotion } from './theme/motion'
+import { fade, spring, useCalmMotion } from './theme/motion'
 
 /** Un cadre dans la fenêtre, en points : sa position (coin en haut à gauche) et sa taille. */
 export type Frame = { x: number; y: number; width: number; height: number }
@@ -92,6 +99,8 @@ const LAND_MAX = 1500
  */
 const REFOCUS_STEP = 50
 const REFOCUS_MAX = 1000
+/** Le rebond de la carte au Retour du navigateur (R14) : elle part de cette échelle, revient à 1. */
+const BOUNCE_FROM = 0.96
 
 /** Sur le web, le lien autour de la photo d'une carte (son `Pressable` en `role="link"`). */
 const linkOf = (node: Measurable | null) => node?.closest?.('[role="link"], a') ?? null
@@ -100,9 +109,17 @@ const linkOf = (node: Measurable | null) => node?.closest?.('[role="link"], a') 
  * Rend le focus au lien de la carte, sans défilement (`focusWithoutScroll`). Un élément caché ne
  * prend pas le focus : on réessaie jusqu'à ce qu'il l'ait (le navigateur le dit par
  * `document.activeElement`), ou que le délai passe. Hors du navigateur, un seul essai.
+ *
+ * `shown` (R14) est appelé une fois, quand la carte est de nouveau à l'écran : son lien a pris le
+ * focus (un élément caché ne le prend pas), le membre a déjà mis le focus ailleurs, ou le délai
+ * est passé. Le rebond attend ce moment : joué sous une page encore cachée, il ne se verrait pas.
  */
-const refocus = (link: unknown) => {
-  if (!link || Platform.OS !== 'web') return
+const refocus = (link: unknown, shown?: () => void) => {
+  if (Platform.OS !== 'web') return
+  if (!link) {
+    shown?.()
+    return
+  }
   const started = Date.now()
   const web = typeof document !== 'undefined'
   // Le focus au moment du retour (le bouton « Retour ») : s'il part ailleurs que sur la page entière
@@ -111,17 +128,24 @@ const refocus = (link: unknown) => {
   const attempt = () => {
     if (web) {
       const now = document.activeElement
-      if (now !== before && now !== document.body && now !== null) return
+      if (now !== before && now !== document.body && now !== null) {
+        shown?.()
+        return
+      }
     }
     focusWithoutScroll(link)
     const done = !web || document.activeElement === link
     if (!done && Date.now() - started < REFOCUS_MAX) setTimeout(attempt, REFOCUS_STEP)
+    else shown?.()
   }
   attempt()
 }
 
-/** Une carte affichée : son projet et la vue de sa photo (null quand elle n'est plus là). */
-type Entry = { id: string; node: Measurable | null }
+/**
+ * Une carte affichée : son projet, la vue de sa photo (null quand elle n'est plus là), et son
+ * rebond (R14), qu'on joue au Retour du navigateur.
+ */
+type Entry = { id: string; node: Measurable | null; bounce: () => void }
 
 /**
  * L'état d'une page qui arrive, partagé par sa photo (`CoverArrival`) et ses autres morceaux
@@ -139,6 +163,16 @@ type Stage = {
   arrived: boolean
   /** Les `CoverArrival` montés pour ce projet ; l'état s'oublie quand il n'y en a plus. */
   users: number
+  /**
+   * Le bouton « Retour » de la page a été touché (`leave`). Une page qui disparaît sans lui, c'est
+   * le Retour du navigateur (R14) : la carte d'origine rebondit.
+   */
+  left: boolean
+  /**
+   * La page vient d'une carte touchée (R14). Gardé ici, pas seulement dans la photo : une photo
+   * remontée ensuite (passage en colonnes) ne le relit plus, la carte en attente étant déjà oubliée.
+   */
+  fromCard: boolean
 }
 
 /** Ce qu'une photo de page sait faire au départ : jouer le plan, puis appeler `then`. */
@@ -187,6 +221,8 @@ const stageOf = (store: Store, id: string): Stage => {
       rest: makeMutable(0),
       arrived: false,
       users: 0,
+      left: false,
+      fromCard: false,
     }
     store.stages.set(id, stage)
   }
@@ -194,15 +230,76 @@ const stageOf = (store: Store, id: string): Stage => {
 }
 
 /**
+ * La page d'un projet ouvert depuis une carte vient de disparaître sans son bouton « Retour » : le
+ * Retour du navigateur (R14). La page de la carte revient d'un coup, sans photo qui se replie ; la
+ * carte d'origine, si elle est encore affichée, reprend le focus (sans défilement) et rebondit.
+ * Sur le web seulement : sur téléphone, le retour par le geste ou la touche du système a déjà le
+ * glissement de la pile.
+ */
+const welcomeBack = (store: Store, id: string) => {
+  if (Platform.OS !== 'web') return
+  const origin = store.origins.get(id)
+  if (!origin?.node || !store.entries.has(origin)) return
+  refocus(linkOf(origin.node), origin.bounce)
+}
+
+/**
+ * R14, le retour sans page vide : le drapeau d'une page, que ses cartes lèvent quand l'une d'elles
+ * ouvre un projet. Au retour sur la page, son fondu (ui/ScreenFade) le lit et ne se rejoue pas :
+ * la page est déjà là, au même endroit ; puis il le baisse, et le retour suivant (par un autre
+ * chemin) refond. Un simple objet, changé sans redessiner : seul le rendu du retour le lit.
+ */
+export type CoverReturn = { opened: boolean }
+
+// Le drapeau de la page, pour ses cartes. Null hors d'une page (catalogue, tests d'une carte seule).
+const ReturnContext = createContext<CoverReturn | null>(null)
+
+/**
+ * Le drapeau de la page : celui que pose plus haut `Screen`, partagé par tous ses fondus (l'en-tête,
+ * le contenu, le pied) ; sinon un drapeau propre à ce composant.
+ */
+export function useCoverReturn(): CoverReturn {
+  const outer = useContext(ReturnContext)
+  const [own] = useState<CoverReturn>(() => ({ opened: false }))
+  return outer ?? own
+}
+
+/** Rend le drapeau de la page à tout ce qui est posé dessous (ses cartes, ses autres fondus). */
+export function CoverReturnScope({ value, children }: { value: CoverReturn; children: ReactNode }) {
+  return <ReturnContext.Provider value={value}>{children}</ReturnContext.Provider>
+}
+
+/**
  * Hook de la carte : `ref` se pose sur la vue autour de sa photo ; `capture(then)` se donne au
  * toucher, à la place de la navigation, qu'il appelle une fois la photo mesurée. Sans fournisseur,
  * avec « Réduire les animations » ou sans photo mesurable, `then` tout de suite.
+ *
+ * `bounceStyle` (R14) : le style animé du rebond de la carte au Retour du navigateur, à poser sur
+ * une vue à lui (une vue par transformation animée : l'appui et l'inclinaison de la carte gardent
+ * les leurs). Une échelle, 1 quand rien ne bouge.
  */
 export function useCoverSource(id: string) {
   const store = useContext(CoverContext)
+  const back = useContext(ReturnContext)
   const calm = useCalmMotion()
-  const entry = useRef<Entry>({ id, node: null })
+  // L'échelle du rebond, et « Réduire les animations » au moment où il se joue (un `ref` : le
+  // rebond part d'un minuteur, après le rendu qui l'a vu).
+  const scale = useSharedValue(1)
+  const calmNow = useRef(calm)
+  calmNow.current = calm
+  const entry = useRef<Entry>({
+    id,
+    node: null,
+    bounce: () => {
+      // Sous « Réduire les animations », pas de rebond. C'est voulu, au-delà de la règle du projet
+      // (seuls les grands déplacements y deviennent des fondus) : un retour calme ne bouge pas.
+      if (calmNow.current) return
+      scale.value = BOUNCE_FROM
+      scale.value = spring(1, 'honey')
+    },
+  })
   entry.current.id = id
+  const bounceStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
 
   // La carte s'inscrit tant qu'elle est affichée : au retour, « la carte est encore là » se lit ici.
   useEffect(() => {
@@ -228,6 +325,9 @@ export function useCoverSource(id: string) {
       // La carte touchée est retenue (l'objet, pas sa vue du moment) : au retour, si elle est encore
       // affichée, son lien reprend le focus.
       store.origins.set(id, entry.current)
+      // Sa page, restée dans la pile, ne refondra pas au retour (R14), « Réduire les animations »
+      // compris : ce n'est pas une animation de moins, c'est une page vide de moins.
+      if (back) back.opened = true
       if (calm || !node) {
         // Rien à faire grandir, mais la page sait qu'elle vient d'une carte : son titre prendra le
         // focus après le fondu (une adresse ouverte directement, elle, laisse le focus en haut).
@@ -252,10 +352,10 @@ export function useCoverSource(id: string) {
         open(width > 0 && height > 0 ? { x, y, width, height } : null)
       })
     },
-    [store, calm, id],
+    [store, back, calm, id],
   )
 
-  return { ref, capture }
+  return { ref, capture, bounceStyle }
 }
 
 /**
@@ -298,6 +398,10 @@ export function useCoverTarget(id: string) {
 
   const leave = useCallback(
     (then: () => void) => {
+      // Quittée par son bouton : sa disparition ne sera pas prise pour le Retour du navigateur (pas
+      // de rebond en plus du repli). Gardé même si la page reste (rien avant elle) : sans rebond.
+      const stage = store?.stages.get(id)
+      if (stage) stage.left = true
       // Venue d'une carte, la page rend le focus du clavier au lien de cette carte une fois quittée
       // (sur le web) : la lecture au clavier reprend là où elle s'était arrêtée dans le fil, au lieu
       // de retomber sur la page entière. Ouverte par son adresse, elle ne focalise aucune carte.
@@ -374,16 +478,21 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
 
   // L'état de la page compte ses photos ; il s'oublie après la dernière (un peu plus tard : une
   // photo qui passe d'une colonne à l'autre est retirée puis remontée dans le même affichage).
+  // R14 : la dernière photo partie sans le bouton « Retour », d'une page venue d'une carte, c'est le
+  // Retour du navigateur ; l'aperçu remplacé par le projet complet, lui, garde la même photo.
   useEffect(() => {
     if (!store || !stage) return
     stage.users += 1
+    if (fromCard) stage.fromCard = true
     return () => {
       stage.users -= 1
       setTimeout(() => {
-        if (stage.users === 0 && store.stages.get(id) === stage) store.stages.delete(id)
+        if (stage.users !== 0 || store.stages.get(id) !== stage) return
+        store.stages.delete(id)
+        if (stage.fromCard && !stage.left) welcomeBack(store, id)
       }, 0)
     }
-  }, [store, stage, id])
+  }, [store, stage, id, fromCard])
 
   useEffect(() => {
     mounted.current = true
