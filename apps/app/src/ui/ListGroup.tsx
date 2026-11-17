@@ -7,7 +7,9 @@
 // flèches cochent le choix voisin en faisant le tour, Espace et Entrée cochent le choix qui a le
 // focus. Avant (point de liste de R1), la page « Signaler » demandait sept Tab pour traverser
 // ses motifs.
-import { borders, layout, radii, space } from '@ruche/brand'
+// R16 : `ListRowSkeleton`, la ligne vide d'une liste qui charge (en bas du fichier), et
+// `TextLineShape`, une ligne de texte vide à la hauteur d'une ligne écrite.
+import { borders, layout, radii, space, type TextVariant, textStyles } from '@ruche/brand'
 import {
   Children,
   createContext,
@@ -24,6 +26,7 @@ import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
 import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
 import { RadioMark } from './Radio'
+import { Shape } from './Skeleton'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -70,6 +73,13 @@ type RadioSlot = {
 }
 
 const RadioSlotContext = createContext<RadioSlot | null>(null)
+
+/**
+ * R16 : le rang d'une ligne dans son groupe (0 pour la première). Seule la ligne vide le lit, pour
+ * varier la longueur de ses formes d'une ligne à la suivante, comme des noms de longueurs
+ * différentes ; l'écran pose ses lignes vides sans compter.
+ */
+const RowRankContext = createContext(0)
 
 /**
  * La largeur que garde le nom d'une ligne (en points) avant que le côté droit passe dessous : de quoi
@@ -166,11 +176,13 @@ export function ListGroup({
             ) : null
           const key = (row as { key?: string }).key ?? i
           // Une liste (R7b) : la ligne et son trait dans un même élément de liste.
+          // Son rang, que lit la ligne vide (R16) ; sans effet sur une vraie ligne.
+          const ranked = <RowRankContext.Provider value={i}>{row}</RowRankContext.Provider>
           if (asList) {
             return (
               <View key={key} role="listitem">
                 {separator}
-                {row}
+                {ranked}
               </View>
             )
           }
@@ -178,9 +190,9 @@ export function ListGroup({
             <Fragment key={key}>
               {separator}
               {choices[i] ? (
-                <RadioSlotContext.Provider value={slot(i)}>{row}</RadioSlotContext.Provider>
+                <RadioSlotContext.Provider value={slot(i)}>{ranked}</RadioSlotContext.Provider>
               ) : (
-                row
+                ranked
               )}
             </Fragment>
           )
@@ -554,8 +566,103 @@ export function ListRow({
   )
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** Une ligne vide de liste. Sans rôle ni nom à elle. */
-export function ListRowSkeleton(_props: Record<string, never>): ReactNode {
-  return null
+// ---------------------------------------------------------------------------------------------
+// R16 (« Les squelettes ») : la ligne vide d'une liste
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Une ligne de texte vide : une forme de la hauteur d'une ligne écrite dans ce style (`textStyles`
+ * de la marque), la forme elle-même un peu plus basse que les lettres et centrée dedans. Deux lignes
+ * vides empilées prennent ainsi la place des deux lignes écrites qui arrivent : rien ne saute.
+ * Exportée pour les autres pièces vides qui imitent du texte (l'en-tête et la carte d'un membre).
+ */
+export function TextLineShape({
+  variant,
+  width,
+  center = false,
+}: {
+  variant: TextVariant
+  width: `${number}%` | number
+  /** Centrée sur sa ligne, comme un texte centré (l'en-tête d'un membre sur téléphone). */
+  center?: boolean
+}): ReactNode {
+  const { size, lineHeight } = textStyles[variant]
+  return (
+    <View
+      style={{
+        height: lineHeight,
+        justifyContent: 'center',
+        ...(center ? { alignItems: 'center' } : null),
+      }}
+    >
+      <Shape height={Math.round(size * SHAPE_TO_TEXT)} width={width} />
+    </View>
+  )
+}
+
+/** La forme d'une ligne vide, en part de la taille des lettres : un peu moins que leur hauteur. */
+const SHAPE_TO_TEXT = 0.75
+
+/** Les largeurs des deux lignes d'une ligne vide, qui varient d'une ligne à la suivante. */
+const ROW_WIDTHS = [
+  ['55%', '80%'],
+  ['40%', '65%'],
+  ['50%', '75%'],
+] as const
+
+/** La place d'un avatar ou d'une tuile en tête de ligne (ceux de `HiveMemberList`, `InitialTile`). */
+const ROW_LEADING = 40
+/** Une pastille à droite (« Tester », un statut) ; une courte ligne (un compte). */
+const ROW_PILL_WIDTH = 64
+const ROW_SHORT_LINE = 24
+
+/**
+ * La ligne vide d'une liste (plan R16, choix 4 et 11) : à poser dans un `ListGroup` (le groupe
+ * blanc, ses filets), cinq fois pour une liste qui charge, ou autant que la liste aura de lignes.
+ * Elle reprend les marges et la hauteur d'une `ListRow` : en tête, un rond (la photo d'un membre)
+ * ou une tuile (un outil) ; puis le nom et une précision, deux lignes dont la largeur change d'une
+ * ligne à la suivante (le groupe lui donne son rang) ; à droite, si la vraie ligne en a, une tuile,
+ * une pastille ou une courte ligne.
+ *
+ * Sans rôle ni nom : c'est le `Loading` de la zone (ui/Skeleton.tsx) qui dit « Chargement… », une
+ * seule fois pour toutes ses lignes.
+ */
+export function ListRowSkeleton({
+  leading = 'round',
+  trailing = 'none',
+}: {
+  /** En tête : `round`, une photo ; `square`, une tuile ; `none`, rien. */
+  leading?: 'round' | 'square' | 'none'
+  /** À droite : `square`, une vignette ; `pill`, une pastille ; `line`, un compte ; `none`, rien. */
+  trailing?: 'square' | 'pill' | 'line' | 'none'
+}): ReactNode {
+  const rank = useContext(RowRankContext)
+  const [name, detail] = ROW_WIDTHS[rank % ROW_WIDTHS.length] ?? ROW_WIDTHS[0]
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        minHeight: layout.controlHeight.regular,
+        paddingHorizontal: space.lg,
+        paddingVertical: space.md,
+      }}
+    >
+      {leading === 'none' ? null : (
+        <Shape height={ROW_LEADING} width={ROW_LEADING} round={leading === 'round'} />
+      )}
+      {/* Les deux lignes de la vraie ligne : le nom (en gras, la taille du texte courant) et la
+          précision (plus petite), chacune à la hauteur de sa ligne écrite. */}
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: MIN_NAME, gap: space.xxs }}>
+        <TextLineShape variant="body" width={name} />
+        <TextLineShape variant="callout" width={detail} />
+      </View>
+      {trailing === 'square' ? <Shape height={ROW_LEADING} width={ROW_LEADING} /> : null}
+      {trailing === 'pill' ? (
+        <Shape height={layout.controlHeight.small} width={ROW_PILL_WIDTH} round />
+      ) : null}
+      {trailing === 'line' ? <TextLineShape variant="caption" width={ROW_SHORT_LINE} /> : null}
+    </View>
+  )
 }
