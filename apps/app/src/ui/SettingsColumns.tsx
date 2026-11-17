@@ -46,8 +46,21 @@ export function SettingsColumns({ nav, title, current, children }: Props) {
     focusWithoutScroll(titleRef.current)
   }, [current])
 
+  // R15 (« Ce qui reste étroit ») : la colonne et la rubrique forment un bloc de largeur fixe,
+  // centré dans la page au lieu d'être calé à gauche. Sa borne est la somme de ses parties (la
+  // colonne, l'écart, un formulaire) : à 1 920 ou 2 560 points, il ne s'élargit pas. `width:
+  // '100%'` lui fait remplir une page plus étroite, où la rubrique rétrécit comme avant.
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.xxl }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: space.xxl,
+        width: '100%',
+        maxWidth: layout.settingsNavWidth + space.xxl + layout.formWidth,
+        alignSelf: 'center',
+      }}
+    >
       {/* La colonne : une carte blanche, de la largeur d'une colonne latérale. */}
       <View style={{ width: layout.settingsNavWidth, flexShrink: 0 }}>
         <Surface variant="grouped" padding="sm">
