@@ -4004,3 +4004,65 @@ Des règles de contenu, sans code : l'équipe les suit en publiant.
 - Ses projets comptent dans « Outils populaires » et dans le nombre de projets d'un outil, comme
   ceux des membres : les outils d'un même éditeur n'apparaissent pas dans plus de 4 projets
   d'exemple, pour ne pas faire le classement à la place des membres.
+
+## R13 — Le premier chargement
+
+Mesuré le 17/11/2026 sur waiggle.com (audit de design, section 4) : sur un téléphone modeste (4G
+lente, processeur ralenti), l'accueil ne devient vivant qu'après 8,5 s ; pendant ce temps le titre
+est caché sous la barre du haut et la page reste un moment sans texte. Sur ordinateur, on voit
+d'abord la page du téléphone étirée, puis un saut. En mode sombre, l'écran reste noir, puis montre la
+page de jour. Le script fait 1,3 Mo, le même pour toutes les pages, catalogue de développement et
+deux langues comprises. Le serveur, lui, répond en 33 ms : tout se joue dans la page.
+
+Le contenu des pages publiques dans leur HTML et le cache des images publiques viennent avec R22
+« Les pages publiques » ; une seule langue dans le script, avec R18 « Les finitions » (quelques
+dizaines de Ko pour beaucoup de précautions : la page anglaise doit l'avoir dès le premier rendu).
+
+### Ce que voit un visiteur pendant le chargement
+
+- Étant donné un visiteur qui ouvre l'accueil, une page publique ou les Règles
+  Quand la page n'a pas encore démarré
+  Alors le titre est lisible en entier : la barre du haut a déjà sa place et ne recouvre rien.
+- Le texte s'affiche dès la première image, dans une police du système de la même famille (sans
+  empattement, ou à chasse fixe pour le code), puis dans les polices de la marque quand elles
+  arrivent : jamais une page sans texte.
+- Étant donné un visiteur sur ordinateur (fenêtre de plus de 700 px)
+  Quand la page n'a pas encore démarré
+  Alors il voit le fond de la page et l'abeille au centre, jamais la mise en page du téléphone
+  étirée ; puis la page d'ordinateur, sans saut.
+- Étant donné un appareil en mode sombre
+  Quand la page n'a pas encore démarré, même après 3 secondes
+  Alors il voit le fond de nuit et l'abeille, jamais la page de jour ; puis la page de nuit.
+- Un lecteur d'écran n'annonce pas l'abeille d'attente comme un contenu : elle est décorative, et la
+  page annonce son titre quand elle est prête.
+- « Réduire les animations » : l'abeille d'attente ne vole pas, elle reste posée.
+
+### Ce que charge la page
+
+- Le catalogue des composants n'est pas dans le script de l'appli publiée : ni ses écrans ni ses
+  textes (« Catalogue des composants » et ses exemples) ; la page `/catalogue` reste « introuvable »
+  en ligne et marche en développement.
+- Les écrans rares et lourds (modération, éditeur de projet, réglages, coin des testeurs) se
+  chargent quand on les ouvre, pas avec l'accueil.
+- Les polices : au format du web (WOFF2) ; seules celles du premier écran sont préchargées ; la
+  police à chasse fixe (Geist Mono) arrive avec l'écran qui s'en sert.
+
+### Les cibles (téléphone modeste, mesurées avant et après par le même script)
+
+| Mesure | Le 17/11 | Cible |
+| --- | --- | --- |
+| Poids transféré de `/fr/` | 1 650 Ko | moins de 600 Ko |
+| Script de `/fr/` | 1 319 Ko | moins de 450 Ko |
+| L'appli démarre | 8,5 s | moins de 4 s |
+| Polices au premier écran | 208 Ko, 8 fichiers | moins de 70 Ko, 3 fichiers |
+| Sauts de mise en page de l'accueil (ordinateur ; téléphone) | 0,24 ; 0,20 | moins de 0,05 |
+| Titre caché par la barre | oui, 7 s | jamais |
+| Page sans texte | 0,4 s | jamais |
+| Mode sombre avant le démarrage | écran noir 3,4 s, puis page de jour | l'abeille sur fond de nuit |
+
+Une cible manquée ne bloque pas la tranche : le bilan dit de combien, et pourquoi.
+
+### Le reste ne change pas
+
+Une fois la page démarrée, rien ne change pour un membre ni pour un visiteur : mêmes écrans, mêmes
+textes, mêmes adresses. Le parcours d'un membre et les captures restent verts.

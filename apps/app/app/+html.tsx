@@ -1,7 +1,7 @@
 // Le squelette HTML des pages web, fabriqué une fois à la construction (pas d'API du navigateur ici).
 import { ScrollViewStyleReset } from 'expo-router/html'
 import type { PropsWithChildren } from 'react'
-import { documentCss } from '../src/ui/theme/document'
+import { documentCss, noscriptCss, waitBeeMarkup } from '../src/ui/theme/document'
 
 /*
  * R12 (plan, choix 5 ; relecture de sécurité du plan, B1) : en ligne, Caddy lit les pages publiques
@@ -77,7 +77,23 @@ export default function Root({ children }: PropsWithChildren) {
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: texte fixe tiré des jetons, sans contenu de membre */}
         <style dangerouslySetInnerHTML={{ __html: documentCss }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* R13 : sans JavaScript, la page se montre tout de suite et l'abeille d'attente reste
+            cachée (src/ui/theme/document.ts, noscriptCss). Dans le corps, jamais dans la tête : le
+            contenu d'un <noscript> de la tête se lit autrement, et le marqueur de Caddy n'y veut
+            rien d'autre (plus haut). Une feuille de style seule : aucun script en ligne (la
+            politique de sécurité n'admet que celui d'Expo). */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: texte fixe tiré des jetons, sans contenu de membre */}
+        <noscript dangerouslySetInnerHTML={{ __html: `<style>${noscriptCss}</style>` }} />
+        {/* L'abeille d'attente (R13) : sur ordinateur et en mode sombre, la page reste cachée
+            jusqu'au démarrage de l'appli, et l'abeille du lancement attend au centre. Un décor
+            (aria-hidden), sans aucun mot, hors du flux de la page ; ses couleurs et son vol sont
+            dans documentCss. Avant la page : Expo Router n'hydrate que `#root`, ce frère reste tel
+            quel. */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: dessin fixe du logo, sans contenu de membre */}
+        <div data-wait="" aria-hidden="true" dangerouslySetInnerHTML={{ __html: waitBeeMarkup }} />
+        {children}
+      </body>
     </html>
   )
 }

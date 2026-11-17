@@ -50,6 +50,8 @@ jest.mock('../profile/ProvisionalNameGate', () => ({ ProvisionalNameGate: () => 
 jest.mock('../rules/RulesGate', () => ({ RulesGate: () => null }))
 // R12 : le marqueur « membre » du web lit la session ; il a ses propres tests (accounts/memberMarker).
 jest.mock('../accounts/memberMarker', () => ({ useMemberMarkerSync: () => {} }))
+// R13 : le préchargement de l'éditeur lit la session ; il a ses propres tests (chunks/preload).
+jest.mock('../navigation/chunks/preload', () => ({ EditorPreload: () => null }))
 // Ni lumière dessinée (WebGL), ni thème qui touche au navigateur : l'hôte donne seulement sa place.
 jest.mock('../ui/AmbientLight', () => ({ AmbientLight: () => null }))
 

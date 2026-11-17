@@ -21,7 +21,7 @@ import {
 } from 'react-native'
 import type { Focusable } from './focus'
 import { TextLayoutContext } from './textLayout'
-import { fontFiles, fontName, monoFont } from './theme/fonts'
+import { fontFiles, fontName, fontStack, monoFont } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Les couleurs de texte possibles, par rôle. */
@@ -111,12 +111,14 @@ const toneColor = {
 
 /**
  * La police d'un rôle de texte. Geist Mono (les rôles `mono` et `code`) est livrée en 400 et 500 ;
- * si une graisse manquait un jour à `fontFiles`, on prendrait `monoFont` plutôt qu'une police que
- * l'appli n'a pas chargée.
+ * si une graisse manquait un jour à `fontFiles`, on prendrait le 400 plutôt qu'une police que
+ * l'appli n'a pas chargée. Sur le web, le nom est suivi de la famille du système qui le remplace
+ * tant que la police n'est pas arrivée (fontStack, R13).
  */
 const fontFamilyOf = (family: FontFamily, weight: FontWeight): string => {
   const name = fontName(family, weight)
-  return family === 'mono' && !(name in fontFiles) ? monoFont : name
+  if (family === 'mono' && !(name in fontFiles)) return monoFont
+  return fontStack(family, name)
 }
 
 /**

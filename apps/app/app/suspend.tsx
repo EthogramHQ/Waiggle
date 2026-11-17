@@ -9,11 +9,20 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useMemberSession } from '../src/accounts/session'
 import { useQueueAuthor } from '../src/moderation/api'
-import { SuspendSheet } from '../src/moderation/SuspendSheet'
+import { lazyScreen } from '../src/navigation/lazyScreen'
 import { firstParam } from '../src/navigation/params'
 import { useRouteSheet } from '../src/navigation/useRouteSheet'
 import { MemberScreen } from '../src/screens/MemberScreen'
 import { useHydrated } from '../src/ui/theme/hydration'
+
+// La fenêtre « Suspendre », réservée aux administrateurs, se charge quand on l'ouvre, pas avec
+// l'accueil (R13, navigation/lazyScreen.tsx). Elle n'est posée qu'une fois la page hydratée (elle
+// ne s'ouvre pas avant, `useRouteSheet`) : pendant son morceau, rien ne s'affiche à sa place, et la
+// page d'en dessous (celle d'avant, ou celle du membre) reste visible.
+const SuspendSheet = lazyScreen(
+  () => import('../src/navigation/chunks/moderation').then((m) => m.SuspendSheet),
+  { sheet: true },
+)
 
 export default function SuspendPage() {
   const { member, fromKind, fromId } = useLocalSearchParams<{
@@ -42,13 +51,15 @@ export default function SuspendPage() {
   return (
     <>
       {alone ? <MemberScreen id={memberId} /> : null}
-      <SuspendSheet
-        memberId={memberId}
-        open={sheet.open}
-        onClose={sheet.close}
-        {...(parsed.success ? { fromReport: parsed.data } : null)}
-        {...(author ? { author } : null)}
-      />
+      {hydrated ? (
+        <SuspendSheet
+          memberId={memberId}
+          open={sheet.open}
+          onClose={sheet.close}
+          {...(parsed.success ? { fromReport: parsed.data } : null)}
+          {...(author ? { author } : null)}
+        />
+      ) : null}
     </>
   )
 }

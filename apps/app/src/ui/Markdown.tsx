@@ -17,7 +17,7 @@ import { Fragment, type ReactNode, useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { enterActivates } from './keyboard'
 import { headingLevel } from './Text'
-import { fontName, monoFont } from './theme/fonts'
+import { fontName, fontStack, monoFont } from './theme/fonts'
 import { type Theme, useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -247,20 +247,20 @@ const makeStyles = ({ colors }: Theme) => {
     // peine à retrouver le début de la ligne suivante).
     root: { gap: space.md, maxWidth: readableWidth },
     text: {
-      fontFamily: fontName(body.family, body.weight),
+      fontFamily: fontStack(body.family, fontName(body.family, body.weight)),
       fontSize: body.size,
       lineHeight: body.lineHeight,
       color: colors.textSecondary,
     },
     heading: {
-      fontFamily: fontName(heading.family, heading.weight),
+      fontFamily: fontStack(heading.family, fontName(heading.family, heading.weight)),
       fontSize: heading.size,
       lineHeight: heading.lineHeight,
       letterSpacing: heading.size * heading.tracking,
       color: colors.text,
       marginTop: space.xs,
     },
-    bold: { fontFamily: fontName('text', 700), color: colors.text },
+    bold: { fontFamily: fontStack('text', fontName('text', 700)), color: colors.text },
     italic: { fontStyle: 'italic' },
     strike: { textDecorationLine: 'line-through' },
     link: { color: colors.amberText, textDecorationLine: 'underline' },

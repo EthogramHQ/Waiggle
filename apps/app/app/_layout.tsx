@@ -4,7 +4,6 @@
 // (couleurs du jour ou de la nuit) et les polices.
 import { defaultLanguage } from '@ruche/i18n'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { useFonts } from 'expo-font'
 import { DefaultTheme, ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
@@ -14,6 +13,7 @@ import { useMemberMarkerSync } from '../src/accounts/memberMarker'
 import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
+import { EditorPreload } from '../src/navigation/chunks/preload'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
@@ -21,7 +21,7 @@ import { AmbientHost, hostedNavigationTheme, usePageStackOptions } from '../src/
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
-import { fontFiles } from '../src/ui/theme/fonts'
+import { useAppFonts } from '../src/ui/theme/fonts'
 import { ThemeProvider, useTheme } from '../src/ui/theme/ThemeProvider'
 import { ToastProvider } from '../src/ui/theme/toast'
 
@@ -36,9 +36,10 @@ export default function RootLayout() {
   // langue du visiteur une fois chargées. Ainsi le HTML préparé et le premier affichage concordent.
   // useState(() => …) ne crée l'instance qu'une seule fois, au premier affichage.
   const [i18n] = useState(() => createI18n(isWeb ? defaultLanguage : detectLanguage()))
-  // Les polices de l'appli (voir src/ui/theme/fonts.ts). Sur le web, elles sont déclarées dans la
-  // page dès sa préparation ; sur téléphone, on attend qu'elles soient prêtes avant d'afficher.
-  const [fontsLoaded] = useFonts(fontFiles)
+  // Les polices de l'appli (voir useAppFonts dans src/ui/theme/fonts.ts). Sur le web, Funnel est
+  // déclarée dans la page dès sa préparation, Geist Mono demandée après l'hydratation ; sur
+  // téléphone, toutes d'emblée, et on attend qu'elles soient prêtes avant d'afficher.
+  const fontsLoaded = useAppFonts()
 
   // useEffect s'exécute après l'affichage : c'est là qu'on peut toucher au navigateur.
   useEffect(() => {
@@ -58,8 +59,9 @@ export default function RootLayout() {
   // Sur téléphone, tant que les polices chargent : l'écran du lancement, le logo animé sur le fond
   // de l'appli (plutôt qu'un écran vide). Il a besoin des traductions (son nom pour les lecteurs
   // d'écran) et du thème : il se pose donc à la place de la navigation, dans les fournisseurs. Sur
-  // le web, rien de plus : la page est pré-rendue, ses polices déclarées dans la page.
-  const launching = !fontsLoaded && !isWeb
+  // le web, rien de plus : la page est pré-rendue, son texte s'écrit d'abord dans une police du
+  // système (`font-display: swap`), puis dans celles de la marque à leur arrivée.
+  const launching = !isWeb && !fontsLoaded
 
   return (
     // Les « Provider » rendent une ressource disponible à tous les écrans placés à l'intérieur,
@@ -72,6 +74,8 @@ export default function RootLayout() {
           {/* R12 : sur le web, le marqueur `waiggle_member` suit la session (posé, effacé), pour
               que le serveur envoie au Fil un membre qui arrive sur `/`. */}
           <MemberMarkerSync />
+          {/* R13 : le morceau de l'éditeur, demandé d'avance pour un membre (web). */}
+          <EditorPreload />
           {/* R3 : la barre d'onglets du téléphone, posée une seule fois au-dessus de toutes les pages,
               pour que sa goutte glisse d'un onglet à l'autre. AppTabBar décide où elle se montre ;
               TabBarHost mesure sa hauteur et la donne aux écrans (la place à réserver en bas) et

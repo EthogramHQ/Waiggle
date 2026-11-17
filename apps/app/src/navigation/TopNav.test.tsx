@@ -4,7 +4,7 @@
 //
 // Tranche 7c : la barre porte aussi le bandeau d'un compte suspendu, une fois pour toutes les
 // pages qui la montent, sur téléphone comme sur ordinateur, et n'y propose plus « Publier ».
-import { palettes } from '@ruche/brand'
+import { layout, palettes, space } from '@ruche/brand'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Dimensions, StyleSheet } from 'react-native'
 import { createI18n } from '../i18n'
@@ -256,6 +256,90 @@ describe('the links of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     expect(screen.queryByRole('link', { name: t(($) => $.nav.explore) })).toBeNull()
+  })
+})
+
+// R13 (relecture du plan, décision 1, R4) : sur ordinateur, la capsule attend la réponse de la
+// session (une requête partie après le démarrage de l'appli). Pendant ce temps, la barre garde sa
+// place, vide : sinon le titre remonte puis redescend quand la capsule arrive. La place n'a rien à
+// dire ni à toucher : cachée aux lecteurs d'écran.
+describe('the top bar while the session loads', () => {
+  type Node = {
+    type: unknown
+    props: Record<string, unknown>
+    parent: Node | null
+    children: (Node | string)[]
+  }
+  const everyNode = (node: Node): Node[] => {
+    const all: Node[] = []
+    const visit = (current: Node | string) => {
+      if (typeof current === 'string') return
+      all.push(current)
+      for (const child of current.children) visit(child)
+    }
+    visit(node)
+    return all
+  }
+  const hiddenFromReaders = (node: Node) =>
+    node.props['aria-hidden'] === true ||
+    node.props.accessibilityElementsHidden === true ||
+    node.props.importantForAccessibility === 'no-hide-descendants'
+
+  it('holds the capsule place, hidden from screen readers, while the session loads on a wide screen', async () => {
+    mockSession(null, true)
+    await renderWithProviders(<TopNav />)
+
+    // La hauteur de la capsule : la place réservée de la barre, moins la marge du haut que la bande
+    // (ScreenTopBar) ajoute elle-même au-dessus (zone sûre nulle dans Jest).
+    const capsule = layout.topBarHeight.regular - space.lg
+    const holders = everyNode(screen.root as unknown as Node).filter((node) => {
+      const style = StyleSheet.flatten(node.props.style as never) as
+        | Record<string, unknown>
+        | undefined
+      return style?.height === capsule || style?.minHeight === capsule
+    })
+    expect(holders).toHaveLength(1)
+    const holder = holders[0] as Node
+    expect(hiddenFromReaders(holder)).toBe(true)
+    expect(holder.props.role ?? holder.props.accessibilityRole).toBeUndefined()
+    // Rien à lire ni à toucher dedans.
+    expect(screen.queryAllByRole('button', { includeHiddenElements: true })).toEqual([])
+    expect(screen.queryAllByRole('link', { includeHiddenElements: true })).toEqual([])
+    expect(everyNode(holder).some((node) => node.children.some((c) => typeof c === 'string'))).toBe(
+      false,
+    )
+  })
+
+  it('holds no place for a visitor once the session is known', async () => {
+    // Témoin : la session répond « personne » ; la barre ne rend rien, plus de place gardée.
+    mockSession(null, false)
+    await renderWithProviders(<TopNav />)
+
+    const capsule = layout.topBarHeight.regular - space.lg
+    const holders = everyNode(screen.root as unknown as Node).filter((node) => {
+      const style = StyleSheet.flatten(node.props.style as never) as
+        | Record<string, unknown>
+        | undefined
+      return style?.height === capsule || style?.minHeight === capsule
+    })
+    expect(holders).toEqual([])
+  })
+
+  it('holds no place on a phone, where the capsule never shows', async () => {
+    restoreWindow()
+    restoreWindow = () => {}
+    mockSession(null, true)
+    await renderWithProviders(<TopNav />)
+
+    expect(screen.queryAllByRole('button', { includeHiddenElements: true })).toEqual([])
+    const capsule = layout.topBarHeight.regular - space.lg
+    const holders = everyNode(screen.root as unknown as Node).filter((node) => {
+      const style = StyleSheet.flatten(node.props.style as never) as
+        | Record<string, unknown>
+        | undefined
+      return style?.height === capsule || style?.minHeight === capsule
+    })
+    expect(holders).toEqual([])
   })
 })
 

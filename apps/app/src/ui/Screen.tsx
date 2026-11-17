@@ -54,7 +54,12 @@ import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
 import { ScreenFooterOutlet, useScreenFooterSlot } from './ScreenFooterSlot'
 import { ScreenSticky } from './ScreenSticky'
-import { rememberedTopBarSpace, ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
+import {
+  declaresTopBarReserve,
+  rememberedTopBarSpace,
+  ScreenTopBar,
+  type TopBarSpace,
+} from './ScreenTopBar'
 import { Surface } from './Surface'
 import { useScreenFocused, useScreenShownCount } from './screenFocus'
 import { type ScreenScroll, ScreenScrollContext, useScreenScrollChannel } from './scrollLight'
@@ -293,6 +298,15 @@ export function Screen({
   const [barSpace, setBarSpace] = useState<TopBarSpace>(
     () => (topBar ? rememberedTopBarSpace(windowWidth) : null) ?? NO_BAR_SPACE,
   )
+  // R13 (relecture du plan, décision 1) : la place d'une barre qui la déclare (`VisitorBar`), avant
+  // toute mesure. La page pré-rendue n'a ni mesure ni effet : réservée dès le premier rendu, sans
+  // attendre `onSpace`, la barre ne se pose plus sur le titre. Le jeton `layout.topBarHeight`, par
+  // taille d'écran (la page pré-rendue est en largeur de téléphone), plus la zone sûre du haut.
+  // Jamais pour un en-tête qui ne rend peut-être rien (`TopNav` d'un visiteur).
+  const barReserve =
+    topBar && declaresTopBarReserve(header)
+      ? insets.top + layout.topBarHeight[sizeClass === 'compact' ? 'compact' : 'regular']
+      : undefined
   const barPinned = topBar && barSpace.pinned
   // Ce que la barre fixe couvre en haut de la fenêtre : la lumière qui suit le défilement cherche
   // son « milieu de l'écran » dessous (ui-15).
@@ -301,9 +315,10 @@ export function Screen({
   }, [scroll.channel, barPinned, barSpace.height])
   // La place réservée en haut du contenu : sous la barre de ScreenTopBar, sa hauteur mesurée plus
   // l'écart d'avant entre la barre et le titre. Tant qu'elle n'est pas mesurée (le pré-rendu, la
-  // première image), la place d'une barre vide : la marge du haut, et le même écart.
+  // première image), la place déclarée par la barre (plus haut), sinon celle d'une barre vide : la
+  // marge du haut, et le même écart.
   const contentTop = topBar
-    ? (barSpace.height > 0 ? barSpace.height : insets.top + space.lg) + space.xl
+    ? (barSpace.height > 0 ? barSpace.height : (barReserve ?? insets.top + space.lg)) + space.xl
     : (pinned ? 0 : insets.top) + space.lg
   // ui-5 : `titleAside` passé sous la barre fixe, une fois le titre passé dessous. Ses deux places,
   // à côté du titre et sous la barre : il est remonté en changeant de place, et s'il avait le focus
@@ -599,6 +614,7 @@ export function Screen({
                   belowBar={barPinned ? shownBelowBar : undefined}
                   belowRef={asideUnderBar}
                   onSpace={setBarSpace}
+                  reserved={barReserve}
                 >
                   {header}
                 </ScreenTopBar>

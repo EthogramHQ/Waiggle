@@ -13,7 +13,7 @@ import { foldForSearch, foldWithMap } from '@ruche/contracts'
 import type { ReactElement } from 'react'
 import { Text as NativeText, Platform, type TextStyle } from 'react-native'
 import { Text, type TextProps } from './Text'
-import { fontName } from './theme/fonts'
+import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Un morceau du texte d'origine, `[début, fin)`, en unités UTF-16 (celles de `slice`). */
@@ -91,7 +91,9 @@ export function HighlightedText({ text, words, ...props }: HighlightedTextProps)
   const style = textStyles[props.variant ?? 'body']
   const weight =
     style.family === 'text'
-      ? { fontFamily: fontName('text', markWeight(props.weight ?? style.weight)) }
+      ? {
+          fontFamily: fontStack('text', fontName('text', markWeight(props.weight ?? style.weight))),
+        }
       : null
   // Le surlignage passe l'encre (`text`) sur le miel, même dans une ligne grise : couple mesuré
   // dans `contrastPairs` (packages/brand), et une graisse de plus (voir markWeight). Il hérite du

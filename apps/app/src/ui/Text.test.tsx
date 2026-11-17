@@ -1,7 +1,7 @@
 // Tests des rôles de texte de Miel 2 (tranche R1) : le nom géant d'un outil tient sur une ligne
 // (il rétrécit au lieu de passer à la ligne au milieu d'un mot), et les rôles à chasse fixe (mono,
 // code) ne demandent jamais une police que l'appli n'a pas chargée.
-import { maxHeadingScale, maxTextScale } from '@ruche/brand'
+import { maxHeadingScale, maxTextScale, type TextVariant, textStyles } from '@ruche/brand'
 import { screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -97,6 +97,44 @@ describe('Text, the page and section titles', () => {
     )
 
     expect(multiplier('Waiggle')).toBe(1.2)
+  })
+})
+
+// R13 (relecture du plan, décision 4) : sur le web, une police de la marque arrive après le texte
+// (`font-display: swap`) ; d'ici là, le navigateur prend une police du système de la même famille :
+// sans empattement pour Funnel, à chasse fixe pour Geist Mono. Sur téléphone, le nom seul : une
+// liste de polices n'y veut rien dire, et casserait la police.
+describe('Text, the fallback of the brand fonts', () => {
+  const generic = { display: 'sans-serif', text: 'sans-serif', mono: 'monospace' } as const
+  const variants = Object.keys(textStyles) as TextVariant[]
+
+  it('ends every web font family with a generic fallback of the same kind', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <>
+          {variants.map((variant) => (
+            <Text key={variant} variant={variant}>{`texte ${variant}`}</Text>
+          ))}
+        </>,
+      )
+
+      for (const variant of variants) {
+        const family = styleOf(`texte ${variant}`).fontFamily ?? ''
+        const [brand, ...rest] = family.split(',').map((name) => name.trim())
+        // D'abord la police de la marque, livrée par l'appli ; puis la famille du système, seule.
+        expect(Object.keys(fontFiles)).toContain(brand)
+        expect(rest).toEqual([generic[textStyles[variant].family]])
+      }
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('names the brand font alone on a phone', async () => {
+    await renderWithProviders(<Text variant="body">Sur téléphone</Text>)
+
+    expect(Object.keys(fontFiles)).toContain(styleOf('Sur téléphone').fontFamily)
   })
 })
 

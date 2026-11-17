@@ -22,13 +22,13 @@
 //
 // Jest ne calcule aucune position : on appelle les `onLayout` comme l'appareil le ferait, et on lit
 // l'arbre et les propriétés.
-import { space } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import { act, screen } from '@testing-library/react-native'
 import type { ReactNode } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { Button } from './Button'
-import { ScreenTopBar } from './ScreenTopBar'
+import { forgetTopBarSpace, ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
 import { type ScreenScroll, ScreenScrollContext, type ScrollEvent } from './scrollLight'
 import { Text } from './Text'
 
@@ -86,9 +86,21 @@ const bar = (
 )
 
 /** La place du haut, posée dans un cadre du test (`host`) qui borne ce qu'on lit. */
-const stage = (props: { belowBar?: ReactNode; onHeight?: (height: number) => void } = {}) => (
+const stage = (
+  props: {
+    belowBar?: ReactNode
+    onHeight?: (height: number) => void
+    onSpace?: (space: TopBarSpace) => void
+    reserved?: number
+  } = {},
+) => (
   <View testID="host">
-    <ScreenTopBar belowBar={props.belowBar} onHeight={props.onHeight}>
+    <ScreenTopBar
+      belowBar={props.belowBar}
+      onHeight={props.onHeight}
+      onSpace={props.onSpace}
+      reserved={props.reserved}
+    >
       {bar}
     </ScreenTopBar>
   </View>
@@ -191,6 +203,32 @@ describe('ScreenTopBar', () => {
     const news = screen.getByRole('button', { name: NEWS }) as unknown as Node
     expect(order.indexOf(publish)).toBeGreaterThan(-1)
     expect(order.indexOf(news)).toBeGreaterThan(order.indexOf(publish))
+  })
+
+  // R13 (plan, décision 4 ; relecture du plan, décision 1 et R5) : une barre qui déclare sa place
+  // (`reserved`, donnée par Screen : `layout.topBarHeight`) la rend dès le premier rendu, celui de la
+  // page pré-rendue, avant toute mesure ; la mesure la remplace ensuite.
+  it('hands the reserved height to the screen from its first render, then the measure', async () => {
+    forgetTopBarSpace()
+    const onSpace = jest.fn()
+    await renderWithProviders(stage({ onSpace, reserved: layout.topBarHeight.compact }))
+
+    // La première place rendue (l'effet qui suit le premier rendu), avant toute mesure.
+    expect(onSpace.mock.calls[0]?.[0]).toMatchObject({ height: layout.topBarHeight.compact })
+
+    await measureBar(72)
+
+    expect(onSpace.mock.calls.at(-1)?.[0]).toMatchObject({ height: 72 })
+  })
+
+  it('reserves nothing before the measure when no place is declared', async () => {
+    // Témoin : sans `reserved`, une barre qui ne rend peut-être rien (TopNav d'un visiteur) ne
+    // réserve rien avant d'être mesurée.
+    forgetTopBarSpace()
+    const onSpace = jest.fn()
+    await renderWithProviders(stage({ onSpace }))
+
+    expect(onSpace.mock.calls[0]?.[0]).toMatchObject({ height: 0 })
   })
 
   it('hands the measured height of the bar to the screen', async () => {
