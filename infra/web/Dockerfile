@@ -41,7 +41,7 @@ RUN pnpm --filter @ruche/app build
 RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
 
 # --- Étape 2 : Caddy et les fichiers de l'appli, rien d'autre ---
-FROM caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
+FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 COPY infra/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/app/dist /srv/app
 # La politique MTA-STS des e-mails (voir infra/Caddyfile, « MTA-STS »), servie à part.
