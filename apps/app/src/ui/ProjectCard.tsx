@@ -76,6 +76,7 @@ import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { GridCardsContext } from './ProjectGrid'
 import { RelativeTime } from './RelativeTime'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
@@ -174,7 +175,10 @@ type Props = {
    * de sa taille (`PROJECT_CARD_HEIGHT`, `PROJECT_CARD_COMPACT_HEIGHT`).
    */
   height?: number
-  /** R14 : la grande carte du fil (par défaut) ou la petite de la mosaïque d'un membre. */
+  /**
+   * R14 : la grande carte du fil (par défaut) ou la petite de la mosaïque d'un membre. R15 : sans
+   * elle, la compacte dans une grille de compactes (`GridCardsContext`) sur ordinateur.
+   */
   size?: ProjectCardSize
   /**
    * R14 : le style animé du rebond de la carte au Retour du navigateur (`bounceStyle` de
@@ -281,7 +285,7 @@ export function ProjectCard({
   reactionTotal = 0,
   onPress,
   height: givenHeight,
-  size = 'full',
+  size: givenSize,
   bounceStyle,
   overlay,
   category: givenCategory,
@@ -292,10 +296,17 @@ export function ProjectCard({
   const { t } = useTranslation()
   const { colors } = useTheme()
   const web = Platform.OS === 'web'
-  const compact = size === 'compact'
   // R15 (planches R15-Membre-1920) : sur ordinateur, le titre d'une compacte en `heading` (22) ; sur
   // téléphone et tablette, `headline` (18), où une compacte n'a que 110 à 230 points de texte.
   const wide = useLayout().sizeClass === 'wide'
+  // Sans taille donnée, la grille décide (relecture de design de R15, planche R15-Explorer-1920) :
+  // sous `GridCardsContext` à `compact` (« Récents » d'Explorer), sur ordinateur, la compacte, et
+  // non la grande carte du Fil resserrée (470 points de haut : aucune rangée entière dans une
+  // fenêtre de 940). Sur téléphone et tablette, « Récents » garde ses grandes cartes, une ou deux
+  // par rangée, avec « Tester ».
+  const gridCards = useContext(GridCardsContext)
+  const size: ProjectCardSize = givenSize ?? (gridCards === 'compact' && wide ? 'compact' : 'full')
+  const compact = size === 'compact'
   const height = givenHeight ?? (compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
   const panelPadding = compact ? COMPACT_PANEL_PADDING : PANEL_PADDING
   // R14 : la carte compacte ne montre ni la catégorie ni « Tester » (la page du projet les a) ;
