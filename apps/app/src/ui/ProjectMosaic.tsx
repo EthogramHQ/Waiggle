@@ -138,10 +138,10 @@ export function ProjectMosaic<T extends { id: string }>({ items, render }: Props
   // Le texte très agrandi (sur le web, lu par une ligne cachée, `probe`, posée dans la liste).
   const { large, probe } = useLargeText()
   // Les colonnes sous le bloc d'en tête, comptées d'après la place (R15). Les compactes s'y
-  // alignent sur les bords de la grande carte ; elles ne descendent pas sous la largeur des cartes
-  // du Fil sur grand écran (`cardMin.feedWide`) : trois de 437 points à côté du profil à 1 920
-  // (planche R15-Membre-1920), et non quatre de 324 ; trois au moins, pour le bloc d'en tête.
-  const columns = Math.max(MIN_COLUMNS, columnsFor(room, layout.cardMin.feedWide, GAP))
+  // alignent sur les bords de la grande carte ; elles ne descendent pas sous `cardMin.mosaic` :
+  // trois de 437 points à côté du profil à 1 920 (planche R15-Membre-1920), et non quatre de 324 ;
+  // trois au moins, pour le bloc d'en tête.
+  const columns = Math.max(MIN_COLUMNS, columnsFor(room, layout.cardMin.mosaic, GAP))
   const rows = mosaicRows(items.length, width, { largeText: large, columns })
   // Deux projets au-delà du téléphone : deux grandes cartes égales, côte à côte.
   const twoEqual = rows.length === 1 && Array.isArray(rows[0]) && rows[0].length === 2
