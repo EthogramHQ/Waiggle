@@ -158,7 +158,7 @@ export const publicRoutes = ({ db, publicApiUrl }: Deps) => {
     // projet inconnu, quel que soit le curseur. Il est lu comme pour un membre (routes/updates.ts) :
     // trois étapes (cursor.ts), une date bornée des deux côtés.
     const cursor = readCursor(c.req.valid('query').cursor)
-    const bad = cursor === 'invalid' || (cursor !== null && cursor.at >= '2100')
+    const bad = cursor === 'invalid'
     // 21 lignes : la dernière dit s'il y a une suite, sans compter ni deviner.
     const rows = await loadPublicUpdates(
       db,

@@ -1,7 +1,6 @@
 // Tests des règles de texte communes : ce qu'un nom, une bio ou un outil peut contenir.
 import { describe, expect, it } from 'vitest'
-import { NoteText } from './notes'
-import { DisplayName, FreeText, ShortLabel } from './text'
+import { DisplayName, FreeText, ShortLabel, VisibleFreeText } from './text'
 
 // Deux numéros Unicode « à ignorer par défaut », écrits par leur numéro : tapés tels quels, ils
 // seraient invisibles dans ce fichier.
@@ -70,16 +69,20 @@ describe('DisplayName', () => {
   })
 })
 
-describe('NoteText', () => {
-  it('refuses a note made only of code points that Unicode says to ignore', () => {
+// La règle des textes libres qui doivent se voir (commentaires, explications d'un retrait…),
+// essayée ici avec une limite de 1 000 caractères.
+describe('VisibleFreeText', () => {
+  const VisibleText = VisibleFreeText(1_000)
+
+  it('refuses a text made only of code points that Unicode says to ignore', () => {
     for (const blank of [IGNORED_2065, IGNORED_FFF0, `${IGNORED_2065}\n${IGNORED_FFF0}`]) {
-      expect(NoteText.safeParse(blank).success).toBe(false)
+      expect(VisibleText.safeParse(blank).success).toBe(false)
     }
   })
 
-  it('accepts a note that shows something, even with a code point to ignore inside', () => {
-    const note = `Bonne idée${IGNORED_2065}\n${IGNORED_FFF0} !`
-    expect(NoteText.parse(note)).toBe(note)
+  it('accepts a text that shows something, even with a code point to ignore inside', () => {
+    const text = `Bonne idée${IGNORED_2065}\n${IGNORED_FFF0} !`
+    expect(VisibleText.parse(text)).toBe(text)
   })
 })
 

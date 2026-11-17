@@ -5,7 +5,7 @@
 // le compteur à partir de 900 caractères, l'erreur au-dessus du champ avec « Réessayer », et la
 // légende dessous, qui dit qui lira (donnée par l'écran : relecture juridique jur-P1).
 //
-// Les gardes reprises de `NoteComposer` (Découpage du plan R5b) : rien ne part d'un champ vide ou
+// Les gardes du champ (Découpage du plan R5b) : rien ne part d'un champ vide ou
 // fait d'espaces, un double toucher n'envoie qu'une fois, l'envoi en cours est annoncé « occupé »,
 // le texte reste dans le champ après une erreur, et le focus revient au champ quand on ferme le
 // bandeau. Le composant ne garde aucun état du texte : l'écran (`useCommentDraft`) le lui donne.

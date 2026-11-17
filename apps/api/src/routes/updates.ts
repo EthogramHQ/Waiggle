@@ -274,11 +274,11 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // autre, bloqué dans un sens ou l'autre : la même réponse). Un projet public d'un autre se lit.
     if ((await projectAccess(db, id, user.id)) === 'not_found') return notFound(c)
 
-    // Le curseur se décode en trois étapes (cursor.ts : format, JSON, schéma strict). Sa date est
-    // bornée des deux côtés : avant 2000 (PostgreSQL refuse l'an 0) et après 2100 (rien n'est publié
-    // si tard) ; hors de ces bornes, 400 comme pour tout curseur qui ne veut rien dire.
+    // Le curseur se décode en trois étapes (cursor.ts : format, JSON, schéma strict), et sa date
+    // est bornée des deux côtés par `CursorDate` ; hors de ces bornes, 400 comme pour tout curseur
+    // qui ne veut rien dire.
     const cursor = readCursor(c.req.valid('query').cursor)
-    if (cursor === 'invalid' || (cursor !== null && cursor.at >= '2100')) {
+    if (cursor === 'invalid') {
       return c.json(errorBody(languageOf(c), 'validation'), 400)
     }
 

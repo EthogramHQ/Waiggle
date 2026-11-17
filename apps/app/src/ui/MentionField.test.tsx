@@ -50,8 +50,10 @@ function Field({
   placement,
   title,
   maxHeight,
+  onKeyPress,
 }: {
   maxHeight?: number
+  onKeyPress?: (event: { nativeEvent: { key: string } }) => void
   suggestions?: Suggestion[]
   suggestionsFor?: string | null
   onQueryChange?: (query: string | null) => void
@@ -73,6 +75,7 @@ function Field({
       {...(placement ? { suggestionsPlacement: placement } : null)}
       {...(title ? { suggestionsTitle: title } : null)}
       {...(maxHeight ? { suggestionsMaxHeight: maxHeight } : null)}
+      {...(onKeyPress ? { onKeyPress } : null)}
     />
   )
 }
@@ -372,6 +375,23 @@ describe('MentionField with a keyboard (web)', () => {
 
     expect(screen.queryByLabelText(LIST)).toBeNull()
     expect(field()).toHaveDisplayValue('Bravo @in')
+  })
+
+  // Un écran qui ferme son champ à la touche Échap (un commentaire en cours) : le premier Échap
+  // ferme seulement la liste, le second arrive à l'écran. Ce test passait par NoteComposer avant sa
+  // suppression (décision du 17/11/2026) ; il vérifie maintenant le relais du champ lui-même.
+  it('keeps the first Escape for its list, and passes the second one on to the screen', async () => {
+    const onKeyPress = jest.fn()
+    await renderWithProviders(<Field onKeyPress={onKeyPress} />)
+    await type('Bravo @in')
+
+    await key('Escape')
+    expect(screen.queryByLabelText(LIST)).toBeNull()
+    expect(onKeyPress).not.toHaveBeenCalled()
+
+    await key('Escape')
+    expect(onKeyPress).toHaveBeenCalledTimes(1)
+    expect(onKeyPress.mock.calls[0]?.[0].nativeEvent.key).toBe('Escape')
   })
 
   it('opens the list again after Escape at the next letter', async () => {

@@ -13,7 +13,6 @@ import {
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
-import { PROJECT_NOTE_MAX } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -41,7 +40,6 @@ import { Markdown } from '../ui/Markdown'
 import { MarkedAvatar } from '../ui/MarkedAvatar'
 import { MemberHeader } from '../ui/MemberHeader'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
-import { NoteComposer } from '../ui/NoteComposer'
 import { Notice } from '../ui/Notice'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
@@ -56,7 +54,6 @@ import { Step, StepNumber } from '../ui/StepNumber'
 import { Surface } from '../ui/Surface'
 import { Switch } from '../ui/Switch'
 import { Tag } from '../ui/Tag'
-import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { TextLink, TextLinkShape } from '../ui/TextLink'
@@ -416,7 +413,6 @@ export function CatalogueScreen() {
         </Text>
         <Tag label={l.longHost} onPress={() => {}} />
         <Button label={l.longHost} icon="arrow-up-right" onPress={() => {}} />
-        <TagSample l={l} />
         <VisualEditorSample l={l} />
         {/* Sans couverture verticale : le bouton seul. */}
         <VisualEditorSample l={l} empty />
@@ -817,18 +813,6 @@ export function CatalogueScreen() {
       <CommentThreadCatalogue />
       <CommentMentionsCatalogue />
       <CommentComposerCatalogue />
-      <Section title={l.noteComposerSection}>
-        {/* Le champ d'écriture que `CommentComposer` enveloppe : fermé, fermé juste après un envoi,
-            ouvert (vide, avec un texte, en cours d'envoi, texte manquant, envoi refusé). */}
-        <NoteComposerSample l={l} open={false} />
-        <NoteComposerSample l={l} open={false} success={l.notePublished} />
-        <NoteComposerSample l={l} open value="" />
-        <NoteComposerSample l={l} open value={l.noteBody} />
-        <NoteComposerSample l={l} open value={l.noteBody} pending />
-        <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
-        <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
-      </Section>
-
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
       <ModerationCatalogue />
@@ -1171,65 +1155,6 @@ const newsAuthors = [
 ]
 
 /** Les vignettes sous une couverture : toucher l'une la sélectionne. */
-/** Le champ d'une note dans un état donné, posé dans un journal comme sur la page d'un projet. */
-function NoteComposerSample({
-  l,
-  open,
-  value = '',
-  pending = false,
-  fieldError,
-  error,
-  success,
-}: {
-  l: Labels
-  open: boolean
-  value?: string
-  pending?: boolean
-  fieldError?: string
-  error?: string
-  success?: string
-}) {
-  return (
-    <Surface variant="grouped" padding="xl" gap="lg">
-      <NoteComposer
-        open={open}
-        onOpen={() => {}}
-        onCancel={() => {}}
-        value={value}
-        onChangeText={() => {}}
-        onSubmit={() => {}}
-        pending={pending}
-        max={PROJECT_NOTE_MAX}
-        labels={{
-          open: l.addNote,
-          field: l.noteField,
-          hint: l.noteHint,
-          submit: l.submitNote,
-          cancel: l.cancel,
-        }}
-        fieldError={fieldError}
-        error={error}
-        success={success}
-        autoFocus={false}
-      />
-    </Surface>
-  )
-}
-
-function TagSample({ l }: { l: Labels }) {
-  const [tools, setTools] = useState(['Claude', 'Expo', 'Supabase'])
-  return (
-    <TagInput
-      label={l.toolsField}
-      values={tools}
-      onChange={setTools}
-      placeholder={l.toolsPlaceholder}
-      removeLabel={(item) => `${l.remove} ${item}`}
-      limit="15"
-    />
-  )
-}
-
 function Choicesample({ l }: { l: Labels }) {
   const { t } = useTranslation()
   const [status, setStatus] = useState<'idea' | 'building' | 'testable'>('testable')

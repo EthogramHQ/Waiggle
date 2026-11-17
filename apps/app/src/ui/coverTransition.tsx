@@ -28,7 +28,7 @@
 // Sur le web, l'API View Transitions du navigateur n'est pas utilisée : la page du projet ne dessine
 // sa photo qu'une fois le projet lu, et le navigateur photographie la page juste après la navigation,
 // donc l'écran de chargement. La même mesure sert partout.
-import { type Radius, radii, springs } from '@ruche/brand'
+import { durations, type Radius, radii, springs } from '@ruche/brand'
 import {
   createContext,
   type ReactNode,
@@ -76,12 +76,13 @@ const PENDING_MAX = 5000
 /** La mesure de la carte ne répond pas (vue retirée entre-temps) : on ouvre la page quand même. */
 const MEASURE_MAX = 150
 /** Le ressort « open » est posé à ce moment-là (environ 0,45 s pour 98 % du chemin). */
-const GROW_LANDED = 560
+// Ces délais suivent les jetons de la marque : changer un jeton garde le passage accordé.
+const GROW_LANDED = durations.slow
 /** Le ressort « close » arrive presque à la carte : on peut quitter la page. */
-const SHRINK_DONE = 420
-/** Les fondus d'entrée et de sortie. */
-const FADE_IN = 320
-const FADE_OUT = 160
+const SHRINK_DONE = durations.medium
+/** Les fondus d'entrée et de sortie, les mêmes que `fade(…)` plus bas (`base`, puis `quick`). */
+const FADE_IN = durations.base
+const FADE_OUT = durations.quick
 /** Filet de sécurité : la photo n'est jamais mesurée (rendu sans mise en page) ; elle se pose. */
 const LAND_MAX = 1500
 /**

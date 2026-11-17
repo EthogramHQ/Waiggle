@@ -7,7 +7,7 @@
 // - « N caractères de trop. » si le texte dépasse la limite, puis la légende, qui dit qui lira.
 //
 // Le composant ne garde aucun texte : l'écran (`useCommentDraft`) le lui donne, décide de la légende
-// et du bandeau. Il garde ce qui se règle ici, repris de `NoteComposer` :
+// et du bandeau. Il garde ce qui se règle ici :
 // - rien ne part d'un champ vide, fait d'espaces ou trop long ; un double toucher n'envoie qu'une fois ;
 // - pendant l'envoi, le champ reste modifiable (R6b : `editable={false}` fermait le clavier sur
 //   iOS) : ce qu'on tape alors reste dans le champ, et seul le texte parti s'en efface à la réponse

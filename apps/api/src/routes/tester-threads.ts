@@ -343,7 +343,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     if (isAuthor && !(await threadExists(db, id, testerId))) return notFound(c)
 
     const cursor = readCursor(c.req.valid('query').cursor)
-    if (cursor === 'invalid' || (cursor !== null && cursor.at >= '2100')) return invalidCursor(c)
+    if (cursor === 'invalid') return invalidCursor(c)
     const page = await loadMessagePage(db, {
       projectId: id,
       testerId,
