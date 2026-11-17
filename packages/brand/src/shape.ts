@@ -77,9 +77,11 @@ export const layout = {
   // suit le gabarit large.
   searchFieldMax: 560,
   // R15 : la largeur sous laquelle une carte ne descend jamais ; une grille gagne une colonne dès
-  // qu'une carte de plus tient à cette largeur. `feed` : les cartes du Fil ; `compact` : les petites
-  // cartes (Récents, la mosaïque d'un membre) ; `tile` : les tuiles d'une étiquette ou d'une ruche.
-  cardMin: { feed: 320, compact: 320, tile: 200 },
+  // qu'une carte de plus tient à cette largeur. `feed` : les cartes du Fil (deux colonnes gardées à
+  // 1 100 points) ; `feedWide` : les mêmes à partir de `breakpoints.xwide` (trois colonnes de 436 à
+  // 1 920, planche R15-Fil-1920, et pas quatre) ; `compact` : les petites cartes (Récents, la mosaïque
+  // d'un membre) ; `tile` : les tuiles d'une étiquette ou d'une ruche (quatre à 1 280, cinq à 1 920).
+  cardMin: { feed: 320, feedWide: 420, compact: 320, tile: 280 },
   // R15 : les colonnes de côté du gabarit large : le panneau du Fil et d'Explorer, la colonne du
   // profil sur la page d'un membre (planches R15-Fil-1920, R15-Membre-1920).
   sidePanel: 340,
