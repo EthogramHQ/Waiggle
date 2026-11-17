@@ -65,6 +65,22 @@ export const useMemberMarkerSync = (): void => {
   }, [state, userId])
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** Vrai si le cookie `waiggle_member=1` existe (web seulement) : la barre garde alors sa place. */
-export const hasMemberMarker = (): boolean => false
+// Le motif de Caddy (`infra/Caddyfile`), recopié tel quel : le nom exact, au début de la liste ou après un « ; »,
+// la valeur « 1 » seule, puis la fin de la liste ou un « ; ». `xwaiggle_member=1`,
+// `waiggle_member=10` ou `other=waiggle_member=1` ne comptent donc pas, ici comme sur le serveur.
+const MARKER_PATTERN = new RegExp(`(^|;)\\s*${MEMBER_MARKER}=1\\s*(;|$)`)
+
+/**
+ * Vrai si le cookie `waiggle_member=1` existe (web seulement) : la barre du haut garde alors sa
+ * place pendant que la session se lit (R16, plan, choix 3), au lieu de faire sauter la page d'un
+ * visiteur. Lecture seule : seul `useMemberMarkerSync` pose et efface le repère.
+ *
+ * Il ne décide d'aucun contenu (relecture de sécurité R16, C2) : n'importe qui peut l'écrire.
+ * Au pré-rendu, sur le serveur, il n'y a pas de `document` : faux. Dans le navigateur, le cookie
+ * est là dès la première image, mais la page pré-rendue ne le connaissait pas : un composant ne le
+ * lit donc qu'une fois `useHydrated()` vrai, sinon React verrait deux pages différentes.
+ */
+export const hasMemberMarker = (): boolean => {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return false
+  return MARKER_PATTERN.test(document.cookie ?? '')
+}

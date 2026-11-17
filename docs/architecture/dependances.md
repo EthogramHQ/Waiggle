@@ -156,6 +156,7 @@ flowchart LR
   n4 --> n32
   n5 --> n6
   n5 --> n32
+  n6 --> n1
   n6 --> n5
   n6 --> n29
   n6 --> n32

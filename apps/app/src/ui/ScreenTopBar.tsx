@@ -40,6 +40,7 @@ import {
 import { type LayoutChangeEvent, Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenScrollContext } from './scrollLight'
+import { useHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -111,18 +112,40 @@ type Props = {
 // R13 (relecture du plan, décision 1) : les barres qui déclarent leur place avant d'être mesurées.
 // Screen ne peut pas savoir, avant de la dessiner, si une barre rendra quelque chose (TopNav d'un
 // visiteur ne rend rien) : seule une barre qui rend toujours sa capsule se déclare, une fois, par
-// son composant (`declareTopBarReserve(VisitorBar)`). Un `WeakSet` : un ensemble qui ne retient pas
-// ce qu'il contient en mémoire, et ne se lit que par `has`.
-const reservingBars = new WeakSet<object>()
+// son composant (`declareTopBarReserve(VisitorBar)`). Une `WeakMap` : une table qui ne retient pas
+// en mémoire les composants qu'elle contient, et ne se lit que par clé.
+//
+// R16 (plan, choix 3) : une barre peut aussi la déclarer sous condition (`TopNav`, qui ne rend sa
+// capsule qu'à un membre : sur le web, seulement si le repère de membre existe). La condition lit
+// le navigateur (un cookie) : la page pré-rendue ne la connaît pas. Elle n'est donc jamais posée au
+// premier rendu (Screen ne la voit pas), mais par la bande elle-même, une fois la page hydratée et
+// sur écran large (`lateReserve`, plus bas). `null` : une barre qui réserve toujours.
+const reservingBars = new WeakMap<object, (() => boolean) | null>()
 
-/** Déclare qu'une barre (son composant) rend toujours sa capsule : Screen lui réserve sa place. */
-export const declareTopBarReserve = (component: object) => {
-  reservingBars.add(component)
+/**
+ * Déclare qu'une barre (son composant) rend toujours sa capsule : Screen lui réserve sa place. Avec
+ * `onlyWhen`, seulement quand la fonction répond vrai, lue après l'hydratation et sur écran large
+ * (une fonction simple, sans hook : elle est appelée pendant le rendu de la bande).
+ */
+export const declareTopBarReserve = (component: object, onlyWhen?: () => boolean) => {
+  reservingBars.set(component, onlyWhen ?? null)
 }
 
-/** Vrai si le `header` donné à Screen est une barre qui a déclaré sa place. */
-export const declaresTopBarReserve = (header: ReactNode): boolean =>
-  isValidElement(header) && typeof header.type !== 'string' && reservingBars.has(header.type)
+/** Le composant de la barre donnée à Screen, si c'en est un (et non une vue native). */
+const barComponent = (header: ReactNode): object | null =>
+  isValidElement(header) && typeof header.type !== 'string' ? (header.type as object) : null
+
+/** Vrai si le `header` donné à Screen est une barre qui a déclaré sa place, sans condition. */
+export const declaresTopBarReserve = (header: ReactNode): boolean => {
+  const bar = barComponent(header)
+  return bar !== null && reservingBars.get(bar) === null
+}
+
+/** Vrai si le `header` a déclaré sa place sous condition, et que la condition tient maintenant. */
+const reservesNow = (header: ReactNode): boolean => {
+  const bar = barComponent(header)
+  return bar !== null && (reservingBars.get(bar)?.() ?? false)
+}
 
 /**
  * La place de la capsule d'ordinateur, vide (R13, relecture du plan, décision 1) : `TopNav` la rend
@@ -179,6 +202,17 @@ export function ScreenTopBar({
   const { colors } = useTheme()
   const { padding, sizeClass, height: windowHeight, width: windowWidth } = useLayout()
   const insets = useSafeAreaInsets()
+  const hydrated = useHydrated()
+
+  // R16 : la place d'une barre déclarée sous condition (`TopNav` d'un membre probable, voir
+  // `declareTopBarReserve`), une fois la page hydratée et sur écran large seulement : la page
+  // pré-rendue ne connaît pas la condition, et sur téléphone, la capsule n'existe pas. La bande la
+  // rend à Screen (`onSpace`), qui pose le contenu dessous avant toute mesure.
+  const lateReserve =
+    reserved === undefined && !brand && hydrated && sizeClass !== 'compact' && reservesNow(children)
+      ? insets.top + layout.topBarHeight.regular
+      : undefined
+  const reserve = reserved ?? lateReserve
 
   // Les hauteurs mesurées : la dernière mesure non nulle (ui-6). Sur le web, une page quittée reste
   // montée, cachée (`display: none`), et mesure 0 : la garder ferait sauter le contenu à son retour.
@@ -189,7 +223,7 @@ export function ScreenTopBar({
   // Sans mesure ni place déjà mesurée, la place déclarée (R13) : celle de la page pré-rendue. Lue à
   // chaque rendu, elle suit la taille d'écran tant que rien n'est mesuré (le pré-rendu est en
   // largeur de téléphone ; après l'hydratation, un ordinateur passe à la capsule d'ordinateur).
-  const barHeight = measuredHeight > 0 || brand ? measuredHeight : (reserved ?? 0)
+  const barHeight = measuredHeight > 0 || brand ? measuredHeight : (reserve ?? 0)
   const [belowHeight, setBelowHeight] = useState(0)
   const keepHeight = (set: (height: number) => void) => (event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height)
