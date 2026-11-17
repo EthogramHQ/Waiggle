@@ -108,6 +108,7 @@ import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
 import { ModerationCatalogue } from './moderation'
 import { ModerationSheetsCatalogue } from './moderation-fenetres'
 import { ModerationR9Catalogue } from './moderation-r9'
+import { MemberMosaicCatalogue } from './mosaique-membre'
 import { NavigationCatalogue } from './navigation'
 import { NotificationsCatalogue } from './notifications'
 import { ToolsCatalogue } from './outils'
@@ -884,6 +885,9 @@ export function CatalogueScreen() {
       {/* Tranche R12b : la pastille « Exemple » et les cartes d'un projet d'exemple
           (exemples-cartes.tsx). */}
       <ExampleCardsCatalogue />
+      {/* Tranche R14 : la carte compacte et la mosaïque des projets d'un membre
+          (mosaique-membre.tsx). */}
+      <MemberMosaicCatalogue />
       {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
           son issue (projet-categorie.tsx). */}
       <ProjectCategoryCatalogue />
