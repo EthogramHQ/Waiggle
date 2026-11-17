@@ -2,6 +2,7 @@
 import { ScrollViewStyleReset } from 'expo-router/html'
 import type { PropsWithChildren } from 'react'
 import { documentCss, noscriptCss, waitBeeMarkup } from '../src/ui/theme/document'
+import { fontFallbackCss } from '../src/ui/theme/fontFallback'
 
 /*
  * R12 (plan, choix 5 ; relecture de sécurité du plan, B1) : en ligne, Caddy lit les pages publiques
@@ -76,6 +77,13 @@ export default function Root({ children }: PropsWithChildren) {
             Une feuille en ligne est permise par la politique de sécurité (style-src 'unsafe-inline'). */}
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: texte fixe tiré des jetons, sans contenu de membre */}
         <style dangerouslySetInnerHTML={{ __html: documentCss }} />
+        {/* R16 (« La page ne bouge plus en arrivant ») : les polices de secours calibrées, une par
+            police livrée (src/ui/theme/fontFallback.ts). Le texte s'écrit d'abord en Arial réglé
+            aux mesures de Funnel, puis en Funnel quand elle arrive, sans que rien ne bouge. Une
+            feuille, pas un script : l'empreinte du script admis par la politique de sécurité ne
+            change pas. */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: texte fixe tiré des mesures des polices, sans contenu de membre */}
+        <style dangerouslySetInnerHTML={{ __html: fontFallbackCss }} />
       </head>
       <body>
         {/* R13 : sans JavaScript, la page se montre tout de suite et l'abeille d'attente reste
