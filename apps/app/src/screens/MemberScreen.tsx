@@ -20,6 +20,12 @@
 //
 // Tranche R10 (F-Et5) : les projets en mosaïque de tuiles (`TileMosaic`, `ProjectTile`), comme la
 // page d'un outil, avec la pastille « Privé » ou « Réservé à Famille ».
+//
+// Tranche R14 (décision 16, « ok, mosaïque ») : les tuiles laissent la place à une mosaïque de
+// cartes comme celles du Fil (`ProjectMosaic`) : le plus récent en grande carte, les suivants en
+// cartes compactes. Aucune carte ne répète le nom du membre (on est sur sa page) ; sa photo est la
+// première de la galerie, à toute largeur ; la pastille de visibilité reste. Toucher une carte fait
+// grandir sa photo jusqu'à la page du projet (`SummaryCard`, par `ui/coverTransition`).
 import {
   type Member,
   PROJECT_LIST_MAX,
@@ -42,6 +48,7 @@ import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { ProvisionalNameBanner } from '../profile/ProvisionalNameBanner'
+import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -54,16 +61,13 @@ import { IconButton } from '../ui/IconButton'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
+import { ProjectMosaic } from '../ui/ProjectMosaic'
 import { parisDateTime } from '../ui/parisTime'
 import { RemovedPart } from '../ui/RemovedPart'
 import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
-import { ProjectTile } from '../ui/Tile'
-import { TileMosaic } from '../ui/TileMosaic'
-import { useTapGuard } from '../ui/tapGuard'
-import { useLayout } from '../ui/theme/layout'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -171,7 +175,8 @@ export function MemberScreen({ id }: { id: string }) {
   // Pas de session : aucune requête (la page d'un membre est réservée aux membres).
   const member = useMember(id, Boolean(session))
 
-  if (state === 'pending') return <LoadingScreen width="page" />
+  // R14 : le squelette prend la forme des petites cartes de la mosaïque, celles qui arrivent.
+  if (state === 'pending') return <LoadingScreen width="page" shape="compact" />
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />
@@ -191,7 +196,7 @@ export function MemberScreen({ id }: { id: string }) {
       <LoadErrorScreen error={member.error} onRetry={() => void member.refetch()} width="page" />
     )
   }
-  if (!member.data) return <LoadingScreen width="page" />
+  if (!member.data) return <LoadingScreen width="page" shape="compact" />
   return <MemberView member={member.data} />
 }
 
@@ -344,14 +349,7 @@ function MemberView({ member }: { member: Member }) {
     ? t(($) => $.member.projectCountMore, { max: PROJECT_LIST_MAX })
     : t(($) => $.member.projectCount, { count: projectCount })
 
-  // R10 : les tuiles de « Ses projets ». Deux colonnes sur téléphone, quatre ailleurs (comme la page
-  // d'un outil). Une tuile n'a pas de garde à elle : la seconde tape d'une double tape n'ouvre pas
-  // deux pages.
-  const phone = useLayout().sizeClass === 'compact'
-  const guard = useTapGuard()
-  const openProject = (projectId: string) =>
-    guard(() => router.push(`/projects/${encodeURIComponent(projectId)}`))
-  // La pastille de visibilité d'une tuile : « Privé » (sur « Moi » : l'API ne montre ses projets
+  // La pastille de visibilité d'une carte : « Privé » (sur « Moi » : l'API ne montre ses projets
   // privés qu'à leur auteur), « Réservé à Famille » pour un projet réservé à une ruche, que l'API ne
   // montre qu'aux membres de la ruche ; « Ruche sans nom » si son nom a été retiré, comme la ligne
   // d'actualité d'une ruche (`HiveActivityRow`).
@@ -517,32 +515,23 @@ function MemberView({ member }: { member: Member }) {
               {null}
             </ProjectGrid>
           ) : (
-            // R10 (F-Et5) : ses projets en mosaïque de tuiles, comme la page d'un outil ; deux
-            // colonnes sur téléphone, quatre ailleurs. La tuile garde la photo, le titre, l'auteur
-            // et la pastille de visibilité ; « Tester », « Suivre » et l'accroche restent au Fil.
-            <TileMosaic columns={phone ? 2 : 4}>
-              {member.projects.map((project) => {
-                const visual = project.portraitCover ?? project.cover
-                return (
-                  <ProjectTile
-                    key={project.id}
-                    title={project.title}
-                    author={project.author.name}
-                    image={
-                      visual
-                        ? {
-                            source: toSource(visual.url),
-                            thumbhash: visual.thumbhash,
-                            label: project.title,
-                          }
-                        : null
-                    }
-                    badge={visibilityBadge(project)}
-                    onPress={openProject(project.id)}
-                  />
-                )
-              })}
-            </TileMosaic>
+            // R14 : ses projets en mosaïque de cartes. La mosaïque choisit la taille de chaque
+            // carte (la grande pour le plus récent) et sa place selon la largeur ; la carte, sans
+            // l'auteur (`owner`), garde le reste de celle du Fil : la photo (la première de la
+            // galerie, `galleryCover`), le titre, l'accroche, le statut, « Tester » sur la grande,
+            // les réactions et la pastille de visibilité. Elle a sa garde contre la double tape.
+            <ProjectMosaic
+              items={member.projects}
+              render={(project, size) => (
+                <SummaryCard
+                  project={project}
+                  owner
+                  size={size}
+                  galleryCover
+                  badge={visibilityBadge(project)}
+                />
+              )}
+            />
           )}
         </>
       )}

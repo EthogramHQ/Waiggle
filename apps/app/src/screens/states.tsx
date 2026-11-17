@@ -8,7 +8,7 @@
 // Ces pages n'ont pas d'autre titre que celui de leur état : il est donc de niveau 1 (`level`),
 // comme le titre de la page qu'elles remplacent.
 import { type Href, usePathname, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { type ComponentProps, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { nextAfterSignIn } from '../navigation/signInAgain'
@@ -36,10 +36,16 @@ export function LoadingScreen({
   width = 'form',
   fade = true,
   fallback = '/feed',
+  shape,
 }: {
   width?: Width
   /** RF : faux pour une page qui a son propre passage (un projet ouvert depuis une carte). */
   fade?: boolean
+  /**
+   * R14 : la forme des cartes du squelette, celle de la page qui arrive (`compact`, les petites
+   * cartes de la mosaïque d'un membre) ; la carte simple par défaut.
+   */
+  shape?: ComponentProps<typeof SkeletonList>['shape']
   /**
    * Où mène « Revenir » sans page d'avant : le Fil (`/feed`, plan R12, décision 9) ; l'accueil (`/`)
    * pour une page de visiteur, à qui le Fil dirait « Réservé aux membres ».
@@ -59,7 +65,7 @@ export function LoadingScreen({
   return (
     <Screen header={<TopNav />} width={width} fade={fade}>
       <Stack gap="xl" align="stretch">
-        <SkeletonList count={width === 'page' ? 3 : 2} />
+        <SkeletonList count={width === 'page' ? 3 : 2} shape={shape} />
         {slow ? (
           <Stack align="start">
             <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
