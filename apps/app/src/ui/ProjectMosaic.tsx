@@ -87,8 +87,12 @@ export function mosaicRows(
   if (count === 1) return [[0]]
   if (count === 2) return [[0, 1]]
   // 4 projets sur ordinateur : la planche R15, la grande carte sur la moitié, une compacte large à
-  // côté, puis deux compactes côte à côte (la tablette garde la forme de R14).
-  if (count === 4 && sizeClass === 'wide') return [{ lead: 0, beside: [1, [2, 3]] }]
+  // côté, puis deux compactes côte à côte (la tablette garde la forme de R14). À texte très agrandi,
+  // la forme de R14 : les deux compactes côte à côte n'ont qu'un quart de la mosaïque, et le titre
+  // de trois lignes s'y coupait à 200 % (« Le patron de tricot qui compte le… », à 1 440 points).
+  if (count === 4 && sizeClass === 'wide' && !largeText) {
+    return [{ lead: 0, beside: [1, [2, 3]] }]
+  }
   // Un nombre de colonnes donné reste raisonnable : entier, 1 au moins (0 boucle sans fin).
   const perRow =
     columns !== undefined && Number.isFinite(columns)

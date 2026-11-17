@@ -9,7 +9,7 @@ import type { ReactNode } from 'react'
 import { Dimensions, StyleSheet, Text, View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { ProjectGrid } from './ProjectGrid'
-import { ProjectMosaic } from './ProjectMosaic'
+import { mosaicRows, ProjectMosaic } from './ProjectMosaic'
 import { ProjectTile } from './Tile'
 import { TileMosaic } from './TileMosaic'
 import { ContentWidthContext } from './theme/layout'
@@ -124,6 +124,15 @@ describe('ProjectMosaic reads the width its column publishes', () => {
 
     await renderWithProviders(mosaic(1728, 7))
     expect(cellsInRowOf('Projet 4')).toBe(4)
+  })
+
+  // La batterie à 200 % (1 440 points) : dans la forme de la planche, les deux compactes côte à côte
+  // n'ont qu'un quart de la mosaïque, et un titre de trois lignes s'y coupait. À texte très agrandi,
+  // 4 projets gardent la forme de R14, où la quatrième carte a toute une rangée.
+  it('lays four projects as the R14 block when the text is very large on a computer', () => {
+    expect(mosaicRows(4, 1440, { largeText: true })).toEqual([{ lead: 0, beside: [1, 2] }, [3]])
+    // Témoin : sans texte agrandi, la forme de la planche R15.
+    expect(mosaicRows(4, 1440)).toEqual([{ lead: 0, beside: [1, [2, 3]] }])
   })
 
   it('keeps three columns under the block in a narrow room beside the profile at 1 100', async () => {
