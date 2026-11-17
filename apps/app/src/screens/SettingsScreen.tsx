@@ -20,7 +20,7 @@ import type { PressEvent } from '../ui/ListGroup'
 import { MemberCard } from '../ui/MemberCard'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { SettingsColumns } from '../ui/SettingsColumns'
+import { SettingsColumns, settingsColumnsWidth } from '../ui/SettingsColumns'
 import { SettingsNav, type SettingsNavItem } from '../ui/SettingsNav'
 import { useLayout } from '../ui/theme/layout'
 import { type ContentSection, SettingsSection } from './settings/sections'
@@ -140,7 +140,7 @@ export function SettingsScreen({ section }: Props) {
         title={navLabel}
         // Le titre de l'onglet suit la rubrique ouverte (WCAG 2.4.2, relecture juridique, jur-15).
         pageTitle={section ? label(shown) : navLabel}
-        width="page"
+        width={settingsColumnsWidth}
         notice={notice}
       >
         {card}

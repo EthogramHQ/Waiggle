@@ -154,8 +154,11 @@ type Props = {
    * membre…) prennent la place d'un grand écran, `wideContentWidth` de la fenêtre (1 376 à 1 440,
    * 1 728 à 1 920, jamais plus de 1 920) ; sous 1 280, et jusqu'à l'hydratation, comme `page`. La
    * barre du haut prend la même largeur ; avec `form` et `page`, elle garde 1 280.
+   * Un nombre (R15, « Ce qui reste étroit ») : la largeur d'un bloc de taille fixe, donnée par son
+   * composant (`legalDocumentWidth`, `settingsColumnsWidth`) ; la colonne, son retour et son titre
+   * se centrent avec lui, au lieu de rester calés à gauche d'une page de 1 280 (jamais plus).
    */
-  width?: 'form' | 'page' | 'wide'
+  width?: 'form' | 'page' | 'wide' | number
   /** Sur un grand écran : une scène à gauche, le contenu dans une carte à droite. */
   hero?: ReactNode
   /** La lumière d'ambiance derrière l'écran (vrai par défaut). */
@@ -1277,14 +1280,16 @@ const shorten = (text: string) =>
  * l'hydratation (fenêtre de 0), la page pré-rendue ne la connaît pas : 1 280, comme une page
  * ordinaire et comme le serveur (relecture du plan de R15, C1).
  */
-const columnWidthFor = (width: 'form' | 'page' | 'wide', windowWidth: number) =>
-  width === 'wide'
-    ? windowWidth > 0
-      ? wideContentWidth(windowWidth)
-      : layout.maxContentWidth
-    : width === 'page'
-      ? layout.maxContentWidth
-      : layout.formWidth
+const columnWidthFor = (width: 'form' | 'page' | 'wide' | number, windowWidth: number) =>
+  typeof width === 'number'
+    ? Math.min(width, layout.maxContentWidth)
+    : width === 'wide'
+      ? windowWidth > 0
+        ? wideContentWidth(windowWidth)
+        : layout.maxContentWidth
+      : width === 'page'
+        ? layout.maxContentWidth
+        : layout.formWidth
 
 /** La carte d'un grand écran à scène (`hero`) : un peu plus étroite qu'un formulaire. */
 const HERO_CARD_WIDTH = layout.formWidth - 80

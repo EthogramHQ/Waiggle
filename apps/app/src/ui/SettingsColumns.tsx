@@ -37,6 +37,13 @@ type Props = {
   children: ReactNode
 }
 
+/**
+ * La largeur des Réglages sur ordinateur : la colonne des rubriques, l'écart, puis un formulaire.
+ * L'écran la donne à `Screen`, pour que son retour, son titre et la carte du compte s'alignent sur
+ * le bloc (R15).
+ */
+export const settingsColumnsWidth = layout.settingsNavWidth + space.xxl + layout.formWidth
+
 export function SettingsColumns({ nav, title, current, children }: Props) {
   const titleRef = useRef<View>(null)
   // useEffect sans dépendance qui change : une seule fois, à l'affichage de la page.
@@ -57,7 +64,7 @@ export function SettingsColumns({ nav, title, current, children }: Props) {
         alignItems: 'flex-start',
         gap: space.xxl,
         width: '100%',
-        maxWidth: layout.settingsNavWidth + space.xxl + layout.formWidth,
+        maxWidth: settingsColumnsWidth,
         alignSelf: 'center',
       }}
     >

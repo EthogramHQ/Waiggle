@@ -46,6 +46,14 @@ type Props = {
 const CONTENTS_WIDTH = 260
 
 /**
+ * La largeur du document sur ordinateur : le sommaire, l'écart, puis le texte à `readableWidth`.
+ * L'écran la donne à `Screen`, pour que son retour et son titre s'alignent sur le bloc (R15) ; sans
+ * le sommaire (`wide` faux), le texte seul, à `readableWidth`.
+ */
+export const legalDocumentWidth = (wide: boolean) =>
+  wide ? CONTENTS_WIDTH + space.xxxl + readableWidth : readableWidth
+
+/**
  * La partie lue est la dernière dont le titre est passé au-dessus de cette part de la fenêtre
  * (sous la barre fixe) : un titre qui arrive dans le premier tiers de l'écran est déjà « lu ».
  */
@@ -206,7 +214,7 @@ export function LegalDocument({ version, summary, sections, wide, onLinkPress }:
         alignItems: 'flex-start',
         gap: space.xxxl,
         width: '100%',
-        maxWidth: CONTENTS_WIDTH + space.xxxl + readableWidth,
+        maxWidth: legalDocumentWidth(true),
         alignSelf: 'center',
       }}
     >
