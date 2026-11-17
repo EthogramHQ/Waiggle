@@ -19,10 +19,16 @@
 import { durations } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import type { ComponentType, ReactNode } from 'react'
-import { Platform, StyleSheet } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 import { getAnimatedStyle, useReducedMotion, withTiming } from 'react-native-reanimated'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
+import {
+  CoverArrival,
+  CoverTransitionProvider,
+  useCoverSource,
+  useCoverTarget,
+} from './coverTransition'
 import { ScreenFade } from './ScreenFade'
 import { Text } from './Text'
 
@@ -265,6 +271,120 @@ describe('ScreenFade, its guards (web)', () => {
 
     expect(content()).toBeTruthy()
     expect(screen.queryByTestId('fade-shield', { includeHiddenElements: true })).toBeNull()
+  })
+})
+
+// R14 (« Entrer dans un projet et en sortir ») : la page d'un membre, restée dans la pile sous un
+// projet ouvert depuis une de ses cartes, est déjà là au retour, au même endroit, sans page vide
+// entre les deux : elle ne rejoue pas son fondu (la photo, elle, se replie dans sa carte). Le
+// fondu ne se saute que si le projet a été ouvert par une carte de cette page ; ScreenFade le lit
+// dans le magasin de « la carte qui devient la page » (`ui/coverTransition`), posé au-dessus des
+// pages. Sinon (une adresse, un lien), le retour garde son fondu : le test ui-11 plus haut
+// (« fades a page in again when the member comes back to it ») en est le témoin.
+describe('ScreenFade, back from a project opened by a card (R14, web)', () => {
+  // Le lien de la carte, tel que le navigateur le donne.
+  const link = { focus: jest.fn() }
+  let source: ReturnType<typeof useCoverSource> | undefined
+  let target: ReturnType<typeof useCoverTarget> | undefined
+
+  /** La carte du projet sur la page du membre : sa photo se mesure dans la fenêtre. */
+  function Card() {
+    const cover = useCoverSource('p1')
+    source = cover
+    return (
+      <View
+        ref={(view) =>
+          cover.ref(
+            view
+              ? {
+                  measureInWindow: (callback) => callback(16, 240, 358, 220),
+                  closest: () => link,
+                }
+              : null,
+          )
+        }
+      />
+    )
+  }
+
+  /** La page du projet, posée par-dessus : sa photo, qui arrive depuis la carte. */
+  function ProjectPage() {
+    target = useCoverTarget('p1')
+    return (
+      <CoverArrival id="p1">
+        <View />
+      </CoverArrival>
+    )
+  }
+
+  /** La page du membre (dans son fondu) et, au-dessus d'elle, la page du projet ou rien. */
+  const stage = (route: RouteState, project: boolean) => (
+    <CoverTransitionProvider>
+      <MockRoute value={route}>
+        <ScreenFade>
+          <Text>Les projets de la semaine</Text>
+          <Card />
+        </ScreenFade>
+      </MockRoute>
+      {project ? <ProjectPage /> : null}
+    </CoverTransitionProvider>
+  )
+
+  /**
+   * Ouvre le projet depuis la carte, attend son arrivée, puis revient : par le bouton Retour de la
+   * page (`leave`), ou par le Retour du navigateur (la page du projet disparaît sans `leave`).
+   */
+  const openThenBack = async (back: 'button' | 'browser') => {
+    const view = await renderWithProviders(stage({ focused: true, shown: 1 }, false))
+    expect(seenOpacity(content())).toBe(1) // témoin : la page du membre est là
+    await act(async () => {
+      source?.capture(() => {})
+    })
+    await view.rerender(stage({ focused: false, shown: 1 }, true))
+    await wait(3000)
+    if (back === 'button') {
+      await act(async () => {
+        target?.leave(() => {})
+      })
+      await wait(1000)
+    }
+    await view.rerender(stage({ focused: true, shown: 2 }, false))
+    return view
+  }
+
+  it('does not replay the page fade on return from a project opened by a card, with reduce motion too', async () => {
+    for (const calm of [false, true]) {
+      jest.mocked(useReducedMotion).mockReturnValue(calm)
+      const view = await openThenBack('button')
+
+      // Dès le rendu qui la montre, puis pendant ce qui aurait été le fondu : pleine.
+      expect({ calm, opacity: seenOpacity(content()) }).toEqual({ calm, opacity: 1 })
+      await wait(durations.page / 2)
+      expect({ calm, opacity: seenOpacity(content()) }).toEqual({ calm, opacity: 1 })
+      expect(screen.queryByTestId('fade-shield', { includeHiddenElements: true })).toBeNull()
+      await view.unmount()
+    }
+  })
+
+  it('does not replay the page fade on the browser Back from a project opened by a card', async () => {
+    await openThenBack('browser')
+
+    expect(seenOpacity(content())).toBe(1)
+    await wait(durations.page / 2)
+    expect(seenOpacity(content())).toBe(1)
+  })
+
+  it('still fades the page in on its next return, once the project opened by a card is behind', async () => {
+    const view = await openThenBack('button')
+    expect(seenOpacity(content())).toBe(1)
+
+    // Le membre quitte la page par un autre chemin (un lien), puis revient : le fondu reprend.
+    await view.rerender(stage({ focused: false, shown: 2 }, false))
+    await view.rerender(stage({ focused: true, shown: 3 }, false))
+
+    expect(seenOpacity(content())).toBe(0)
+    await wait(durations.page + 50)
+    expect(seenOpacity(content())).toBe(1)
   })
 })
 

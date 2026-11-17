@@ -217,3 +217,55 @@ describe('SummaryCard, a project raised by its update (R7a)', () => {
     expect(updatedProp()).toBeUndefined()
   })
 })
+
+// R14 (« La mosaïque ») : sur la page d'un membre, aucune carte ne répète son nom (`owner` : la carte
+// est sur la page de son auteur, elle n'a ni son nom ni sa photo) ; la pastille calculée par la page
+// (« Réservé à Famille », `badge`) reste ; et la mosaïque choisit la taille de chaque carte (`size`,
+// transmise telle quelle à ProjectCard).
+describe('SummaryCard on the page of its author (R14)', () => {
+  beforeEach(() => {
+    mockCardProps.length = 0
+  })
+
+  it('shows the author of the project without `owner` (témoin)', async () => {
+    await renderWithProviders(<SummaryCard project={cardOf('cooking')} />)
+
+    await screen.findByText(recipesProject.title)
+    expect(screen.getByRole('link', { name: recipesProject.author.name })).toBeTruthy()
+  })
+
+  it('drops the author from the card with `owner`', async () => {
+    await renderWithProviders(<SummaryCard project={cardOf('cooking')} owner />)
+
+    await screen.findByText(recipesProject.title)
+    expect(mockCardProps.length).toBeGreaterThan(0) // témoin : la carte a été dessinée
+    expect(mockCardProps.at(-1)?.author).toBeUndefined()
+    expect(screen.queryByRole('link', { name: recipesProject.author.name })).toBeNull()
+    expect(
+      screen.queryByText(recipesProject.author.name, { includeHiddenElements: true }),
+    ).toBeNull()
+  })
+
+  it('keeps the mark passed in `badge`, with `owner`', async () => {
+    await renderWithProviders(
+      <SummaryCard project={cardOf('cooking')} owner badge="Réservé à Famille" />,
+    )
+
+    expect(await screen.findByText('Réservé à Famille')).toBeTruthy()
+  })
+
+  it('still marks a private project « Privé », with `owner`', async () => {
+    await renderWithProviders(
+      <SummaryCard project={{ ...cardOf('cooking'), visibility: 'private' }} owner />,
+    )
+
+    expect(await screen.findByText(fr.t(($) => $.member.private))).toBeTruthy()
+  })
+
+  it('gives the card the size it is asked for', async () => {
+    await renderWithProviders(<SummaryCard project={cardOf('cooking')} owner size="compact" />)
+
+    await screen.findByText(recipesProject.title)
+    expect(mockCardProps.at(-1)?.size).toBe('compact')
+  })
+})

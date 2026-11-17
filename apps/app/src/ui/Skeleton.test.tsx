@@ -6,6 +6,7 @@ import { screen } from '@testing-library/react-native'
 import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
+import { ProjectCard } from './ProjectCard'
 import { SkeletonCard, SkeletonList } from './Skeleton'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -124,6 +125,74 @@ describe('SkeletonCard, in the shape of a feed card', () => {
 
     expect(screen.getByLabelText(loading)).toBeTruthy() // témoin
     expect(heights()).not.toContain(FEED_CARD_HEIGHT)
+  })
+})
+
+// R14 : la forme d'une carte compacte (`shape="compact"`), celle de la mosaïque d'un membre. Le
+// chargement de sa page dessine ces formes à la hauteur exacte d'une `ProjectCard size="compact"`
+// (lue sur la vraie carte, pas recopiée) : quand les cartes arrivent, rien ne saute.
+describe('SkeletonCard, in the shape of a compact card (R14)', () => {
+  /** Les hauteurs posées sur les formes dessinées, en points. */
+  const heights = () => {
+    const found: number[] = []
+    const visit = (node: unknown) => {
+      if (!node || typeof node !== 'object' || !('props' in node)) return
+      const { props, children } = node as { props: { style?: unknown }; children: unknown[] }
+      const { height } = (StyleSheet.flatten(props.style as object) ?? {}) as { height?: unknown }
+      if (typeof height === 'number') found.push(height)
+      for (const child of children) visit(child)
+    }
+    visit(screen.root)
+    return found
+  }
+
+  /** La hauteur minimale d'une vraie carte compacte, celle de la vue qui porte sa photo. */
+  const compactCardHeight = async () => {
+    const view = await renderWithProviders(
+      <ProjectCard
+        title="Biscotte au parc"
+        pitch="Le carnet des promenades du chien."
+        author={{ name: 'Tante Odile', avatar: null }}
+        when="il y a 5 jours"
+        status={{ label: 'En construction', strong: false }}
+        size="compact"
+        onPress={() => {}}
+      />,
+    )
+    let node = screen.getByText('Biscotte au parc', { includeHiddenElements: true }) as unknown as {
+      props: { style?: unknown }
+      parent: unknown
+    } | null
+    let found = 0
+    while (node && !found) {
+      const { minHeight } = (StyleSheet.flatten(node.props.style as object) ?? {}) as {
+        minHeight?: unknown
+      }
+      if (typeof minHeight === 'number' && minHeight > 0) found = minHeight
+      node = node.parent as typeof node
+    }
+    await view.unmount()
+    return found
+  }
+
+  it('takes the height of a compact card', async () => {
+    const compact = await compactCardHeight()
+    // Témoin : la carte compacte est plus basse que celle du fil.
+    expect(compact).toBeGreaterThanOrEqual(230)
+    expect(compact).toBeLessThan(FEED_CARD_HEIGHT)
+
+    await renderWithProviders(<SkeletonCard shape="compact" />)
+
+    expect(heights()).toContain(compact)
+    expect(heights()).not.toContain(FEED_CARD_HEIGHT)
+  })
+
+  it('is named « Loading » and marked busy, and has no text of its own', async () => {
+    await renderWithProviders(<SkeletonList shape="compact" count={2} />)
+
+    expect(screen.getAllByLabelText(loading)).toHaveLength(1)
+    expect(busy(screen.getByLabelText(loading))).toBe(true)
+    expect(screen.queryByText(/./, { includeHiddenElements: true })).toBeNull()
   })
 })
 
