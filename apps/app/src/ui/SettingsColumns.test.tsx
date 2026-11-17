@@ -2,7 +2,7 @@
 // l'interface C7 et C8) : la colonne des rubriques, le titre de la rubrique ouverte (un titre de
 // section, h2) et son contenu ; et le focus du clavier, posé sur ce titre quand on vient de choisir
 // la rubrique dans la colonne (sinon il retomberait tout en haut de la nouvelle page).
-import { layout } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import { screen } from '@testing-library/react-native'
 import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -112,5 +112,38 @@ describe('SettingsColumns, on a wide screen (R3)', () => {
         (StyleSheet.flatten(node.props.style as never) as { width?: unknown } | undefined)?.width,
     )
     expect(widths).toContain(layout.settingsNavWidth)
+  })
+})
+
+// R15 (« Ce qui reste étroit ») : les Réglages gardent leur largeur (la colonne des rubriques et
+// une rubrique de la largeur d'un formulaire), mais leur bloc est centré dans la page au lieu d'être
+// calé à gauche. Le bloc : le premier cadre qui porte la colonne des rubriques et la rubrique.
+// Centré : `alignSelf: 'center'`, ou des marges automatiques ; borné : une largeur maximale qui
+// ne dépasse pas les deux colonnes et leur écart.
+describe('SettingsColumns, centred in a wide page (R15)', () => {
+  const isCentred = (node: Node) => {
+    const style = (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>
+    return (
+      style.alignSelf === 'center' ||
+      style.marginHorizontal === 'auto' ||
+      (style.marginLeft === 'auto' && style.marginRight === 'auto')
+    )
+  }
+
+  it('centres its block in the page, at the same width as before', async () => {
+    await renderWithProviders(<Sample />)
+
+    const block = ancestorsOf(screen.getByText('Français ou anglais')).find((node) =>
+      contains(node, 'La colonne des rubriques'),
+    )
+    expect(block).toBeDefined()
+    if (!block) return
+    expect(isCentred(block)).toBe(true)
+    const bound = maxWidthOf(block)
+    expect(typeof bound).toBe('number')
+    expect(bound as number).toBeLessThanOrEqual(
+      layout.settingsNavWidth + space.xxl + layout.formWidth,
+    )
+    expect(bound as number).toBeGreaterThan(layout.settingsNavWidth)
   })
 })

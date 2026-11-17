@@ -262,6 +262,27 @@ describe('SearchField', () => {
 // la loupe ou le bord de la pilule donne le focus à la saisie ; « Annuler » de la page de recherche
 // est posé par le champ, qui le fait passer dessous quand le texte est grand.
 describe('SearchField, its frame and its action', () => {
+  // R15 (« Le gabarit large ») : le champ qui prend la place qui reste dans une rangée (`grow`,
+  // la barre du haut) ne s'étire pas au-delà de `layout.searchFieldMax`, même quand la barre suit
+  // un écran de 1 920 points. Le plafond vit dans la pilule commune au champ et à `SearchLink`.
+  it('stops growing at 560 points when it takes the room left in a row', async () => {
+    await renderWithProviders(
+      <SearchField value="" onChangeText={() => {}} label={label} placeholder={placeholder} grow />,
+    )
+
+    // La pilule : le premier cadre autour de la saisie qui prend la place qui reste.
+    const ancestors: { props: { style?: unknown } }[] = []
+    for (
+      let node = field() as unknown as { props: { style?: unknown }; parent: unknown } | null;
+      node;
+      node = node.parent as typeof node
+    )
+      ancestors.push(node)
+    const pill = ancestors.find((node) => styleOf(node).flexGrow === 1)
+    expect(pill).toBeDefined() // témoin : la pilule grandit dans sa rangée
+    expect(styleOf(pill).maxWidth).toBe(layout.searchFieldMax)
+  })
+
   it('keeps the input itself 44 points high', async () => {
     await renderWithProviders(
       <SearchField value="" onChangeText={() => {}} label={label} placeholder={placeholder} />,

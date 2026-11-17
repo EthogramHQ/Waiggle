@@ -9,13 +9,26 @@
 // L'API (découpage amendé de R6b, U2) : TileMosaic({ children; columns: 2 | 4 }), avec les
 // `ProjectTile` de `ui/Tile.tsx` pour enfants.
 import { fireEvent, screen } from '@testing-library/react-native'
-import { StyleSheet } from 'react-native'
+import { Dimensions, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
+import { Screen } from './Screen'
 import { ProjectTile } from './Tile'
 import { TileMosaic } from './TileMosaic'
+import { useHydrated } from './theme/hydration'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// R15 : la mosaïque se mesure aussi dans un vrai Screen (le gabarit large).
+jest.mock('expo-router', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useIsFocused: () => true,
+}))
+// L'hydratation de la page, qu'un test choisit (vraie sur téléphone, d'emblée).
+jest.mock('./theme/hydration', () => ({
+  ...jest.requireActual('./theme/hydration'),
+  useHydrated: jest.fn(() => true),
+}))
 
 /** Sept projets, du plus récent au plus ancien (un nombre impair : la dernière rangée est courte). */
 const projects = [
@@ -85,5 +98,88 @@ describe('TileMosaic', () => {
 
     await rerender(<Mosaic columns={4} />)
     for (const width of widths()) expect(width).not.toBe(150)
+  })
+})
+
+// R15 (« Des colonnes qui suivent la place ») : sans nombre imposé (`columns` devient facultatif ;
+// les Ruches, restées étroites, gardent le leur), la mosaïque compte ses colonnes selon la place que
+// lui donne l'écran (`useContentWidth()`) : des tuiles de `layout.cardMin.tile` (280, décision du
+// 17/11) au moins, une colonne de plus dès qu'elle tient. La page d'une étiquette ou d'un outil :
+// quatre tuiles par rangée à 1 280 (1 216 points de contenu), cinq à 1 920 (1 728 points).
+describe('TileMosaic columns from the room it has (R15)', () => {
+  /** Quatorze tuiles : assez pour remplir deux rangées de six. */
+  const many = Array.from({ length: 14 }, (_, i) => `Projet ${String(i + 1).padStart(2, '0')}`)
+  type Node = { props: Record<string, unknown>; parent: Node | null; children: unknown[] }
+  /** Le nombre de cases de la rangée qui porte cette tuile (la première vue en rangée). */
+  const cellsInRowOf = (title: string) => {
+    let node = (screen.getByRole('link', { name: title }) as unknown as Node).parent
+    while (
+      node &&
+      (StyleSheet.flatten(node.props.style as never) as { flexDirection?: string } | undefined)
+        ?.flexDirection !== 'row'
+    )
+      node = node.parent
+    if (!node) throw new Error('No mosaic row')
+    return node.children.length
+  }
+  const tagPage = (
+    <Screen width="wide" title="Claude">
+      <TileMosaic>
+        {many.map((title) => (
+          <ProjectTile key={title} title={title} author="Sam Petit" onPress={() => {}} />
+        ))}
+      </TileMosaic>
+    </Screen>
+  )
+
+  const initialWindow = Dimensions.get('window')
+  const setWindow = (width: number) => {
+    const size = { ...initialWindow, width, height: 1080 }
+    Dimensions.set({ window: size, screen: size })
+  }
+  afterEach(() => {
+    Dimensions.set({ window: initialWindow, screen: initialWindow })
+    jest.mocked(useHydrated).mockReturnValue(true)
+  })
+
+  it('shows five tiles per row at 1 920, with no column count given', async () => {
+    setWindow(1920)
+    await renderWithProviders(tagPage)
+
+    expect(cellsInRowOf('Projet 01')).toBe(5)
+    expect(cellsInRowOf('Projet 06')).toBe(5)
+  })
+
+  it('shows four tiles per row at 1 280', async () => {
+    setWindow(1280)
+    await renderWithProviders(tagPage)
+
+    expect(cellsInRowOf('Projet 01')).toBe(4)
+  })
+
+  it('keeps the column count a screen gives, even on a wide screen', async () => {
+    setWindow(1920)
+    await renderWithProviders(
+      <Screen width="wide" title="Famille">
+        <TileMosaic columns={2}>
+          {many.map((title) => (
+            <ProjectTile key={title} title={title} author="Sam Petit" onPress={() => {}} />
+          ))}
+        </TileMosaic>
+      </Screen>,
+    )
+
+    expect(cellsInRowOf('Projet 01')).toBe(2)
+  })
+
+  // Avant l'hydratation, la place vaut 0 : une tuile par rangée, toutes montrées, jamais une boucle
+  // sans fin sur 0 colonne.
+  it('lists every tile, one per row, until the page is hydrated', async () => {
+    setWindow(1920)
+    jest.mocked(useHydrated).mockReturnValue(false)
+    await renderWithProviders(tagPage)
+
+    expect(screen.getAllByRole('link')).toHaveLength(many.length)
+    expect(cellsInRowOf('Projet 01')).toBe(1)
   })
 })
