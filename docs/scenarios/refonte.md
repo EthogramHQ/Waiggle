@@ -4196,3 +4196,75 @@ premier écran (audit de design du 17/11, section 2). Louis a choisi un gabarit 
 
 Recherche, Outils et Ruches restent étroits (leurs grilles viennent plus tard, avec leurs planches).
 Le projet épinglé n'est pas dans cette tranche.
+
+## R16 — Les squelettes
+
+Pendant un chargement, l'appli montre partout la même image : trois bandes grises, dessinées en R1,
+avant la refonte. Elles ne ressemblent ni au Fil, ni à un projet, ni à une personne ; posées sur la
+lumière miel, elles virent au kaki ; dans l'appli, elles clignotent moins de 300 ms entre deux pages,
+et au premier chargement elles restent jusqu'à 8 s à l'écran (audit de design du 17/11, section 11).
+Louis a choisi des squelettes à la forme de chaque page, sur planche d'abord (décision 17 du 17/11).
+La tranche commence par une garde de session commune aux écrans, qui règle aussi le saut des pages
+lisibles sans compte (placé ici par Louis le 17/11).
+
+### Le squelette a la forme de sa page
+
+- Étant donné une page qui charge (le Fil, la page d'un projet, la page d'un membre, l'accueil du
+  visiteur, Explorer, la page d'une étiquette ou d'un outil)
+  Alors son squelette pose, aux mêmes places et aux mêmes tailles, les cartes, la galerie, l'en-tête
+  et les colonnes que la page aura, à la largeur de l'écran (téléphone, tablette, ordinateur,
+  jusqu'à 1 920) ;
+  Et ce qui est déjà connu s'affiche pour de vrai : la barre du haut, « Retour », les titres de
+  section (« Tes ruches », « Récents »…).
+- Le Fil n'a plus qu'un squelette, au lieu de deux qui se suivent.
+- Ouverte depuis une carte, la page d'un projet montre tout de suite le titre, l'auteur, la photo et
+  le statut que la carte connaissait ; le squelette ne couvre que la description, la recette et les
+  commentaires. De même, depuis une carte, la page d'un membre montre tout de suite son nom et sa
+  photo.
+- Sur l'accueil du visiteur, la vitrine garde sa place avec quatre cartes vides : rien ne pousse le
+  bas de la page.
+- Une section qui arrive seule (« À la une », « Outils populaires », « Proches à suivre », la
+  vitrine) garde sa hauteur pendant qu'elle charge.
+- Les listes (Activité, ruches, commentaires, modération) et les formulaires (profil, réglages)
+  montrent des lignes et des champs vides ; les indicateurs qui tournent et les « Chargement… »
+  écrits disparaissent (un lecteur d'écran entend toujours « Chargement »).
+
+### La couleur et le mouvement (sur la planche, de jour et de nuit)
+
+- Une carte vide garde la matière d'une carte réelle sans photo (crème ou feuille, coins et bord),
+  pas une dalle grise ; les lignes et les ronds sont d'un brun miel transparent, qui ne vire plus au
+  kaki sur la lumière.
+- Une lueur miel traverse lentement les cartes vides, au lieu de la respiration grise d'aujourd'hui
+  (choix de Louis du 17/11).
+- Sous « Réduire les animations », elle ne bouge plus : le squelette est immobile.
+
+### Quand on le voit
+
+- Dans l'appli, si la page arrive en moins de 160 ms, aucun squelette ne s'affiche.
+- Quand le contenu arrive, le squelette fond vers lui (environ 180 ms) au lieu d'être échangé d'un
+  coup.
+- Au premier chargement du site, la page pré-rendue est déjà le squelette de la bonne forme.
+- « Revenir » apparaît toujours après 4 s d'attente.
+
+### La garde de session et les pages lisibles sans compte
+
+- Étant donné un visiteur sans compte sur ordinateur
+  Quand il ouvre les Règles, la Confidentialité, les Mentions ou l'Accessibilité
+  Alors le titre ne saute plus à l'arrivée (aujourd'hui 63 points, deux fois).
+- Les écrans qui demandent un compte partagent une même garde de session : même attente, même
+  renvoi vers la connexion qu'aujourd'hui.
+
+### Les cibles (mesurées avant et après par le même passage)
+
+- Décalage de mise en page (CLS) sous 0,05 au premier chargement : Fil, page d'un projet, page d'un
+  membre, accueil du visiteur (0,24 aujourd'hui), Explorer (0,41), pages légales vues sans compte
+  (0,098 à 1 440).
+- Images de squelette entre deux pages quand l'API répond vite : 3 à 5 aujourd'hui (190 ms) → 0.
+- États avant le contenu sur le Fil : 3 → 1.
+- Le squelette et la page finie, superposés, ont leurs grandes masses aux mêmes places (galerie,
+  colonnes, cartes).
+
+### Le reste ne change pas
+
+Les transitions entre pages, la photo qui défile moins vite et la vague de miel sont R17. Le
+préchargement des pages avant le clic n'est pas dans cette tranche.
