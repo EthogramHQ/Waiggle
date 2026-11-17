@@ -194,6 +194,41 @@ describe('the page of a project opened from a card, before the API answers (R14)
     expect(await screen.findByRole('button', { name: T.menu })).toBeTruthy()
   })
 
+  it('shows neither « Suivre » nor the reactions on the preview of a project by another member, then both once the API answers', async () => {
+    // Le projet d'Inès, lu par Léa : seul un lecteur qui n'est pas l'auteur voit « Suivre Inès » et
+    // la capsule des réactions. (Le projet de Léa, lu par Léa, ne les montre jamais : il ne
+    // prouverait rien.)
+    const ines = { id: 'u2', name: 'Inès', avatarUrl: null }
+    const theirs: Project = { ...project, id: 'p-ines', author: ines, isMine: false }
+    const inesPage: Member = {
+      ...leaPage,
+      id: ines.id,
+      name: ines.name,
+      handle: 'ines',
+      projects: [{ ...summaryOf(theirs), reactionTotal: 7 }],
+    }
+    const followInes = fr.t(($) => $.follow.member, { name: ines.name })
+    await renderWithProviders(
+      <WithCachedList page={inesPage}>
+        <ProjectScreen id={theirs.id} />
+      </WithCachedList>,
+    )
+    await screen.findByRole('header', { name: containing(theirs.title) })
+
+    expect(screen.queryByRole('switch', { name: containing(followInes) })).toBeNull()
+    expect(screen.queryByRole('button', { name: containing(followInes) })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Waggle/ })).toBeNull()
+
+    // Témoin : l'API répond, et les deux arrivent pour ce lecteur.
+    await answerWith(theirs)
+    expect(
+      await screen
+        .findAllByRole('button', { name: containing(followInes) })
+        .catch(() => screen.findAllByRole('switch', { name: containing(followInes) })),
+    ).not.toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: /^Waggle/ })).not.toHaveLength(0)
+  })
+
   it('offers the Back button of the page while only the preview is known', async () => {
     await open()
     await screen.findByRole('header', { name: containing(project.title) })
