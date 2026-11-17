@@ -4078,12 +4078,15 @@ page d'un outil, les ruches et « Récents » gardent leurs tuiles ou leurs cart
 
 ### La mosaïque
 
-- Étant donné la page de Léa (vue par Léa, par un proche ou par un visiteur sur sa page publique)
+- Étant donné la page de Léa, vue par Léa ou par un proche
   Quand ses projets s'affichent
   Alors le plus récent est une grande carte, comme celles du Fil : photo plein cadre, titre,
   accroche, statut, « Tester » s'il est testable, réactions ;
   Et les suivants sont des cartes plus petites : photo plein cadre, titre, statut et réactions ;
   sans photo, la lumière miel avec l'accroche sur deux lignes.
+- Étant donné la page publique de Léa, vue par un visiteur
+  Alors la même mosaïque, avec ce que la page publique sait de chaque projet : photo, titre,
+  accroche et statut (ni réactions ni « Tester » : la page publique du projet les montre).
 - Aucune carte ne répète le nom de Léa : on est sur sa page.
 - La pastille de visibilité (« Privé », « Réservé à Famille »), « Exemple » et « Mis à jour »
   restent sur la carte qui les a.
@@ -4102,11 +4105,13 @@ page d'un outil, les ruches et « Récents » gardent leurs tuiles ou leurs cart
 
 ### Entrer dans un projet et en sortir
 
+Pour un membre ; un visiteur passe d'une page publique à l'autre comme aujourd'hui.
+
 - Étant donné la page de Léa
   Quand je touche un de ses projets
   Alors sa photo grandit depuis la carte jusqu'à la page du projet, le reste de la page apparaît en
-  fondu, et la page montre tout de suite ce que la carte savait (titre, accroche, statut, photo) ;
-  seuls la description et les commentaires attendent leur chargement.
+  fondu, et la page montre tout de suite ce que la carte savait (titre, accroche, statut, photo,
+  d'abord floue puis nette) ; le reste de la page arrive avec son chargement.
 - Quand je reviens par le bouton Retour de la page
   Alors la photo se replie dans sa carte, la page de Léa est déjà là, au même endroit, sans page
   vide entre les deux, et le focus revient sur la carte.
