@@ -1,8 +1,14 @@
 // Le mouvement de l'appli, réglé par les jetons de @ruche/brand. Les animations utilisent
 // Reanimated : elles tournent sur un fil séparé de l'appareil, donc restent fluides même quand
 // l'appli travaille (chargement, calcul).
-import { durations, type SpringName, springs } from '@ruche/brand'
-import { useReducedMotion, withSpring, withTiming } from 'react-native-reanimated'
+import { durations, easings, type SpringName, springs } from '@ruche/brand'
+import {
+  Easing,
+  ReduceMotion,
+  useReducedMotion,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
 
 /**
  * Hook : faut-il remplacer les grands déplacements par des fondus ? Vrai seulement si la personne a
@@ -18,8 +24,18 @@ export const spring = (to: number, name: SpringName = 'honey') => {
   return withSpring(to, springs[name])
 }
 
-/** Anime une valeur vers `to` en un temps fixe (fondus). */
+/**
+ * Anime une valeur vers `to` en un temps fixe (fondus), sur la courbe `exit` de la marque. Un fondu
+ * n'est pas un déplacement : c'est justement le repli promis quand la personne demande moins de
+ * mouvement. Sans `ReduceMotion.Never`, Reanimated le sauterait (son réglage par défaut suit
+ * l'appareil), et la carte qui devient la page, le toast ou la goutte des onglets apparaîtraient
+ * d'un coup (audit de design du 17/11/2026, 7.5).
+ */
 export const fade = (to: number, duration: keyof typeof durations = 'base') => {
   'worklet'
-  return withTiming(to, { duration: durations[duration] })
+  return withTiming(to, {
+    duration: durations[duration],
+    easing: Easing.bezier(...easings.exit),
+    reduceMotion: ReduceMotion.Never,
+  })
 }
