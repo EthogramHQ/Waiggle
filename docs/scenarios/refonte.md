@@ -4066,3 +4066,56 @@ Une cible manquée ne bloque pas la tranche : le bilan dit de combien, et pourqu
 
 Une fois la page démarrée, rien ne change pour un membre ni pour un visiteur : mêmes écrans, mêmes
 textes, mêmes adresses. Le parcours d'un membre et les captures restent verts.
+
+## R14 — Les projets d'un membre
+
+Depuis R10 (F-Et5), la page d'un membre range ses projets en tuiles, comme la page d'un outil : le
+nom de l'auteur revient sous chaque tuile de sa propre page, une tuile ne dit rien du projet
+(ni accroche, ni statut, ni réactions), et la tuile montre une autre image que la page du projet.
+Les planches validées `R3-Moi` et `R3-Membre-Desktop` montraient autre chose : une mosaïque de
+cartes comme celles du Fil. Louis y revient (décision 16 du 17/11/2026, « ok, mosaïque ») ; la
+page d'un outil, les ruches et « Récents » gardent leurs tuiles ou leurs cartes.
+
+### La mosaïque
+
+- Étant donné la page de Léa (vue par Léa, par un proche ou par un visiteur sur sa page publique)
+  Quand ses projets s'affichent
+  Alors le plus récent est une grande carte, comme celles du Fil : photo plein cadre, titre,
+  accroche, statut, « Tester » s'il est testable, réactions ;
+  Et les suivants sont des cartes plus petites : photo plein cadre, titre, statut et réactions ;
+  sans photo, la lumière miel avec l'accroche sur deux lignes.
+- Aucune carte ne répète le nom de Léa : on est sur sa page.
+- La pastille de visibilité (« Privé », « Réservé à Famille »), « Exemple » et « Mis à jour »
+  restent sur la carte qui les a.
+- Un seul projet : la grande carte seule. Deux : deux cartes égales. Trois et plus : la grande carte
+  puis les petites, sans case vide.
+- L'ordre de lecture (clavier, lecteur d'écran) suit l'ordre des projets : 1, 2, 3…
+- La photo d'une carte est la même que la première photo de la galerie du projet.
+
+### Ce que la mosaïque devient selon la largeur
+
+- Téléphone : la grande carte sur toute la largeur, puis deux colonnes de petites cartes.
+- Tablette : la grande carte sur deux colonnes, deux petites empilées à côté, puis des rangées de
+  trois.
+- Ordinateur : la même mosaïque sous l'en-tête, la grande carte à côté de deux petites empilées,
+  puis des rangées de trois (quatre au-delà de 1 536 points).
+
+### Entrer dans un projet et en sortir
+
+- Étant donné la page de Léa
+  Quand je touche un de ses projets
+  Alors sa photo grandit depuis la carte jusqu'à la page du projet, le reste de la page apparaît en
+  fondu, et la page montre tout de suite ce que la carte savait (titre, accroche, statut, photo) ;
+  seuls la description et les commentaires attendent leur chargement.
+- Quand je reviens par le bouton Retour de la page
+  Alors la photo se replie dans sa carte, la page de Léa est déjà là, au même endroit, sans page
+  vide entre les deux, et le focus revient sur la carte.
+- Par le Retour du navigateur : la page de Léa revient tout de suite, sans page vide, et sa carte
+  le marque d'un léger rebond.
+- « Réduire les animations » : un fondu court dans les deux sens, sans vol.
+
+### Le reste ne change pas
+
+La page d'un outil, l'onglet Projets d'une ruche et « Récents » d'Explorer gardent leur forme. Le
+projet épinglé (en grand même s'il n'est pas le plus récent), la bannière et la colonne du profil
+sur ordinateur viennent plus tard (R15 et suivantes).
