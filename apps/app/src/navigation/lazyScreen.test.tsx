@@ -170,6 +170,35 @@ describe('a screen loaded on demand', () => {
     }
   })
 
+  it('leaves a failed chunk to the error screen when the browser is offline, without reloading', async () => {
+    // Recharger hors ligne montrerait la page d'erreur du navigateur à la place de l'appli.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    mockHydrated = true
+    const page = globalThis as Record<string, unknown>
+    const navigatorBefore = page.navigator
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { onLine: false },
+      configurable: true,
+      writable: true,
+    })
+    const browser = lendBrowser('/settings')
+    try {
+      const failing = () => Promise.reject(new Error('Loading chunk 12 failed'))
+
+      await render(createElement(Boundary, null, createElement(lazyScreen(failing))))
+
+      await waitFor(() => expect(count('aside')).toBe(1))
+      expect(browser.reload).not.toHaveBeenCalled()
+    } finally {
+      browser.restore()
+      Object.defineProperty(globalThis, 'navigator', {
+        value: navigatorBefore,
+        configurable: true,
+        writable: true,
+      })
+    }
+  })
+
   it('leaves a failed chunk to the error screen on a phone, without reloading', async () => {
     const browser = lendBrowser('/settings')
     try {

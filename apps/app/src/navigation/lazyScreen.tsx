@@ -34,6 +34,7 @@ export type LazyScreenOptions = {
 // Ce que le navigateur prête ici, décrit sans dépendre des types du DOM (le code tourne aussi sur
 // téléphone, où ni `location` ni `sessionStorage` n'existent).
 type Browser = {
+  navigator?: { onLine?: boolean }
   location?: { pathname: string; reload: () => void }
   sessionStorage?: {
     getItem: (key: string) => string | null
@@ -51,11 +52,14 @@ const reloadKey = (pathname: string) => `waiggle.chunkReload:${pathname}`
  * demande un fichier qui n'existe plus (son nom change à chaque construction). Recharger la page
  * donne la nouvelle version. Une seule fois par adresse : si le morceau manque encore, c'est un vrai
  * défaut, et l'écran de secours de la route prend le relais (sinon la page se rechargerait sans
- * fin). Rend vrai si la page se recharge.
+ * fin). Hors ligne, jamais : le navigateur remplacerait l'appli par sa propre page d'erreur ;
+ * l'écran de secours, lui, garde l'appli et propose « Réessayer » (relecture de design du 17/11).
+ * Rend vrai si la page se recharge.
  */
 const reloadOnce = (): boolean => {
   if (Platform.OS !== 'web') return false
-  const { location, sessionStorage } = globalThis as Browser
+  const { navigator, location, sessionStorage } = globalThis as Browser
+  if (navigator?.onLine === false) return false
   if (!location || !sessionStorage) return false
   try {
     const key = reloadKey(location.pathname)
