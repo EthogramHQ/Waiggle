@@ -45,7 +45,7 @@ const fr = {
       pitch: 'Il range les recettes de saison et propose un menu.',
     },
     { title: 'Le carnet des plantes', pitch: 'Une photo de la feuille, et il dit quand arroser.' },
-    { title: 'Décollage !', pitch: 'Un compte à rebours pour les fusées en papier du mercredi.' },
+    { title: 'Décollage !', pitch: 'Un compte à rebours pour les fusées en papier du mercredi.' },
   ],
   day: 'jour',
   night: 'nuit',

@@ -24,6 +24,7 @@
 import type { ReactNode } from 'react'
 import { View, type ViewStyle } from 'react-native'
 import { CardStretchContext, PROJECT_CARD_GAP, type ProjectCardSize } from './ProjectCard'
+import { useLargeText } from './textScale'
 import { sizeClassFor, useLayout } from './theme/layout'
 
 /** Une rangée de la mosaïque : des rangs côte à côte, ou le bloc d'en tête. */
@@ -44,11 +45,20 @@ const chunks = (from: number, count: number, size: number): number[][] => {
   return rows
 }
 
-/** Le plan des rangées pour `count` projets dans une page de `width` points. */
-export function mosaicRows(count: number, width: number): MosaicRow[] {
+/**
+ * Le plan des rangées pour `count` projets dans une page de `width` points. `largeText` : le texte
+ * est très agrandi (150 % et plus, `useLargeText`) ; sur téléphone, une compacte de 115 points (à
+ * 320) ne tient plus son statut à 200 % : les compactes passent alors une par rangée.
+ */
+export function mosaicRows(
+  count: number,
+  width: number,
+  { largeText = false }: { largeText?: boolean } = {},
+): MosaicRow[] {
   if (count <= 0) return []
-  // Le téléphone : la grande carte seule sur sa rangée, puis les compactes deux par deux.
-  if (sizeClassFor(width) === 'compact') return [[0], ...chunks(1, count, 2)]
+  // Le téléphone : la grande carte seule sur sa rangée, puis les compactes deux par deux (une par
+  // une à texte très agrandi).
+  if (sizeClassFor(width) === 'compact') return [[0], ...chunks(1, count, largeText ? 1 : 2)]
   if (count === 1) return [[0]]
   if (count === 2) return [[0, 1]]
   return [{ lead: 0, beside: [1, 2] }, ...chunks(3, count, columnsFor(width))]
@@ -85,7 +95,9 @@ const share = { flexGrow: 1, flexBasis: 0, minWidth: 0 } as const
 export function ProjectMosaic<T extends { id: string }>({ items, render }: Props<T>) {
   // La largeur de la fenêtre, 0 avant l'hydratation du web (la mise en page du téléphone).
   const { width } = useLayout()
-  const rows = mosaicRows(items.length, width)
+  // Le texte très agrandi (sur le web, lu par une ligne cachée, `probe`, posée dans la liste).
+  const { large, probe } = useLargeText()
+  const rows = mosaicRows(items.length, width, { largeText: large })
   const columns = columnsFor(width)
   // Deux projets au-delà du téléphone : deux grandes cartes égales, côte à côte.
   const twoEqual = rows.length === 1 && Array.isArray(rows[0]) && rows[0].length === 2
@@ -128,6 +140,8 @@ export function ProjectMosaic<T extends { id: string }>({ items, render }: Props
           </View>
         )
       })}
+      {/* Hors du flux, caché à l'œil et aux lecteurs d'écran. */}
+      {probe}
     </View>
   )
 }
