@@ -436,8 +436,10 @@ export function ProjectCard({
           {hasPhoto ? null : categoryTag}
           {/* Le titre de la compacte, plus petit (celui des petites cartes, `TesterCard`) : à 390
               points, une compacte n'a que 110 points de texte, où le titre du fil se coupait au
-              milieu d'un mot (« Décollage » / « ! », essai du catalogue). */}
-          <Text variant={compact ? 'headline' : 'title3'} numberOfLines={2}>
+              milieu d'un mot (« Décollage » / « ! », essai du catalogue). Trois lignes : sans
+              accroche, le titre est le seul texte qui nomme une compacte avec photo, et deux
+              lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
+          <Text variant={compact ? 'headline' : 'title3'} numberOfLines={compact ? 3 : 2}>
             {title}
           </Text>
           {change ? (
