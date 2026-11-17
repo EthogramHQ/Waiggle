@@ -5,17 +5,21 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
-import { space } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Carousel } from '../ui/Carousel'
+import { InitialTile, tileVariantOf } from '../ui/InitialTile'
+import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { ProjectCover } from '../ui/ProjectCover'
+import { SidePanel } from '../ui/SidePanel'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { TesterCard } from '../ui/TesterCard'
+import { TesterRow } from '../ui/TesterRow'
 import { TestLink } from '../ui/TestLink'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
@@ -42,6 +46,8 @@ const fr = {
   compact: 'compacte',
   failed:
     'Sections en panne (500) : chacune dit ce qui lui manque, « Réessayer » sous une seule forme',
+  panel:
+    'Panneau des grands écrans (SidePanel, 340) : testeurs et outils en lignes, puis le même en panne',
   day: 'jour',
   night: 'nuit',
   photo: 'Photo du projet',
@@ -60,6 +66,8 @@ const en: typeof fr = {
   small: 'small',
   compact: 'compact',
   failed: 'Sections that could not load (500): each says what is missing, one form of “Retry”',
+  panel:
+    'Side panel of large screens (SidePanel, 340): testers and tools in rows, then the same failing',
   day: 'day',
   night: 'night',
   photo: 'Photo of the project',
@@ -195,6 +203,77 @@ export function ExploreCatalogue() {
                     size="small"
                     style={{ position: 'absolute', left: space.xs, bottom: space.xs }}
                   />
+                </View>
+              </Stack>
+            </Example>
+
+            {/* R15 : le panneau des grands écrans (SidePanel), dans la largeur que lui donne
+                `Columns sideWidth="panel"` (340) ; ses sections en lignes, puis le même panneau en
+                panne : chaque section garde son titre et dit ce qui lui manque. */}
+            <Example caption={`${l.panel} — ${l[scheme]}`}>
+              <Stack direction="row" gap="xxl" wrap>
+                <View style={{ width: layout.sidePanel, maxWidth: '100%' }}>
+                  <SidePanel>
+                    <Stack gap="md" align="stretch">
+                      <Text variant="heading" heading={3}>
+                        {t(($) => $.explore.testers)}
+                      </Text>
+                      <ListGroup>
+                        {cards.slice(0, 4).map((card) => (
+                          <TesterRow
+                            key={card.title}
+                            title={card.title}
+                            author={card.author}
+                            image={
+                              card.thumbhash
+                                ? { source: null, thumbhash: card.thumbhash, label: l.photo }
+                                : null
+                            }
+                            onTest={noop}
+                            onOpen={noop}
+                          />
+                        ))}
+                      </ListGroup>
+                    </Stack>
+                    <Stack gap="md" align="stretch">
+                      <Text variant="heading" heading={3}>
+                        {t(($) => $.explore.popularTools)}
+                      </Text>
+                      <ListGroup>
+                        {tools.slice(0, 6).map(([label, count]) => (
+                          <ListRow
+                            key={label}
+                            label={label}
+                            leading={<InitialTile name={label} variant={tileVariantOf(label)} />}
+                            detail={t(($) => $.tools.projects, { count })}
+                            detailRight
+                            onPress={noop}
+                          />
+                        ))}
+                      </ListGroup>
+                      <TextLink label={t(($) => $.explore.allTools)} onPress={noop} />
+                    </Stack>
+                  </SidePanel>
+                </View>
+                <View style={{ width: layout.sidePanel, maxWidth: '100%' }}>
+                  <SidePanel>
+                    {(
+                      [
+                        [t(($) => $.explore.testers), t(($) => $.explore.testersError)],
+                        [t(($) => $.explore.popularTools), t(($) => $.explore.toolsError)],
+                      ] as const
+                    ).map(([title, message]) => (
+                      <Stack key={title} gap="md">
+                        <Text variant="heading" heading={3}>
+                          {title}
+                        </Text>
+                        <Notice
+                          message={message}
+                          action={{ label: t(($) => $.common.retry), onPress: noop }}
+                        />
+                      </Stack>
+                    ))}
+                  </SidePanel>
                 </View>
               </Stack>
             </Example>
