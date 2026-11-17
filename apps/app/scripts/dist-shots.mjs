@@ -51,6 +51,9 @@ export const buildSite = () => {
       'web',
       '--output-dir',
       build,
+      // Le cache de Metro ne tient pas compte des variables EXPO_PUBLIC_* : après une construction
+      // de production (sans catalogue), il resservait la page du catalogue vide (R13, 17/11/2026).
+      '--clear',
       ...(workers > 0 ? ['--max-workers', String(workers)] : []),
     ],
     { cwd: root, stdio: 'inherit', env: { ...process.env, EXPO_PUBLIC_CATALOGUE: '1' } },
