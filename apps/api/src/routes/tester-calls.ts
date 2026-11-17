@@ -245,7 +245,7 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
 
     // Le curseur se décode en trois étapes (cursor.ts) ; hors de ses bornes, 400.
     const cursor = readCursor(c.req.valid('query').cursor)
-    if (cursor === 'invalid' || (cursor !== null && cursor.at >= '2100')) {
+    if (cursor === 'invalid') {
       return c.json(errorBody(languageOf(c), 'validation'), 400)
     }
 

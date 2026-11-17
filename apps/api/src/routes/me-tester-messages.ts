@@ -44,9 +44,8 @@ export const meTesterMessageRoutes = ({ db, publicApiUrl }: Deps) => {
     const user = ctx.get('user')
     if (!user) return ctx.json(errorBody(languageOf(ctx), 'unauthorized'), 401)
     const cursor = readCursor(ctx.req.valid('query').cursor)
-    // Un curseur illisible, ou daté d'après l'an 2100 (PostgreSQL refuserait l'an 9999 dans la
-    // comparaison : ce serait une erreur 500), est refusé (400).
-    if (cursor === 'invalid' || (cursor !== null && cursor.at >= '2100')) {
+    // Un curseur illisible, ou daté hors des bornes de `CursorDate` (cursor.ts), est refusé (400).
+    if (cursor === 'invalid') {
       return ctx.json(errorBody(languageOf(ctx), 'validation'), 400)
     }
     return ctx.json(
