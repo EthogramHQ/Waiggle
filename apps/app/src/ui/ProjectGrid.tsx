@@ -16,6 +16,7 @@ import { Button } from './Button'
 import { Stack } from './Stack'
 import { Surface } from './Surface'
 import { Text } from './Text'
+import { useLargeText } from './textScale'
 import { columnsFor, useContentWidth, useLayout } from './theme/layout'
 
 type Props = {
@@ -50,7 +51,12 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
   // La largeur de la colonne où la grille est posée ; 0 avant l'hydratation, donc une colonne : la
   // page du téléphone, celle du pré-rendu, qui ne connaît pas la fenêtre.
   const room = useContentWidth()
-  const cardMin = width >= layout.breakpoints.xwide ? layout.cardMin.feedWide : layout.cardMin.feed
+  // Le texte très agrandi (sur le web, lu par une ligne cachée, `probe`, posée dans la liste) : les
+  // cartes prennent la largeur de grand écran, sinon leurs titres se coupent au premier mot (à 200 %,
+  // trois cartes de 327 à côté du panneau, à 1 440 ; deux de 498 avec cette règle).
+  const { large, probe } = useLargeText()
+  const cardMin =
+    large || width >= layout.breakpoints.xwide ? layout.cardMin.feedWide : layout.cardMin.feed
   // Children.toArray : la liste des cartes, sans les « trous » (null, false) laissés par l'écran,
   // chacune avec sa clé.
   const cards = Children.toArray(children)
@@ -93,6 +99,7 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
           ))}
         </View>
       ))}
+      {probe}
     </View>
   )
 }
