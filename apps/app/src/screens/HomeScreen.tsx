@@ -143,8 +143,14 @@ function FeedWaiting() {
   const { t } = useTranslation()
   const { sizeClass, columns } = useLayout()
   const compact = sizeClass === 'compact'
+  const panelId = useId()
   const idleNews = <FeedNews news={NO_NEWS} onPress={noop} />
-  const main = <FeedSkeleton news={compact ? idleNews : null} />
+  // Le filtre, réduit à « Tout » tant qu'on ne connaît pas ses ruches (voir MemberHome).
+  const main = (
+    <TabPanel id={panelId} label={t(($) => $.hives.pills.all)}>
+      <FeedSkeleton news={compact ? idleNews : null} />
+    </TabPanel>
+  )
   return (
     <Screen
       width="wide"
@@ -154,8 +160,13 @@ function FeedWaiting() {
       keepAsideInView
       titleAside={compact ? undefined : idleNews}
       pageTitle={t(($) => $.nav.feed)}
+      sticky={
+        <>
+          {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
+          <HivePills hives={[]} value={ALL_HIVES} onChange={noop} panelId={panelId} />
+        </>
+      }
     >
-      {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
       {columns ? (
         <Columns sideWidth="panel" sticky main={main} side={<FeedSideSkeleton />} />
       ) : (
@@ -246,10 +257,12 @@ function MemberHome({
   // 1 440 et à 1 920 (planche R15-Fil-1920).
 
   // R10 : les pastilles, seulement pour un membre d'au moins une ruche. Elles commandent le
-  // panneau du Fil (`panelId`), posé autour de la colonne principale.
+  // panneau du Fil (`panelId`), posé autour de la colonne principale. R16 (planches R16-Fil) : le
+  // filtre est déjà là pendant la lecture de ses ruches, réduit à « Tout » : les cartes ne
+  // descendent plus quand ses ruches arrivent (69 points sur téléphone). Sans ruche, il part.
   const panelId = useId()
   const pills =
-    hiveChoice.hives.length > 0 ? (
+    hiveChoice.hives.length > 0 || hiveChoice.waiting ? (
       <HivePills
         hives={hiveChoice.hives}
         value={chosen?.id ?? ALL_HIVES}
