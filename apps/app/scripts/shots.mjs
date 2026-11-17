@@ -4837,6 +4837,10 @@ const pages = [
     bigScreens: true,
   },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
+  // R15 : une étiquette pleine (les 60 projets de Lovable), pour voir les rangées de tuiles qui
+  // suivent la place (4 à 1 280, 5 à 1 920) ; `etiquette` n'a que deux projets. Le premier écran
+  // suffit.
+  { name: 'outil', path: '/tags/lovable', signedIn: true, bigScreens: true },
   // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
   // adresse qui ne mène nulle part. R12 : la page réservée aux membres prend le nom
   // `visiteur-projet-membres` ; `visiteur-projet` est désormais un projet public (plus bas).
