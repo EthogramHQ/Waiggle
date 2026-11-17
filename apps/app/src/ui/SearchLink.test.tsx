@@ -86,4 +86,19 @@ describe('SearchLink', () => {
     })
     expect(radius()).toBe(radii.panel)
   })
+
+  // R15 (« Le gabarit large ») : la barre du haut suit la largeur de l'écran ouvert, jusqu'à
+  // 1 920 points ; le lien qui y prend la place qui reste (`grow`) ne s'étire pas au-delà de
+  // `layout.searchFieldMax` (relecture du plan de R15, C5 : le plafond vit dans la pilule commune,
+  // `usePill`). Le texte d'attente reste près de la loupe, sans bande vide de 1 000 points.
+  it('SearchLink in the top bar stops growing at 560 points', async () => {
+    await renderWithProviders(
+      <SearchLink label={label} placeholder={placeholder} href="/search" onPress={() => {}} grow />,
+    )
+
+    const style = StyleSheet.flatten(screen.getByRole('link').props.style) as ViewStyle
+    expect(style.flexGrow).toBe(1) // témoin : il prend la place qui reste
+    expect(style.maxWidth).toBe(layout.searchFieldMax)
+    expect(layout.searchFieldMax).toBe(560)
+  })
 })

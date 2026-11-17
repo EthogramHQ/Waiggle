@@ -14,9 +14,10 @@
 //   « Le texte complet » sont des titres de niveau 2, et chaque partie un titre de niveau 3 ;
 // - le corps d'une partie est du Markdown (ui/Markdown) : ses liens passent par `onLinkPress` ;
 // - `wide` (ordinateur) montre la navigation « Sommaire », une entrée par partie.
+import { readableWidth } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { createRef } from 'react'
-import { Dimensions, Text as NativeText, Platform } from 'react-native'
+import { Dimensions, Text as NativeText, Platform, StyleSheet } from 'react-native'
 import { labelOf } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -274,5 +275,52 @@ describe('LegalDocument (R11)', () => {
     }
     expect(screen.queryByLabelText(contents)).toBeNull()
     expect(screen.queryByRole('link', { name: sections[0]?.title ?? '' })).toBeNull()
+  })
+})
+
+// R15 (« Ce qui reste étroit ») : le texte d'une page légale reste à `readableWidth` au plus, mais
+// son bloc est centré dans la page au lieu d'être calé à gauche ; sur ordinateur, le bloc est le
+// sommaire et le texte côte à côte. Centré : `alignSelf: 'center'`, ou des marges automatiques ;
+// borné : une largeur maximale, sans quoi « centré » ne déplace rien.
+describe('LegalDocument, centred in the page (R15)', () => {
+  type Node = { props: Record<string, unknown>; parent: Node | null }
+  const styleOf = (node: Node) =>
+    (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>
+  const isCentred = (node: Node) => {
+    const style = styleOf(node)
+    return (
+      style.alignSelf === 'center' ||
+      style.marginHorizontal === 'auto' ||
+      (style.marginLeft === 'auto' && style.marginRight === 'auto')
+    )
+  }
+  /** Le premier cadre au-dessus du titre « En bref » qui borne sa largeur. */
+  const boundedAbove = (node: Node): Node | null => {
+    for (let current: Node | null = node.parent; current; current = current.parent) {
+      if (typeof styleOf(current).maxWidth === 'number') return current
+    }
+    return null
+  }
+
+  it('centres the column of text at the readable width, on a phone or a tablet', async () => {
+    await show({ wide: false })
+
+    const column = boundedAbove(screen.getByText(summaryTitle) as unknown as Node)
+    expect(column).not.toBeNull()
+    if (!column) return
+    expect(styleOf(column).maxWidth).toBe(readableWidth) // témoin : la largeur ne change pas
+    expect(isCentred(column)).toBe(true)
+  })
+
+  it('centres the contents and the text together on a computer', async () => {
+    await show({ wide: true })
+
+    // Le bloc : le cadre qui porte la navigation « Sommaire » et le texte.
+    const nav = screen.getByLabelText(contents) as unknown as Node
+    const block = nav.parent
+    expect(block).not.toBeNull()
+    if (!block) return
+    expect(typeof styleOf(block).maxWidth).toBe('number')
+    expect(isCentred(block)).toBe(true)
   })
 })
