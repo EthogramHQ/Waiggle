@@ -47,7 +47,7 @@ import {
   updateNotification,
 } from '../testing/notifications'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
-import { missingSentences, removalSentences } from '../testing/text'
+import { fr, missingSentences, removalSentences } from '../testing/text'
 import { relativeDate, shortDate } from '../ui/relativeDate'
 import { NotificationsScreen } from './NotificationsScreen'
 
@@ -140,6 +140,23 @@ const mockPages = (
     .mockReturnValue(result as unknown as ReturnType<typeof useNotifications>)
   return result
 }
+
+// R16 : la pièce vide, telle quelle, dans une vue marquée de son nom (elle n'a ni rôle ni nom à
+// elle, choix 4) : le test la compte.
+jest.mock('../ui/ListGroup', () => {
+  const actual = jest.requireActual('../ui/ListGroup')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  return {
+    ...actual,
+    ListRowSkeleton: (props: Record<string, unknown>) =>
+      createElement(
+        View,
+        { testID: 'ListRowSkeleton' },
+        createElement(actual.ListRowSkeleton, props),
+      ),
+  }
+})
 
 beforeEach(() => {
   mockPush.mockReset()
@@ -1285,5 +1302,32 @@ describe('the new lines of the Activity (R8)', () => {
     await fireEvent.press(control(t(($) => $.notifications.emptyExplore)))
 
     expect(addressOf(mockPush.mock.calls[0]?.[0])).toBe('/explore')
+  })
+})
+
+// --- R16 : une liste qui charge (docs/scenarios/refonte.md, « Le squelette a la forme de sa
+// page ») : des lignes vides (5, choix 11), aucun indicateur qui tourne, aucun « Chargement… »
+// écrit ; un lecteur d'écran entend toujours « Chargement… », une seule fois.
+describe('the activity while it loads (R16)', () => {
+  it('shows empty rows under a single loading name, without any written « Chargement… »', async () => {
+    jest.mocked(useNotifications).mockReturnValue({
+      data: undefined,
+      status: 'pending',
+      isPending: true,
+      isLoading: true,
+      isSuccess: false,
+      isError: false,
+      error: null,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: jest.fn(),
+      refetch: jest.fn(),
+    } as unknown as ReturnType<typeof useNotifications>)
+    await renderWithProviders(<NotificationsScreen />)
+
+    const loading = fr.t(($) => $.common.loading)
+    expect(screen.getAllByTestId('ListRowSkeleton')).toHaveLength(5)
+    expect(screen.getAllByRole('progressbar', { name: loading })).toHaveLength(1)
+    expect(screen.queryByText(loading)).toBeNull()
   })
 })
