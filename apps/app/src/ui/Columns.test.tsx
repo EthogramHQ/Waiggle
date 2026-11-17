@@ -532,7 +532,8 @@ describe('Columns in the wide layout (R15)', () => {
     expect(covered).toBeGreaterThan(0) // témoin : la barre est fixe et couvre le haut
     const sticky = stickyAround(SIDE)
     expect(sticky).not.toBeNull()
-    expect(sticky ? r15Style(sticky).top : undefined).toBe(covered)
+    // Relecture de design de R15 (17/11/2026) : avec l'air du contenu sous la barre, `space.xl`.
+    expect(sticky ? r15Style(sticky).top : undefined).toBe(covered + space.xl)
   })
 
   it('Columns sticks the side column at the top when the bar follows the content', async () => {
@@ -547,7 +548,8 @@ describe('Columns in the wide layout (R15)', () => {
     expect(channel?.coveredTop.current).toBe(0) // témoin : la barre n'est pas fixe
     const sticky = stickyAround(SIDE)
     expect(sticky).not.toBeNull()
-    expect(sticky ? r15Style(sticky).top : undefined).toBe(0)
+    // Relecture de design de R15 (17/11/2026) : le même air, sous le haut de la fenêtre.
+    expect(sticky ? r15Style(sticky).top : undefined).toBe(space.xl)
   })
 
   it('Columns keeps the side column in the flow when it is taller than the window', async () => {
@@ -572,6 +574,24 @@ describe('Columns in the wide layout (R15)', () => {
     await measureSide(880)
 
     expect(stickyAround(SIDE)).toBeNull()
+  })
+
+  // Relecture de design de R15 (17/11/2026) : une colonne plus haute que la fenêtre se colle par
+  // le bas. Son haut collé devient négatif (la hauteur de la fenêtre, moins la sienne, moins l'air
+  // gardé sous son pied) : elle défile avec la page jusqu'à ce que son bas apparaisse, puis reste
+  // en place. Tant qu'elle n'est pas mesurée, elle reste dans le flux, comme avant.
+  it('Columns sticks a side column taller than the window by its bottom, once measured', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    setR15Window(1440, 900)
+    await renderWithProviders(stickyPage)
+
+    await measureBar(64)
+    expect(stickyAround(SIDE)).toBeNull() // pas encore mesurée : dans le flux
+
+    await measureSide(2000)
+    const sticky = stickyAround(SIDE)
+    expect(sticky).not.toBeNull()
+    expect(sticky ? r15Style(sticky).top : undefined).toBe(900 - 2000 - space.xl)
   })
 
   it('does not stick the side column on a phone, where it goes below the main column', async () => {

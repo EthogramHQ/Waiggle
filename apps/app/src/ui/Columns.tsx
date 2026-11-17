@@ -56,10 +56,11 @@ type Props = { gap?: Space; sideWidth?: SideWidth } & (
       sideFirst?: boolean
       /**
        * R15 : la latérale reste en place pendant que la page défile (le panneau du Fil, la colonne
-       * du profil), sur le web seulement (sur téléphone, elle passe sous la principale). Collée sous
-       * la barre du haut quand celle-ci est fixe, en haut de la fenêtre quand elle suit le contenu,
-       * et seulement si elle tient dans la place qui reste : plus haute, elle défile avec la page,
-       * sinon son bas ne se montrerait jamais (ni le contrôle qui y reçoit le focus du clavier).
+       * du profil), sur le web seulement (sur téléphone, elle passe sous la principale). Collée un
+       * peu sous la barre du haut quand celle-ci est fixe, un peu sous le haut de la fenêtre quand
+       * elle suit le contenu. Plus haute que la place qui reste, elle se colle par le bas : elle
+       * défile avec la page jusqu'à son pied, puis reste en place (sinon son bas ne se montrerait
+       * jamais, ni le contrôle qui y reçoit le focus du clavier).
        */
       sticky?: boolean
       /**
@@ -163,12 +164,20 @@ function ColumnPair({
     // Une page quittée reste montée, cachée, et mesure 0 : la dernière vraie mesure reste.
     if (height > 0) setSideHeight(height)
   }
-  const stuck =
-    sticky &&
-    Platform.OS === 'web' &&
-    widths.beside &&
-    sideHeight > 0 &&
-    sideHeight <= windowHeight - coveredTop
+  // Relecture de design de R15 (17/11/2026) : la colonne colle dès qu'elle est mesurée, quelle que
+  // soit sa hauteur (avant, plus haute que la place sous la barre, elle renonçait : le panneau du Fil,
+  // 940 points, ne collait ni à 1 440 × 900 ni à 1 920 × 940). Tant qu'elle ne l'est pas, elle reste
+  // dans le flux, comme avant : rien ne saute, puisque la page n'a pas encore défilé.
+  const stuck = sticky && Platform.OS === 'web' && widths.beside && sideHeight > 0
+  // Où elle colle (le `top` du CSS, compté depuis le haut de la zone qui défile) :
+  // - si elle tient, `space.xl` sous la barre, le même air que celui du contenu sous la barre
+  //   (`ScreenTopBar`) ; collée au bord, son titre passait sous le voile dégradé et pâlissait ;
+  // - sinon, par le bas : la hauteur de la fenêtre, moins la sienne, moins le même air sous son pied.
+  //   Ce nombre est négatif : son haut reste au-dessus de la fenêtre. Elle défile avec la page
+  //   jusqu'à ce que son bas apparaisse, puis reste en place (la technique habituelle des colonnes
+  //   de côté). Le plus petit des deux suffit : quand la colonne grandit, on passe de l'un à
+  //   l'autre sans saut, à la hauteur où les deux valent autant.
+  const stuckTop = Math.min(coveredTop + space.xl, windowHeight - sideHeight - space.xl)
 
   const mainContent =
     hasAside && !three ? (
@@ -198,7 +207,7 @@ function ColumnPair({
         // `position: sticky` : react-native-web le transmet au navigateur, qui garde la colonne en
         // place dans la zone qui défile, tant que sa rangée est à l'écran. Les types de React Native
         // ne le connaissent pas (le téléphone n'en a pas besoin : la colonne y passe dessous).
-        stuck ? ({ position: 'sticky', top: coveredTop } as unknown as ViewStyle) : null,
+        stuck ? ({ position: 'sticky', top: stuckTop } as unknown as ViewStyle) : null,
       ]}
     >
       <ContentWidthContext.Provider value={widths.side}>{side}</ContentWidthContext.Provider>
