@@ -25,7 +25,7 @@ import {
 } from 'react'
 import { Platform, useColorScheme } from 'react-native'
 import { type Appearance, loadAppearance, saveAppearance } from './appearance'
-import { focusHalo, SCHEME_FADE_MS, SCHEME_FADING } from './document'
+import { focusHalo, REVEAL_NET_MS, SCHEME_FADE_MS, SCHEME_FADING } from './document'
 import { useHydrated } from './hydration'
 
 export type Theme = {
@@ -150,10 +150,15 @@ export function ThemeProvider({ children, appearance: forced }: Props) {
   }, [scheme, theme.colors, hydrated, ownsDocument])
 
   // Filet de sécurité : si une page ne signalait jamais son hydratation, elle ne doit pas rester
-  // cachée de nuit (voir documentCss). Au bout de quelques secondes, on la montre quoi qu'il arrive.
+  // cachée (de nuit et sur ordinateur, voir documentCss). Au bout de 10 secondes, le délai du filet
+  // en CSS seul, on la montre quoi qu'il arrive (R13 : à 3 s, un téléphone modeste qui démarrait
+  // l'appli en 8,5 s voyait d'abord la page de jour en mode sombre).
   useEffect(() => {
     if (!ownsDocument) return
-    const timer = setTimeout(() => document.documentElement.setAttribute('data-hydrated', ''), 3000)
+    const timer = setTimeout(
+      () => document.documentElement.setAttribute('data-hydrated', ''),
+      REVEAL_NET_MS,
+    )
     return () => clearTimeout(timer)
   }, [ownsDocument])
 

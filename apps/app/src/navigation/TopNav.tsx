@@ -39,6 +39,7 @@ import { NotificationBell } from '../notifications/NotificationBell'
 import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { type NavLinkEntry, NavLinks, NavPhotoLink } from '../ui/NavLinks'
+import { TopBarPlaceholder } from '../ui/ScreenTopBar'
 import { SearchButton, SearchField } from '../ui/SearchField'
 import { SearchLink } from '../ui/SearchLink'
 import { Row, Stack } from '../ui/Stack'
@@ -185,7 +186,7 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   const router = useRouter()
   const pathname = usePathname()
   const { sizeClass } = useLayout()
-  const { data: session } = useSession()
+  const { data: session, isPending } = useSession()
   const shown = sizeClass !== 'compact'
   // Le profil est lu sur toutes les largeurs : pour la photo de la capsule, et, sur téléphone aussi,
   // pour savoir si le compte est suspendu (le bandeau). Une seule copie en cache pour toute l'appli.
@@ -201,7 +202,11 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   // Cette page est-elle celle qui est affichée ? (hors d'un navigateur, oui : ui/screenFocus.ts).
   const focusedScreen = useScreenFocused()
 
-  if (!session) return null
+  // R13 (relecture du plan, décision 1) : sur écran large, pendant que la session se charge (une
+  // requête partie après le démarrage de l'appli), la place de la capsule, vide et cachée aux
+  // lecteurs d'écran : sinon le titre remonterait, puis redescendrait quand la capsule arrive. Sur
+  // téléphone, la capsule n'existe pas : rien à garder.
+  if (!session) return isPending && shown ? <TopBarPlaceholder /> : null
   const banner = suspension ? (
     // Ailleurs que sur l'accueil, rien d'imposé : le bandeau suit la mémoire de l'appareil.
     <SuspensionBanner suspension={suspension} initiallyOpen={openSuspension ? true : undefined} />

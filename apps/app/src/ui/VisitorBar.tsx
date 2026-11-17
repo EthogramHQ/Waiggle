@@ -23,6 +23,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './Button'
 import { Logo } from './Logo'
+import { declareTopBarReserve } from './ScreenTopBar'
 import { Row, Stack } from './Stack'
 import { Surface } from './Surface'
 import { useLayout } from './theme/layout'
@@ -98,3 +99,8 @@ export function VisitorBar({ homeHref, next, action, variant }: Props) {
     </Surface>
   )
 }
+
+// R13 : la barre d'un visiteur rend toujours sa capsule (elle ne lit aucune session) : Screen lui
+// réserve sa place dès le premier rendu, celui de la page pré-rendue (`layout.topBarHeight`). Sans
+// cela, le titre commençait sous la barre jusqu'au démarrage de l'appli.
+declareTopBarReserve(VisitorBar)

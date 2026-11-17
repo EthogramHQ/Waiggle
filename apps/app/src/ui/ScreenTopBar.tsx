@@ -27,7 +27,15 @@
 // vers un endroit de la page jusque sous cette place : Screen la donne à la zone qui défile
 // (`scrollPaddingTop`, rendu par `onSpace`, jur-RF3).
 import { layout, space } from '@ruche/brand'
-import { type ReactNode, type Ref, useContext, useEffect, useRef, useState } from 'react'
+import {
+  isValidElement,
+  type ReactNode,
+  type Ref,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { type LayoutChangeEvent, Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenScrollContext } from './scrollLight'
@@ -41,8 +49,8 @@ export type TopBarSpace = {
   /**
    * La hauteur à réserver en haut du contenu, du bord de l'écran au bas de la barre (zone sûre du
    * téléphone et marge du haut comprises, `belowBar` non compris : il flotte sur le contenu). Le
-   * contenu commence `space.xl` plus bas, l'écart d'avant entre la barre et le titre. 0 tant que la
-   * barre n'est pas mesurée.
+   * contenu commence `space.xl` plus bas, l'écart d'avant entre la barre et le titre. Tant que la
+   * barre n'est pas mesurée : la place qu'elle a déclarée (`reserved`, R13), sinon 0.
    */
   height: number
   /**
@@ -74,6 +82,47 @@ type Props = {
   onSpace?: (space: TopBarSpace) => void
   /** La place de `belowBar`, pour Screen, qui y rend le focus quand l'élément y arrive (ui-5). */
   belowRef?: Ref<View>
+  /**
+   * R13 : la hauteur à réserver avant toute mesure (`layout.topBarHeight`, zone sûre comprise),
+   * donnée par Screen pour une barre qui la déclare (`declareTopBarReserve`). Rendue dès le premier
+   * rendu, celui de la page pré-rendue, où aucun script ne mesure encore ; la mesure la remplace.
+   * Sans elle (une barre qui ne rend peut-être rien), 0 jusqu'à la mesure.
+   */
+  reserved?: number
+}
+
+// R13 (relecture du plan, décision 1) : les barres qui déclarent leur place avant d'être mesurées.
+// Screen ne peut pas savoir, avant de la dessiner, si une barre rendra quelque chose (TopNav d'un
+// visiteur ne rend rien) : seule une barre qui rend toujours sa capsule se déclare, une fois, par
+// son composant (`declareTopBarReserve(VisitorBar)`). Un `WeakSet` : un ensemble qui ne retient pas
+// ce qu'il contient en mémoire, et ne se lit que par `has`.
+const reservingBars = new WeakSet<object>()
+
+/** Déclare qu'une barre (son composant) rend toujours sa capsule : Screen lui réserve sa place. */
+export const declareTopBarReserve = (component: object) => {
+  reservingBars.add(component)
+}
+
+/** Vrai si le `header` donné à Screen est une barre qui a déclaré sa place. */
+export const declaresTopBarReserve = (header: ReactNode): boolean =>
+  isValidElement(header) && typeof header.type !== 'string' && reservingBars.has(header.type)
+
+/**
+ * La place de la capsule d'ordinateur, vide (R13, relecture du plan, décision 1) : `TopNav` la rend
+ * pendant que la session se charge sur écran large, pour que le titre ne remonte pas puis ne
+ * redescende pas quand la capsule arrive. La hauteur de la barre réservée moins la marge du haut,
+ * que la bande ajoute elle-même au-dessus. Rien à lire ni à toucher : cachée aux lecteurs d'écran.
+ */
+export function TopBarPlaceholder() {
+  return (
+    <View
+      pointerEvents="none"
+      aria-hidden
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ height: layout.topBarHeight.regular - space.lg }}
+    />
+  )
 }
 
 /**
@@ -108,6 +157,7 @@ export function ScreenTopBar({
   onHeight,
   onSpace,
   belowRef,
+  reserved,
 }: Props) {
   const { colors } = useTheme()
   const { padding, sizeClass, height: windowHeight, width: windowWidth } = useLayout()
@@ -116,9 +166,13 @@ export function ScreenTopBar({
   // Les hauteurs mesurées : la dernière mesure non nulle (ui-6). Sur le web, une page quittée reste
   // montée, cachée (`display: none`), et mesure 0 : la garder ferait sauter le contenu à son retour.
   // Avant sa propre mesure, la barre d'une page neuve reprend la place déjà mesurée (plus haut).
-  const [barHeight, setBarHeight] = useState(() =>
+  const [measuredHeight, setBarHeight] = useState(() =>
     brand ? 0 : (rememberedTopBarSpace(windowWidth)?.height ?? 0),
   )
+  // Sans mesure ni place déjà mesurée, la place déclarée (R13) : celle de la page pré-rendue. Lue à
+  // chaque rendu, elle suit la taille d'écran tant que rien n'est mesuré (le pré-rendu est en
+  // largeur de téléphone ; après l'hydratation, un ordinateur passe à la capsule d'ordinateur).
+  const barHeight = measuredHeight > 0 || brand ? measuredHeight : (reserved ?? 0)
   const [belowHeight, setBelowHeight] = useState(0)
   const keepHeight = (set: (height: number) => void) => (event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height)
@@ -151,14 +205,16 @@ export function ScreenTopBar({
     )
       return
     reported.current = next
-    if (!brand && next.height > 0) remembered = { windowWidth, space: next }
+    // Seule une place mesurée est retenue pour la page suivante : la réserve n'est qu'une attente.
+    if (!brand && measuredHeight > 0) remembered = { windowWidth, space: next }
     onSpace?.(next)
-  }, [pinned, barHeight, scrollPaddingTop, onSpace, brand, windowWidth])
+  }, [pinned, barHeight, measuredHeight, scrollPaddingTop, onSpace, brand, windowWidth])
 
-  // La hauteur de la barre seule, rendue à Screen quand elle change (jamais 0 : voir plus haut).
+  // La hauteur mesurée de la barre seule, rendue quand elle change (jamais 0 : voir plus haut ;
+  // jamais la réserve, qui n'est pas une mesure).
   useEffect(() => {
-    if (barHeight > 0) onHeight?.(barHeight)
-  }, [barHeight, onHeight])
+    if (measuredHeight > 0) onHeight?.(measuredHeight)
+  }, [measuredHeight, onHeight])
 
   // Dans le flux, la barre remonte avec le contenu : son décalage suit le défilement de l'écran (le
   // canal de Screen, ui/scrollLight.ts). Le dernier défilement est toujours noté (`lastScroll`),
