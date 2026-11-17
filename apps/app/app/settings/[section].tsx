@@ -2,12 +2,19 @@
 // fichier : cette partie de l'adresse est variable, et useLocalSearchParams la lit. Une rubrique
 // inconnue (« /settings/nimporte ») donne la page « introuvable ». « /settings/profile » a sa
 // propre page (profile.tsx), qu'Expo Router préfère à celle-ci.
+// L'écran des réglages se charge quand on ouvre la page, pas avec l'accueil (R13,
+// navigation/lazyScreen.tsx) ; `import type` ne lit que son type, effacé à la construction.
 import { useLocalSearchParams } from 'expo-router'
+import { lazyScreen } from '../../src/navigation/lazyScreen'
 import { firstParam } from '../../src/navigation/params'
 import { NotFoundScreen } from '../../src/screens/NotFoundScreen'
-import { SettingsScreen, type SettingsSectionKey } from '../../src/screens/SettingsScreen'
+import type { SettingsSectionKey } from '../../src/screens/SettingsScreen'
 import { LoadingScreen } from '../../src/screens/states'
 import { useHydrated } from '../../src/ui/theme/hydration'
+
+const SettingsScreen = lazyScreen(() =>
+  import('../../src/navigation/chunks/settings').then((m) => m.SettingsScreen),
+)
 
 const sections: readonly SettingsSectionKey[] = [
   'profile',

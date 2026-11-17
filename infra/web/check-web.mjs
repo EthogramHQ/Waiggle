@@ -9,6 +9,9 @@
 // 3. Un outil de développement servi en ligne.
 // 4. Une page publique sans sa copie française ou anglaise, la copie générique [lang]/ servie, ou
 //    le marqueur de la tête absent (R12).
+// 5. Le premier chargement (R13) : le catalogue des composants (un outil de développement) resté
+//    dans le JavaScript publié, une page pré-rendue qui laisse une frontière en suspens, ou une
+//    page qui fait télécharger Geist Mono d'emblée.
 //
 // Usage : node infra/web/check-web.mjs <dossier de l'appli construite> <Caddyfile>
 import { createHash } from 'node:crypto'
@@ -23,14 +26,15 @@ if (!dist || !caddyfilePath) {
 const caddyfile = readFileSync(caddyfilePath, 'utf8')
 const problems = []
 
-// Toutes les pages HTML construites, avec leur chemin relatif écrit avec des « / ».
-const pagesIn = (dir) =>
+// Les fichiers construits d'un type (`.html`, `.js`), sous-dossiers compris, avec leur chemin
+// relatif écrit avec des « / ».
+const filesIn = (dir, extension) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) return pagesIn(path)
-    return entry.name.endsWith('.html') ? [relative(dist, path).split(sep).join('/')] : []
+    if (entry.isDirectory()) return filesIn(path, extension)
+    return entry.name.endsWith(extension) ? [relative(dist, path).split(sep).join('/')] : []
   })
-const pages = pagesIn(dist)
+const pages = filesIn(dist, '.html')
 if (!pages.includes('index.html') || !pages.includes('+not-found.html')) {
   problems.push(`${dist} ne contient pas index.html et +not-found.html : est-ce bien l'appli ?`)
 }
@@ -137,6 +141,53 @@ for (const page of pages.filter((p) => LANGUAGES.some((lang) => p.startsWith(`${
   }
 }
 
+// 5. Le premier chargement (R13, relecture du plan, décisions 2 et 6).
+//    a. Le catalogue des composants n'est construit qu'avec EXPO_PUBLIC_CATALOGUE=1 (captures) :
+//       son titre ne doit se trouver dans aucun fichier JavaScript, le script d'entrée comme les
+//       morceaux chargés à la demande, sous-dossiers compris. Aucun fichier lu : le contrôle ne
+//       prouverait rien (mauvais dossier, construction ratée), il échoue.
+const scripts = filesIn(dist, '.js')
+if (scripts.length === 0) {
+  problems.push(`${dist} ne contient aucun fichier .js : la construction est-elle complète ?`)
+}
+const CATALOGUE_TITLE = 'Catalogue des composants'
+for (const script of scripts) {
+  if (readFileSync(join(dist, script), 'utf8').includes(CATALOGUE_TITLE)) {
+    problems.push(
+      `${script} contient « ${CATALOGUE_TITLE} » : le catalogue est dans le JavaScript publié (apps/app/app/catalogue.tsx doit le charger dans sa condition, par require).`,
+    )
+  }
+}
+//    b. `<!--$!-->` : une frontière <Suspense> que le pré-rendu n'a pas pu remplir. Le navigateur
+//       la refait entièrement (erreur React 419) : l'écran d'une route chargée à la demande passe
+//       par navigation/lazyScreen.tsx, qui pré-rend la page de chargement.
+//    c. Geist Mono, la police des outils et des versions, se charge après l'hydratation : aucune
+//       page ne la précharge (`<link rel="preload">`) ni ne la déclare (`@font-face`), sinon chaque
+//       visiteur la télécharge avant de voir la page.
+const preloads = /<link\b[^>]*\brel=["']?preload\b[^>]*>/gi
+const fontFaces = /@font-face\s*\{[^}]*\}/gi
+const geistMono = /geist-?mono/i
+// Les pages fautives, regroupées par défaut : le même défaut vient d'ordinaire de toutes les pages.
+const faulty = { suspended: [], preload: [], fontFace: [] }
+for (const page of pages) {
+  const html = readFileSync(join(dist, page), 'utf8')
+  if (html.includes('<!--$!-->')) faulty.suspended.push(page)
+  if ([...html.matchAll(preloads)].some(([link]) => geistMono.test(link))) faulty.preload.push(page)
+  if ([...html.matchAll(fontFaces)].some(([face]) => geistMono.test(face))) {
+    faulty.fontFace.push(page)
+  }
+}
+const FAULTS = {
+  suspended: 'une frontière en suspens (<!--$!-->), que le navigateur refera (erreur React 419)',
+  preload: "précharge Geist Mono, qui doit attendre l'hydratation",
+  fontFace: "déclare Geist Mono (@font-face), qui doit attendre l'hydratation",
+}
+for (const [fault, where] of Object.entries(faulty)) {
+  if (where.length === 0) continue
+  const list = where.length > 3 ? `${where.slice(0, 3).join(', ')}…` : where.join(', ')
+  problems.push(`${where.length} page(s) (${list}) : ${FAULTS[fault]}.`)
+}
+
 if (problems.length > 0) {
   console.error(
     `L'appli construite et infra/Caddyfile ne vont pas ensemble :\n- ${problems.join('\n- ')}`,
@@ -144,5 +195,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log(
-  `Caddyfile vérifié : ${pages.length} pages, scripts en ligne autorisés, pages à paramètre réécrites, pages par langue complètes et marquées, copie générique fermée.`,
+  `Caddyfile vérifié : ${pages.length} pages, scripts en ligne autorisés, pages à paramètre réécrites, pages par langue complètes et marquées, copie générique fermée ; ${scripts.length} fichiers JavaScript sans le catalogue, aucune frontière en suspens, Geist Mono hors du premier chargement.`,
 )
