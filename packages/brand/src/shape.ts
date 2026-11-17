@@ -107,6 +107,15 @@ export const layout = {
   // pré-rendue, aucun script ne la mesure encore : sans cette réserve, la barre se posait sur le titre
   // jusqu'au démarrage de l'appli (audit de design du 17/11/2026, 4.3). Seule une barre qui la déclare
   // la réserve ; la mesure garde le dernier mot, et ces valeurs doivent rester celles qu'elle trouve.
+  // Mesurées au navigateur le 17/11/2026 (Chromium, site des captures, texte à 100 %) : la hauteur de
+  // la bande de ScreenTopBar, la vue qui porte la marge du haut (16) et que sa vue de mesure épouse.
+  // - compact, à 390 de large : la barre d'un visiteur (deux pilules de 44, VisitorBar) mesure 60 ;
+  // - regular, à 1 440 : la capsule des membres (TopNav) mesure 79 (capsule de 63 : une rangée de 45
+  //   pour des éléments de 44), celle d'un visiteur 78. 79 : la place gardée par TopNav pendant que
+  //   la session se charge (79 - 16) vaut alors exactement la capsule qui la remplace ; la barre d'un
+  //   visiteur, elle, se corrige d'un point à sa mesure, au moment où la page se montre.
+  // À mesurer de nouveau si la barre change (taille d'un bouton, marge, capsule) : getBoundingClientRect
+  // de cette bande, après le démarrage, aux deux largeurs.
   topBarHeight: { compact: 60, regular: 79 },
   fab: 64, // le bouton rond flottant (« Publier »)
   // R10 : l'alvéole d'une ruche (HiveBadge, planches R10), un hexagone pointe en haut, à trois
