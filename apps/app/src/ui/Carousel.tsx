@@ -6,7 +6,7 @@
 // Il ne bouge jamais seul (relecture juridique de R3, jur-J7 : un carrousel qui défile seul attire
 // l'œil malgré soi) : ni minuteur, ni défilement au montage ; seulement le doigt, une flèche, Tab.
 // Il ressemble à Thumbnails, l'autre ScrollView horizontal de l'appli.
-import { type ShadowName, shadows, space } from '@ruche/brand'
+import { layout, type ShadowName, shadows, space } from '@ruche/brand'
 import {
   Children,
   isValidElement,
@@ -41,7 +41,8 @@ type Props = {
   children: ReactNode
   /**
    * Ce qui se pose à gauche des flèches, sur la même ligne : le titre de la section (et un lien
-   * « Tous les outils »). Sans lui, les flèches se rangent seules à droite, au-dessus de la bande.
+   * « Tous les outils »). Sans lui, les flèches se rangent seules à droite, au-dessus de la bande ;
+   * sur ordinateur, leur ligne y est gardée même quand les cartes tiennent (R16 : rien ne bouge).
    */
   header?: ReactNode
   /** cards : des cartes, bien espacées ; chips : des étiquettes, serrées comme une ligne de texte. */
@@ -120,21 +121,30 @@ export function Carousel({
   // Les positions où la bande s'arrête (téléphone : snapToOffsets). Sur le web, c'est le CSS
   // (scroll-snap) qui aimante, d'après chaque carte.
   const [offsets, setOffsets] = useState<number[]>([])
-  const [ends, setEnds] = useState({ start: true, end: false, fits: false })
+  // `measured` (R16, « La page ne bouge plus en arrivant ») : la largeur visible et celle du contenu
+  // sont toutes deux connues. Distinct de `fits` : « pas encore mesurée » ne veut pas dire « tient
+  // entière ». La page web pré-rendue ne mesure jamais rien ; elle s'ouvre donc sans flèche.
+  const [ends, setEnds] = useState({ measured: false, start: true, end: false, fits: false })
 
   const cards = Children.toArray(children)
 
-  // Après chaque mesure ou chaque arrêt : la bande est-elle au début, au bout, ou tient-elle
-  // entière ? Tant que rien n'est mesuré (premier rendu, tests), les deux flèches restent actives.
+  // Après chaque mesure ou chaque arrêt : la bande est-elle mesurée, au début, au bout, ou
+  // tient-elle entière ?
   const updateEnds = useCallback(() => {
     const measured = viewport.current > 0 && content.current > 0
     const next = {
+      measured,
       start: x.current <= 1,
       end: measured && x.current + viewport.current >= content.current - 1,
       fits: measured && content.current <= viewport.current + 1,
     }
     setEnds((prev) =>
-      prev.start === next.start && prev.end === next.end && prev.fits === next.fits ? prev : next,
+      prev.measured === next.measured &&
+      prev.start === next.start &&
+      prev.end === next.end &&
+      prev.fits === next.fits
+        ? prev
+        : next,
     )
   }, [])
 
@@ -199,15 +209,22 @@ export function Carousel({
     updateEnds()
   }
 
-  const showArrows = arrows && !ends.fits
+  // Les flèches n'existent qu'une fois la bande mesurée, et seulement si elle déborde (R16) : avant,
+  // elles se montraient puis disparaissaient quand les cartes tenaient, et « À la une » sautait de
+  // 9 puis de 18 points. Absentes de l'arbre, pas cachées : ni vues, ni lues, ni atteignables par Tab.
+  const showArrows = arrows && ends.measured && !ends.fits
+  // Là où des flèches peuvent venir (ordinateur), l'en-tête se pose d'emblée, avec au moins leur
+  // hauteur : qu'elles arrivent ou non, rien ne bouge dessous. Une hauteur minimale, jamais fixe :
+  // à 200 %, un titre sur deux lignes l'agrandit au lieu d'être coupé.
   const top =
-    header || showArrows ? (
+    header || arrows ? (
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: header ? 'space-between' : 'flex-end',
           gap: space.md,
+          ...(arrows ? { minHeight: layout.touchTarget } : null),
         }}
       >
         {/* Le titre peut passer à la ligne (texte agrandi) sans pousser les flèches hors de l'écran.
