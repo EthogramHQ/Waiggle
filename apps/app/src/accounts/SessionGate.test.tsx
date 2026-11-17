@@ -23,6 +23,8 @@ import { SessionGate } from './SessionGate'
 import type { SessionData } from './session'
 
 jest.mock('./api', () => ({ useSession: jest.fn() }))
+// Sur le web, la page lit la langue du navigateur : on la fixe au français, comme les textes cherchés.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
 jest.mock('../api/media', () => ({
   useMediaSources: () => (url: string | null | undefined) => (url ? { uri: url } : null),
 }))
