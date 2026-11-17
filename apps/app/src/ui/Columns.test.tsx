@@ -552,28 +552,20 @@ describe('Columns in the wide layout (R15)', () => {
     expect(sticky ? r15Style(sticky).top : undefined).toBe(space.xl)
   })
 
-  it('Columns keeps the side column in the flow when it is taller than the window', async () => {
+  // Une colonne à peine plus haute que la place sous la barre fixe (mais plus basse que la fenêtre)
+  // se colle elle aussi par le bas (relecture de design de R15, 17/11/2026) : avant, elle restait
+  // dans le flux et défilait avec la page.
+  it('sticks by its bottom a side column just taller than the room below the bar', async () => {
     jest.replaceProperty(Platform, 'OS', 'web')
     setR15Window(1440, 900)
     await renderWithProviders(stickyPage)
 
     await measureBar(64)
-    await measureSide(2000)
-
-    expect(screen.getByText(SIDE)).toBeTruthy() // témoin
-    expect(stickyAround(SIDE)).toBeNull()
-  })
-
-  it('keeps the side column in the flow when it is just taller than the room below the bar', async () => {
-    jest.replaceProperty(Platform, 'OS', 'web')
-    setR15Window(1440, 900)
-    await renderWithProviders(stickyPage)
-
-    await measureBar(64)
-    // Plus bas que la fenêtre (900), mais plus haut que la place sous la barre fixe.
     await measureSide(880)
 
-    expect(stickyAround(SIDE)).toBeNull()
+    const sticky = stickyAround(SIDE)
+    expect(sticky).not.toBeNull()
+    expect(sticky ? r15Style(sticky).top : undefined).toBe(900 - 880 - space.xl)
   })
 
   // Relecture de design de R15 (17/11/2026) : une colonne plus haute que la fenêtre se colle par
