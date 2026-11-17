@@ -101,7 +101,7 @@ export function PublicMemberScreen({ id, preview = false, onClose }: Props) {
       />
     )
   }
-  if (!member.data) return <LoadingScreen width="page" fallback={fallback} />
+  if (!member.data) return <LoadingScreen width="wide" fallback={fallback} />
   return (
     <PublicMemberView
       member={member.data}

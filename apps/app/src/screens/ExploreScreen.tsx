@@ -72,7 +72,7 @@ const PANEL_TOOLS = 6
 
 export function ExploreScreen() {
   const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="wide" />
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen />

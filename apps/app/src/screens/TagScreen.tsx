@@ -53,7 +53,7 @@ import { type ToolEditResult, ToolEditSheet } from './ToolEditSheet'
 
 export function TagScreen({ slug }: { slug: string }) {
   const { state, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="wide" />
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts). Rien de la
   // page n'est demandé avant : les lectures vivent dans `MemberToolPage`.
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
@@ -146,7 +146,7 @@ function MemberToolPage({ slug }: { slug: string }) {
       </Screen>
     )
   }
-  return <LoadingScreen width="page" />
+  return <LoadingScreen width="wide" />
 }
 
 type ViewProps = {

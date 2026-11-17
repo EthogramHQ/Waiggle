@@ -184,7 +184,7 @@ export function MemberScreen({ id }: { id: string }) {
   const member = useMember(id, Boolean(session))
 
   // R14 : le squelette prend la forme des petites cartes de la mosaïque, celles qui arrivent.
-  if (state === 'pending') return <LoadingScreen width="page" shape="compact" />
+  if (state === 'pending') return <LoadingScreen width="wide" shape="compact" />
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />
@@ -204,7 +204,7 @@ export function MemberScreen({ id }: { id: string }) {
       <LoadErrorScreen error={member.error} onRetry={() => void member.refetch()} width="page" />
     )
   }
-  if (!member.data) return <LoadingScreen width="page" shape="compact" />
+  if (!member.data) return <LoadingScreen width="wide" shape="compact" />
   return <MemberView member={member.data} />
 }
 

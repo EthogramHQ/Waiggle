@@ -100,6 +100,7 @@ import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
+import { MemberColumnCatalogue } from './membre-colonne'
 import { MyCommentsCatalogue } from './mes-commentaires'
 import { MyFeedbackCatalogue } from './mes-retours'
 import { UpdateFamiliesCatalogue } from './mises-a-jour'
@@ -888,6 +889,7 @@ export function CatalogueScreen() {
       {/* Tranche R14 : la carte compacte et la mosaïque des projets d'un membre
           (mosaique-membre.tsx). */}
       <MemberMosaicCatalogue />
+      <MemberColumnCatalogue />
       {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
           son issue (projet-categorie.tsx). */}
       <ProjectCategoryCatalogue />
