@@ -28,6 +28,11 @@
 // récent en grande carte, les suivants en cartes compactes, avec ce que la page publique sait de
 // chacun (photo, titre, accroche, statut).
 //
+// R15 (« L'ordinateur en grand ») : la même mise en page que la page d'un membre. Le gabarit large ;
+// dès 1 100 points, le profil en colonne à gauche (`MemberHeader layout="column"`, sa bannière
+// floue), qui reste en place, et la mosaïque à droite ; « Signaler ce profil » et le pied dessous,
+// sur toute la largeur.
+//
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import { PROJECT_LIST_MAX, type PublicMember } from '@ruche/contracts'
 import { type Href, useRouter } from 'expo-router'
@@ -38,6 +43,7 @@ import { useMediaSources } from '../api/media'
 import { useGoBack } from '../navigation/useGoBack'
 import { usePageLanguage, usePublicMember } from '../public/api'
 import { publicPath } from '../publicPath'
+import { Columns } from '../ui/Columns'
 import { CountedTitle } from '../ui/CountedTitle'
 import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
@@ -123,8 +129,11 @@ function PublicMemberView({
   const lang = usePageLanguage()
   const goBack = useGoBack(fallback)
   const back = onClose ?? goBack
-  // Sur téléphone, « Partager » va dans la barre d'un visiteur ; ailleurs, en haut à droite.
-  const phone = useLayout().sizeClass === 'compact'
+  // Sur téléphone, « Partager » va dans la barre d'un visiteur ; ailleurs, en haut à droite. R15 :
+  // sur ordinateur (1 100 points et plus, après l'hydratation), le profil en colonne.
+  const { sizeClass } = useLayout()
+  const phone = sizeClass === 'compact'
+  const column = sizeClass === 'wide'
 
   // L'aperçu s'ouvre à la place de l'écran des réglages : le bouton touché disparaît, et le focus
   // tombait sur la page entière (le lecteur d'écran ne disait rien, Tab repartait du haut). À
@@ -173,87 +182,106 @@ function PublicMemberView({
   const report = () =>
     router.push({ pathname: '/report', params: { kind: 'member', id: member.id } })
 
+  // Le profil : le nom et la photo, puis ce que le membre a choisi de montrer. Centré au-dessus des
+  // projets, ou rangé à gauche dans sa colonne (`layout="column"`, R15).
+  const profile = (
+    <MemberHeader
+      name={member.name}
+      avatar={toSource(member.avatarUrl)}
+      bio={member.bio ?? ''}
+      nameRef={preview ? nameRef : undefined}
+      layout={column ? 'column' : undefined}
+      // R12b : le compte d'exemples de l'équipe, comme sur la page d'un membre : « Exemple » à
+      // côté du nom, et dessous la phrase qui dit ses projets fictifs.
+      exampleNote={member.example ? t(($) => $.member.exampleNote) : undefined}
+      toolsTitle={t(($) => $.member.favoriteTools)}
+      // Des pastilles sans `onPress` : la page d'un outil est réservée aux membres. Un « autre
+      // outil », hors du catalogue, reste marqué comme tel (`inCatalogue`).
+      tools={(member.favoriteTools ?? []).map((tool) => ({
+        label: tool.label,
+        inCatalogue: tool.inCatalogue,
+      }))}
+      // Le nombre seul, jamais qui ; absent si la case est décochée.
+      action={
+        member.followerCount === undefined ? null : (
+          <FollowerCount text={t(($) => $.follow.followers, { count: member.followerCount })} />
+        )
+      }
+    />
+  )
+
+  // Les projets : absents si la case est décochée (ni titre, ni phrase).
+  const projectList = projects ? (
+    <>
+      <CountedTitle
+        title={t(($) => $.member.projects)}
+        count={projectCount}
+        more={capped}
+        spokenCount={spokenCount}
+      />
+      {projects.length === 0 ? (
+        // Cochés, mais aucun projet public : la phrase de la grille, sans mosaïque.
+        <ProjectGrid empty={t(($) => $.visitor.noProjects)}>{null}</ProjectGrid>
+      ) : (
+        // R14 : la même mosaïque que pour un membre, avec ce que la page publique sait de chaque
+        // projet (`PublicProjectCard`) : la photo, le titre, l'accroche et le statut. Ni auteur
+        // (on est sur sa page), ni réactions, ni « Tester » : la page publique du projet les
+        // montre. Pas de photo qui grandit non plus : un visiteur passe d'une page publique à
+        // l'autre comme avant. La carte a sa garde contre la double tape.
+        <ProjectMosaic
+          items={projects}
+          render={(project, size) => (
+            <ProjectCard
+              title={project.title}
+              pitch={project.pitch}
+              size={size}
+              image={
+                project.cover
+                  ? {
+                      source: toSource(project.cover.url),
+                      thumbhash: project.cover.thumbhash,
+                      label: project.title,
+                    }
+                  : null
+              }
+              status={{
+                label: t(($) => $.project.status[project.status]),
+                strong: project.status === 'testable',
+              }}
+              // « Exemple » sur chaque projet du compte d'exemples de l'équipe (R12b), comme sur
+              // la page d'un membre : la page publique ne le dit que du membre, et tous ses
+              // projets en sont.
+              example={member.example === true}
+              // Dans l'aperçu, la carte est seulement dessinée : rien ne fait quitter l'aperçu.
+              {...(preview
+                ? null
+                : { onPress: () => router.push(publicPath('project', lang, project.id)) })}
+            />
+          )}
+        />
+      )}
+    </>
+  ) : null
+
   return (
     <Screen
-      width="page"
+      width="wide"
       header={header}
       onBack={back}
       pageTitle={member.name}
       topAction={phone ? undefined : shareButton}
     >
-      <MemberHeader
-        name={member.name}
-        avatar={toSource(member.avatarUrl)}
-        bio={member.bio ?? ''}
-        nameRef={preview ? nameRef : undefined}
-        // R12b : le compte d'exemples de l'équipe, comme sur la page d'un membre : « Exemple » à
-        // côté du nom, et dessous la phrase qui dit ses projets fictifs.
-        exampleNote={member.example ? t(($) => $.member.exampleNote) : undefined}
-        toolsTitle={t(($) => $.member.favoriteTools)}
-        // Des pastilles sans `onPress` : la page d'un outil est réservée aux membres. Un « autre
-        // outil », hors du catalogue, reste marqué comme tel (`inCatalogue`).
-        tools={(member.favoriteTools ?? []).map((tool) => ({
-          label: tool.label,
-          inCatalogue: tool.inCatalogue,
-        }))}
-        // Le nombre seul, jamais qui ; absent si la case est décochée.
-        action={
-          member.followerCount === undefined ? null : (
-            <FollowerCount text={t(($) => $.follow.followers, { count: member.followerCount })} />
-          )
-        }
-      />
-      {projects ? (
+      {/* R15 : sur ordinateur, le profil en colonne à gauche, lu d'abord, qui reste en place
+          (s'il tient dans la fenêtre) ; les projets prennent le reste. Plus étroit, l'un sous
+          l'autre. */}
+      {column ? (
+        <Columns sideFirst sideWidth="profile" sticky side={profile} main={projectList} />
+      ) : (
         <>
-          <CountedTitle
-            title={t(($) => $.member.projects)}
-            count={projectCount}
-            more={capped}
-            spokenCount={spokenCount}
-          />
-          {projects.length === 0 ? (
-            // Cochés, mais aucun projet public : la phrase de la grille, sans mosaïque.
-            <ProjectGrid empty={t(($) => $.visitor.noProjects)}>{null}</ProjectGrid>
-          ) : (
-            // R14 : la même mosaïque que pour un membre, avec ce que la page publique sait de
-            // chaque projet (`PublicProjectCard`) : la photo, le titre, l'accroche et le statut.
-            // Ni auteur (on est sur sa page), ni réactions, ni « Tester » : la page publique du
-            // projet les montre. Pas de photo qui grandit non plus : un visiteur passe d'une page
-            // publique à l'autre comme avant. La carte a sa garde contre la double tape.
-            <ProjectMosaic
-              items={projects}
-              render={(project, size) => (
-                <ProjectCard
-                  title={project.title}
-                  pitch={project.pitch}
-                  size={size}
-                  image={
-                    project.cover
-                      ? {
-                          source: toSource(project.cover.url),
-                          thumbhash: project.cover.thumbhash,
-                          label: project.title,
-                        }
-                      : null
-                  }
-                  status={{
-                    label: t(($) => $.project.status[project.status]),
-                    strong: project.status === 'testable',
-                  }}
-                  // « Exemple » sur chaque projet du compte d'exemples de l'équipe (R12b), comme
-                  // sur la page d'un membre : la page publique ne le dit que du membre, et tous
-                  // ses projets en sont.
-                  example={member.example === true}
-                  // Dans l'aperçu, la carte est seulement dessinée : rien ne fait quitter l'aperçu.
-                  {...(preview
-                    ? null
-                    : { onPress: () => router.push(publicPath('project', lang, project.id)) })}
-                />
-              )}
-            />
-          )}
+          {profile}
+          {projectList}
         </>
-      ) : null}
+      )}
       {preview ? null : (
         <>
           {/* « Signaler ce profil », en bas, discret, comme sous un projet public. */}

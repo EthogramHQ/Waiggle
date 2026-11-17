@@ -123,7 +123,18 @@ export function FollowButton({
     />
   )
   return (
-    <View style={{ gap: space.sm, alignItems: stacked ? 'center' : 'stretch' }}>
+    // maxWidth et flexShrink : posé dans une rangée (la page d'un membre : « Suivre » puis « … »),
+    // il ne dépasse jamais la place qu'elle lui donne. Sur le web, une vue ne rétrécit pas d'elle-même
+    // (flexShrink: 0 par défaut) : à texte très agrandi sur un téléphone étroit, il sortait de
+    // l'écran des deux côtés au lieu de passer son libellé à la ligne (R15).
+    <View
+      style={{
+        gap: space.sm,
+        alignItems: stacked ? 'center' : 'stretch',
+        maxWidth: '100%',
+        flexShrink: 1,
+      }}
+    >
       {stacked ? (
         // Le nombre au-dessus : il ne bouge pas quand le bouton passe de « Suivre » à « Suivi ».
         <>

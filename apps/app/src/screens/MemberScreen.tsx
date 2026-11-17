@@ -26,6 +26,12 @@
 // cartes compactes. Aucune carte ne répète le nom du membre (on est sur sa page) ; sa photo est la
 // première de la galerie, à toute largeur ; la pastille de visibilité reste. Toucher une carte fait
 // grandir sa photo jusqu'à la page du projet (`SummaryCard`, par `ui/coverTransition`).
+//
+// Tranche R15 (« L'ordinateur en grand », planche R15-Membre-1920) : la page prend le gabarit large
+// (`Screen width="wide"`). Dès 1 100 points, son profil devient une colonne de 360 points à gauche,
+// lue d'abord, qui reste en place pendant qu'on descend dans ses projets (`Columns sideFirst
+// sticky`) ; la mosaïque prend tout le reste, et y compte ses colonnes. Plus étroit, la page de R14 :
+// l'en-tête centré, puis les projets dessous.
 import {
   type Member,
   PROJECT_LIST_MAX,
@@ -52,6 +58,7 @@ import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
+import { Columns } from '../ui/Columns'
 import { CountedTitle } from '../ui/CountedTitle'
 import { contestSubjectOf } from '../ui/contestSubject'
 import { FollowButton } from '../ui/FollowButton'
@@ -68,6 +75,7 @@ import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
+import { useLayout } from '../ui/theme/layout'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -379,9 +387,156 @@ function MemberView({ member }: { member: Member }) {
       ? t(($) => $.follow.error)
       : undefined
 
+  // R15 : sur ordinateur (1 100 points et plus, une fois la fenêtre connue : avant l'hydratation,
+  // la page du téléphone), le profil en colonne à gauche et les projets à droite.
+  const column = useLayout().sizeClass === 'wide'
+
+  // Le profil : l'en-tête, avec ce qu'on peut y faire. Centré au-dessus des projets, ou rangé à
+  // gauche dans sa colonne (`layout="column"`, R15).
+  const profile = (
+    <>
+      <MemberHeader
+        name={member.name}
+        handle={t(($) => $.member.handle, { handle })}
+        avatar={toSource(member.avatarUrl)}
+        bio={member.bio}
+        layout={column ? 'column' : undefined}
+        // R12b : le compte d'exemples de l'équipe (`example`, absent pour tout autre membre) :
+        // « Exemple » à côté du nom, et dessous la phrase qui dit ses projets fictifs.
+        exampleNote={member.example ? t(($) => $.member.exampleNote) : undefined}
+        toolsTitle={t(($) => $.member.favoriteTools)}
+        tools={member.favoriteTools.map((tool) => ({
+          label: tool.label,
+          onPress: () => router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } }),
+          // R6b : un « autre outil », absent du catalogue, est une pastille marquée, sans lien
+          // (`Tag inCatalogue={false}` ignore alors `onPress`).
+          inCatalogue: tool.inCatalogue,
+        }))}
+        // Les actions suivent la forme de l'en-tête : centrées sous lui, ou à gauche dans la
+        // colonne. Là, les textes s'étirent sur la largeur (rangés à gauche, ils se réduiraient à
+        // leur plus long mot) et les boutons restent à leur taille, sur une rangée.
+        action={
+          member.isMe ? (
+            <Stack gap="sm" align={column ? 'stretch' : 'center'}>
+              {/* R9 : le pseudo ou le nom provisoire, au-dessus de « Modifier mon profil ». */}
+              <ProvisionalNameBanner />
+              <FollowerCount text={followers} />
+              {/* R3 (F-Nav8) : la rubrique « Mon profil » des réglages. */}
+              <Row justify={column ? 'start' : 'center'}>
+                <Button
+                  label={t(($) => $.me.editProfile)}
+                  variant="secondary"
+                  icon="pencil-simple"
+                  onPress={() => router.push('/settings/profile')}
+                />
+              </Row>
+            </Stack>
+          ) : (
+            <Stack gap="md" align={column ? 'stretch' : 'center'}>
+              {/* Pour l'administrateur seul : jusqu'à quand le compte est suspendu. Lue à son tour
+                  (role « status ») : elle est là dès l'ouverture de la page. */}
+              {suspensionLine ? <Notice tone="info" message={suspensionLine} polite /> : null}
+              {/* Lus sans interrompre (role « status ») : le même texte avant et après la relecture
+                  de la page, pour une seule annonce. */}
+              {blocked ? (
+                <Notice tone="info" message={t(($) => $.block.notice, { handle })} polite />
+              ) : unblocked ? (
+                <Notice
+                  ref={unblockedRef}
+                  tone="success"
+                  message={t(($) => $.block.unblocked, { handle })}
+                  polite
+                />
+              ) : null}
+              {/* Le nombre d'abonnés au-dessus : il ne bouge pas quand « Suivre » devient « Tu suis Léa ». */}
+              {blocked ? null : <FollowerCount text={followers} />}
+              {/* « Suivre » (ou « Débloquer ») et le menu « … » sur une rangée (centrée, ou à
+                  gauche dans la colonne). Le menu garde sa place dans l'arbre, bloqué ou non :
+                  après « Bloquer », le focus revient à son bouton au lieu de se perdre. La rangée
+                  passe à la ligne (`wrap`) : à texte très agrandi sur un téléphone étroit, « Plus
+                  d'actions » descend sous « Suivre » au lieu de sortir de l'écran. */}
+              <Row gap="sm" align="center" justify={column ? 'start' : 'center'} wrap>
+                {blocked ? (
+                  <Button
+                    label={t(($) => $.block.unblock)}
+                    // Le nom lu contient le texte affiché, et dit qui (comme dans la liste).
+                    spokenLabel={t(($) => $.block.list.unblockLabel, { handle })}
+                    variant="secondary"
+                    size="compact"
+                    onPress={() => ask('unblock')}
+                  />
+                ) : showFollow ? (
+                  <FollowButton
+                    followed={member.isFollowed}
+                    onPress={follow.toggle}
+                    // Suspendu, le suivi retiré : plus de nouveau suivi (l'API le refuserait).
+                    disabled={suspended && !member.isFollowed}
+                    // Le nom lu contient toujours le texte affiché : « Suivre », puis « Tu suis
+                    // Léa » une fois suivie (R3, planches ; la coche est dessinée par le bouton,
+                    // hors du nom lu). Dire « touche Tu suis Léa » à la commande vocale trouve
+                    // bien ce bouton.
+                    label={followName}
+                    text={member.isFollowed ? followName : t(($) => $.follow.follow)}
+                  />
+                ) : null}
+                <ActionMenu items={menuItems} />
+              </Row>
+              {/* Sous la rangée, pas dans le bouton : « … » reste à sa place près de « Suivre ».
+                  Lu dès qu'il apparaît (role « alert »), comme les autres erreurs. */}
+              {!blocked && followError ? (
+                <Notice message={followError} action={follow.expired ? signInAgain() : undefined} />
+              ) : null}
+            </Stack>
+          )
+        }
+      />
+      {/* R9 : sur « Moi », les parties de son profil retirées par la modération (l'API ne les
+          donne qu'à leur auteur). */}
+      {member.isMe ? <RemovedProfileParts member={member} /> : null}
+    </>
+  )
+
+  // Les projets, sous « Projets · 3 ». Bloqué : ni projets, ni « Pas encore de projet public »
+  // (l'API n'en donne aucun).
+  const projects = blocked ? null : (
+    <>
+      <CountedTitle
+        title={listTitle}
+        count={projectCount}
+        more={capped}
+        spokenCount={spokenCount}
+      />
+      {member.projects.length === 0 ? (
+        // Aucun projet : la phrase de la grille, sans mosaïque.
+        <ProjectGrid empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}>
+          {null}
+        </ProjectGrid>
+      ) : (
+        // R14 : ses projets en mosaïque de cartes. La mosaïque choisit la taille de chaque carte
+        // (la grande pour le plus récent) et sa place selon la largeur que lui donne sa colonne
+        // (R15) ; la carte, sans l'auteur (`owner`), garde le reste de celle du Fil : la photo (la
+        // première de la galerie, `galleryCover`), le titre, l'accroche, le statut, « Tester » sur
+        // la grande, les réactions et la pastille de visibilité. Elle a sa garde contre la double
+        // tape.
+        <ProjectMosaic
+          items={member.projects}
+          render={(project, size) => (
+            <SummaryCard
+              project={project}
+              owner
+              size={size}
+              galleryCover
+              badge={visibilityBadge(project)}
+            />
+          )}
+        />
+      )}
+    </>
+  )
+
   return (
     <Screen
-      width="page"
+      width="wide"
       header={<TopNav />}
       onBack={onBack}
       pageTitle={member.name}
@@ -408,131 +563,15 @@ function MemberView({ member }: { member: Member }) {
         )
       }
     >
-      <MemberHeader
-        name={member.name}
-        handle={t(($) => $.member.handle, { handle })}
-        avatar={toSource(member.avatarUrl)}
-        bio={member.bio}
-        // R12b : le compte d'exemples de l'équipe (`example`, absent pour tout autre membre) :
-        // « Exemple » à côté du nom, et dessous la phrase qui dit ses projets fictifs.
-        exampleNote={member.example ? t(($) => $.member.exampleNote) : undefined}
-        toolsTitle={t(($) => $.member.favoriteTools)}
-        tools={member.favoriteTools.map((tool) => ({
-          label: tool.label,
-          onPress: () => router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } }),
-          // R6b : un « autre outil », absent du catalogue, est une pastille marquée, sans lien
-          // (`Tag inCatalogue={false}` ignore alors `onPress`).
-          inCatalogue: tool.inCatalogue,
-        }))}
-        action={
-          member.isMe ? (
-            <Stack gap="sm" align="center">
-              {/* R9 : le pseudo ou le nom provisoire, au-dessus de « Modifier mon profil ». */}
-              <ProvisionalNameBanner />
-              <FollowerCount text={followers} />
-              {/* R3 (F-Nav8) : la rubrique « Mon profil » des réglages. */}
-              <Button
-                label={t(($) => $.me.editProfile)}
-                variant="secondary"
-                icon="pencil-simple"
-                onPress={() => router.push('/settings/profile')}
-              />
-            </Stack>
-          ) : (
-            <Stack gap="md" align="center">
-              {/* Pour l'administrateur seul : jusqu'à quand le compte est suspendu. Lue à son tour
-                  (role « status ») : elle est là dès l'ouverture de la page. */}
-              {suspensionLine ? <Notice tone="info" message={suspensionLine} polite /> : null}
-              {/* Lus sans interrompre (role « status ») : le même texte avant et après la relecture
-                  de la page, pour une seule annonce. */}
-              {blocked ? (
-                <Notice tone="info" message={t(($) => $.block.notice, { handle })} polite />
-              ) : unblocked ? (
-                <Notice
-                  ref={unblockedRef}
-                  tone="success"
-                  message={t(($) => $.block.unblocked, { handle })}
-                  polite
-                />
-              ) : null}
-              {/* Le nombre d'abonnés au-dessus : il ne bouge pas quand « Suivre » devient « Tu suis Léa ». */}
-              {blocked ? null : <FollowerCount text={followers} />}
-              {/* « Suivre » (ou « Débloquer ») et le menu « … » sur une rangée centrée. Le menu
-                  garde sa place dans l'arbre, bloqué ou non : après « Bloquer », le focus revient
-                  à son bouton au lieu de se perdre. */}
-              <Row gap="sm" align="center" justify="center">
-                {blocked ? (
-                  <Button
-                    label={t(($) => $.block.unblock)}
-                    // Le nom lu contient le texte affiché, et dit qui (comme dans la liste).
-                    spokenLabel={t(($) => $.block.list.unblockLabel, { handle })}
-                    variant="secondary"
-                    size="compact"
-                    onPress={() => ask('unblock')}
-                  />
-                ) : showFollow ? (
-                  <FollowButton
-                    followed={member.isFollowed}
-                    onPress={follow.toggle}
-                    // Suspendu, le suivi retiré : plus de nouveau suivi (l'API le refuserait).
-                    disabled={suspended && !member.isFollowed}
-                    // Le nom lu contient toujours le texte affiché : « Suivre », puis « Tu suis
-                    // Léa » une fois suivie (R3, planches ; la coche est dessinée par le bouton,
-                    // hors du nom lu). Dire « touche Tu suis Léa » à la commande vocale trouve
-                    // bien ce bouton.
-                    label={followName}
-                    text={member.isFollowed ? followName : t(($) => $.follow.follow)}
-                  />
-                ) : null}
-                <ActionMenu items={menuItems} />
-              </Row>
-              {/* Sous la rangée, pas dans le bouton : « … » reste centré sur « Suivre ». Lu dès
-                  qu'il apparaît (role « alert »), comme les autres erreurs. */}
-              {!blocked && followError ? (
-                <Notice message={followError} action={follow.expired ? signInAgain() : undefined} />
-              ) : null}
-            </Stack>
-          )
-        }
-      />
-      {/* R9 : sur « Moi », les parties de son profil retirées par la modération (l'API ne les
-          donne qu'à leur auteur). */}
-      {member.isMe ? <RemovedProfileParts member={member} /> : null}
-      {/* Bloqué : ni projets, ni « Pas encore de projet public » (l'API n'en donne aucun). */}
-      {blocked ? null : (
+      {/* R15 : sur ordinateur, le profil en colonne à gauche, lu d'abord (`sideFirst`), de 360
+          points (`profile`), qui reste en place quand on descend dans les projets (`sticky`, s'il
+          tient dans la fenêtre) ; les projets prennent le reste. Plus étroit, l'un sous l'autre. */}
+      {column ? (
+        <Columns sideFirst sideWidth="profile" sticky side={profile} main={projects} />
+      ) : (
         <>
-          <CountedTitle
-            title={listTitle}
-            count={projectCount}
-            more={capped}
-            spokenCount={spokenCount}
-          />
-          {member.projects.length === 0 ? (
-            // Aucun projet : la phrase de la grille, sans mosaïque.
-            <ProjectGrid
-              empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}
-            >
-              {null}
-            </ProjectGrid>
-          ) : (
-            // R14 : ses projets en mosaïque de cartes. La mosaïque choisit la taille de chaque
-            // carte (la grande pour le plus récent) et sa place selon la largeur ; la carte, sans
-            // l'auteur (`owner`), garde le reste de celle du Fil : la photo (la première de la
-            // galerie, `galleryCover`), le titre, l'accroche, le statut, « Tester » sur la grande,
-            // les réactions et la pastille de visibilité. Elle a sa garde contre la double tape.
-            <ProjectMosaic
-              items={member.projects}
-              render={(project, size) => (
-                <SummaryCard
-                  project={project}
-                  owner
-                  size={size}
-                  galleryCover
-                  badge={visibilityBadge(project)}
-                />
-              )}
-            />
-          )}
+          {profile}
+          {projects}
         </>
       )}
       {/* Bloquer et débloquer passent par la même fenêtre, qui dit ce qui change (J9, J10). */}
