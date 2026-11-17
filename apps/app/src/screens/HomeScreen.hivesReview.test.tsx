@@ -238,7 +238,7 @@ describe('the hives read after the feed (R10, review)', () => {
     expect(screen.queryByLabelText(TEXT.pills)).toBeNull()
   })
 
-  it('holds the right column until the hives are read, on a computer', async () => {
+  it('keeps the right column titles in place while the hives are read, on a computer', async () => {
     const restore = setDesktopWindow()
     try {
       const held = heldReply()
@@ -247,8 +247,10 @@ describe('the hives read after the feed (R10, review)', () => {
       await feedRead()
       await act(async () => {})
 
-      // Les proches à suivre ne se montrent pas avant « Tes ruches », qui les pousserait.
-      expect(screen.queryByRole('header', { name: TEXT.suggestionsSide })).toBeNull()
+      // R16 : les titres de la colonne sont là pendant la lecture des ruches, chacun sur ses lignes
+      // vides, qui gardent sa place : rien ne pousse « Proches à suivre » à l'arrivée des ruches.
+      expect(screen.getByRole('header', { name: TEXT.side })).toBeTruthy()
+      expect(screen.getByRole('header', { name: TEXT.suggestionsSide })).toBeTruthy()
 
       await held.release(ok(myHives))
 

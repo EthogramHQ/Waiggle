@@ -237,7 +237,9 @@ describe('the home screen when the session cannot be read', () => {
     mockSession(null, true)
     await renderWithI18n(<HomeScreen />)
 
-    expect(screen.getByRole('progressbar', { name: fr.t(($) => $.common.loading) })).toBeTruthy()
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeNull()
     expect(screen.queryByRole('button', { name: fr.t(($) => $.home.haveAccount) })).toBeNull()
   })
