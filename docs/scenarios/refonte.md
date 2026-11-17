@@ -4023,8 +4023,9 @@ dizaines de Ko pour beaucoup de précautions : la page anglaise doit l'avoir dè
 - Étant donné un visiteur qui ouvre l'accueil, une page publique ou les Règles
   Quand la page n'a pas encore démarré
   Alors le titre est lisible en entier : la barre du haut a déjà sa place et ne recouvre rien.
-- Le texte s'affiche dès la première image, dans une police de repli aux mêmes proportions, puis
-  dans les polices de la marque quand elles arrivent : jamais une page sans texte.
+- Le texte s'affiche dès la première image, dans une police du système de la même famille (sans
+  empattement, ou à chasse fixe pour le code), puis dans les polices de la marque quand elles
+  arrivent : jamais une page sans texte.
 - Étant donné un visiteur sur ordinateur (fenêtre de plus de 700 px)
   Quand la page n'a pas encore démarré
   Alors il voit le fond de la page et l'abeille au centre, jamais la mise en page du téléphone
