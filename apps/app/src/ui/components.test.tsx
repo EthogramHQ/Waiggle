@@ -22,7 +22,6 @@ import { ListGroup, ListRow } from './ListGroup'
 import { Markdown } from './Markdown'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
-import { NoteComposer } from './NoteComposer'
 import { Notice, NoticeScope } from './Notice'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
@@ -36,7 +35,6 @@ import { StateMessage } from './StateMessage'
 import { Step } from './StepNumber'
 import { Switch } from './Switch'
 import { Tag } from './Tag'
-import { TagInput } from './TagInput'
 import { Text } from './Text'
 import { FieldGroup, TextField } from './TextField'
 import { TextLink } from './TextLink'
@@ -878,31 +876,6 @@ describe('Choices', () => {
   })
 })
 
-describe('TagInput', () => {
-  it('adds a word typed before a comma, and removes it with its named button', async () => {
-    const Sample = () => {
-      const [values, setValues] = useState(['Claude'])
-      return (
-        <TagInput
-          label="Outils"
-          values={values}
-          onChange={setValues}
-          placeholder="Ajouter un outil"
-          removeLabel={(item) => `Retirer ${item}`}
-        />
-      )
-    }
-    await renderWithProviders(<Sample />)
-
-    await fireEvent.changeText(screen.getByPlaceholderText('Ajouter un outil'), 'Python,')
-    expect(screen.getByRole('button', { name: 'Retirer Python' })).toBeTruthy()
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Retirer Claude' }))
-    expect(screen.queryByRole('button', { name: 'Retirer Claude' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Retirer Python' })).toBeTruthy()
-  })
-})
-
 describe('TextLink', () => {
   it('is a link by default, or a button when it acts in place', async () => {
     const onPress = jest.fn()
@@ -1111,106 +1084,6 @@ describe('fonts', () => {
   })
 })
 
-// --- Tranche 4b : les notes d'un projet ---
-// R7a : NoteCard et NoteList sont partis avec le Journal ; les mises à jour qui les remplacent ont
-// leurs tests dans leurs propres fichiers (ui/UpdateEntry.test.tsx, ui/UpdateTimeline.test.tsx).
-// NoteComposer reste : CommentComposer s'en sert.
-
-describe('NoteComposer', () => {
-  const labels = {
-    open: 'Publier une note',
-    field: 'Ta note',
-    hint: 'Ce qui a changé.',
-    submit: 'Publier la note',
-    cancel: 'Annuler',
-  }
-  const handlers = () => ({
-    onOpen: jest.fn(),
-    onCancel: jest.fn(),
-    onChangeText: jest.fn(),
-    onSubmit: jest.fn(),
-  })
-
-  it('is a single button while closed, which asks to open the field', async () => {
-    const on = handlers()
-    await renderWithProviders(
-      <NoteComposer open={false} value="" max={1000} labels={labels} {...on} />,
-    )
-
-    expect(screen.queryByLabelText('Ta note')).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
-
-    expect(on.onOpen).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows the field with its counter once open, then publishes or cancels', async () => {
-    const on = handlers()
-    await renderWithProviders(
-      <NoteComposer open value="v2" max={1000} labels={labels} {...on} autoFocus={false} />,
-    )
-
-    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2')
-    expect(screen.getByText('2 / 1000')).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
-
-    expect(on.onSubmit).toHaveBeenCalledTimes(1)
-    expect(on.onCancel).toHaveBeenCalledTimes(1)
-  })
-
-  it('stays busy while the note is on its way, without publishing it twice', async () => {
-    const on = handlers()
-    await renderWithProviders(
-      <NoteComposer open value="v2" max={1000} labels={labels} {...on} pending />,
-    )
-
-    const submit = screen.getByRole('button', { name: 'Publier la note' })
-    expect(submit).toBeBusy()
-    await fireEvent.press(submit)
-
-    expect(on.onSubmit).not.toHaveBeenCalled()
-  })
-
-  it('announces a failed publication, above the text kept in the field', async () => {
-    await renderWithProviders(
-      <NoteComposer open value="v2" max={1000} labels={labels} {...handlers()} error="Raté." />,
-    )
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Raté.')
-    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2')
-  })
-
-  it('announces the published note once closed', async () => {
-    await renderWithProviders(
-      <NoteComposer
-        open={false}
-        value=""
-        max={1000}
-        labels={labels}
-        {...handlers()}
-        success="Note publiée."
-      />,
-    )
-
-    // Une confirmation se lit poliment (role « status »), comme « Note supprimée. » : pas une alerte.
-    expect(screen.getByRole('status')).toHaveTextContent('Note publiée.')
-    expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
-  })
-
-  it('freezes the text and waits to be cancelled while the note is on its way', async () => {
-    const on = handlers()
-    await renderWithProviders(
-      <NoteComposer open value="v2" max={1000} labels={labels} {...on} pending />,
-    )
-
-    expect(screen.getByLabelText('Ta note')).toHaveProp('editable', false)
-    const cancel = screen.getByRole('button', { name: 'Annuler' })
-    expect(cancel).toBeDisabled()
-    await fireEvent.press(cancel)
-    expect(on.onCancel).not.toHaveBeenCalled()
-  })
-})
-
 // --- Relectures de la 4b ---
 
 describe('TextField counter', () => {
@@ -1366,34 +1239,6 @@ describe('CommentList, after the reviews', () => {
   })
 })
 
-describe('NoteComposer, on a phone', () => {
-  it('shows its short text while closed, and keeps its full name', async () => {
-    await renderWithProviders(
-      <NoteComposer
-        open={false}
-        onOpen={jest.fn()}
-        onCancel={jest.fn()}
-        value=""
-        onChangeText={jest.fn()}
-        onSubmit={jest.fn()}
-        max={1000}
-        labels={{
-          open: 'Écrire un commentaire',
-          openShort: 'Commenter',
-          field: 'Ton commentaire',
-          hint: 'Tous les membres connectés liront ton commentaire.',
-          submit: 'Publier le commentaire',
-          cancel: 'Annuler',
-        }}
-      />,
-    )
-
-    expect(screen.getByRole('button', { name: 'Écrire un commentaire' })).toHaveTextContent(
-      'Commenter',
-    )
-  })
-})
-
 // --- Tranche 6a : le pseudo ---
 
 describe('TextField with a prefix', () => {
@@ -1469,46 +1314,6 @@ describe('MentionField, beyond the end of the text', () => {
     await fireEvent(screen.getByLabelText('Ton commentaire'), 'blur')
 
     expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
-  })
-
-  it('lets a second Escape close the comment, once the list is closed (web)', async () => {
-    jest.replaceProperty(Platform, 'OS', 'web')
-    try {
-      const onCancel = jest.fn()
-      await renderWithProviders(
-        <NoteComposer
-          open
-          onOpen={() => {}}
-          onCancel={onCancel}
-          value="Bravo @in"
-          onChangeText={() => {}}
-          onSubmit={() => {}}
-          max={1000}
-          labels={{
-            open: 'Écrire un commentaire',
-            field: 'Ton commentaire',
-            hint: 'Tous les membres le liront.',
-            submit: 'Publier le commentaire',
-            cancel: 'Annuler',
-          }}
-          mentions={{ suggestions, label: 'Membres à mentionner', onQueryChange: () => {} }}
-          autoFocus={false}
-        />,
-      )
-      const pressEscape = () =>
-        fireEvent(screen.getByLabelText('Ton commentaire'), 'keyPress', {
-          nativeEvent: { key: 'Escape', preventDefault: jest.fn() },
-        })
-
-      await pressEscape()
-      expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
-      expect(onCancel).not.toHaveBeenCalled()
-
-      await pressEscape()
-      expect(onCancel).toHaveBeenCalledTimes(1)
-    } finally {
-      jest.restoreAllMocks()
-    }
   })
 })
 

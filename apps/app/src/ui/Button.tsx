@@ -88,7 +88,10 @@ type Props = {
    * effet avec `checked` (un interrupteur reste un interrupteur).
    */
   role?: 'button' | 'link'
-  /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteComposer). */
+  /**
+   * Pour y poser le focus du clavier depuis l'écran ou le composant qui l'utilise (voir
+   * PublicPageSettingsScreen, qui rend le focus à son bouton d'aperçu quand l'aperçu se ferme).
+   */
   ref?: Ref<View>
   /**
    * R10 : dessiné seulement, dans un aperçu (« Ce que reçoit Max », la carte d'invitation telle que
