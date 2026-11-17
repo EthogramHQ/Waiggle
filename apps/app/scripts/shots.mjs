@@ -5198,7 +5198,6 @@ const settleLoading = (page, shot) =>
  * texte » d'un téléphone poussé à 200 % : la largeur de l'écran ne change pas, seul le texte
  * grossit. Sur le web, `fontScale` vaut toujours 1 : on écrit donc les tailles dans la page. Les
  * tailles sont toutes lues avant d'être écrites (un parent grossi changerait celles de ses enfants).
- * Même règle que `textScale` des essais (`.claude/explore/lib.mjs`).
  */
 const scaleText = async (page, factor) => {
   await page.evaluate((factor) => {
