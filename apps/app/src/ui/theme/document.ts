@@ -109,6 +109,15 @@ const whileWaiting = `
 export const noscriptCss = `${PAGE} { visibility: visible; } ${WAITING_BEE} { display: none; }`
 
 /**
+ * L'attribut de la lueur des squelettes (R16, ui/Skeleton.tsx), et l'objet qui le pose (à étaler sur
+ * la bande de lumière, sur le web seulement : `{...skeletonGlowMark}`). react-native-web transforme
+ * `dataSet` en attributs data- ; `dataSet` n'existe pas dans les types de React Native, d'où cet
+ * objet préparé une fois ici. Il ne dépend pas de la plateforme : seule la lueur du web le pose.
+ */
+const SKELETON_GLOW = 'data-skeleton-glow'
+export const skeletonGlowMark: object = { dataSet: { skeletonGlow: 'on' } }
+
+/**
  * La feuille de style fixe de la page (n'y mettre que des jetons de @ruche/brand, jamais une donnée
  * venue d'ailleurs : elle est écrite telle quelle dans le HTML).
  *
@@ -146,6 +155,11 @@ export const noscriptCss = `${PAGE} { visibility: visible; } ${WAITING_BEE} { di
  *   dessinent l'anneau à l'intérieur (data-focus="inset", voir insetFocus) : un cadre posé
  *   par-dessus leur contenu (::after), sinon une photo le recouvrirait ; leur halo est à l'intérieur
  *   de l'anneau. Les champs de saisie montrent leur focus par leur cadre : ni anneau ni halo.
+ * - La lueur des squelettes (R16) : sur le web, une animation CSS qui part dès la page pré-rendue,
+ *   avant que l'appli démarre ; `useCalmMotion` ne pourrait donc pas l'arrêter à temps. Sous
+ *   « Réduire les animations », cette feuille l'arrête (`animation-name: none`), avant comme après
+ *   l'hydratation ; la bande reste alors à sa place de repos, hors de la carte. `html […]` pèse
+ *   plus lourd que la classe de react-native-web qui porte l'animation : sans `!important`.
  */
 export const documentCss = `
 html { --d-scheme: ${durations.scheme}ms; }
@@ -172,6 +186,7 @@ ${waitBeeColours(palettes.day)}
 ${waitBeeColours(palettes.night)}
 }
 @media (prefers-reduced-motion: reduce) { [data-wait] svg { animation: none; } }
+@media (prefers-reduced-motion: reduce) { html [${SKELETON_GLOW}] { animation-name: none; } }
 @keyframes reveal { to { visibility: visible; } }
 @keyframes wait-leave { to { visibility: hidden; } }
 @keyframes wait-fly { to { transform: translateY(-${WAIT_BEE_LIFT}px); } }

@@ -3,16 +3,19 @@
 // passe et propose quoi faire ensuite (« Réessayer », « Revenir », « Me connecter »).
 import { layout, space } from '@ruche/brand'
 import type { ReactNode, Ref } from 'react'
-import { ActivityIndicator, useWindowDimensions, View } from 'react-native'
+import { useWindowDimensions, View } from 'react-native'
 import { Button, type ButtonVariant } from './Button'
 import type { Focusable } from './focus'
 import type { IconName } from './Icon'
 import { Emblem } from './Illustrations'
 import { Mascot, type MascotPose } from './Mascot'
+import { Loading, SkeletonRows } from './Skeleton'
 import { Stack } from './Stack'
 import { type HeadingLevel, Text } from './Text'
 import { useLayout } from './theme/layout'
-import { useTheme } from './theme/ThemeProvider'
+
+/** Les rangées vides d'une attente : celles d'une liste, comme sur les planches (plan R16, choix 11). */
+const LOADING_ROWS = 5
 
 // « soon » : une partie de l'appli qui n'existe pas encore (l'onglet Ruches avant les ruches, R3).
 // « done » : une démarche qui a abouti ou qui est en route (« Un lien vient de partir », « Adresse
@@ -83,7 +86,6 @@ export function StateMessage({
   picture: givenPicture,
   focusRef,
 }: Props) {
-  const { colors } = useTheme()
   const { height } = useLayout()
   // fontScale : le réglage de taille de texte de l'appareil (2 = deux fois plus grand). Sur le web,
   // il vaut toujours 1 (le navigateur agrandit la page autrement) : pas d'écart d'hydratation.
@@ -93,7 +95,32 @@ export function StateMessage({
   const cramped = fontScale >= 1.5 || (height > 0 && height < 600)
   // Le message en paragraphes : aucun, un seul, ou la liste donnée (les textes vides sont ignorés).
   const paragraphs = (typeof message === 'string' ? [message] : (message ?? [])).filter(Boolean)
-  // L'image qui accompagne l'état : une indication de chargement ; la mascotte pour « introuvable »
+  // R16 (scénario : « les indicateurs qui tournent et les « Chargement… » écrits disparaissent ») :
+  // l'attente d'une liste ou d'une feuille dessine des rangées vides, dans un seul `Loading` nommé
+  // « Chargement… ». Le mot n'est plus écrit : c'est le nom lu de l'attente, sur toute la largeur
+  // du bloc. Un titre éventuel reste dehors, lisible (les titres ne sont pas des pièces).
+  if (kind === 'loading') {
+    return (
+      <View
+        style={{
+          width: '100%',
+          maxWidth: layout.formWidth,
+          alignSelf: 'flex-start',
+          gap: space.lg,
+        }}
+      >
+        {title ? (
+          <Text variant="title2" heading={level} breakAnywhere>
+            {title}
+          </Text>
+        ) : null}
+        <Loading>
+          <SkeletonRows count={LOADING_ROWS} />
+        </Loading>
+      </View>
+    )
+  }
+  // L'image qui accompagne l'état : la mascotte pour « introuvable »
   // (la loupe), « liste vide » (le sommeil) et « réservé aux membres » (le salut) ; une tuile de
   // miel avec une icône pour l'erreur, où l'abeille n'aurait pas le ton juste.
   // La mascotte est décorative (J10) : le titre dit déjà l'état, comme l'indicateur de chargement.
@@ -101,9 +128,6 @@ export function StateMessage({
   const picture =
     givenPicture !== undefined ? (
       givenPicture
-    ) : kind === 'loading' ? (
-      // aria-hidden : l'indicateur ne dit rien de plus que le texte « Chargement… » qui le suit.
-      <ActivityIndicator size="large" color={colors.amber} aria-hidden />
     ) : kind === 'done' ? (
       <Emblem icon={icon ?? 'check'} flush />
     ) : kind === 'error' ? (
@@ -134,7 +158,7 @@ export function StateMessage({
       {/* L'image et les textes forment un groupe plus serré (space.lg) que l'écart des issues :
           l'image appartient au titre qu'elle illustre. */}
       <View style={{ alignSelf: 'stretch', alignItems: 'flex-start', gap: space.lg }}>
-        {picture !== null && (kind === 'loading' || !cramped) ? (
+        {picture !== null && !cramped ? (
           // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
           // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
           // revient à « collée au bord gauche ». L'emblème d'une erreur n'a pas d'air dessous :
