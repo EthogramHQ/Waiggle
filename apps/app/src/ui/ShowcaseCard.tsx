@@ -24,7 +24,7 @@
 // « Exemple » à côté de son statut ; elle décrit le lien elle aussi, entre le statut et l'auteur
 // (« Testable, Exemple, WaiggleBot »), pour qu'un lecteur d'écran ne prenne pas le projet pour un
 // vrai.
-import { layout, type ShadowName, space } from '@ruche/brand'
+import { layout, radii, type ShadowName, space } from '@ruche/brand'
 import { type ReactNode, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -33,10 +33,12 @@ import { ExampleBadge } from './ExampleBadge'
 import type { ImageSource } from './image'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { Row } from './Stack'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
 import { Text } from './Text'
+import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
   /** Le titre du projet : écrit dans le panneau, et nom du lien. */
@@ -166,8 +168,56 @@ export function ShowcaseCard({
   )
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** La carte vide de la vitrine. Sans rôle ni nom à elle. */
-export function ShowcaseCardSkeleton(_props: Record<string, never>): ReactNode {
-  return null
+/** Les formes de la carte vide : la ligne du titre, celle de l'auteur, en points. */
+const SKELETON_LINE = 14
+
+/**
+ * R16 (« Les squelettes », planche R16-Visiteur) : la carte vide de la vitrine, à la place d'une
+ * carte qui arrive, à ses mesures exactes (celles de `SIZES`, partagées avec la vraie carte) : la
+ * bande garde sa hauteur, rien ne pousse le bas de la page. Une carte vide (`SkeletonSurface`, avec
+ * sa lueur) et, en bas, un panneau plein à la place du verre : la ligne du titre, puis la photo et
+ * le nom de l'auteur. Le statut n'a pas de forme : la planche n'en dessine pas.
+ *
+ * Ni rôle ni nom : le `Loading` de l'écran (« Chargement… ») enveloppe toute la bande, une fois.
+ * `column` : le rang de la carte dans sa bande, le retard de sa lueur (150 ms par colonne).
+ */
+export function ShowcaseCardSkeleton({
+  size = 'carousel',
+  column = 0,
+}: {
+  size?: 'carousel' | 'fill'
+  column?: number
+}): ReactNode {
+  const { colors } = useTheme()
+  const { width, height } = SIZES[size]
+  return (
+    <View
+      // Les mêmes largeurs que la vraie carte : fixe dans une bande, une part égale de la rangée.
+      style={
+        width === undefined
+          ? { flexGrow: 1, flexBasis: 0, minWidth: 0 }
+          : { width, maxWidth: '100%' }
+      }
+    >
+      <SkeletonSurface height={height} column={column}>
+        <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: space.sm }}>
+          {/* Le verre, plein : la matière d'une feuille, aux coins et aux marges du panneau. */}
+          <View
+            style={{
+              gap: space.sm,
+              padding: space.md,
+              borderRadius: radii.panel,
+              backgroundColor: colors.sheet,
+            }}
+          >
+            <Shape height={SKELETON_LINE} width="70%" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+              <Shape height={AVATAR_SIZE} width={AVATAR_SIZE} round />
+              <Shape height={SKELETON_LINE - 2} width="45%" />
+            </View>
+          </View>
+        </View>
+      </SkeletonSurface>
+    </View>
+  )
 }

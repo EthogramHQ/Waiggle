@@ -54,6 +54,9 @@
 //   rangée de l'auteur ni sa place dans le verre.
 // Dans une case de la mosaïque (`CardStretchContext`), la carte s'étire à la hauteur de la case :
 // les cartes d'une rangée prennent la hauteur de la plus haute.
+//
+// R16 (« Les squelettes ») : `ProjectCardSkeleton`, la carte vide qui tient sa place pendant le
+// chargement, à sa hauteur, avec son panneau en bas (voir en fin de fichier).
 import { layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import {
@@ -76,8 +79,9 @@ import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
-import { GridCardsContext } from './ProjectGrid'
+import { GridCardsContext, GridColumnContext } from './ProjectGrid'
 import { RelativeTime } from './RelativeTime'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
 import { Tag } from './Tag'
@@ -781,8 +785,119 @@ function UpdateChange({
   )
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** La carte de projet vide, à sa hauteur. Sans rôle ni nom à elle. */
-export function ProjectCardSkeleton(_props: { size?: ProjectCardSize }): ReactNode {
-  return null
+// ---------------------------------------------------------------------------------------------
+// R16 (« Les squelettes ») : la carte vide
+// ---------------------------------------------------------------------------------------------
+
+/** Les formes de la carte vide, en points : une ligne de texte, le titre, la photo de l'auteur. */
+const SKELETON_LINE = 14
+const SKELETON_TITLE = 22
+const SKELETON_AVATAR = 28
+/** « Tester » : la hauteur d'un contrôle compact (`TestLink size="compact"`) et à peu près sa largeur. */
+const SKELETON_TESTER = { height: layout.controlHeight.compact, width: 96 }
+/** Le statut : une pastille plus basse, et le total des réactions, un petit trait au bout. */
+const SKELETON_PILL = { height: 2 * SKELETON_LINE, width: 72 }
+const SKELETON_TOTAL = 28
+
+/**
+ * La carte de projet vide (planches R16-Fil et R16-Membre ; plan R16, choix 4) : à la place d'une
+ * `ProjectCard` qui arrive, de sa hauteur exacte (`PROJECT_CARD_HEIGHT` ou
+ * `PROJECT_CARD_COMPACT_HEIGHT`, les mêmes constantes que la carte, jamais recopiées) : quand la
+ * vraie carte la remplace, rien ne saute. C'est une carte vide (`SkeletonSurface`, crème de jour,
+ * la feuille de nuit, avec sa lueur) et, en bas, un panneau plein à la place du verre, aux mêmes
+ * marges, avec les rangées de la vraie carte :
+ * - la grande : l'auteur et la date, le titre, deux lignes d'accroche, puis « Tester », le statut et
+ *   le total des réactions ;
+ * - la compacte (la mosaïque d'un membre, « Récents » d'Explorer) : le titre, puis le statut et le
+ *   total.
+ *
+ * Elle n'a ni rôle ni nom : un seul `Loading` (« Chargement… ») enveloppe toutes les cartes vides
+ * d'une zone, et un lecteur d'écran ne l'entend qu'une fois, pas une fois par carte.
+ *
+ * Sans `size`, elle choisit comme la carte : la compacte dans une grille de compactes sur
+ * ordinateur (`GridCardsContext`), la grande ailleurs. Sans `column`, elle prend celle de sa case
+ * dans une `ProjectGrid` (`GridColumnContext`), 0 hors d'une grille : sa lueur passe 150 ms plus
+ * tard d'une colonne à la suivante, et traverse ainsi la rangée.
+ */
+export function ProjectCardSkeleton({
+  size: givenSize,
+  column,
+  author = true,
+}: {
+  size?: ProjectCardSize
+  /** Le rang de la carte dans sa rangée (0 pour la première) : le retard de sa lueur. */
+  column?: number
+  /**
+   * La rangée de l'auteur, dans la grande carte. Faux sur la page d'un membre, où la vraie carte
+   * n'en a pas (R14, `author` absent) : le panneau vide garde la même forme que celui qui arrive.
+   */
+  author?: boolean
+}): ReactNode {
+  const { colors } = useTheme()
+  const wide = useLayout().sizeClass === 'wide'
+  const gridCards = useContext(GridCardsContext)
+  const gridColumn = useContext(GridColumnContext)
+  const compact =
+    (givenSize ?? (gridCards === 'compact' && wide ? 'compact' : 'full')) === 'compact'
+  return (
+    <SkeletonSurface
+      height={compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT}
+      column={column ?? gridColumn}
+    >
+      {/* Le panneau en bas, à la marge du verre de la vraie carte. */}
+      <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: INSET }}>
+        {/* Le verre, plein : la matière d'une feuille, sans flou (rien derrière à flouter). */}
+        <View
+          style={{
+            gap: ROW_GAP,
+            padding: compact ? COMPACT_PANEL_PADDING : PANEL_PADDING,
+            borderRadius: radii.panel,
+            backgroundColor: colors.sheet,
+          }}
+        >
+          {author && !compact ? (
+            // L'auteur à gauche, la date à droite, à la hauteur d'une zone à toucher.
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: space.sm,
+                minHeight: layout.touchTarget,
+              }}
+            >
+              <Shape height={SKELETON_AVATAR} width={SKELETON_AVATAR} round />
+              <View style={{ flexGrow: 1 }}>
+                <Shape height={SKELETON_LINE} width="45%" />
+              </View>
+              <Shape height={SKELETON_LINE} width={SKELETON_TOTAL * 2} />
+            </View>
+          ) : null}
+          <Shape height={SKELETON_TITLE} width={compact ? '80%' : '70%'} />
+          {compact ? null : (
+            <>
+              <Shape height={SKELETON_LINE} width="92%" />
+              <Shape height={SKELETON_LINE} width="65%" />
+            </>
+          )}
+          {/* La rangée du bas : « Tester » (grande carte), le statut, puis le total au bout. */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.sm,
+              ...(compact ? null : { minHeight: layout.touchTarget }),
+            }}
+          >
+            {compact ? null : (
+              <Shape height={SKELETON_TESTER.height} width={SKELETON_TESTER.width} round />
+            )}
+            <View style={{ flexGrow: 1 }}>
+              <Shape height={SKELETON_PILL.height} width={SKELETON_PILL.width} round />
+            </View>
+            <Shape height={SKELETON_LINE} width={SKELETON_TOTAL} />
+          </View>
+        </View>
+      </View>
+    </SkeletonSurface>
+  )
 }

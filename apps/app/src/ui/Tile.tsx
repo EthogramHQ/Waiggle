@@ -8,6 +8,7 @@
 // - AddTile : la tuile « + Ajouter », en pointillés de miel, au bout de la rangée ; un bouton (ou un
 //   lien, quand elle mène à une autre page).
 // Toutes deux s'enfoncent sous le doigt (jeton `pressScale`), comme les boutons.
+// - TileSkeleton (R16) : la tuile vide qui tient la place d'une tuile pendant le chargement.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
 import { createContext, type ReactNode, type Ref, useContext, useId } from 'react'
@@ -19,6 +20,7 @@ import { ExampleBadge } from './ExampleBadge'
 import { Icon } from './Icon'
 import { enterActivates } from './keyboard'
 import type { CoverImage } from './ProjectCover'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { StatusPill } from './StatusPill'
 import { Text, type TextTone } from './Text'
 import { spring } from './theme/motion'
@@ -322,8 +324,39 @@ export function AddTile({ label, onPress, role = 'button' }: AddTileProps) {
   )
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** La tuile vide d'une mosaïque. Sans rôle ni nom à elle. */
-export function TileSkeleton(_props: Record<string, never>): ReactNode {
-  return null
+/** Les formes de la tuile vide : la ligne du titre, puis celle de l'auteur, en points. */
+const SKELETON_TITLE = 18
+const SKELETON_LINE = 12
+
+/**
+ * R16 (« Les squelettes ») : la tuile vide, à la place d'une `ProjectTile` qui arrive, à ses mesures
+ * (`TILE`, partagées avec la vraie tuile). Seule, 150 points sur 200 ; dans une case de mosaïque
+ * (`TileCellContext`), la largeur de sa colonne et la hauteur de sa rangée. Une carte vide aux
+ * coins d'une tuile (`SkeletonSurface`, avec sa lueur), et dedans ce que montre une tuile à photo :
+ * la photo en haut, puis le titre et l'auteur en bas, aux marges de la vraie tuile.
+ *
+ * Ni rôle ni nom : le `Loading` de l'écran (« Chargement… ») enveloppe toute la mosaïque, une fois.
+ * `column` : le rang de la tuile dans sa rangée, le retard de sa lueur (150 ms par colonne).
+ */
+export function TileSkeleton({ column = 0 }: { column?: number }): ReactNode {
+  const cell = useContext(TileCellContext)
+  const height = cell ? cell.minHeight : TILE.height
+  // La photo prend tout le haut de la tuile, comme dans la vraie : la hauteur de la tuile, moins ses
+  // marges, l'écart et le bloc du titre et de l'auteur (une forme a une hauteur fixe, elle ne
+  // grandit pas seule).
+  const textBlock = SKELETON_TITLE + space.xs + SKELETON_LINE + space.xs
+  const photo = Math.max(TILE.width / 2, height - 2 * space.sm - space.sm - textBlock)
+  return (
+    <View style={cell ? { width: '100%' } : { width: TILE.width }}>
+      <SkeletonSurface radius="tile" height={height} column={column}>
+        <View style={{ padding: space.sm, gap: space.sm }}>
+          <Shape height={photo} width="100%" />
+          <View style={{ gap: space.xs, paddingHorizontal: space.xs, paddingBottom: space.xs }}>
+            <Shape height={SKELETON_TITLE} width="80%" />
+            <Shape height={SKELETON_LINE} width="55%" />
+          </View>
+        </View>
+      </SkeletonSurface>
+    </View>
+  )
 }
