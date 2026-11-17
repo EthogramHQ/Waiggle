@@ -22,7 +22,7 @@ import {
 } from '@ruche/contracts'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { createRef } from 'react'
-import { Platform, View } from 'react-native'
+import { Dimensions, Platform, View } from 'react-native'
 import type { ApiResult } from '../api/errors'
 import { categoryList } from '../testing/categories'
 import { passTapGuard } from '../testing/dialog'
@@ -808,4 +808,53 @@ describe('TagScreen, for an administrator', () => {
     expect(mockServer.received('PATCH', /moderation/)).toHaveLength(1)
     await act(async () => answer(ok({ ...adminLovable, name: 'Lovable Studio' })))
   })
+})
+
+// R15 (docs/scenarios/refonte.md, « Des colonnes qui suivent la place ») : la page d'un outil prend
+// le gabarit large, et sa mosaïque compte ses colonnes selon la place, plus selon le type
+// d'appareil (avant R15 : deux sur téléphone, quatre ailleurs). Jest ne mesure rien : la largeur
+// vient de la fenêtre simulée ; on compte les cases de la rangée (`ui/TileMosaic`, une liste de
+// rangées, une case par colonne, vides comprises) qui porte une tuile.
+describe('TagScreen on a wide computer screen (R15)', () => {
+  /** Le temps d'un test, une fenêtre de 1 920 × 1 080 ; le téléphone est remis à la fin. */
+  const atFullHd = async (run: () => Promise<void>) => {
+    const window = { width: 1920, height: 1080, scale: 2, fontScale: 1 }
+    const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
+    Dimensions.set({ window, screen: window })
+    try {
+      await run()
+    } finally {
+      Dimensions.set({ window: phone, screen: phone })
+    }
+  }
+
+  /** Le nombre de cases de la rangée de la mosaïque qui porte la tuile de ce projet. */
+  const cellsInRowOf = (title: string) => {
+    type Host = { props: Record<string, unknown>; parent: Host | null; children: unknown[] }
+    let node: Host | null = screen.getByRole('link', { name: title }) as unknown as Host
+    let row: Host | null = null
+    while (node && node.props.role !== 'list' && node.props.accessibilityRole !== 'list') {
+      row = node
+      node = node.parent
+    }
+    if (!node || !row) throw new Error(`no mosaic around « ${title} »`)
+    return row.children.length
+  }
+
+  it('lays the page of a tool out on the wide template', () =>
+    atFullHd(async () => {
+      await renderLoaded()
+
+      expect(mockScreenProps.at(-1)?.width).toBe('wide')
+    }))
+
+  it('TagScreen shows five tiles per row at 1 920', () =>
+    atFullHd(async () => {
+      // Douze projets : assez pour remplir plus d'une rangée.
+      mockServer.tagPage = () =>
+        ok(page({ projects: Array.from({ length: 12 }, (_, index) => tile(index + 1)) }))
+      await renderLoaded()
+
+      expect(cellsInRowOf('Projet numéro 1')).toBe(5)
+    }))
 })
