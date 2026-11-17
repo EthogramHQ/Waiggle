@@ -122,9 +122,10 @@ describe('Text, the fallback of the brand fonts', () => {
       for (const variant of variants) {
         const family = styleOf(`texte ${variant}`).fontFamily ?? ''
         const [brand, ...rest] = family.split(',').map((name) => name.trim())
-        // D'abord la police de la marque, livrée par l'appli ; puis la famille du système, seule.
+        // D'abord la police de la marque, livrée par l'appli ; puis sa police de secours calibrée
+        // (R16, ui/theme/fontFallback.ts) ; puis la famille du système, seule.
         expect(Object.keys(fontFiles)).toContain(brand)
-        expect(rest).toEqual([generic[textStyles[variant].family]])
+        expect(rest).toEqual([`${brand}-fallback`, generic[textStyles[variant].family]])
       }
     } finally {
       jest.restoreAllMocks()

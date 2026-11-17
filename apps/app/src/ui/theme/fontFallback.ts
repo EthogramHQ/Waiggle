@@ -3,8 +3,11 @@
 
 /** Une face de secours : son nom, la police locale qu'elle prend, et ses réglages. */
 export type FontFallback = {
+  /** Le nom de la face : celui de la police livrée, suivi de `-fallback` (« FunnelSans-600-fallback »). */
   name: string
+  /** Les polices du système à prendre, dans l'ordre (`local("Arial")`, `local("Arial Bold")`). */
   local: readonly string[]
+  // Les quatre réglages sont des rapports (1 = 100 %), écrits en pour cent dans la règle CSS.
   sizeAdjust: number
   ascentOverride: number
   descentOverride: number
