@@ -271,6 +271,27 @@ describe('the feed while it loads, on a computer (R16)', () => {
       expect(insideProgressbar(title)).toBe(false)
     }))
 
+  it('keeps « Proches à suivre » and its title in the column while the suggestions load', () =>
+    atWindow(1920, 1080, async () => {
+      // Le Fil est lu (le membre suit déjà quelqu'un : la colonne propose des proches) ; seules les
+      // suggestions sont en route. La section arrivait seule et poussait les testeurs vers le bas.
+      mockFollowing({ items: four })
+      jest
+        .mocked(useSuggestions)
+        .mockReturnValue(pendingQuery() as unknown as ReturnType<typeof useSuggestions>)
+      await renderMemberHome()
+
+      // Témoin : la colonne est posée (les testeurs y sont déjà).
+      expect(
+        await screen.findByRole('header', { name: fr.t(($) => $.feed.side.testers) }),
+      ).toBeTruthy()
+      const title = screen.getByRole('header', { name: fr.t(($) => $.feed.side.suggestions) })
+      expect(insideProgressbar(title)).toBe(false)
+      expect(
+        screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+      ).toBeGreaterThan(0)
+    }))
+
   it('leaves the feed route without a loading page of its own', () => {
     // La page `/feed` ne pose plus de squelette avant l'écran : l'écran attend la session lui-même
     // (sa garde, `SessionGate`), avec le squelette du Fil.
