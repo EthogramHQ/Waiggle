@@ -5,7 +5,7 @@
 // statut restent. Sur téléphone, « Récents » garde ses grandes cartes, « Tester » compris. Une
 // taille donnée par l'écran l'emporte toujours.
 import { act, screen } from '@testing-library/react-native'
-import { Dimensions, Text } from 'react-native'
+import { Dimensions, StyleSheet, Text } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { ProjectCard } from './ProjectCard'
@@ -61,6 +61,31 @@ it('ProjectCard becomes the compact card in a compact grid on a computer', async
   expect(screen.getByText(card.author.name)).toBeTruthy()
   expect(screen.getByText(CHIP)).toBeTruthy()
   expect(screen.getByText(card.status.label)).toBeTruthy()
+})
+
+// Les compactes d'une rangée prennent la hauteur de la plus haute (sa case l'offre, `ProjectGrid`) :
+// la carte grandit avec sa case, comme dans la mosaïque. Jest ne calcule aucune hauteur : on lit
+// la croissance (`flexGrow`) des vues autour du titre.
+type Node = { props: Record<string, unknown>; parent: Node | null }
+const growsWithItsCell = () => {
+  for (let node = screen.getByText(card.title) as unknown as Node | null; node; ) {
+    const style = StyleSheet.flatten(node.props.style as never) as { flexGrow?: number } | undefined
+    if (style?.flexGrow === 1) return true
+    node = node.parent
+  }
+  return false
+}
+
+it('stretches the compact card of a grid to the height of its row', async () => {
+  setWindow(1920, 940)
+  await renderWithProviders(inCompactGrid())
+  expect(growsWithItsCell()).toBe(true)
+})
+
+it('does not stretch the large card of the feed', async () => {
+  setWindow(1920, 940)
+  await renderWithProviders(inCompactGrid('full'))
+  expect(growsWithItsCell()).toBe(false)
 })
 
 it('keeps the large card with Tester in a compact grid on a phone', async () => {
