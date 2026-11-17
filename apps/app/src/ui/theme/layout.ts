@@ -36,7 +36,10 @@ export const useLayout = () => {
   // Les écrans de marque (miel vif) : la scène à gauche et la carte à droite, dès 1 000 points
   // (plus tôt que la mise en colonnes, `wide`).
   const card = width >= layout.breakpoints.card
-  return { width, height, sizeClass, padding, columns, card }
+  // R15 : un très grand écran (dès `breakpoints.xwide`, 1 536 points), où le panneau d'Explorer
+  // apparaît et où les cartes du Fil s'élargissent. Le seuil est lu ici, pas dans les écrans.
+  const xwide = width >= layout.breakpoints.xwide
+  return { width, height, sizeClass, padding, columns, card, xwide }
 }
 
 /** La largeur d'une page ordinaire (`Screen width="page"`) dans une fenêtre : ses marges, puis 1 280 au plus. */

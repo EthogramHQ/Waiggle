@@ -57,7 +57,7 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
   // La largeur de la fenêtre (0 avant l'hydratation du web) : à partir de `breakpoints.xwide`, une
   // carte du Fil ne descend plus sous `cardMin.feedWide` (trois colonnes de 436 à 1 920 à côté du
   // panneau, et non quatre plus serrées : planche R15-Fil-1920).
-  const { width } = useLayout()
+  const { xwide } = useLayout()
   // La largeur de la colonne où la grille est posée ; 0 avant l'hydratation, donc une colonne : la
   // page du téléphone, celle du pré-rendu, qui ne connaît pas la fenêtre.
   const room = useContentWidth()
@@ -70,7 +70,7 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
     ? layout.cardMin.feedWide
     : family === 'compact'
       ? layout.cardMin.compact
-      : width >= layout.breakpoints.xwide
+      : xwide
         ? layout.cardMin.feedWide
         : layout.cardMin.feed
   // Children.toArray : la liste des cartes, sans les « trous » (null, false) laissés par l'écran,

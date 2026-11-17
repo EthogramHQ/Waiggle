@@ -17,7 +17,6 @@
 // panneau qui reste en place au défilement, avec « Ils cherchent des testeurs » et « Outils
 // populaires » en lignes, lu après « Récents » (comme le panneau du Fil). En dessous, la page
 // d'avant, sections l'une sous l'autre ; sur téléphone, celle de R12.
-import { layout } from '@ruche/brand'
 import { CategoryCode, type ProjectSummary } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
@@ -82,12 +81,12 @@ export function ExploreScreen() {
 function MemberExplore({ userId }: { userId: string }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const { sizeClass, width } = useLayout()
+  const { sizeClass, xwide } = useLayout()
   const compact = sizeClass === 'compact'
   // R15 : le panneau dès 1 536 points. `useLayout` donne une largeur de 0 tant que la page web n'est
   // pas hydratée (`useHydrated`) : la page pré-rendue, qui ne connaît pas la fenêtre, est donc celle
   // sans panneau, et le premier affichage du navigateur la reprend sans écart.
-  const withPanel = width >= layout.breakpoints.xwide
+  const withPanel = xwide
   // Les abonnements faits ou défaits ici, auteur par auteur, depuis l'ouverture de la page. Ils
   // l'emportent sur ce que dit le fil : après « Suivre Nora », le fil relu dit que Nora est suivie,
   // et sa pastille doit rester là, « Tu suis Nora », sous le doigt qui vient de la toucher (et
