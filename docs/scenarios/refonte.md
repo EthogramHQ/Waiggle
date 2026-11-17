@@ -4012,10 +4012,11 @@ lente, processeur ralenti), l'accueil ne devient vivant qu'après 8,5 s ; pendan
 est caché sous la barre du haut et la page reste un moment sans texte. Sur ordinateur, on voit
 d'abord la page du téléphone étirée, puis un saut. En mode sombre, l'écran reste noir, puis montre la
 page de jour. Le script fait 1,3 Mo, le même pour toutes les pages, catalogue de développement et
-deux langues compris. Le serveur, lui, répond en 33 ms : tout se joue dans la page.
+deux langues comprises. Le serveur, lui, répond en 33 ms : tout se joue dans la page.
 
-Le contenu des pages publiques dans leur HTML (P7) et le cache des images publiques (P9) viennent
-avec R22 « Les pages publiques ».
+Le contenu des pages publiques dans leur HTML et le cache des images publiques viennent avec R22
+« Les pages publiques » ; une seule langue dans le script, avec R18 « Les finitions » (quelques
+dizaines de Ko pour beaucoup de précautions : la page anglaise doit l'avoir dès le premier rendu).
 
 ### Ce que voit un visiteur pendant le chargement
 
@@ -4040,8 +4041,6 @@ avec R22 « Les pages publiques ».
 - Le catalogue des composants n'est pas dans le script de l'appli publiée : ni ses écrans ni ses
   textes (« Catalogue des composants » et ses exemples) ; la page `/catalogue` reste « introuvable »
   en ligne et marche en développement.
-- Une seule langue est chargée au départ, celle de la page ; l'autre arrive quand on change de
-  langue, sans recharger la page.
 - Les écrans rares et lourds (modération, éditeur de projet, réglages, coin des testeurs) se
   chargent quand on les ouvre, pas avec l'accueil.
 - Les polices : au format du web (WOFF2) ; seules celles du premier écran sont préchargées ; la
