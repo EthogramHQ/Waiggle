@@ -15,6 +15,7 @@ import { Avatar } from './Avatar'
 import { ExampleBadge } from './ExampleBadge'
 import type { Focusable } from './focus'
 import type { ImageSource } from './image'
+import { ProjectCover } from './ProjectCover'
 import { Stack } from './Stack'
 import { Tag } from './Tag'
 import { Text } from './Text'
@@ -189,7 +190,7 @@ export function MemberHeader({
 
 /**
  * R15 : le haut de la colonne du profil. Une bannière, la photo floutée jusqu'à n'être plus que ses
- * couleurs (sans photo, un miel pâle) ; par-dessus son bas, à gauche, la photo nette dans un anneau
+ * couleurs (sans photo, la lumière miel des couvertures) ; par-dessus son bas, à gauche, la photo nette dans un anneau
  * de verre. La bannière est un décor tiré de la photo : cachée aux lecteurs d'écran, qui lisent la
  * photo nette, nommée.
  */
@@ -221,7 +222,12 @@ function ColumnPhoto({ name, source }: { name: string; source: ImageSource | nul
               transform: [{ scale: 1.3 }],
             }}
           />
-        ) : null}
+        ) : (
+          // Sans photo, la lumière miel des couvertures sans image (relecture de design de R15) :
+          // le miel pâle seul, sur la crème du jour, se lisait comme un cadre vide ou une image
+          // cassée. La couverture décore (sans titre, elle ne dit rien) ; la bannière la rogne.
+          <ProjectCover height={BANNER} radius="none" image={null} />
+        )}
       </View>
       {/* La photo remonte sur la bannière (marge négative) de la moitié de sa hauteur, rangée à
           gauche avec un peu d'air : elle chevauche le bord, comme sur la planche. */}

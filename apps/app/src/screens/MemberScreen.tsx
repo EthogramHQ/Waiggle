@@ -564,8 +564,9 @@ function MemberView({ member }: { member: Member }) {
       }
     >
       {/* R15 : sur ordinateur, le profil en colonne à gauche, lu d'abord (`sideFirst`), de 360
-          points (`profile`), qui reste en place quand on descend dans les projets (`sticky`, s'il
-          tient dans la fenêtre) ; les projets prennent le reste. Plus étroit, l'un sous l'autre. */}
+          points (`profile`), qui reste en place quand on descend dans les projets (`sticky` ; plus
+          haut que la fenêtre, une fois son pied atteint) ; les projets prennent le reste. Plus
+          étroit, l'un sous l'autre. */}
       {column ? (
         <Columns sideFirst sideWidth="profile" sticky side={profile} main={projects} />
       ) : (
