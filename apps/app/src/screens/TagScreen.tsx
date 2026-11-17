@@ -353,7 +353,11 @@ function ToolPageView({ slug, filters, page, isAdmin }: ViewProps) {
           }
         />
       ) : (
-        <TileMosaic columns={phone ? 2 : 4}>
+        // R15 (« Des colonnes qui suivent la place ») : hors du téléphone, la mosaïque compte ses
+        // tuiles d'après la largeur de la page (`Screen` la lui publie) : 4 à 1 280, 5 à 1 920. Sur
+        // téléphone, deux tuiles par rangée, comme avant : la place seule n'en ferait tenir qu'une
+        // (358 points pour deux tuiles d'au moins 280), et la page deviendrait une longue colonne.
+        <TileMosaic {...(phone ? { columns: 2 } : null)}>
           {projects.map((project) => {
             const visual = project.portraitCover ?? project.cover
             return (
@@ -397,7 +401,8 @@ function ToolPageView({ slug, filters, page, isAdmin }: ViewProps) {
 
   return (
     <Screen
-      width="page"
+      // R15 : le gabarit large des écrans de cartes ; sous 1 280 points, une page ordinaire.
+      width="wide"
       header={<TopNav />}
       onBack={back}
       pageTitle={tool.name}
