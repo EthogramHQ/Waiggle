@@ -83,6 +83,7 @@ import { Tag } from './Tag'
 import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
+import { useLayout } from './theme/layout'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 import { useTilt } from './tilt'
@@ -292,6 +293,9 @@ export function ProjectCard({
   const { colors } = useTheme()
   const web = Platform.OS === 'web'
   const compact = size === 'compact'
+  // R15 (planches R15-Membre-1920) : sur ordinateur, le titre d'une compacte en `heading` (22) ; sur
+  // téléphone et tablette, `headline` (18), où une compacte n'a que 110 à 230 points de texte.
+  const wide = useLayout().sizeClass === 'wide'
   const height = givenHeight ?? (compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
   const panelPadding = compact ? COMPACT_PANEL_PADDING : PANEL_PADDING
   // R14 : la carte compacte ne montre ni la catégorie ni « Tester » (la page du projet les a) ;
@@ -439,7 +443,10 @@ export function ProjectCard({
               milieu d'un mot (« Décollage » / « ! », essai du catalogue). Trois lignes : sans
               accroche, le titre est le seul texte qui nomme une compacte avec photo, et deux
               lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
-          <Text variant={compact ? 'headline' : 'title3'} numberOfLines={compact ? 3 : 2}>
+          <Text
+            variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
+            numberOfLines={compact ? 3 : 2}
+          >
             {title}
           </Text>
           {change ? (

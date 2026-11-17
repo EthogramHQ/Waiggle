@@ -60,8 +60,30 @@ export const layout = {
     // commentaires y resserre le retrait des réponses, et le champ de réponse y laisse la photo.
     // Un seul seuil pour les deux, écrit ici plutôt que deux fois dans les composants.
     narrow: 360,
+    // R15 (audit de design du 17/11, décision 11 de Louis) : au-delà, les marges du gabarit large
+    // deviennent une part de la fenêtre ; la mosaïque d'un membre et le panneau d'Explorer
+    // changent de forme ici.
+    xwide: 1536,
   },
   maxContentWidth: 1280, // le contenu ne s'étale pas au-delà, même sur un grand écran
+  // R15 : le gabarit large, celui des écrans de cartes (Fil, Explorer, étiquette, membre, accueil
+  // du visiteur). Marges de `wideGutter` jusqu'à `breakpoints.xwide`, puis `wideGutterShare` de la
+  // fenêtre de chaque côté ; jamais plus de `maxWideWidth`. Le texte qui se lit reste à
+  // `readableWidth` (typography.ts), les formulaires à `formWidth`.
+  maxWideWidth: 1920,
+  wideGutter: 32,
+  wideGutterShare: 0.05,
+  // R15 : le champ de recherche de la barre du haut ne s'étire pas au-delà, même quand la barre
+  // suit le gabarit large.
+  searchFieldMax: 560,
+  // R15 : la largeur sous laquelle une carte ne descend jamais ; une grille gagne une colonne dès
+  // qu'une carte de plus tient à cette largeur. `feed` : les cartes du Fil ; `compact` : les petites
+  // cartes (Récents, la mosaïque d'un membre) ; `tile` : les tuiles d'une étiquette ou d'une ruche.
+  cardMin: { feed: 320, compact: 320, tile: 200 },
+  // R15 : les colonnes de côté du gabarit large : le panneau du Fil et d'Explorer, la colonne du
+  // profil sur la page d'un membre (planches R15-Fil-1920, R15-Membre-1920).
+  sidePanel: 340,
+  profileColumn: 360,
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)
   sideColumn: 320, // largeur de base de la colonne latérale
   // La colonne latérale large (la page d'un projet, décision de Louis du 2/11/2026) : elle part de
