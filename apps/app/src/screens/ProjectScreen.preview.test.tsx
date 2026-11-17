@@ -68,6 +68,21 @@ jest.mock('../comments/api', () => ({
 }))
 jest.mock('../mentions/api', () => ({ useMentionable: () => [] }))
 jest.mock('../ui/clipboard', () => ({ copyText: jest.fn() }))
+// R16 : le bas vide de la page, tel quel, dans une vue marquée de son nom (sans rôle ni nom à lui).
+jest.mock('../projects/ProjectPage', () => {
+  const actual = jest.requireActual('../projects/ProjectPage')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  return {
+    ...actual,
+    ProjectPageSkeleton: (props: Record<string, unknown>) =>
+      createElement(
+        View,
+        { testID: 'ProjectPageSkeleton' },
+        createElement(actual.ProjectPageSkeleton, props),
+      ),
+  }
+})
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
   useRouter: () => ({
@@ -286,5 +301,51 @@ describe('the page of a project opened from a card, before the API answers (R14)
 
     expect(await screen.findByRole('header', { name: containing(project.title) })).toBeTruthy()
     expect(screen.getByRole('header', { name: descriptionTitle })).toBeTruthy()
+  })
+})
+
+// --- R16 : ce qui est déjà connu s'affiche (docs/scenarios/refonte.md, « Le squelette a la forme
+// de sa page », choix 10) ---
+// Ouverte depuis une carte, la page montre le titre, l'auteur, la photo, le statut et l'accroche ;
+// le squelette ne couvre que la description, la recette et les commentaires. Une zone qui charge
+// n'a qu'un nom pour un lecteur d'écran (« Chargement… ») : ce qui est connu doit rester dehors,
+// sinon il ne serait plus lu.
+
+/** Vrai si l'élément est dans une zone « Chargement » (un `progressbar`). */
+const insideProgressbar = (element: { parent: unknown; props: Record<string, unknown> }) => {
+  let node = element.parent as { parent: unknown; props: Record<string, unknown> } | null
+  while (node) {
+    if (node.props.role === 'progressbar' || node.props.accessibilityRole === 'progressbar')
+      return true
+    node = node.parent as typeof node
+  }
+  return false
+}
+
+describe('the preview of a project while the rest of its page loads (R16)', () => {
+  it('keeps the title, author, status and pitch readable outside the loading progressbar', async () => {
+    await open()
+
+    const known = [
+      await screen.findByRole('header', { name: containing(project.title) }),
+      screen.getAllByText(containing(project.author.name))[0],
+      screen.getAllByText(T.status)[0],
+      screen.getByText(project.pitch),
+    ]
+    // Témoin : le reste de la page attend bien, sous un seul nom.
+    expect(screen.getByRole('progressbar', { name: T.loading })).toBeTruthy()
+    for (const element of known) {
+      expect(element).toBeTruthy()
+      expect(insideProgressbar(element as never)).toBe(false)
+    }
+  })
+
+  it('draws the empty bottom of the page under the preview, where the description and the comments will be', async () => {
+    await open()
+    await screen.findByRole('header', { name: containing(project.title) })
+
+    // La pièce vide de la page d'un projet (projects/ProjectPage.tsx), sans rôle ni nom à elle :
+    // son faux module l'entoure d'une vue marquée de son nom.
+    expect(screen.getByTestId('ProjectPageSkeleton')).toBeTruthy()
   })
 })

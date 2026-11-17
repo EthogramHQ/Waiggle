@@ -1,6 +1,8 @@
 // Tests de la page d'un membre. L'API (members/api) est remplacée par de faux appels.
 import { BLOCKS_PER_DAY, UNBLOCKS_PER_DAY } from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { type ReactNode, useState } from 'react'
 import { ApiError } from '../api/errors'
 import { useBlock, useUnblock } from '../blocks/api'
 import { webAppUrl } from '../config'
@@ -41,6 +43,8 @@ jest.mock('../members/api', () => {
   const { useQuery } = jest.requireActual('@tanstack/react-query')
   const getMember = jest.fn()
   return {
+    // R16 : l'aperçu d'un membre tiré des listes en cache (`useMemberPreview`), tel quel.
+    ...jest.requireActual('../members/api'),
     getMember,
     useMember: (id: string, enabled = true) =>
       useQuery({ queryKey: ['member', id], queryFn: () => getMember(id), enabled }),
@@ -974,5 +978,64 @@ describe('sharing the page of a member', () => {
       expect(screen.queryByText(fr.t(($) => $.share.title, { title: 'Léa' }))).toBeNull(),
     )
     expect(screen.getByRole('button', { name: 'Partager' })).toBeTruthy()
+  })
+})
+
+// --- R16 : la page d'un membre ouverte depuis une carte (docs/scenarios/refonte.md, « Le squelette
+// a la forme de sa page », choix 10) ---
+// Une carte du Fil connaît déjà l'auteur (son nom, sa photo) : sa page les montre tout de suite,
+// avant la réponse de l'API, et le squelette couvre le reste.
+
+/** Range le Fil dans le cache avant le premier rendu (une carte de Léa vient d'y être touchée). */
+function WithCachedFeed({ children }: { children: ReactNode }) {
+  const client = useQueryClient()
+  // useState avec une fonction : appelée une seule fois, au premier rendu, avant celui de la page.
+  useState(() => {
+    client.setQueryData(['feed', 'following'], {
+      pages: [{ items: [{ project: summaryOf(projectWithPhotos) }], nextCursor: null }],
+      pageParams: [undefined],
+    })
+    return null
+  })
+  return <>{children}</>
+}
+
+/** Vrai si l'élément est dans une zone « Chargement » (un `progressbar`). */
+const insideProgressbar = (element: { parent: unknown; props: Record<string, unknown> }) => {
+  let node = element.parent as { parent: unknown; props: Record<string, unknown> } | null
+  while (node) {
+    if (node.props.role === 'progressbar' || node.props.accessibilityRole === 'progressbar')
+      return true
+    node = node.parent as typeof node
+  }
+  return false
+}
+
+describe('the page of a member opened from a card, before the API answers (R16)', () => {
+  it('shows the name known from a cached list, outside the loading progressbar', async () => {
+    // Témoin de la carte : le projet du Fil est bien de Léa.
+    expect(summaryOf(projectWithPhotos).author.id).toBe(leaPage.id)
+    jest.mocked(getMember).mockReturnValue(new Promise(() => {}))
+    await renderWithProviders(
+      <WithCachedFeed>
+        <MemberScreen id={leaPage.id} />
+      </WithCachedFeed>,
+    )
+
+    const names = await screen.findAllByText(containing(leaPage.name))
+    expect(names.length).toBeGreaterThan(0)
+    for (const name of names) expect(insideProgressbar(name as never)).toBe(false)
+    // Le reste de la page attend, sous un seul nom.
+    expect(screen.getByRole('progressbar', { name: fr.t(($) => $.common.loading) })).toBeTruthy()
+  })
+
+  it('shows only the skeleton when no list knows the member (témoin)', async () => {
+    jest.mocked(getMember).mockReturnValue(new Promise(() => {}))
+    await renderWithProviders(<MemberScreen id={leaPage.id} />)
+
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
+    expect(screen.queryByText(containing(leaPage.name))).toBeNull()
   })
 })
