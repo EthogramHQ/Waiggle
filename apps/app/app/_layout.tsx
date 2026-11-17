@@ -13,6 +13,7 @@ import { useMemberMarkerSync } from '../src/accounts/memberMarker'
 import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
+import { EditorPreload } from '../src/navigation/chunks/preload'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
@@ -73,6 +74,8 @@ export default function RootLayout() {
           {/* R12 : sur le web, le marqueur `waiggle_member` suit la session (posé, effacé), pour
               que le serveur envoie au Fil un membre qui arrive sur `/`. */}
           <MemberMarkerSync />
+          {/* R13 : le morceau de l'éditeur, demandé d'avance pour un membre (web). */}
+          <EditorPreload />
           {/* R3 : la barre d'onglets du téléphone, posée une seule fois au-dessus de toutes les pages,
               pour que sa goutte glisse d'un onglet à l'autre. AppTabBar décide où elle se montre ;
               TabBarHost mesure sa hauteur et la donne aux écrans (la place à réserver en bas) et

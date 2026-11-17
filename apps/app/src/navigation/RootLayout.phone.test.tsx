@@ -46,6 +46,7 @@ jest.mock('../profile/LanguageSync', () => ({ LanguageSync: () => null }))
 jest.mock('../profile/ProvisionalNameGate', () => ({ ProvisionalNameGate: () => null }))
 jest.mock('../rules/RulesGate', () => ({ RulesGate: () => null }))
 jest.mock('../accounts/memberMarker', () => ({ useMemberMarkerSync: () => {} }))
+jest.mock('../navigation/chunks/preload', () => ({ EditorPreload: () => null }))
 jest.mock('../ui/AmbientLight', () => ({ AmbientLight: () => null }))
 
 // L'écran du lancement, nommé dans la langue de l'appareil (celle de Jest : l'anglais), qu'on ne
