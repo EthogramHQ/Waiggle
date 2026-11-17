@@ -28,6 +28,7 @@
 // (`scrollPaddingTop`, rendu par `onSpace`, jur-RF3).
 import { layout, space } from '@ruche/brand'
 import {
+  createContext,
   isValidElement,
   type ReactNode,
   type Ref,
@@ -60,6 +61,18 @@ export type TopBarSpace = {
   scrollPaddingTop: number
 }
 
+/**
+ * R15 : ce que la barre fixe couvre en haut de la fenêtre (sa hauteur), 0 quand elle suit le contenu
+ * ou qu'il n'y en a pas. Screen le pose pour son contenu, et le redonne à chaque mesure de la barre :
+ * une colonne collée (`Columns sticky`) se pose juste dessous. Le canal du défilement en a une copie
+ * (`coveredTop`), mais dans un `ref`, que rien ne redessine quand il change ; ce contexte, lui,
+ * redessine ceux qui le lisent.
+ */
+export const TopBarCoverContext = createContext(0)
+
+/** Hook : ce que la barre fixe couvre en haut de la fenêtre (0 sans barre fixe). */
+export const useTopBarCover = () => useContext(TopBarCoverContext)
+
 type Props = {
   /** La barre (le `header` de Screen : TopNav, la capsule et le bandeau de suspension). */
   children: ReactNode
@@ -69,7 +82,11 @@ type Props = {
    * fixe (`TopBarSpace.pinned`) ; sinon, il suivrait la barre et le contenu.
    */
   belowBar?: ReactNode
-  /** La largeur maximale de la barre (celle de la page) ; la même partout par défaut. */
+  /**
+   * La largeur maximale de la barre : 1 280 par défaut (les pages ordinaires et les formulaires) ;
+   * R15, celle du contenu d'un écran large (`Screen width="wide"`), que Screen lui donne : la barre
+   * et les cartes s'alignent sur les mêmes bords.
+   */
   width?: number
   /** Sur le miel, la barre n'est jamais fixe (elle se poserait hors de la feuille). */
   brand?: boolean
