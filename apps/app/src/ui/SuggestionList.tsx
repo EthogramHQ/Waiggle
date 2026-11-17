@@ -23,10 +23,11 @@ import { useTranslation } from 'react-i18next'
 import { AppState, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
 import type { ImageSource } from './image'
-import { ListGroup } from './ListGroup'
+import { ListGroup, TextLineShape } from './ListGroup'
 import { LiveStatus } from './LiveStatus'
 import { Notice } from './Notice'
 import type { CoverImage } from './ProjectCover'
+import { Loading, Shape } from './Skeleton'
 import { SuggestionRow } from './SuggestionRow'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -297,6 +298,162 @@ export function SuggestionList({
           />
         ) : null}
       </SaidLine>
+    </View>
+  )
+}
+
+/**
+ * R16 (« Les squelettes », scénario : « Proches à suivre » garde sa hauteur pendant qu'elle charge) :
+ * la section qui charge. Son vrai titre, lisible hors du « Chargement… » (une zone `progressbar` n'a
+ * qu'un nom : un titre dedans ne serait plus lu), puis, sous un seul `Loading`, autant de lignes
+ * vides que la liste en montrera (`count`), dans le groupe blanc d'une vraie liste.
+ *
+ * `shown` : les lignes vides se montrent tout de suite, sans les 160 ms d'attente de `Loading`
+ * (elles prennent la suite d'un squelette déjà vu).
+ */
+export function SuggestionListSkeleton({
+  count,
+  stacked = false,
+  shown = false,
+}: {
+  count: number
+  stacked?: boolean
+  shown?: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <View style={{ gap: space.md }}>
+      <Text variant="heading" heading={2}>
+        {t(($) => $.suggestions.title)}
+      </Text>
+      <Loading shown={shown}>
+        <ListGroup>
+          {Array.from({ length: count }, (_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+            <SuggestionRowSkeleton key={index} stacked={stacked} />
+          ))}
+        </ListGroup>
+      </Loading>
+    </View>
+  )
+}
+
+// Les mesures de `SuggestionRow`, que sa ligne vide reprend. Ce qui fait la hauteur d'une ligne, ce
+// sont ses zones de 44 points (photo, nom, projet, boutons : `layout.touchTarget`) et ses marges,
+// lues ici aux mêmes jetons ; les formes posées dedans (rond de 40, vignette de 16) ne la changent pas.
+/** La photo du membre, dans sa zone de 44. */
+const ROW_AVATAR = 40
+/** La vignette du projet, à la taille d'une ligne de texte. */
+const ROW_THUMBNAIL = 16
+/** La largeur sous laquelle « Suivre » passe sous le nom, en rangée. */
+const ROW_NAME_BASIS = 88
+/** Empilé : le projet et les boutons commencent sous le nom, après la photo. */
+const ROW_TEXT_INSET = layout.touchTarget + space.sm
+/** La pastille de « Suivre ». */
+const ROW_FOLLOW_WIDTH = 72
+
+/**
+ * R16 : la ligne vide d'une suggestion, à la hauteur d'une vraie (`SuggestionRow`) : en rangée
+ * (premier lancement), deux zones de 44 l'une sur l'autre, la photo à gauche et « Suivre » à
+ * droite ; empilée (la colonne du Fil), trois zones de 44 : la photo et le nom, le projet, puis
+ * « Suivre » et « × ». À poser dans un `ListGroup`, sous un `Loading`.
+ *
+ * Ni rôle ni nom : c'est le `Loading` de la zone qui dit « Chargement… », une fois pour toutes ses
+ * lignes.
+ */
+export function SuggestionRowSkeleton({ stacked = false }: { stacked?: boolean }) {
+  const photo = (
+    <View
+      style={{
+        width: layout.touchTarget,
+        height: layout.touchTarget,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <Shape height={ROW_AVATAR} width={ROW_AVATAR} round />
+    </View>
+  )
+  const project = (
+    <View
+      style={{
+        minHeight: layout.touchTarget,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: space.sm,
+        paddingTop: stacked ? space.sm : space.xxs,
+      }}
+    >
+      <View style={{ marginTop: space.xxs }}>
+        <Shape height={ROW_THUMBNAIL} width={ROW_THUMBNAIL} />
+      </View>
+      <View style={{ flexGrow: 1, flexShrink: 1 }}>
+        <TextLineShape variant="callout" width="70%" />
+      </View>
+    </View>
+  )
+  const follow = <Shape height={layout.controlHeight.small} width={ROW_FOLLOW_WIDTH} round />
+  // La place du « × », vide : il n'y a rien à écarter.
+  const dismiss = <View style={{ width: layout.touchTarget, height: layout.touchTarget }} />
+
+  if (stacked) {
+    return (
+      <View style={{ paddingLeft: space.lg, paddingRight: space.sm, paddingVertical: space.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          {photo}
+          <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0 }}>
+            <TextLineShape variant="body" width="60%" />
+          </View>
+        </View>
+        <View style={{ paddingLeft: ROW_TEXT_INSET }}>{project}</View>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space.sm,
+            paddingLeft: ROW_TEXT_INSET,
+          }}
+        >
+          {follow}
+          <View style={{ marginLeft: 'auto' }}>{dismiss}</View>
+        </View>
+      </View>
+    )
+  }
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.sm,
+        paddingLeft: space.lg,
+        paddingRight: space.sm,
+        paddingVertical: space.xs,
+      }}
+    >
+      {photo}
+      <View
+        style={{
+          flexGrow: 1,
+          flexShrink: 1,
+          flexBasis: 0,
+          minWidth: 0,
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          columnGap: space.md,
+        }}
+      >
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: ROW_NAME_BASIS, minWidth: 0 }}>
+          <View style={{ minHeight: layout.touchTarget, justifyContent: 'flex-end' }}>
+            <TextLineShape variant="body" width="55%" />
+          </View>
+          {project}
+        </View>
+        {follow}
+      </View>
+      {dismiss}
     </View>
   )
 }
