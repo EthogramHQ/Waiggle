@@ -11,8 +11,13 @@
 //
 // Les faux modules sont ceux de HomeScreen.computer.test.tsx ; le faux module de ProjectGrid note
 // en plus ce que la grille reçoit, puis dessine la vraie.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { screen } from '@testing-library/react-native'
 import { Dimensions } from 'react-native'
+import { useDiscoverFeed, useFollowingFeed } from '../feed/api'
+import { useMyHives } from '../hives/api'
+import { useSuggestions } from '../suggestions/api'
 import { fr } from '../testing/text'
 import {
   card,
@@ -72,6 +77,27 @@ jest.mock('../ui/ProjectGrid', () => {
     },
   }
 })
+// R16 : la carte vide du Fil, telle quelle, dans une vue marquée de son nom (elle n'a ni rôle ni
+// nom à elle, choix 4) : le test compte les cartes vides de la grille.
+jest.mock('../ui/ProjectCard', () => {
+  const actual = jest.requireActual('../ui/ProjectCard')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  return {
+    ...actual,
+    ProjectCardSkeleton: (props: Record<string, unknown>) =>
+      createElement(
+        View,
+        { testID: 'ProjectCardSkeleton' },
+        createElement(actual.ProjectCardSkeleton, props),
+      ),
+  }
+})
+// R16 : ses ruches, lues pour de vrai par défaut ; le test du chargement les garde en route.
+jest.mock('../hives/api', () => {
+  const actual = jest.requireActual('../hives/api')
+  return { ...actual, useMyHives: jest.fn(actual.useMyHives) }
+})
 jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
 jest.mock('expo-router', () => ({
   usePathname: () => '/',
@@ -81,6 +107,8 @@ jest.mock('expo-router', () => ({
 beforeEach(() => {
   resetHomeMocks()
   mockGridProps.length = 0
+  const { useMyHives: read } = jest.requireActual('../hives/api')
+  jest.mocked(useMyHives).mockReset().mockImplementation(read)
 })
 
 /**
@@ -167,4 +195,88 @@ describe('the feed on a wide computer screen (R15)', () => {
         mockGridProps.map(() => undefined),
       )
     }))
+})
+
+// --- R16 : le Fil qui charge (docs/scenarios/refonte.md, « Le squelette a la forme de sa page ») ---
+// Un seul état d'attente, au lieu de trois qui se suivaient (la page `app/feed.tsx`, puis l'écran,
+// puis la liste) : le squelette pose la grille de cartes vides du Fil et la colonne de droite avec
+// ses titres. Les pièces vides n'ont ni rôle ni nom (choix 4) : leur faux module les entoure d'une
+// vue marquée de leur nom, que le test compte.
+
+/** Ce que rend une lecture de React Query avant sa première réponse. */
+const pendingQuery = () => ({
+  data: undefined,
+  status: 'pending',
+  isPending: true,
+  isLoading: true,
+  isSuccess: false,
+  isError: false,
+  error: null,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  isRefetching: false,
+  fetchNextPage: jest.fn().mockResolvedValue(undefined),
+  refetch: jest.fn().mockResolvedValue(undefined),
+})
+
+/** Tout ce que le Fil lit est en route : le fil, ses ruches, la colonne. */
+const everythingLoads = () => {
+  jest
+    .mocked(useFollowingFeed)
+    .mockReturnValue(pendingQuery() as unknown as ReturnType<typeof useFollowingFeed>)
+  jest
+    .mocked(useDiscoverFeed)
+    .mockReturnValue(pendingQuery() as unknown as ReturnType<typeof useDiscoverFeed>)
+  jest
+    .mocked(useSuggestions)
+    .mockReturnValue(pendingQuery() as unknown as ReturnType<typeof useSuggestions>)
+  jest
+    .mocked(useMyHives)
+    .mockReturnValue(pendingQuery() as unknown as ReturnType<typeof useMyHives>)
+}
+
+/** Vrai si l'élément est dans une zone « Chargement » (un `progressbar`), lue d'un seul nom. */
+const insideProgressbar = (element: Element) => {
+  let node: Element | null = element.parent
+  while (node) {
+    if (node.props.role === 'progressbar' || node.props.accessibilityRole === 'progressbar')
+      return true
+    node = node.parent
+  }
+  return false
+}
+
+describe('the feed while it loads, on a computer (R16)', () => {
+  it('shows a single loading state: the grid of empty cards and the column beside it', () =>
+    atWindow(1920, 1080, async () => {
+      everythingLoads()
+      await renderMemberHome()
+
+      // Quatre cartes vides au Fil (choix 11), là où le Fil posera les siennes.
+      expect(screen.getAllByTestId('ProjectCardSkeleton')).toHaveLength(4)
+      expect(
+        screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+      ).toBeGreaterThan(0)
+      // La colonne de droite est posée tout de suite, avec son titre.
+      expect(screen.getByRole('header', { name: fr.t(($) => $.feed.side.testers) })).toBeTruthy()
+    }))
+
+  it('keeps the column titles readable outside the loading progressbars', () =>
+    atWindow(1920, 1080, async () => {
+      everythingLoads()
+      await renderMemberHome()
+
+      const title = screen.getByRole('header', { name: fr.t(($) => $.feed.side.testers) })
+      // Un titre dans un `progressbar` ne serait plus lu : la zone n'a qu'un nom, « Chargement… ».
+      expect(insideProgressbar(title)).toBe(false)
+    }))
+
+  it('leaves the feed route without a loading page of its own', () => {
+    // La page `/feed` ne pose plus de squelette avant l'écran : l'écran attend la session lui-même
+    // (sa garde, `SessionGate`), avec le squelette du Fil.
+    const route = readFileSync(join(__dirname, '..', '..', 'app', 'feed.tsx'), 'utf8')
+    expect(route).toMatch(/<HomeScreen\b/) // témoin : c'est bien la page du Fil
+    expect(route).not.toMatch(/\bLoadingScreen\b/)
+    expect(route).not.toMatch(/\buseMemberSession\b/)
+  })
 })
