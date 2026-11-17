@@ -308,13 +308,16 @@ export function ProjectCard({
   const compact = size === 'compact'
   const height = givenHeight ?? (compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
   const panelPadding = compact ? COMPACT_PANEL_PADDING : PANEL_PADDING
-  // R14 : la carte compacte ne montre ni la catégorie ni « Tester » (la page du projet les a) ;
-  // le reste du dessin les ignore donc comme s'ils étaient absents.
+  // Une compacte que sa grille a choisie (R15, « Récents » d'Explorer), et non une case de la
+  // mosaïque d'un membre, où l'écran donne la taille.
+  const chosenByGrid = compact && givenSize === undefined
+  // R14 : la carte compacte ne montre pas la catégorie (la page du projet l'a) ; le reste du dessin
+  // l'ignore donc comme si elle était absente.
   const category = compact ? undefined : givenCategory
   // Dans une case de la mosaïque, chaque étage de la carte grandit jusqu'à la hauteur de la case.
   // Une compacte choisie par sa grille aussi (R15) : les cartes d'une rangée de « Récents » ont la
   // même hauteur, celle de la plus haute, au lieu de bas en escalier (un titre de trois lignes).
-  const stretched = useContext(CardStretchContext) || (compact && givenSize === undefined)
+  const stretched = useContext(CardStretchContext) || chosenByGrid
   const grow = stretched ? ({ flexGrow: 1 } as const) : null
   const [measures, measure] = useMeasures()
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
@@ -331,7 +334,10 @@ export function ProjectCard({
       })
     : undefined
   const openAuthor = author?.onPress ? guard(author.onPress) : undefined
-  const shownTryIt = compact ? undefined : tryIt
+  // « Tester » : pas sur une case de la mosaïque d'un membre (R14, la page du projet l'a). Une
+  // compacte de « Récents » le garde : Explorer est l'endroit où l'on vient essayer des projets, et
+  // « Tester » y est l'action de chaque carte (décisions du 31/10 et du 17/11/2026).
+  const shownTryIt = compact && !chosenByGrid ? undefined : tryIt
   const test = shownTryIt?.onPress ? guard(shownTryIt.onPress) : undefined
   // L'accroche décrit le lien de la carte sur le web (lue après son nom) : useId donne le même
   // identifiant au pré-rendu et dans le navigateur.
