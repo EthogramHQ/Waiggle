@@ -5482,7 +5482,7 @@ const shoot = async (page, options, label) => {
     console.warn(`capture reprise : ${label}`)
     await page.waitForTimeout(500)
     try {
-      await page.screenshot(options)
+      await page.screenshot({ ...options, timeout: 30_000 })
     } catch (again) {
       throw new Error(`capture impossible : ${label} (${again?.message ?? again})`)
     }
@@ -5950,8 +5950,22 @@ const capture = async ({ shot, device, scheme }) => {
     await context.close()
   }
 }
+// Chromium refuse parfois deux fois de suite la même page dans le même contexte (17/11/2026 : deux
+// fois « inscription-telephone-nuit » sur main) : on refait alors toute la capture dans un contexte
+// neuf, une seule fois (R13-E1). Une autre erreur, ou un troisième refus, arrête le lot comme avant.
+const captureWithRetry = async (job) => {
+  try {
+    await capture(job)
+  } catch (error) {
+    if (!/Unable to capture screenshot/.test(String(error?.message))) throw error
+    console.warn(
+      `capture refaite dans un contexte neuf : ${job.shot.name}-${job.device.name}-${job.scheme.name}`,
+    )
+    await capture(job)
+  }
+}
 try {
-  await runQueue(jobs, capture)
+  await runQueue(jobs, captureWithRetry)
 } finally {
   await browser.close()
   server.close()
