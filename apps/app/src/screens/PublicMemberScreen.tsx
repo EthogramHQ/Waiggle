@@ -240,6 +240,10 @@ function PublicMemberView({
                     label: t(($) => $.project.status[project.status]),
                     strong: project.status === 'testable',
                   }}
+                  // « Exemple » sur chaque projet du compte d'exemples de l'équipe (R12b), comme
+                  // sur la page d'un membre : la page publique ne le dit que du membre, et tous
+                  // ses projets en sont.
+                  example={member.example === true}
                   // Dans l'aperçu, la carte est seulement dessinée : rien ne fait quitter l'aperçu.
                   {...(preview
                     ? null
