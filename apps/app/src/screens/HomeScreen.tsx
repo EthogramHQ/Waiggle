@@ -141,10 +141,11 @@ function MemberHome({ session }: { session: SessionData }) {
   const newsButton = <FeedNews news={news} onPress={showNews} />
   // RF (ui-5) : le titre « Fil », où le focus revient quand le bouton des nouveautés est touché.
   const feedTitle = useRef<Focusable>(null)
-  // Deux colonnes de cartes dès la tablette (768 points) tant que la colonne de droite n'est pas
-  // là, comme Explorer (relecture de design de R4, A5) ; une seule quand elle prend la place,
-  // jusqu'à l'ordinateur (`wide`), où les deux tiennent à côté d'elle.
-  const cardColumns = compact || (columns && sizeClass !== 'wide') ? 1 : 2
+  // R15 (« Des colonnes qui suivent la place ») : l'écran ne compte plus les colonnes de cartes.
+  // La grille (ui/ProjectGrid) lit la largeur de la colonne où elle est posée, que `Screen` et
+  // `Columns` lui publient, et y met autant de cartes qu'il en tient : une sur téléphone, deux sur
+  // tablette, une à côté du panneau sur une petite fenêtre d'ordinateur, deux à 1 100, trois à
+  // 1 440 et à 1 920 (planche R15-Fil-1920).
 
   // R10 : les pastilles, seulement pour un membre d'au moins une ruche. Elles commandent le
   // panneau du Fil (`panelId`), posé autour de la colonne principale.
@@ -176,7 +177,6 @@ function MemberHome({ session }: { session: SessionData }) {
           key={chosen.id}
           hiveId={chosen.id}
           news={compact ? newsButton : null}
-          columns={cardColumns}
           onExplore={onExplore}
           hideMascot={published.noticeUp}
         />
@@ -195,7 +195,6 @@ function MemberHome({ session }: { session: SessionData }) {
           firstRun={firstRun}
           name={name}
           news={compact ? newsButton : null}
-          columns={cardColumns}
           onExplore={onExplore}
           hideMascot={published.noticeUp}
           // Toujours posé (il ne dessine rien sans invitation) : une invitation refusée garde sa
@@ -214,7 +213,10 @@ function MemberHome({ session }: { session: SessionData }) {
     // La carte du projet tout juste publié donne sa vue à la danse (projects/SummaryCard.tsx).
     <PublishTargetContext.Provider value={published.target}>
       <Screen
-        width="page"
+        // R15 : le gabarit large, celui des écrans de cartes. Sous 1 280 points, c'est la largeur
+        // d'une page ordinaire ; au-delà, le Fil prend presque toute la fenêtre (1 728 à 1 920), et
+        // la barre du haut suit la même largeur.
+        width="wide"
         // R6a : la danse de publication, par-dessus tout l'écran.
         overlay={published.dance ? <PublishedDance {...published.dance} /> : null}
         // Sur téléphone (R3, F-Nav10), le haut du Fil : le logo à gauche, à la place de « Bonjour
@@ -264,9 +266,14 @@ function MemberHome({ session }: { session: SessionData }) {
       >
         {pills ? null : hiddenTitle}
         {/* Sur ordinateur (quand les deux colonnes tiennent), la colonne de droite. Sans proches à
-          suivre au premier lancement : la colonne principale les montre déjà. */}
+          suivre au premier lancement : la colonne principale les montre déjà.
+          R15 : le panneau a sa largeur fixe (`panel`, 340), le Fil prend tout le reste ; il reste
+          en place pendant qu'on descend dans le Fil (`sticky`), sous la barre du haut, s'il tient
+          dans la fenêtre (sinon il défile avec la page : son bas doit rester atteignable). */}
         {columns ? (
           <Columns
+            sideWidth="panel"
+            sticky
             main={main}
             side={
               <FeedSide withSuggestions={firstRun === false} shownProjectIds={shownProjectIds} />
@@ -526,7 +533,6 @@ type FollowingFeedProps = {
   name: string
   /** Le bouton des nouveautés, en tête du fil (téléphone) ; null quand il est à côté du titre. */
   news: ReactNode
-  columns: number
   onExplore: () => void
   /** L'avis « Projet publié » est à l'écran : l'abeille de « Tu es à jour » s'efface (H1). */
   hideMascot: boolean
@@ -542,7 +548,6 @@ function FollowingFeed({
   firstRun,
   name,
   news,
-  columns,
   onExplore,
   hideMascot,
   invitations,
@@ -564,7 +569,6 @@ function FollowingFeed({
       news={news}
       // Pas de message de fil vide : un fil vide finit sur « Tu es à jour ».
       upToDate={{ readBefore: readBefore ?? null, onExplore, hideMascot }}
-      columns={columns}
     />
   )
   if (!firstRun) return list
@@ -658,7 +662,6 @@ type HiveFeedProps = {
   hiveId: string
   /** Le haut du fil (la phrase de la ruche), sur téléphone ; null sur ordinateur. */
   news: ReactNode
-  columns: number
   onExplore: () => void
   hideMascot: boolean
 }
@@ -668,7 +671,7 @@ type HiveFeedProps = {
  * à jour » se pose d'après sa dernière visite de la ruche (`lastReadAt` de la première page), figée
  * pour la visite comme celle de « Tout ». Un fil vide finit sur « Tu es à jour ».
  */
-function HiveFeed({ hiveId, news, columns, onExplore, hideMascot }: HiveFeedProps) {
+function HiveFeed({ hiveId, news, onExplore, hideMascot }: HiveFeedProps) {
   const feed = useHiveFeed(hiveId)
   const firstPage = feed.data?.pages[0]
   const readBefore = useReadBefore(firstPage)
@@ -685,7 +688,6 @@ function HiveFeed({ hiveId, news, columns, onExplore, hideMascot }: HiveFeedProp
       items={feed.data.pages.flatMap((page) => page.items)}
       news={news}
       upToDate={{ readBefore: readBefore ?? null, onExplore, hideMascot }}
-      columns={columns}
     />
   )
 }
