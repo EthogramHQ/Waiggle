@@ -46,12 +46,19 @@ export type HeaderProject = Pick<
   // `updatedAt` ne compte plus pour « Mis à jour » (R7a), mais l'en-tête reste nourri du projet
   // entier : la date et le nombre des mises à jour en font partie, comme la dernière et sa version.
   | 'updatedAt'
-  | 'latestUpdate'
-  | 'updateCount'
   | 'version'
   | 'primaryCategory'
   | 'secondaryCategory'
->
+> & {
+  /**
+   * La dernière mise à jour publiée, dont l'en-tête ne lit que la date (« Mis à jour hier »). R14 :
+   * réduite à cette date, pour que l'aperçu tiré d'une liste (`UpdateSummary`, qui la nomme `at`)
+   * dise la même ligne que le projet complet.
+   */
+  latestUpdate: Pick<NonNullable<Project['latestUpdate']>, 'createdAt'> | null
+  /** Le nombre des mises à jour ; absent de l'aperçu tiré d'une liste (R14), qui ne le sait pas. */
+  updateCount?: Project['updateCount']
+}
 
 /**
  * Hook : la ligne de l'auteur, prête pour `AuthorLine`.
@@ -70,8 +77,10 @@ export type HeaderProject = Pick<
  * - Sur son propre projet : aucune pastille (on ne se suit pas soi-même).
  * - Un compte suspendu (tranche 7c) ne suit plus personne, mais peut encore ne plus suivre : la
  *   pastille reste pour un auteur suivi à un moment de la visite, inactive une fois retirée.
+ * - R14 : `followable` faux (l'aperçu de la page, tiré d'une liste), aucune pastille : l'aperçu ne
+ *   montre rien qui dépende de qui lit, et la pastille arrive avec le projet complet.
  */
-export function useAuthorLine(project: HeaderProject): AuthorLineProps {
+export function useAuthorLine(project: HeaderProject, followable = true): AuthorLineProps {
   const { t } = useTranslation()
   const nameOf = useNameOf()
   const router = useRouter()
@@ -100,7 +109,8 @@ export function useAuthorLine(project: HeaderProject): AuthorLineProps {
   if (followed) followedOnce.current = true
 
   const name = author.name
-  const shown = !isMine && followed !== undefined && (!suspended || followedOnce.current)
+  const shown =
+    followable && !isMine && followed !== undefined && (!suspended || followedOnce.current)
   return {
     name,
     // Lu : « @lea ». Pas encore lu : undefined (sa ligne garde sa place). Lecture en échec : null,
@@ -255,15 +265,21 @@ export function ProjectHeaderView({
   )
 }
 
-type Props = Omit<ViewProps, 'author' | 'categories' | 'onOpenCategory' | 'categoryHref'>
+type Props = Omit<ViewProps, 'author' | 'categories' | 'onOpenCategory' | 'categoryHref'> & {
+  /**
+   * Faux : pas de pastille « Suivre » près de l'auteur (R14, l'aperçu de la page tiré d'une liste,
+   * voir `useAuthorLine`). Vrai par défaut.
+   */
+  followable?: boolean
+}
 
 /**
  * L'en-tête de la page d'un projet, avec la ligne de l'auteur et les catégories qu'il lit lui-même.
  * La catégorie principale est un lien vers Explorer filtré sur elle (`/explore?category=<code>`).
  */
-export function ProjectHeader(props: Props) {
+export function ProjectHeader({ followable = true, ...props }: Props) {
   const router = useRouter()
-  const author = useAuthorLine(props.project)
+  const author = useAuthorLine(props.project, followable)
   const { primaryCategory, secondaryCategory } = props.project
   const primary = useCategory(primaryCategory)
   const secondary = useCategory(secondaryCategory)
