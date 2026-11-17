@@ -155,7 +155,7 @@ function MemberExplore({ userId }: { userId: string }) {
       ) : null}
       {withPanel ? (
         // Le panneau à droite, lu après « Récents » (comme celui du Fil) ; il reste en place au
-        // défilement tant qu'il tient dans la fenêtre (`sticky`).
+        // défilement (`sticky`) ; plus haut que la fenêtre, une fois son pied atteint.
         <Columns
           sideWidth="panel"
           sticky

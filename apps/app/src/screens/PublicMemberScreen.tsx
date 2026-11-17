@@ -272,8 +272,8 @@ function PublicMemberView({
       topAction={phone ? undefined : shareButton}
     >
       {/* R15 : sur ordinateur, le profil en colonne à gauche, lu d'abord, qui reste en place
-          (s'il tient dans la fenêtre) ; les projets prennent le reste. Plus étroit, l'un sous
-          l'autre. */}
+          (plus haut que la fenêtre, une fois son pied atteint) ; les projets prennent le reste.
+          Plus étroit, l'un sous l'autre. */}
       {column ? (
         <Columns sideFirst sideWidth="profile" sticky side={profile} main={projectList} />
       ) : (

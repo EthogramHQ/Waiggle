@@ -313,7 +313,10 @@ export function ProjectCard({
   // le reste du dessin les ignore donc comme s'ils étaient absents.
   const category = compact ? undefined : givenCategory
   // Dans une case de la mosaïque, chaque étage de la carte grandit jusqu'à la hauteur de la case.
-  const grow = useContext(CardStretchContext) ? ({ flexGrow: 1 } as const) : null
+  // Une compacte choisie par sa grille aussi (R15) : les cartes d'une rangée de « Récents » ont la
+  // même hauteur, celle de la plus haute, au lieu de bas en escalier (un titre de trois lignes).
+  const stretched = useContext(CardStretchContext) || (compact && givenSize === undefined)
+  const grow = stretched ? ({ flexGrow: 1 } as const) : null
   const [measures, measure] = useMeasures(height)
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
   // carte juste à côté) n'ouvre pas une deuxième page.
