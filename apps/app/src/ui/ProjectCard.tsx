@@ -780,3 +780,9 @@ function UpdateChange({
     </View>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La carte de projet vide, à sa hauteur. Sans rôle ni nom à elle. */
+export function ProjectCardSkeleton(_props: { size?: ProjectCardSize }): ReactNode {
+  return null
+}

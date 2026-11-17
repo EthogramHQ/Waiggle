@@ -321,3 +321,9 @@ export function AddTile({ label, onPress, role = 'button' }: AddTileProps) {
     </TileFrame>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La tuile vide d'une mosaïque. Sans rôle ni nom à elle. */
+export function TileSkeleton(_props: Record<string, never>): ReactNode {
+  return null
+}

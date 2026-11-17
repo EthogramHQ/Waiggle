@@ -68,7 +68,7 @@ const useBreath = () => {
  * `skeleton`, se voit à 1,5:1 au moins sur la page, sur une carte et (de jour) sur la lumière miel :
  * l'ancien fond groupé ne faisait que 1,1:1 et disparaissait, de nuit surtout.
  */
-function Shape({
+export function Shape({
   height,
   width,
   round = false,
@@ -185,7 +185,12 @@ function CardShapes() {
  * web, où un bloc sans rôle serait ignoré. Occupé : `aria-busy` sur le web (react-native-web ignore
  * accessibilityState), l'état « busy » sur téléphone.
  */
-function Loading({ children }: { children: ReactNode }) {
+export function Loading({
+  children,
+}: {
+  children: ReactNode /** R16 : montré tout de suite (pré-rendu). */
+  shown?: boolean
+}) {
   const { t } = useTranslation()
   const breath = useBreath()
   return (
@@ -269,4 +274,16 @@ function FeedGridShapes({ count }: { count: number }) {
       {probe}
     </View>
   )
+}
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La carte vide : la matière d'une carte sans photo (crème de jour, surface de nuit). */
+export function SkeletonSurface(_props: { children?: ReactNode; height?: number }): ReactNode {
+  return null
+}
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La lueur miel qui traverse une carte vide ; `column` décale son passage d'une colonne à l'autre. */
+export function SkeletonGlow(_props: { column?: number }): ReactNode {
+  return null
 }

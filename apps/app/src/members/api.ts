@@ -1,7 +1,7 @@
 // Lire la page d'un membre. Les écrans n'appellent que ce hook ; les tests remplacent la fonction
 // get… par de faux appels. (La page d'un outil, l'ancienne « étiquette », se lit depuis R6b dans
 // tools/api.ts.)
-import { Member } from '@ruche/contracts'
+import { Member, type ProjectSummary } from '@ruche/contracts'
 import { useQuery } from '@tanstack/react-query'
 import { request } from '../api/client'
 import { ApiError } from '../api/errors'
@@ -19,3 +19,7 @@ export const getMember = async (id: string): Promise<Member> => {
 /** Hook : la page d'un membre. `enabled: false` (personne de connecté) : aucune requête. */
 export const useMember = (id: string, enabled = true) =>
   useQuery({ queryKey: ['member', id], queryFn: () => getMember(id), enabled })
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** Ce qu'une liste déjà lue sait d'un membre (nom, photo), pour la page qui s'ouvre. */
+export const useMemberPreview = (_id: string): ProjectSummary['author'] | null => null

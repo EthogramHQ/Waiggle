@@ -5,7 +5,9 @@
 // Pendant que le profil se lit, la carte garde sa place et sa hauteur (« Chargement… » à la place du
 // nom, sans lien) : rien ne bouge sous le doigt quand le profil arrive. Si le profil ne se lit pas,
 // l'écran passe le nom de la session et retire le lien (l'adresse de la page dépend du profil).
+
 import { layout, space } from '@ruche/brand'
+import type { ReactNode } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { Avatar } from './Avatar'
 import { Button } from './Button'
@@ -89,4 +91,10 @@ export function MemberCard({ name, loadingLabel, avatar, avatarLabel, viewPage, 
       </View>
     </Surface>
   )
+}
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La carte vide d'un membre. Sans rôle ni nom à elle. */
+export function MemberCardSkeleton(_props: Record<string, never>): ReactNode {
+  return null
 }

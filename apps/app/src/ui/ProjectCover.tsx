@@ -292,3 +292,9 @@ export function CoverSheet({ children }: { children: ReactNode }) {
     </View>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La galerie vide d'un projet. Sans rôle ni nom à elle. */
+export function ProjectCoverSkeleton(_props: { shape?: CoverShape }): ReactNode {
+  return null
+}

@@ -4288,7 +4288,10 @@ Outils en grand (« on fait tout maintenant dans R16 »).
   familles restent au-dessus.
 - Le texte qui se lit (la phrase qui explique les ruches, celle du catalogue) reste à 560 points
   au plus.
-- Sous 1 280, ces trois pages ne changent pas.
+- Les titres « Ruches », « Recherche » et « Outils » ne s'affichent plus, à toutes les largeurs :
+  l'onglet allumé, le champ de recherche et « Chercher un outil » disent déjà où l'on est (Louis,
+  17/11 au soir). Ils restent le titre de niveau 1 que lit un lecteur d'écran.
+- Sous 1 280, ces trois pages ne changent pas d'une autre façon.
 
 ### Les cibles (mesurées avant et après par le même passage)
 

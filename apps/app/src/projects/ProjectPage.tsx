@@ -386,3 +386,9 @@ export function ProjectDescription({ text, removed }: { text: string; removed?: 
     </Stack>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** Le bas vide de la page d'un projet (description, recette, commentaires). Sans rôle ni nom à elle. */
+export function ProjectPageSkeleton(_props: Record<string, never>): ReactNode {
+  return null
+}

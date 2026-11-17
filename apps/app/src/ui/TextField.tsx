@@ -649,3 +649,9 @@ function Message({
     </View>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** Un champ vide de formulaire. Sans rôle ni nom à elle. */
+export function TextFieldSkeleton(_props: Record<string, never>): ReactNode {
+  return null
+}

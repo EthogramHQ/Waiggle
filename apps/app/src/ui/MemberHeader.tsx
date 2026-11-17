@@ -248,3 +248,9 @@ function ColumnPhoto({ name, source }: { name: string; source: ImageSource | nul
     </View>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** L'en-tête vide d'un membre. Sans rôle ni nom à elle. */
+export function MemberHeaderSkeleton(_props: Record<string, never>): ReactNode {
+  return null
+}

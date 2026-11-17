@@ -64,3 +64,7 @@ export const useMemberMarkerSync = (): void => {
     else if (state === 'signedOut') clearMemberMarker()
   }, [state, userId])
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** Vrai si le cookie `waiggle_member=1` existe (web seulement) : la barre garde alors sa place. */
+export const hasMemberMarker = (): boolean => false

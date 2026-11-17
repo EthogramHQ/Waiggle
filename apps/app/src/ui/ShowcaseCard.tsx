@@ -25,7 +25,7 @@
 // (« Testable, Exemple, WaiggleBot »), pour qu'un lecteur d'écran ne prenne pas le projet pour un
 // vrai.
 import { layout, type ShadowName, space } from '@ruche/brand'
-import { useId } from 'react'
+import { type ReactNode, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
@@ -164,4 +164,10 @@ export function ShowcaseCard({
       </Pressed>
     </View>
   )
+}
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** La carte vide de la vitrine. Sans rôle ni nom à elle. */
+export function ShowcaseCardSkeleton(_props: Record<string, never>): ReactNode {
+  return null
 }

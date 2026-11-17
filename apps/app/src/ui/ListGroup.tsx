@@ -553,3 +553,9 @@ export function ListRow({
     </Pressable>
   )
 }
+
+// R16, socle : pièce vide, écrite par la tranche (plan R16).
+/** Une ligne vide de liste. Sans rôle ni nom à elle. */
+export function ListRowSkeleton(_props: Record<string, never>): ReactNode {
+  return null
+}

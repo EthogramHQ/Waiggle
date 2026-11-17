@@ -27,6 +27,16 @@ import { StateMessage } from '../ui/StateMessage'
 type Width = 'form' | 'page' | 'wide'
 
 /**
+ * R16 : la forme de la page qui arrive, pour que son squelette pose les mêmes masses (le Fil, un
+ * projet, un membre, une grille de cartes, une liste, un formulaire). Sans elle, `width` choisit.
+ */
+export type PageShape = 'feed' | 'project' | 'member' | 'grid' | 'list' | 'form'
+type CardShape = NonNullable<ComponentProps<typeof SkeletonList>['shape']>
+const cardShapes: readonly string[] = ['card', 'feed', 'compact'] satisfies CardShape[]
+const isCardShape = (shape: string | undefined): shape is CardShape =>
+  shape !== undefined && cardShapes.includes(shape)
+
+/**
  * Pendant le chargement : le squelette de la page (Miel 2), des formes pleines à la place du
  * contenu qui arrive, plutôt que le mot « Chargement… » seul. Pour un lecteur d'écran, le squelette
  * s'appelle « Chargement… » et se dit occupé (ui/Skeleton.tsx). Une page large (projet, membre) a
@@ -47,7 +57,7 @@ export function LoadingScreen({
    * R14 : la forme des cartes du squelette, celle de la page qui arrive (`compact`, les petites
    * cartes de la mosaïque d'un membre) ; la carte simple par défaut.
    */
-  shape?: ComponentProps<typeof SkeletonList>['shape']
+  shape?: CardShape | PageShape
   /**
    * Où mène « Revenir » sans page d'avant : le Fil (`/feed`, plan R12, décision 9) ; l'accueil (`/`)
    * pour une page de visiteur, à qui le Fil dirait « Réservé aux membres ».
@@ -67,7 +77,11 @@ export function LoadingScreen({
   return (
     <Screen header={<TopNav />} width={width} fade={fade}>
       <Stack gap="xl" align="stretch">
-        <SkeletonList count={width === 'form' ? 2 : 3} shape={shape} />
+        {/* R16, socle : les formes de page dessinent encore la carte simple, en attendant leurs pièces. */}
+        <SkeletonList
+          count={width === 'form' ? 2 : 3}
+          shape={isCardShape(shape) ? shape : undefined}
+        />
         {slow ? (
           <Stack align="start">
             <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
