@@ -38,7 +38,12 @@ export function FirstRun({ name, invitations }: Props) {
         body={t(($) => $.feed.firstRun.body)}
       />
       {invitations}
-      <PeopleToFollow max={FIRST_RUN_SUGGESTIONS} />
+      {/* La liste des proches garde la largeur d'une colonne de lecture, au bord gauche (relecture
+          de design de R15) : sur toute la largeur d'un écran de 1 920, 1 150 points séparaient un
+          nom de son bouton « Suivre ». */}
+      <Stack readable>
+        <PeopleToFollow max={FIRST_RUN_SUGGESTIONS} />
+      </Stack>
       {suspended ? null : <PublishPrompt onPublish={() => router.push('/projects/new')} />}
     </Stack>
   )
