@@ -4205,7 +4205,10 @@ lumière miel, elles virent au kaki ; dans l'appli, elles clignotent moins de 30
 et au premier chargement elles restent jusqu'à 8 s à l'écran (audit de design du 17/11, section 11).
 Louis a choisi des squelettes à la forme de chaque page, sur planche d'abord (décision 17 du 17/11).
 La tranche commence par une garde de session commune aux écrans, qui règle aussi le saut des pages
-lisibles sans compte (placé ici par Louis le 17/11).
+lisibles sans compte (placé ici par Louis le 17/11). Le 17/11 au soir, Louis a vu sur le site des
+sauts au chargement, surtout sur Explorer, et la page Ruches restée étroite sur grand écran ; il a
+placé dans R16 la garde sur tous les écrans, la correction de ces sauts, et Ruches, Recherche et
+Outils en grand (« on fait tout maintenant dans R16 »).
 
 ### Le squelette a la forme de sa page
 
@@ -4251,14 +4254,51 @@ lisibles sans compte (placé ici par Louis le 17/11).
 - Étant donné un visiteur sans compte sur ordinateur
   Quand il ouvre les Règles, la Confidentialité, les Mentions ou l'Accessibilité
   Alors le titre ne saute plus à l'arrivée (aujourd'hui 63 points, deux fois).
-- Les écrans qui demandent un compte partagent une même garde de session : même attente, même
-  renvoi vers la connexion qu'aujourd'hui.
+- Tous les écrans qui demandent un compte (une quarantaine) partagent une même garde de session :
+  même attente, même renvoi vers la connexion qu'aujourd'hui, même page quand la session ne se
+  vérifie pas.
+
+### La page ne bouge plus en arrivant
+
+- Étant donné un membre connecté sur ordinateur
+  Quand il ouvre ou recharge n'importe quelle page
+  Alors la barre du haut est à sa place dès la première image, et le contenu ne descend plus quand
+  la session se confirme (aujourd'hui 63 points).
+- Étant donné une page qui s'affiche avant l'arrivée des polices de Waiggle
+  Quand elles arrivent
+  Alors ni la barre, ni les titres, ni les cartes ne bougent ni ne grandissent (aujourd'hui, la
+  barre glisse de 10 points et les cartes du Fil grandissent de 52).
+- Sur Explorer, l'en-tête d'« À la une » a la même hauteur avec ou sans ses flèches : les flèches
+  n'apparaissent qu'une fois qu'on sait qu'elles servent, sans rien déplacer.
+- Sur Explorer, « Récents » ne bouge plus quand « À la une » et « Ils cherchent des testeurs »
+  arrivent (aujourd'hui, il est poussé de plus de 500 points).
+- Sur la page d'une ruche, les trois colonnes sont posées dès le squelette : la colonne de droite
+  ne remonte plus (aujourd'hui 161 points).
+
+### Ruches, Recherche et Outils en grand (sur planche d'abord)
+
+- Étant donné Ruches, Recherche ou Outils sur un écran de 1 280 points et plus
+  Alors la page prend le gabarit large de R15 (marges de 32 points, puis 5 % de la fenêtre,
+  1 920 au plus), comme le Fil et Explorer.
+- Ruches : les invitations reçues et mes ruches prennent la largeur, en autant de colonnes que la
+  place le permet ; « Créer une ruche » reste en haut à droite.
+- Recherche : les projets trouvés en grille de cartes, comme sur Explorer ; les membres et les
+  outils trouvés à côté ou dessous, selon la planche.
+- Outils : « Les plus utilisés » et « De A à Z » prennent la largeur, en colonnes ; le champ et les
+  familles restent au-dessus.
+- Le texte qui se lit (la phrase qui explique les ruches, celle du catalogue) reste à 560 points
+  au plus.
+- Sous 1 280, ces trois pages ne changent pas.
 
 ### Les cibles (mesurées avant et après par le même passage)
 
 - Décalage de mise en page (CLS) sous 0,05 au premier chargement : Fil, page d'un projet, page d'un
-  membre, accueil du visiteur (0,24 aujourd'hui), Explorer (0,41), pages légales vues sans compte
-  (0,098 à 1 440).
+  membre, accueil du visiteur (0,24 aujourd'hui), Explorer (0,41 ; 0,14 à 1 440 mesuré le 17/11 au
+  soir), page d'une ruche, Ruches, pages légales vues sans compte (0,098 à 1 440).
+- La barre du haut : 0 point de déplacement entre la première image et la page finie, pour un
+  membre comme pour un visiteur, à 1 440 et à 2 560.
+- Part de la fenêtre occupée par Ruches, Recherche et Outils : environ 90 % à 1 920, comme les
+  écrans de cartes de R15.
 - Images de squelette entre deux pages quand l'API répond vite : 3 à 5 aujourd'hui (190 ms) → 0.
 - États avant le contenu sur le Fil : 3 → 1.
 - Le squelette et la page finie, superposés, ont leurs grandes masses aux mêmes places (galerie,
