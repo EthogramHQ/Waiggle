@@ -243,26 +243,25 @@ const decorative = {
 } as const
 
 /**
- * Les hauteurs mesurées : les deux rangées posées sur le verre, le titre, la carte entière, et la
- * colonne du haut de la photo (catégorie, « Suivre » ; 0 sans elle).
+ * Les hauteurs mesurées : les deux rangées posées sur le verre, le titre et la colonne du haut de la
+ * photo (catégorie, « Suivre » ; 0 sans elle). La carte entière ne l'est plus (R15 : sa couverture
+ * grandit avec elle, voir le corps).
  */
 type Measures = {
   author: number
   bottom: number
   title: number | null
-  card: number
   top: number
 }
 
 /** Hook : une mesure (`onLayout`) qui ne redessine que si la hauteur a changé. */
-const useMeasures = (height: number) => {
+const useMeasures = () => {
   // Avant toute mesure, les rangées valent une zone à toucher (leur hauteur au texte ordinaire) :
   // le verre a déjà la bonne forme au pré-rendu du web, et rien ne saute ensuite.
   const [measures, setMeasures] = useState<Measures>({
     author: layout.touchTarget,
     bottom: layout.touchTarget,
     title: null,
-    card: height,
     top: 0,
   })
   const measure = (key: keyof Measures) => (event: LayoutChangeEvent) => {
@@ -317,7 +316,7 @@ export function ProjectCard({
   // même hauteur, celle de la plus haute, au lieu de bas en escalier (un titre de trois lignes).
   const stretched = useContext(CardStretchContext) || (compact && givenSize === undefined)
   const grow = stretched ? ({ flexGrow: 1 } as const) : null
-  const [measures, measure] = useMeasures(height)
+  const [measures, measure] = useMeasures()
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
   // carte juste à côté) n'ouvre pas une deuxième page.
   const guard = useTapGuard()
@@ -407,7 +406,6 @@ export function ProjectCard({
   // --- Le calque du lien : la photo, le verre, le titre et l'accroche -------------------------
   const body = (
     <View
-      onLayout={measure('card')}
       style={{
         minHeight: height,
         justifyContent: 'flex-end',
@@ -418,10 +416,16 @@ export function ProjectCard({
         ...grow,
       }}
     >
-      {/* La photo remplit la carte, même agrandie par le texte. Elle décore : le lien porte déjà
-          le nom du projet. */}
+      {/* La photo remplit la carte, même agrandie par le texte ou étirée dans sa rangée. Elle
+          décore : le lien porte déjà le nom du projet.
+          R15 : sa hauteur n'est plus mesurée. Elle part de la hauteur minimale de la carte et
+          grandit (`grow`) jusqu'au bas du cadre posé sur toute la carte. Une hauteur mesurée par
+          `onLayout` restait périmée sur le web : react-native-web ne remesure une vue que si sa
+          boîte de contenu change (un `ResizeObserver`, qui ignore les marges intérieures), et la
+          carte grandit justement par sa marge du haut quand la colonne de « Suivre » arrive. Dans
+          « Récents », la photo s'arrêtait 52 points au-dessus du bas de la carte. */}
       <View ref={coverRef} style={{ position: 'absolute', inset: 0 }} {...decorative}>
-        <ProjectCover height={measures.card} image={image ?? null} shadow="card" />
+        <ProjectCover height={height} grow image={image ?? null} shadow="card" />
       </View>
       {tilt.active ? (
         // Le reflet qui suit la souris : une lueur blanche, rognée au rayon de la photo, posée
