@@ -8,14 +8,17 @@
 // - `layout="column"`, la colonne du profil à gauche de la page sur ordinateur : une bannière floue
 //   tirée de sa photo, la photo qui en chevauche le bas, puis le nom, le pseudo, la bio, les outils
 //   et les actions, rangés à gauche, comme une fiche qu'on lit de haut en bas.
-import { borders, radii, readableWidth, space } from '@ruche/brand'
+// R16 : `MemberHeaderSkeleton`, le même en-tête pendant que la page charge (en bas du fichier).
+import { borders, layout as layoutTokens, radii, readableWidth, space } from '@ruche/brand'
 import type { ReactNode, Ref } from 'react'
 import { Image, View } from 'react-native'
 import { Avatar } from './Avatar'
 import { ExampleBadge } from './ExampleBadge'
 import type { Focusable } from './focus'
 import type { ImageSource } from './image'
+import { TextLineShape } from './ListGroup'
 import { ProjectCover } from './ProjectCover'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { Stack } from './Stack'
 import { Tag } from './Tag'
 import { Text } from './Text'
@@ -249,8 +252,124 @@ function ColumnPhoto({ name, source }: { name: string; source: ImageSource | nul
   )
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** L'en-tête vide d'un membre. Sans rôle ni nom à elle. */
-export function MemberHeaderSkeleton(_props: Record<string, never>): ReactNode {
-  return null
+/** Les étiquettes d'outils vides : trois, à la hauteur dessinée d'une étiquette (`Tag`). */
+const SKELETON_TOOLS = [72, 88, 64] as const
+/** La largeur du bouton vide sous l'en-tête (« Suivre Léa »), quand il ne prend pas toute la ligne. */
+const SKELETON_ACTION = 152
+
+/**
+ * R16 (plan, choix 4 et 10 ; planches R16-Membre-1440 et 390) : l'en-tête d'un membre pendant que
+ * sa page charge, dans ses deux formes (`layout`, comme `MemberHeader`) : la colonne du profil sur
+ * ordinateur, l'en-tête centré ailleurs. Les mêmes places et les mêmes hauteurs que l'en-tête qui
+ * arrive : la photo, le nom, puis en formes vides le pseudo, deux lignes de bio, le titre et trois
+ * étiquettes d'outils, et le bouton d'action (`action={false}` pour l'omettre).
+ *
+ * Ouverte depuis une carte, la page connaît déjà le nom et la photo (l'aperçu, `useMemberPreview`) :
+ * donnés (`name`, `avatar`), ils s'affichent pour de vrai, le nom en titre de la page. L'écran pose
+ * alors cet en-tête **hors** de son `Loading` (le nom se lit, il n'attend rien). Sans eux, tout est
+ * formes, sans rôle ni nom à elles : le `Loading` de l'écran les nomme.
+ */
+export function MemberHeaderSkeleton({
+  layout,
+  name,
+  avatar = null,
+  heading = 1,
+  action = true,
+}: {
+  layout?: 'column' | undefined
+  /** Le nom déjà connu (l'aperçu) ; absent, une forme vide. */
+  name?: string | undefined
+  /** Sa photo déjà connue, avec le nom ; sans elle, ses initiales. */
+  avatar?: ImageSource | null | undefined
+  /** Le niveau du nom, quand il est connu (comme `MemberHeader`). */
+  heading?: 1 | 2 | 3
+  /** Le bouton vide sous l'en-tête : `false` quand la vraie page n'en a pas. */
+  action?: boolean
+}): ReactNode {
+  const column = layout === 'column'
+  const center = !column
+  const photo =
+    name === undefined ? (
+      column ? (
+        <ColumnPhotoShape />
+      ) : (
+        <Shape height={96} width={96} round />
+      )
+    ) : column ? (
+      <ColumnPhoto name={name} source={avatar} />
+    ) : (
+      <Avatar name={name} source={avatar} label={name} size={96} />
+    )
+  return (
+    <Stack gap="lg" align={column ? 'stretch' : 'center'}>
+      {photo}
+      <Stack gap="sm" align="stretch">
+        <Stack gap="xxs" align="stretch">
+          {name === undefined ? (
+            <TextLineShape variant={column ? 'display' : 'title1'} width="70%" center={center} />
+          ) : (
+            <Text
+              variant={column ? 'display' : 'title1'}
+              align={center ? 'center' : undefined}
+              heading={heading}
+              breakAnywhere
+            >
+              {name}
+            </Text>
+          )}
+          <TextLineShape variant="callout" width="35%" center={center} />
+        </Stack>
+        {/* La bio : deux lignes, à la largeur de lecture de la vraie bio. */}
+        <View
+          style={center ? { width: '100%', maxWidth: readableWidth, alignSelf: 'center' } : null}
+        >
+          <TextLineShape variant="body" width="95%" center={center} />
+          <TextLineShape variant="body" width="75%" center={center} />
+        </View>
+      </Stack>
+      <Stack gap="sm" align={column ? 'stretch' : 'center'}>
+        <TextLineShape variant="caption" width={96} center={center} />
+        <Stack direction="row" gap="sm" wrap justify={column ? 'start' : 'center'}>
+          {SKELETON_TOOLS.map((width) => (
+            <Shape key={width} height={layoutTokens.chipHeight} width={width} round />
+          ))}
+        </Stack>
+      </Stack>
+      {action ? (
+        <Shape
+          height={layoutTokens.controlHeight.regular}
+          width={column ? SKELETON_ACTION : '100%'}
+          round
+        />
+      ) : null}
+    </Stack>
+  )
+}
+
+/**
+ * La bannière et la photo de la colonne, vides : une carte vide de la hauteur de la bannière (sa
+ * lueur comprise), et le rond de la photo qui en chevauche le bas, dans son anneau, comme
+ * `ColumnPhoto`.
+ */
+function ColumnPhotoShape() {
+  const { colors } = useTheme()
+  return (
+    <View>
+      <SkeletonSurface height={BANNER} radius="tile" />
+      <View
+        style={{
+          alignSelf: 'flex-start',
+          marginTop: -(COLUMN_AVATAR / 2 + RING),
+          marginLeft: space.lg,
+          padding: RING,
+          borderRadius: radii.pill,
+          backgroundColor: colors.glass,
+          borderWidth: borders.hairline,
+          borderColor: colors.glassBorder,
+        }}
+      >
+        <Shape height={COLUMN_AVATAR} width={COLUMN_AVATAR} round />
+      </View>
+    </View>
+  )
 }
