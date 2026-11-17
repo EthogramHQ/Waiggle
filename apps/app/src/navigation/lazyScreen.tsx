@@ -16,12 +16,18 @@
 //   même erreur sans redemander le morceau. Ici, un échec s'oublie, et un nouvel essai redemande.
 import { type ComponentType, useEffect, useState } from 'react'
 import { Platform } from 'react-native'
-import { LoadingScreen } from '../screens/states'
+import { LoadingScreen, type PageShape } from '../screens/states'
 import { useHydrated } from '../ui/theme/hydration'
 
 export type LazyScreenOptions = {
   /** La largeur de la page de chargement, celle de l'écran qu'elle précède (`LoadingScreen`). */
   width?: 'form' | 'page'
+  /**
+   * R16 : la forme du squelette, celle de l'écran qu'il précède (`LoadingScreen shape`), la même que
+   * l'attente de sa garde de session (`SessionGate loading`) : le morceau arrivé, l'attente de la
+   * session prend la place sans que rien ne bouge. Sans elle, `width` choisit.
+   */
+  shape?: PageShape
   /**
    * Une feuille posée sur la page d'avant (`sheetRoute` de `app/_layout.tsx`) : ouverte dans
    * l'appli, rien ne s'affiche pendant son morceau, et la page d'avant reste visible dessous,
@@ -150,7 +156,7 @@ export function lazyScreen<P extends object>(
       return <Screen {...props} />
     }
     if (options.sheet && openedInApp) return null
-    return <LoadingScreen width={options.width ?? 'form'} />
+    return <LoadingScreen width={options.width ?? 'form'} shape={options.shape} />
   }
   return LazyScreen
 }
