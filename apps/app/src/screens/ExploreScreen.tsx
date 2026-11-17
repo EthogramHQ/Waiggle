@@ -42,6 +42,7 @@ import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
+import { GridCardsContext } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { SearchLink } from '../ui/SearchLink'
 import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
@@ -123,7 +124,13 @@ function MemberExplore({ userId }: { userId: string }) {
 
   // « Récents » : sa grille compte ses colonnes d'après la largeur que lui donne sa colonne
   // (`ui/ProjectGrid`).
-  const recent = <Recent viewerId={userId} overlay={chipOf} />
+  // Les cartes de « Récents » comptent avec la largeur d'une compacte (R15) : quatre à cinq colonnes
+  // à côté du panneau, là où le Fil, plus bas dans l'appli, garde ses grandes cartes.
+  const recent = (
+    <GridCardsContext.Provider value="compact">
+      <Recent viewerId={userId} overlay={chipOf} />
+    </GridCardsContext.Provider>
+  )
 
   return (
     <Screen

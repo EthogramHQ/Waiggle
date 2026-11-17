@@ -10,7 +10,7 @@
 // une carte de note, plus basse qu'une carte de projet, s'étire à sa hauteur (sa couverture prend
 // la place qui reste) au lieu de laisser un vide dessous (relecture de design de R4, A2).
 import { layout, space } from '@ruche/brand'
-import { Children, type ReactNode } from 'react'
+import { Children, createContext, type ReactNode, useContext } from 'react'
 import { View } from 'react-native'
 import { Button } from './Button'
 import { Stack } from './Stack'
@@ -43,6 +43,16 @@ type Props = {
 const boundedColumns = (columns: number) =>
   Number.isFinite(columns) ? Math.max(1, Math.round(columns)) : 1
 
+/**
+ * R15 : la famille des cartes des grilles posées dessous. `feed` (par défaut) : les cartes du Fil,
+ * plus larges sur un très grand écran ; `compact` : jamais moins que `cardMin.compact`, quelle que
+ * soit la fenêtre (« Récents » d'Explorer, quatre à cinq colonnes à côté de son panneau). Un
+ * « contexte » React : une valeur posée par un parent, que les grilles lisent sans qu'elle passe par
+ * chaque composant entre les deux (ici, la grille est posée par le fil, que l'écran ne fait que placer).
+ */
+export type GridCards = 'feed' | 'compact'
+export const GridCardsContext = createContext<GridCards>('feed')
+
 export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: Props) {
   // La largeur de la fenêtre (0 avant l'hydratation du web) : à partir de `breakpoints.xwide`, une
   // carte du Fil ne descend plus sous `cardMin.feedWide` (trois colonnes de 436 à 1 920 à côté du
@@ -55,8 +65,14 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
   // cartes prennent la largeur de grand écran, sinon leurs titres se coupent au premier mot (à 200 %,
   // trois cartes de 327 à côté du panneau, à 1 440 ; deux de 498 avec cette règle).
   const { large, probe } = useLargeText()
-  const cardMin =
-    large || width >= layout.breakpoints.xwide ? layout.cardMin.feedWide : layout.cardMin.feed
+  const family = useContext(GridCardsContext)
+  const cardMin = large
+    ? layout.cardMin.feedWide
+    : family === 'compact'
+      ? layout.cardMin.compact
+      : width >= layout.breakpoints.xwide
+        ? layout.cardMin.feedWide
+        : layout.cardMin.feed
   // Children.toArray : la liste des cartes, sans les « trous » (null, false) laissés par l'écran,
   // chacune avec sa clé.
   const cards = Children.toArray(children)
