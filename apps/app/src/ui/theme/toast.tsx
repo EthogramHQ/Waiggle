@@ -34,6 +34,7 @@ import type { IconName } from '../Icon'
 import { Mascot, type MascotPose } from '../Mascot'
 import { readingTime, Toast } from '../Toast'
 import { useTabBarSpace } from '../tabBarSpace'
+import { passageToastMark } from './document'
 import { type SizeClass, useLayout } from './layout'
 import { useCalmMotion } from './motion'
 import { layerPosition, ToastLayer } from './toastLayer'
@@ -187,6 +188,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           // La région vivante, toujours présente. box-none : elle laisse passer les touchers vers la
           // page ; seule la pilule les reçoit (pour le survol).
           pointerEvents="box-none"
+          // R17 : un toast reste en place pendant un passage de page (`wg-toast`).
+          {...passageToastMark}
           {...(Platform.OS === 'web'
             ? { role: 'status' as const, 'aria-live': 'polite' as const }
             : { accessibilityLiveRegion: 'polite' as const })}
