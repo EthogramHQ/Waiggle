@@ -265,8 +265,11 @@ function PillGroup<T extends string>({
   )
 }
 
-/** Les largeurs des pastilles vides (une icône et un nom), qui varient comme des noms. */
-const EMPTY_WIDTHS = [104, 136, 96, 120, 88, 128, 112, 96] as const
+/**
+ * Les largeurs des pastilles vides (une icône et un nom), qui varient comme les noms des catégories
+ * (« Maison et jardin », « Jeux »… mesurées à 1 440 points : 130 en moyenne).
+ */
+const EMPTY_WIDTHS = [160, 104, 172, 124, 84, 112, 168, 112, 180, 92] as const
 
 /**
  * R16 : les pastilles vides des choix à venir, de la hauteur d'une vraie (la zone de 44 points),

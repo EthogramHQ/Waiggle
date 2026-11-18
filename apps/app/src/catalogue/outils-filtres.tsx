@@ -36,7 +36,7 @@ const fr = {
   scroll:
     'Bande qui défile (scroll, 320 points ici, un téléphone) : la pastille cochée, la dernière, se montre en entier',
   waiting:
-    'Les choix pas encore lus (waiting, R16) : le vrai « Toutes », puis huit pastilles vides, qui passent à la ligne (ici 600 points)',
+    'Les choix pas encore lus (waiting, R16) : le vrai « Toutes », puis dix pastilles vides, qui passent à la ligne (ici 600 points)',
   waitingScroll: 'Les mêmes dans la bande qui défile (320 points ici, un téléphone)',
   narrow:
     'Colonne étroite (150 points ici, le texte à 200 %) : les pastilles passent à la ligne, un nom long dans sa pastille',
@@ -77,7 +77,7 @@ const en: typeof fr = {
   scroll:
     'Scrolling strip (scroll, 320 points here, a phone): the checked pill, the last one, shows in full',
   waiting:
-    'Choices not read yet (waiting, R16): the real “All”, then eight empty pills, which wrap (600 points here)',
+    'Choices not read yet (waiting, R16): the real “All”, then ten empty pills, which wrap (600 points here)',
   waitingScroll: 'The same in the scrolling strip (320 points here, a phone)',
   narrow:
     'Narrow column (150 points here, text at 200%): the pills wrap, a long name inside its pill',
@@ -241,7 +241,7 @@ export function ToolFiltersCatalogue() {
             </Example>
             <Example caption={`${l.waiting} — ${l[scheme]}`}>
               <Frame width={600}>
-                <FilterPills {...explore} value={null} options={[]} waiting={8} onChange={noop} />
+                <FilterPills {...explore} value={null} options={[]} waiting={10} onChange={noop} />
               </Frame>
             </Example>
             <Example caption={`${l.waitingScroll} — ${l[scheme]}`}>
@@ -250,7 +250,7 @@ export function ToolFiltersCatalogue() {
                   {...explore}
                   value={null}
                   options={[]}
-                  waiting={8}
+                  waiting={10}
                   scroll
                   onChange={noop}
                 />

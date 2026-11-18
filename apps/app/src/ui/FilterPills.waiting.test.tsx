@@ -15,7 +15,7 @@ const waiting = (props: { value?: string | null; scroll?: boolean; onChange?: je
       allLabel="Toutes"
       value={props.value ?? null}
       options={[]}
-      waiting={8}
+      waiting={10}
       scroll={props.scroll ?? false}
       onChange={props.onChange ?? jest.fn()}
     />,

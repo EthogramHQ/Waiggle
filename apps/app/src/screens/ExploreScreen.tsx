@@ -82,10 +82,10 @@ const BAND_SKELETONS = 3
 /** Les étiquettes vides d'« Outils populaires », en bande : assez pour la remplir sur téléphone. */
 const TAG_SKELETONS = 6
 /**
- * R16 : les pastilles vides des catégories de « Récents », après « Toutes » : huit, de quoi tenir sur
- * deux lignes à 1 440 points et sur une à 1 920, comme une dizaine de vraies catégories.
+ * R16 : les pastilles vides des catégories de « Récents », après « Toutes » : dix, comme une dizaine
+ * de vraies catégories (deux lignes à 1 440 et à 1 920 points, une à 2 560).
  */
-const CATEGORY_SKELETONS = 8
+const CATEGORY_SKELETONS = 10
 
 /** Rien à faire : « Toutes », pendant la lecture de la session, ne filtre encore rien. */
 const noop = () => {}
