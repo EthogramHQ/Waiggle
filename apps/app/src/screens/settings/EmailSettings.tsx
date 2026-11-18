@@ -50,15 +50,16 @@ const TYPES: readonly Setting[] = [
 ]
 
 /**
- * R16 : les lignes vides du groupe pendant la lecture (`ListRowSkeleton`, sans photo, une courte
- * ligne à droite pour le choix actuel). Une ligne vide a deux lignes de texte, plus haute qu'une
- * ligne de choix (une seule) : sept lignes vides prennent à peu près la hauteur des huit choix et de
- * l'interrupteur du récap, pour que la rubrique ne grandisse pas à leur arrivée.
+ * R16 : les lignes vides du groupe pendant la lecture (`ListRowSkeleton`, sans photo, une pastille
+ * à droite pour le choix actuel, comme sur la planche R16-Explorer-Listes). Une ligne vide a deux
+ * lignes de texte, plus haute qu'une ligne de choix (une seule) : sept lignes vides prennent à peu
+ * près la hauteur des huit choix et de l'interrupteur du récap (505 points contre 513, mesurés à 390
+ * et 1 440 le 18/11/2026), pour que la rubrique ne grandisse pas à leur arrivée.
  */
 const EMPTY_ROWS = 7
 const emptyRows = Array.from({ length: EMPTY_ROWS }, (_, index) => (
   // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
-  <ListRowSkeleton key={index} leading="none" trailing="line" />
+  <ListRowSkeleton key={index} leading="none" trailing="pill" />
 ))
 
 /** Les types où « Tout de suite » se propose ; les autres n'ont que le récap ou rien. */
