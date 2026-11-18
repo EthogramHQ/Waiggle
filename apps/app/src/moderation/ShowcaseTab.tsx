@@ -231,6 +231,9 @@ export function ShowcaseTab() {
                 image={coverOf(project)}
                 status={{ label: statusOf(project), strong: project.status === 'testable' }}
                 onPress={() => router.push(`/projects/${encodeURIComponent(project.id)}`)}
+                // R17 : la carte ouvre la page du projet des membres ; sur le web, sa photo grandit
+                // jusqu'à celle de la page (`ui/ShowcaseCard` s'en charge).
+                coverId={project.id}
               />
             }
             note={editedSinceAdded ? t(($) => $.moderation.showcase.changed) : undefined}
