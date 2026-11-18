@@ -268,22 +268,31 @@ export const runPassage = (kind: PassageKind, mutate: () => void): void => {
   let net: ReturnType<typeof setTimeout> | undefined
   let transition: ViewTransition | undefined
   let ended = false
-  // La fin, dans tous les cas (fini, abandonné, refusé) : l'attribut et les noms retirés, puis les
-  // navigations en attente, sans animation.
+  // La fin, dans tous les cas (fini, abandonné, refusé) : l'attribut et les noms retirés, la
+  // navigation envoyée si le navigateur ne l'a pas fait, puis les navigations en attente, sans
+  // animation.
+  // L'ordre compte (S2) : le passage est d'abord déclaré fini, puis la navigation part. Une
+  // navigation qui lève une erreur (ici, quand le navigateur a refusé le passage ou ne l'a jamais
+  // joué) laissait sinon `data-passage` sur <html> et le moteur occupé pour toute la visite : `ended`
+  // empêchait le filet de recommencer. Le `finally` (le bloc joué que `try` réussisse ou lève)
+  // envoie quand même les navigations en attente ; l'erreur, elle, remonte ensuite comme sans passage.
   const end = () => {
     if (ended) return
     ended = true
     clearTimeout(wait)
     clearTimeout(net)
-    send()
-    if (from) unnameElement(from)
-    if (landing) unnameElement(landing)
     doc.documentElement.removeAttribute(PASSAGE_ATTRIBUTE)
     if (current === passage) current = null
-    const next = waiting.splice(0)
-    if (next.length > 0) style = 'none'
-    for (const task of next) runSafely(task)
-    for (const task of afterEnd.splice(0)) runSafely(task)
+    const named = [from, landing]
+    for (const element of named) if (element) runSafely(() => unnameElement(element))
+    try {
+      send()
+    } finally {
+      const next = waiting.splice(0)
+      if (next.length > 0) style = 'none'
+      for (const task of next) runSafely(task)
+      for (const task of afterEnd.splice(0)) runSafely(task)
+    }
   }
 
   try {

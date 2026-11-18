@@ -453,3 +453,51 @@ describe('pageTransition.web, the cover of a card that becomes the page', () => 
     expect(fake.named()).toEqual([])
   })
 })
+
+// La fin d'un passage ne dépend pas de la navigation (relecture de sécurité S2) : si la navigation
+// elle-même lève une erreur au moment où le passage la joue, la marque `data-passage` est quand
+// même retirée de <html> et le moteur est libre. Sinon, la marque restait pour toujours (les
+// captures attendaient sa fin), et toutes les navigations suivantes attendaient un passage fini.
+describe('pageTransition.web, when the navigation itself throws', () => {
+  const failing = () => {
+    throw new Error('navigation failed')
+  }
+
+  it('removes the mark and frees the engine when the browser refuses the passage (S2)', async () => {
+    const fake = fakeDocument({ mode: 'throwing' })
+    const engine = load(fake)
+
+    // L'erreur de la navigation n'est pas cachée : elle remonte, comme sans passage.
+    expect(() => engine.runPassage('deeper', failing)).toThrow('navigation failed')
+    expect(fake.dataset.passage).toBeUndefined()
+    expect(engine.passageBusy()).toBe(false)
+
+    const next = jest.fn()
+    engine.runPassage('deeper', next)
+    await flush()
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes the mark at the net when the browser never plays the passage (S2)', async () => {
+    jest.useFakeTimers()
+    const fake = fakeDocument()
+    // Un navigateur qui ne joue jamais le rappel et ne dit jamais la fin : seul le filet reste.
+    const never = new Promise<void>(() => {})
+    const stalled = {
+      ...fake.doc,
+      startViewTransition: () => ({ updateCallbackDone: never, ready: never, finished: never }),
+    }
+    // `load` ne lit que `doc` : le reste du faux (ses appels enregistrés) ne sert pas ici.
+    const engine = load({ ...fake, doc: stalled } as unknown as Fake)
+    const next = jest.fn()
+
+    engine.runPassage('deeper', failing)
+    engine.runPassage('deeper', next)
+    expect(fake.dataset.passage).toBe('deeper')
+
+    expect(() => jest.advanceTimersByTime(2000)).toThrow('navigation failed')
+    expect(fake.dataset.passage).toBeUndefined()
+    expect(engine.passageBusy()).toBe(false)
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+})
