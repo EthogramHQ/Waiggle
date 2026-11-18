@@ -253,10 +253,11 @@ describe('the feed while it loads, on a computer (R16)', () => {
       await renderMemberHome()
 
       // Quatre cartes vides au Fil (choix 11), là où le Fil posera les siennes.
-      expect(screen.getAllByTestId('ProjectCardSkeleton')).toHaveLength(4)
+      // Le squelette se montre après 160 ms (choix 8) : on l'attend avant de compter ses cartes.
       expect(
         (await screen.findAllByRole('progressbar', { name: fr.t(($) => $.common.loading) })).length,
       ).toBeGreaterThan(0)
+      expect(screen.getAllByTestId('ProjectCardSkeleton')).toHaveLength(4)
       // La colonne de droite est posée tout de suite, avec son titre.
       expect(screen.getByRole('header', { name: fr.t(($) => $.feed.side.testers) })).toBeTruthy()
     }))
