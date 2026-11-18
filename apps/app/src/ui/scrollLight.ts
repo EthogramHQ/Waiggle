@@ -59,7 +59,7 @@ export type ScreenScroll = {
    * R17 (« La photo d'un projet qui défile moins vite ») : de combien la zone qui défile a défilé,
    * en points (négatif quand on tire plus haut que le haut, sur iOS). Une « valeur partagée » de
    * Reanimated : une case que le fil des animations lit aussi, sans redessiner React. La photo
-   * (ui/CoverParallax.tsx) en tire son décalage à chaque image. Facultatif : un canal fait à la
+   * (ui/ParallaxCover.tsx) en tire son décalage à chaque image. Facultatif : un canal fait à la
    * main (un test) peut ne pas l'offrir, et la photo reste alors à sa place.
    */
   offset?: SharedValue<number>
