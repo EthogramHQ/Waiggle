@@ -20,7 +20,7 @@ import type { Notification } from '@ruche/contracts'
 import { type Href, useRouter } from 'expo-router'
 import { type ComponentProps, useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useCategories } from '../categories/api'
@@ -52,7 +52,7 @@ import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SignedOutScreen } from './states'
 
 /**
  * Les notifications d'une décision de la modération : un retrait, un signalement traité, une
@@ -71,12 +71,15 @@ const MODERATION_KINDS = new Set<Notification['kind']>([
 const SETTINGS = '/settings/notifications'
 
 export function NotificationsScreen() {
-  const { state, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (state === 'signedOut') return <SignedOutScreen />
-  return <MemberNotifications />
+  // R16 : la garde commune (attente, erreur, visiteur), avec ses pages d'état de la largeur d'un
+  // formulaire, comme avant. Son attente a la forme d'une liste, cinq lignes vides ; la liste qui
+  // charge ensuite dessine les mêmes (`StateMessage kind="loading"`). Les lectures ne partent
+  // qu'avec une session : elles vivent dans `MemberNotifications`.
+  return (
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
+      {() => <MemberNotifications />}
+    </SessionGate>
+  )
 }
 
 /**
