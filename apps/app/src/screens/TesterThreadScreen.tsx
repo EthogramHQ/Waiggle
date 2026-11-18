@@ -20,7 +20,7 @@
 import type { Project, TesterCorner } from '@ruche/contracts'
 import { type ReactNode, type Ref, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
@@ -35,7 +35,7 @@ import { ThreadHeader } from '../ui/ThreadHeader'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useNameOf } from '../useNameOf'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SessionErrorScreen } from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
 // Les deux pages se rendent l'une l'autre (le coin pose ce fil à droite, ce fil rend le coin sur
 // ordinateur) : chacune n'est lue qu'à l'affichage, jamais au chargement du module.
 import { TestersCornerScreen } from './TestersCornerScreen'
@@ -52,19 +52,25 @@ export type ThreadTester = {
 }
 
 export function TesterThreadScreen({ id, member }: { id: string; member: string }) {
-  const { state, session, retry } = useMemberSession()
   const hydrated = useHydrated()
   const { columns } = useLayout()
   // Sur ordinateur, une fois la page hydratée : le coin, la liste des fils à gauche et ce fil à
   // droite (ui-B1). Avant l'hydratation, la page pré-rendue ne connaît pas la largeur : le fil seul.
+  // Le coin a sa propre garde de session, la même que celle-ci.
   if (hydrated && columns) return <TestersCornerScreen id={id} member={member} />
-  if (state === 'pending') return <LoadingScreen width="page" />
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  // Un visiteur : la page introuvable, comme pour le coin lui-même (scénario R7b ; L5), et comme sur
-  // ordinateur, où cette adresse affiche le coin.
-  if (!session) return <ThreadNotFound />
+  // La garde de session commune (R16, « La garde de session ») : le squelette d'une liste pendant
+  // la lecture, « Réessayer » en erreur. Un visiteur a la page introuvable (`signedOut`), comme pour
+  // le coin lui-même (scénario R7b ; L5), et comme sur ordinateur, où cette adresse affiche le coin.
   // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
-  return <AuthorThread id={id} member={member} memberId={session.user.id} />
+  return (
+    <SessionGate
+      width="page"
+      loading={<LoadingScreen shape="list" />}
+      signedOut={<ThreadNotFound />}
+    >
+      {(session) => <AuthorThread id={id} member={member} memberId={session.user.id} />}
+    </SessionGate>
+  )
 }
 
 /** La page introuvable, la même que pour un projet qu'on n'a pas le droit de voir. */
@@ -90,7 +96,7 @@ function AuthorThread({ id, member, memberId }: ThreadProps) {
     if (errorKey(query.error) === 'notFound') return <ThreadNotFound />
     return <LoadErrorScreen error={query.error} onRetry={() => void query.refetch()} width="page" />
   }
-  if (!corner.data || !project.data) return <LoadingScreen width="page" />
+  if (!corner.data || !project.data) return <LoadingScreen shape="list" />
   // Un testeur lit son fil dans le coin ; ici, seul l'auteur entre.
   if (corner.data.role !== 'author') return <ThreadNotFound />
   const listed = corner.data.testers?.find((one) => one.id === member)
@@ -117,7 +123,7 @@ function FormerTester({
 }) {
   const search = useFormerTester(projectId, member)
   if (search.found) return render(search.found)
-  return search.exhausted ? <ThreadNotFound /> : <LoadingScreen width="page" />
+  return search.exhausted ? <ThreadNotFound /> : <LoadingScreen shape="list" />
 }
 
 /** Ce que la recherche d'un ancien testeur a donné jusqu'ici. */

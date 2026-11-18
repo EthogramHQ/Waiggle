@@ -44,7 +44,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { firstParam } from '../navigation/params'
@@ -87,13 +87,7 @@ import { ThreadRow } from '../ui/ThreadRow'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 import { AuthorThreadPane, type ThreadTester, useFormerTester } from './TesterThreadScreen'
 import { TesterThreadView } from './TesterThreadView'
 
@@ -107,16 +101,24 @@ type TabKey = 'calls' | 'feedback'
  */
 const FALLBACK = ':fallback'
 
+/**
+ * La garde de session commune (R16, « La garde de session ») : pendant la lecture de la session, le
+ * squelette d'une liste ; en erreur, « Réessayer ». Un visiteur a la page introuvable (`signedOut`),
+ * jamais « Réservé aux membres », comme tout membre qui n'a rien à faire dans ce coin : le coin est
+ * privé, on ne dit même pas qu'il existe (R7b, L5). Les largeurs restent celles d'avant (`page`).
+ */
 export function TestersCornerScreen({ id, member }: { id: string; member?: string }) {
-  const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen width="page" />
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  // Un visiteur : la page introuvable, comme tout membre qui n'a rien à faire dans ce coin (le
-  // coin est privé : on ne dit même pas qu'il existe).
-  if (!session) return <CornerNotFound />
   // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
   return (
-    <Corner id={id} member={member} memberId={session.user.id} memberName={session.user.name} />
+    <SessionGate
+      width="page"
+      loading={<LoadingScreen shape="list" />}
+      signedOut={<CornerNotFound />}
+    >
+      {(session) => (
+        <Corner id={id} member={member} memberId={session.user.id} memberName={session.user.name} />
+      )}
+    </SessionGate>
   )
 }
 
@@ -191,7 +193,7 @@ function Corner({ id, member, memberId, memberName }: CornerProps) {
       <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} width="page" />
     )
   }
-  if (!corner.data || !project.data) return <LoadingScreen width="page" />
+  if (!corner.data || !project.data) return <LoadingScreen shape="list" />
   return (
     <CornerPage
       project={project.data}
