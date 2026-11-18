@@ -56,7 +56,8 @@
 // les cartes d'une rangée prennent la hauteur de la plus haute.
 //
 // R16 (« Les squelettes ») : `ProjectCardSkeleton`, la carte vide qui tient sa place pendant le
-// chargement, à sa hauteur, avec son panneau en bas (voir en fin de fichier).
+// chargement, à sa hauteur, avec son panneau en bas (voir en fin de fichier). Et la catégorie en
+// attente (`category="pending"`) : tant que son nom charge, la carte en garde la place, vide.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import {
@@ -199,8 +200,10 @@ type Props = {
   /**
    * R6a : la catégorie principale du projet, son nom traduit et son icône (`optionOf` de
    * `projects/categories.ts`, lue de l'API) ; absente pour un projet d'avant R6a.
+   * R16 : `'pending'`, le projet a une catégorie mais son nom n'est pas encore arrivé (la liste des
+   * catégories charge) : la carte garde la place exacte de l'étiquette, vide, sans rien dire.
    */
-  category?: { label: string; icon: IconName }
+  category?: { label: string; icon: IconName } | 'pending'
   /**
    * La vue qui entoure la photo, pour qui veut la mesurer (`measureInWindow`) : la photo de la carte
    * qui s'agrandit en page du projet (le mouvement de R4).
@@ -316,8 +319,10 @@ export function ProjectCard({
   // mosaïque d'un membre, où l'écran donne la taille.
   const chosenByGrid = compact && givenSize === undefined
   // R14 : la carte compacte ne montre pas la catégorie (la page du projet l'a) ; le reste du dessin
-  // l'ignore donc comme si elle était absente.
-  const category = compact ? undefined : givenCategory
+  // l'ignore donc comme si elle était absente. R16 : une catégorie en attente n'a encore ni nom ni
+  // icône ; seule sa place compte (`categoryPending`).
+  const category = compact || givenCategory === 'pending' ? undefined : givenCategory
+  const categoryPending = !compact && givenCategory === 'pending'
   // Dans une case de la mosaïque, chaque étage de la carte grandit jusqu'à la hauteur de la case.
   // Une compacte choisie par sa grille aussi (R15) : les cartes d'une rangée de « Récents » ont la
   // même hauteur, celle de la plus haute, au lieu de bas en escalier (un titre de trois lignes).
@@ -388,10 +393,18 @@ export function ProjectCard({
   const hint = [changeDescription, categoryDescription].filter(Boolean).join('. ')
   const hasPhoto = Boolean(image)
   // La colonne du haut de la photo : la catégorie (avec photo) et l'emplacement (« Suivre »).
-  const topColumn = Boolean(overlay) || (hasPhoto && Boolean(category))
+  // Une catégorie en attente y garde déjà sa place (R16) : la colonne existe avant l'étiquette, et
+  // « Suivre », dessous, ne descend pas quand elle arrive.
+  const topColumn = Boolean(overlay) || (hasPhoto && (Boolean(category) || categoryPending))
   // L'étiquette dessinée : décor pour les lecteurs d'écran (la description du lien la dit), et le
   // doigt passe au travers, vers la carte (`pointerEvents` en propriété : sur le web, seule cette
   // forme devient du CSS).
+  // R16 (« La page ne bouge plus en arrivant ») : tant que son nom charge, la même vue, vide, à la
+  // hauteur de l'étiquette (la zone à toucher autour de sa pastille, celle de `Tag`). Sans texte
+  // inventé, ni rôle, ni nom : une place, rien à lire. À l'arrivée, l'étiquette s'y pose ; sur une
+  // carte sans photo, le verre ne grandit plus de 52 points (l'étiquette et l'écart sous elle), et
+  // l'auteur, posé au-dessus du titre mesuré, ne remonte plus. Sa largeur ne compte pas : la
+  // place est vide, et l'étiquette, en début de ligne, ne pousse rien à côté d'elle.
   const categoryTag = category ? (
     <View
       pointerEvents="none"
@@ -400,6 +413,13 @@ export function ProjectCard({
     >
       <Tag label={category.label} icon={category.icon} kind="category" onGlass />
     </View>
+  ) : categoryPending ? (
+    <View
+      testID="category-pending"
+      pointerEvents="none"
+      {...decorative}
+      style={{ alignSelf: 'flex-start', minHeight: layout.touchTarget }}
+    />
   ) : null
 
   // La carte s'enfonce un peu sous le doigt, comme les boutons (`Pressed`), mais toute entière :
@@ -833,7 +853,7 @@ export function ProjectCardSkeleton({
    */
   author?: boolean
 }): ReactNode {
-  const { colors, scheme } = useTheme()
+  const { colors } = useTheme()
   const wide = useLayout().sizeClass === 'wide'
   const gridCards = useContext(GridCardsContext)
   const gridColumn = useContext(GridColumnContext)
@@ -846,12 +866,10 @@ export function ProjectCardSkeleton({
     >
       {/* Le panneau en bas, à la marge du verre de la vraie carte. */}
       <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: INSET }}>
-        {/* Le verre, plein : la matière d'une feuille, sans flou (rien derrière à flouter), bordé
-            du filet du vrai verre (`panelBorder`). De nuit, la feuille (`sheet`) a la couleur de la
-            carte vide (`skeletonCard`) : le panneau s'y confondait. La planche R16-Fil-1440-Nuit le
-            veut un peu plus clair : le fond groupé de la nuit (`surfaceGrouped`). Le jour garde la
-            feuille crème (le fond groupé y est gris). Aucun rôle ne dit encore « le panneau d'une
-            carte vide » : ce choix par thème attend le sien dans colors.ts (R16). */}
+        {/* Le verre, plein : sans flou (rien derrière à flouter), bordé du filet du vrai verre
+            (`panelBorder`), dans le rôle du panneau d'une carte vide (`skeletonPanel`) : la crème de
+            jour, et de nuit un ton un peu plus clair que la carte (planche R16-Fil-1440-Nuit), là où
+            la feuille de nuit avait la couleur exacte de la carte vide et s'y confondait. */}
         <View
           style={{
             gap: ROW_GAP,
@@ -859,7 +877,7 @@ export function ProjectCardSkeleton({
             borderRadius: radii.panel,
             borderWidth: borders.hairline,
             borderColor: colors.panelBorder,
-            backgroundColor: scheme === 'night' ? colors.surfaceGrouped : colors.sheet,
+            backgroundColor: colors.skeletonPanel,
           }}
         >
           {author && !compact ? (

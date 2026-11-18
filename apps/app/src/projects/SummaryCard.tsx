@@ -25,7 +25,7 @@ import { ProjectCard, type ProjectCardSize } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
-import { useCategory } from './useCategory'
+import { useCategoryTag } from './useCategory'
 
 /** Une journée, en millisecondes. */
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -149,8 +149,10 @@ export function SummaryCard({
     [coverSource, onTarget],
   )
   // La catégorie principale, nommée par l'API (R6b) ; aucune étiquette pour un projet d'avant R6a,
-  // pendant le chargement ou la panne des catégories, ni pour un code inconnu : jamais le code brut.
-  const category = useCategory(project.primaryCategory)
+  // pendant la panne des catégories, ni pour un code inconnu : jamais le code brut. R16 : pendant
+  // leur chargement, `'pending'` : la carte garde la place de l'étiquette, que rien ne pousse à
+  // l'arrivée de la liste (avant, le verre d'une carte sans photo grandissait de 52 points au Fil).
+  const category = useCategoryTag(project.primaryCategory)
   const updated = useUpdated(project, update)
   return (
     <ProjectCard
