@@ -45,6 +45,8 @@ const fr = {
   cardsSkeleton: 'Cartes vides (ToolCardSkeleton), la lueur de colonne en colonne',
   columns: 'Liste en colonnes (ColumnList) : 14 lignes sur 4 colonnes, la dernière plus courte',
   columnsSkeleton: 'Lignes vides en colonnes (ListRowSkeleton dans ColumnList)',
+  columnsFew:
+    'Deux lignes sur 4 colonnes (un filtre) : seulement 2 colonnes, chacune à sa largeur, le groupe s’arrête après',
   barOneLine: 'Le champ et les familles sur une ligne (colonne de 1 600 points)',
   barBelow: 'Les familles sous le champ (colonne de 1 200 points)',
   search: 'Chercher un outil',
@@ -62,6 +64,8 @@ const en: typeof fr = {
   cardsSkeleton: 'Empty cards (ToolCardSkeleton), the glow from column to column',
   columns: 'List in columns (ColumnList): 14 rows on 4 columns, the last one shorter',
   columnsSkeleton: 'Empty rows in columns (ListRowSkeleton in ColumnList)',
+  columnsFew:
+    'Two rows on 4 columns (a filter): only 2 columns, each at its width, the group stops after them',
   barOneLine: 'The field and the families on one line (1,600-point column)',
   barBelow: 'The families under the field (1,200-point column)',
   search: 'Search a tool',
@@ -228,6 +232,13 @@ export function ToolsWideCatalogue() {
             <Example caption={`${l.columns} — ${l[scheme]}`}>
               <ColumnList>
                 {rows.map((item) => (
+                  <Row key={item.slug} item={item} />
+                ))}
+              </ColumnList>
+            </Example>
+            <Example caption={`${l.columnsFew} — ${l[scheme]}`}>
+              <ColumnList columns={4}>
+                {rows.slice(0, 2).map((item) => (
                   <Row key={item.slug} item={item} />
                 ))}
               </ColumnList>

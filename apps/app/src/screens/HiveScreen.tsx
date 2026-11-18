@@ -53,13 +53,18 @@ import { Columns } from '../ui/Columns'
 import { Hint } from '../ui/Hint'
 import { HiveActivityRow } from '../ui/HiveActivityRow'
 import { HiveBadge } from '../ui/HiveBadge'
+import {
+  HIVE_HEADER_BADGE_SIZE,
+  HiveColumnTitleSkeleton,
+  HiveHeaderSkeleton,
+} from '../ui/HiveHeaderSkeleton'
 import { HiveMemberList } from '../ui/HiveMemberList'
-import { ListGroup, ListRowSkeleton, TextLineShape } from '../ui/ListGroup'
+import { ListGroup, ListRowSkeleton } from '../ui/ListGroup'
 import { Mascot } from '../ui/Mascot'
 import { MetaLine } from '../ui/MetaLine'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { Loading, Shape, SkeletonList, SkeletonRows } from '../ui/Skeleton'
+import { Loading, SkeletonList, SkeletonRows } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Switch } from '../ui/Switch'
@@ -79,8 +84,6 @@ const TAB_KEYS: readonly string[] = ['activity', 'projects', 'members']
 const isTabKey = (value: string | undefined): value is TabKey =>
   value !== undefined && TAB_KEYS.includes(value)
 
-/** L'alvéole du haut de la page, et sa place vide pendant le chargement. */
-const HIVE_BADGE_SIZE = 64
 /**
  * R16 : les lignes vides de la colonne des membres, autant que la ruche a de membres, jusqu'à 12
  * (une liste plus longue dépasse la fenêtre : la suite ne se voit pas, rien à garder en place).
@@ -121,20 +124,11 @@ function HiveSkeleton({ id }: { id: string }) {
   const known = useQueryClient()
     .getQueryData<MyHives>(myHivesQueryKey)
     ?.hives.find((hive) => hive.id === id)
-  const head = (
-    <Row gap="md" align="center">
-      <Shape height={HIVE_BADGE_SIZE} width={HIVE_BADGE_SIZE} />
-      <Stack gap="xxs" grow>
-        <TextLineShape variant="title1" width="45%" />
-        <TextLineShape variant="callout" width="30%" />
-      </Stack>
-    </Row>
-  )
   return (
     <Screen width="page" header={<TopNav />} onBack={back}>
       <Loading>
         <Stack gap="xl">
-          {head}
+          <HiveHeaderSkeleton />
           {columns ? (
             <Columns
               sideFirst
@@ -142,7 +136,7 @@ function HiveSkeleton({ id }: { id: string }) {
               side={
                 <Stack gap="md">
                   {/* Le titre « Membres » de la vraie colonne, en ligne vide à sa hauteur. */}
-                  <TextLineShape variant="headline" width="40%" />
+                  <HiveColumnTitleSkeleton column="members" />
                   <SkeletonRows count={emptyMemberRows(known?.memberCount)} />
                 </Stack>
               }
@@ -150,7 +144,7 @@ function HiveSkeleton({ id }: { id: string }) {
               aside={
                 <Stack gap="sm">
                   {/* Le titre du groupe (« Papi Jean cherche des testeurs »). */}
-                  <TextLineShape variant="caption" width="70%" />
+                  <HiveColumnTitleSkeleton column="testers" />
                   <ListGroup>
                     {Array.from({ length: EMPTY_TESTER_ROWS }, (_, index) => (
                       // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
@@ -507,7 +501,7 @@ function HiveHead({ page, desktop }: { page: HivePage; desktop: boolean }) {
         : null
   return (
     <Row gap="md" align="center">
-      <HiveBadge icon={summary.icon} name={summary.name} size={HIVE_BADGE_SIZE} />
+      <HiveBadge icon={summary.icon} name={summary.name} size={HIVE_HEADER_BADGE_SIZE} />
       <Stack gap="xxs" grow>
         <Text variant="title1" heading={1}>
           {summary.name ?? t(($) => $.hives.unnamed)}

@@ -71,6 +71,23 @@ describe('ColumnList', () => {
     expect(columnsRead(list)).toEqual(list.map((name) => [name]))
   })
 
+  // Relecture de design R16, point 1 : « Clau » trouvait 2 outils sur 5 colonnes, et la liste
+  // dessinait 3 colonnes vides, filets compris.
+  it.each([
+    [2, 5, [1, 1]],
+    [6, 5, [2, 2, 2]],
+    [20, 6, [4, 4, 4, 4, 4]],
+  ])('draws only the columns its %i rows fill on %i columns', async (count, columns, sizes) => {
+    const list = names(count)
+    await renderWithProviders(<ColumnList columns={columns}>{rowsOf(list)}</ColumnList>)
+
+    const read = linesOf(list.map((name) => screen.getByRole('button', { name })))
+    expect(read.sizes).toEqual(sizes)
+    // Aucune colonne de plus, vide, à côté des colonnes remplies.
+    const row = read.groups[0]?.line.parent
+    expect(row?.children).toHaveLength(sizes.length)
+  })
+
   it('draws nothing without a row', async () => {
     await renderWithProviders(
       <View testID="host">

@@ -24,8 +24,6 @@ import { type Focusable, focusWithoutScroll } from '../../ui/focus'
 import { ListGroup, ListRow, ListRowSkeleton } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { NotificationExample } from '../../ui/NotificationExample'
-import { Reveal } from '../../ui/Reveal'
-import { Loading } from '../../ui/Skeleton'
 import { Stack } from '../../ui/Stack'
 import { StatusPill } from '../../ui/StatusPill'
 import { Switch } from '../../ui/Switch'
@@ -252,25 +250,15 @@ export function EmailSettings() {
       </ListGroup>
       {notice}
       {/* R16 : le titre du groupe reste lisible pendant la lecture, hors du « Chargement… »
-          (plan R16, choix 4 : seules les pièces vides sont sous `Loading`). Il est donc posé ici
-          plutôt que par `ListGroup title`, avec la même allure et le même écart (`ListGroup`). */}
-      <Stack gap="sm">
-        <Stack paddingX="lg">
-          <Text variant="caption" weight={600} tone="muted" heading={2}>
-            {t(($) => $.notificationSettings.byEmail)}
-          </Text>
-        </Stack>
-        <Reveal
-          loading={waiting}
-          skeleton={
-            <Loading>
-              <ListGroup>{emptyRows}</ListGroup>
-            </Loading>
-          }
-        >
-          <ListGroup footer={t(($) => $.notificationSettings.security)}>{rows}</ListGroup>
-        </Reveal>
-      </Stack>
+          (plan R16, choix 4 : seules les pièces vides sont sous `Loading`) ; `pending` le garde,
+          puis les lignes vides fondent vers les vraies. */}
+      <ListGroup
+        title={t(($) => $.notificationSettings.byEmail)}
+        footer={t(($) => $.notificationSettings.security)}
+        pending={{ loading: waiting, rows: emptyRows }}
+      >
+        {rows}
+      </ListGroup>
     </Stack>
   )
 }
