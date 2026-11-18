@@ -171,16 +171,12 @@ const settledElsewhere: ReadonlySet<string> = new Set(['alreadyDecided', 'notFou
 
 /**
  * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, des lignes vides à la
- * largeur d'aujourd'hui (`form`) ; en erreur, « Réessayer » ; sans session, « Réservé aux
+ * largeur de la page qui arrive (`page`, scénario R16 : rien ne bouge à l'arrivée) ; en erreur, « Réessayer » ; sans session, « Réservé aux
  * membres ». La vérification de l'administrateur reste ici, dans `Moderation`, après la garde :
  * la garde ne sait que si quelqu'un est connecté, pas ce qu'il a le droit de voir.
  */
 export function ModerationScreen() {
-  return (
-    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
-      {() => <Moderation />}
-    </SessionGate>
-  )
+  return <SessionGate loading={<LoadingScreen shape="list" />}>{() => <Moderation />}</SessionGate>
 }
 
 function Moderation() {
@@ -191,7 +187,7 @@ function Moderation() {
   if (!me.data) {
     if (me.isError) return <LoadErrorScreen error={me.error} onRetry={() => void me.refetch()} />
     // La même forme que l'attente de la garde : le squelette continue, sans changer de dessin.
-    return <LoadingScreen shape="list" width="form" />
+    return <LoadingScreen shape="list" />
   }
   // Un membre qui n'est pas administrateur : la page n'existe pas pour lui, rien n'est demandé.
   if (!me.data.isAdmin) return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
