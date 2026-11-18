@@ -3760,6 +3760,8 @@ const waitingPages = [
   'accueil-attente',
   'explorer-attente',
   'ruche-attente',
+  'ruches-attente',
+  'recherche-attente',
 ]
 const pages = [
   // `layoutWidths` : le relevé de mise en page (--layout) ne mesure le catalogue qu'aux largeurs d'un
