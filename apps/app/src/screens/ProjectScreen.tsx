@@ -551,6 +551,8 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
         // Sans photo, la lumière miel seule (sans `title`) : le titre est déjà juste à côté ou
         // dessous, dans l'en-tête ; écrit aussi sur la lumière, il se lisait deux fois à l'œil.
         bleed={bleed}
+        // R17 : la photo du projet défile moins vite que la page (pas celle de la mise à jour).
+        parallax
         onIndexChange={setPhotoIndex}
         overlay={
           large ? (

@@ -43,6 +43,7 @@ import { focusWithoutScroll } from './focus'
 import { Icon } from './Icon'
 import { IconButton } from './IconButton'
 import type { ImageSource } from './image'
+import { ParallaxCover } from './ParallaxCover'
 import {
   COVER_OVERLAP,
   type CoverPlace,
@@ -103,6 +104,12 @@ type Props = {
    * à jour », sinon le lecteur d'écran entendrait deux fois le même nom.
    */
   label?: string
+  /**
+   * R17 : les photos défilent moins vite que la page (`ParallaxCover`), quand la galerie est dans un
+   * Screen. Seulement pour la photo d'un projet, en tête de sa page : la galerie d'une mise à jour,
+   * plus bas, défile avec la page. Les points, « 1 sur 3 » et les boutons de verre ne bougent pas.
+   */
+  parallax?: boolean
 }
 
 /** Les styles du web que les types de React Native ne connaissent pas (aimantation CSS). */
@@ -133,6 +140,7 @@ export function PhotoGallery({
   height: shape,
   bleed = false,
   label: named,
+  parallax = false,
 }: Props) {
   const { t } = useTranslation()
   const { sizeClass, padding } = useLayout()
@@ -332,6 +340,10 @@ export function PhotoGallery({
           importantForAccessibility: 'no-hide-descendants' as const,
         }
 
+  // La bande des photos, enveloppée par la parallaxe quand la page la demande (R17).
+  const band = (strip: ReactNode) =>
+    parallax ? <ParallaxCover style={StyleSheet.absoluteFill}>{strip}</ParallaxCover> : strip
+
   const slide = slideWidth > 0 ? { width: slideWidth } : { width: '100%' as const }
   const slides =
     count === 0 ? (
@@ -418,30 +430,32 @@ export function PhotoGallery({
         }}
       >
         <View {...reader} style={StyleSheet.absoluteFill}>
-          <ScrollView
-            ref={scroller}
-            horizontal
-            // L'aimant : la bande s'arrête toujours sur une photo entière, une à la fois.
-            pagingEnabled
-            disableIntervalMomentum
-            decelerationRate="fast"
-            showsHorizontalScrollIndicator={false}
-            onScroll={onScroll}
-            onScrollBeginDrag={() => {
-              // Le doigt reprend la main : un saut en cours n'a plus de sens.
-              jumping.current = null
-            }}
-            onMomentumScrollEnd={onScroll}
-            // Une position lue au plus toutes les 16 ms (une image) pendant le glissé.
-            scrollEventThrottle={16}
-            onLayout={onLayout}
-            // Sur le web, la bande elle-même n'est pas un arrêt de Tab (Chrome rend focalisable une
-            // zone qui défile) : la galerie l'est déjà.
-            {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
-            style={[StyleSheet.absoluteFill, webOnly({ scrollSnapType: 'x mandatory' })]}
-          >
-            {slides}
-          </ScrollView>
+          {band(
+            <ScrollView
+              ref={scroller}
+              horizontal
+              // L'aimant : la bande s'arrête toujours sur une photo entière, une à la fois.
+              pagingEnabled
+              disableIntervalMomentum
+              decelerationRate="fast"
+              showsHorizontalScrollIndicator={false}
+              onScroll={onScroll}
+              onScrollBeginDrag={() => {
+                // Le doigt reprend la main : un saut en cours n'a plus de sens.
+                jumping.current = null
+              }}
+              onMomentumScrollEnd={onScroll}
+              // Une position lue au plus toutes les 16 ms (une image) pendant le glissé.
+              scrollEventThrottle={16}
+              onLayout={onLayout}
+              // Sur le web, la bande elle-même n'est pas un arrêt de Tab (Chrome rend focalisable une
+              // zone qui défile) : la galerie l'est déjà.
+              {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
+              style={[StyleSheet.absoluteFill, webOnly({ scrollSnapType: 'x mandatory' })]}
+            >
+              {slides}
+            </ScrollView>,
+          )}
           {several ? (
             <CoverDecor>
               {/* Les points, au milieu en bas : un décor (le lecteur entend « Photo 2 sur 3 »). */}
