@@ -3737,6 +3737,12 @@ const memberMarker = async (page) => {
     .context()
     .addCookies([{ name: 'waiggle_member', value: '1', url: new URL(page.url()).origin }])
 }
+/**
+ * Le premier élément occupé visible. Une page peut en garder un caché (le squelette d'un onglet
+ * qu'on ne voit pas, celui qui attend ses 160 ms) avant celui qu'on attend : `first()` seul
+ * l'attendait 30 s, en vain, sur `recherche-attente` (CI, 18/11/2026).
+ */
+const firstBusy = (page) => page.locator('[aria-busy="true"]').filter({ visible: true }).first()
 /** Ce qu'une page d'attente laisse répondre : la session (hors de /v1), le profil, les règles. */
 const sessionReads = (pathname) => pathname === '/v1/me' || pathname === '/v1/me/rules'
 const holdApi =
@@ -3748,7 +3754,7 @@ const holdApi =
       () => {},
     )
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.locator('[aria-busy="true"]').first().waitFor()
+    await firstBusy(page).waitFor()
     // Le temps que le squelette se montre (160 ms) et finisse son fondu ; `slow` : au-delà des 4 s
     // après lesquelles « Revenir » apparaît sous le squelette d'une page entière.
     await page.waitForTimeout(slow ? 4600 : 900)
@@ -3760,7 +3766,7 @@ const openFromFeed = (link, held) => async (page) => {
     (route) => (route.request().method() === 'GET' ? undefined : route.fallback()),
   )
   await page.getByRole('link', { name: link, exact: true }).first().click()
-  await page.locator('[aria-busy="true"]').first().waitFor()
+  await firstBusy(page).waitFor()
   await page.waitForTimeout(900)
 }
 /** La lecture d'un projet seul (pas ses commentaires, ses mises à jour…). */
@@ -3943,7 +3949,7 @@ const pages = [
         () => {},
       )
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await page.locator('[aria-busy="true"]').first().waitFor()
+      await firstBusy(page).waitFor()
     },
   },
   {
