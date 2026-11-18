@@ -120,6 +120,7 @@ import { ToolHeaderCatalogue } from './outils-entete'
 import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
 import { AdminGesturesCatalogue } from './outils-gestes'
+import { ToolsWideCatalogue } from './outils-grand'
 import { ToolPageSheetsCatalogue } from './outils-page'
 import { LegalPagesCatalogue } from './pages-legales'
 import { HivePillsCatalogue } from './pastilles'
@@ -955,6 +956,9 @@ export function CatalogueScreen() {
       {/* Tranche R16 : la grille de cartes commune, la carte d'une ruche et sa pièce vide
           (grille-cartes.tsx). */}
       <CardGridCatalogue />
+      {/* Tranche R16 : la carte d'un outil, sa pièce vide et la liste en colonnes d'Outils en grand
+          (outils-grand.tsx). */}
+      <ToolsWideCatalogue />
       <FeedEndCatalogue />
       <MascotCatalogue />
     </Screen>
