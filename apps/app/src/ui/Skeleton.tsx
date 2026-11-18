@@ -361,6 +361,77 @@ const guessWait = (now: number): Wait => {
 }
 
 /**
+ * Hook : quand une attente qui se monte se montre, selon la règle de continuité (voir `Loading`).
+ * Il rend `visible` (vue et lue) et le style animé de son opacité. `decided` : montrée d'office, au
+ * montage (demandé, ou la page web pré-rendue). `tracked` : l'attente compte parmi celles de
+ * l'écran (`mounted`, `leaving`), et une suivante peut la continuer. Un `Loading` l'est ; les formes
+ * posées hors de lui (`DelayedShapes`) ne le sont pas : elles suivent la règle sans la porter, et
+ * leur départ ne fait rien continuer.
+ * Hors du module, seul `DelayedShapes` s'en sert, pour se montrer au même instant que le `Loading`
+ * qui l'accompagne, y compris quand celui-ci continue une attente déjà montrée (R16).
+ */
+export function useWait(
+  decided: boolean,
+  tracked: boolean,
+): { visible: boolean; style: ReturnType<typeof useAnimatedStyle> } {
+  // Le moment du montage, et l'attente devinée pendant ce premier rendu.
+  const [born] = useState(Date.now)
+  const [start, setStart] = useState<Wait>(() =>
+    decided ? { since: born, shown: true } : guessWait(born),
+  )
+  const [visible, setVisible] = useState(start.shown)
+  const opacity = useSharedValue(start.shown ? 1 : 0)
+  const onShown = useContext(LoadingShownContext)
+
+  // Sa place dans `mounted`, tenue à jour (l'objet est le même du montage au démontage).
+  const self = useRef<Wait>(start)
+  self.current.shown = visible
+  // useLayoutEffect : avant que l'écran se dessine, et dans le même passage que le démontage de
+  // l'ancien `Loading` (React démonte d'abord, puis monte : `leaving` est déjà écrit ici). Au montage
+  // seulement : `start`, `decided` et `tracked` ne servent qu'à ce moment.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lu une fois, au montage
+  useLayoutEffect(() => {
+    const mine = self.current
+    if (!decided) {
+      // La vérification de `guessWait` : seule une attente qui part dans ce passage se continue ;
+      // sinon, c'est une première attente, qui compte ses 160 ms depuis son montage.
+      const taken: Wait = leaving ?? { since: born, shown: false }
+      if (taken.shown !== start.shown || taken.since !== start.since) {
+        mine.since = taken.since
+        mine.shown = taken.shown
+        setStart(taken)
+        setVisible(taken.shown)
+        opacity.value = taken.shown ? 1 : 0
+      }
+    }
+    if (!tracked) return
+    mounted.add(mine)
+    return () => {
+      mounted.delete(mine)
+      noteLeaving(mine)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (visible) return
+    // Le reste des 160 ms, comptées depuis le début de l'attente (la sienne, ou celle qu'il continue).
+    const timer = setTimeout(
+      () => {
+        setVisible(true)
+        opacity.value = fade(1, 'page')
+      },
+      Math.max(0, start.since + durations.quick - Date.now()),
+    )
+    return () => clearTimeout(timer)
+  }, [visible, opacity, start.since])
+  useEffect(() => {
+    if (visible) onShown?.()
+  }, [visible, onShown])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  return { visible, style }
+}
+
+/**
  * Le cadre qui nomme et marque occupé une zone qui charge : « Chargement… », dans la langue de
  * l'appli, une seule fois pour toutes les pièces qu'il enveloppe. Le rôle « progressbar » (sans
  * valeur : une attente dont on ne connaît pas la fin) fait lire ce nom sur le web, où un bloc sans
@@ -398,59 +469,7 @@ export function Loading({
   // useState(() => …) : calculé une seule fois, au montage. L'hydratation qui suit ne change rien.
   // `decided` : montré d'office (demandé, ou la page pré-rendue), rien à reprendre d'une autre.
   const [decided] = useState(() => shown || !hydrated)
-  // Le moment du montage, et l'attente devinée pendant ce premier rendu.
-  const [born] = useState(Date.now)
-  const [start, setStart] = useState<Wait>(() =>
-    decided ? { since: born, shown: true } : guessWait(born),
-  )
-  const [visible, setVisible] = useState(start.shown)
-  const opacity = useSharedValue(start.shown ? 1 : 0)
-  const onShown = useContext(LoadingShownContext)
-
-  // Sa place dans `mounted`, tenue à jour (l'objet est le même du montage au démontage).
-  const self = useRef<Wait>(start)
-  self.current.shown = visible
-  // useLayoutEffect : avant que l'écran se dessine, et dans le même passage que le démontage de
-  // l'ancien `Loading` (React démonte d'abord, puis monte : `leaving` est déjà écrit ici). Au montage
-  // seulement : `start` et `decided` ne servent qu'à ce moment.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: lu une fois, au montage
-  useLayoutEffect(() => {
-    const mine = self.current
-    if (!decided) {
-      // La vérification de `guessWait` : seule une attente qui part dans ce passage se continue ;
-      // sinon, c'est une première attente, qui compte ses 160 ms depuis son montage.
-      const taken: Wait = leaving ?? { since: born, shown: false }
-      if (taken.shown !== start.shown || taken.since !== start.since) {
-        mine.since = taken.since
-        mine.shown = taken.shown
-        setStart(taken)
-        setVisible(taken.shown)
-        opacity.value = taken.shown ? 1 : 0
-      }
-    }
-    mounted.add(mine)
-    return () => {
-      mounted.delete(mine)
-      noteLeaving(mine)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (visible) return
-    // Le reste des 160 ms, comptées depuis le début de l'attente (la sienne, ou celle qu'il continue).
-    const timer = setTimeout(
-      () => {
-        setVisible(true)
-        opacity.value = fade(1, 'page')
-      },
-      Math.max(0, start.since + durations.quick - Date.now()),
-    )
-    return () => clearTimeout(timer)
-  }, [visible, opacity, start.since])
-  useEffect(() => {
-    if (visible) onShown?.()
-  }, [visible, onShown])
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  const { visible, style } = useWait(decided, true)
   return (
     <Animated.View
       accessible
