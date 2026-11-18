@@ -158,8 +158,10 @@ describe('after the second link (done), signed out', () => {
     expect(seen(text('doneTitle'))).toBe(0)
     expect(seen(text('doneDevices'))).toBe(0)
     // Depuis Miel 2, le chargement est un squelette : « Chargement… » est son nom, plus un texte.
+    // R16, choix 8 : le squelette (`Loading`) reste caché aux lecteurs d'écran ses 160 premières
+    // millisecondes, puis se montre : on l'attend (`findAllBy…`) au lieu de le lire tout de suite.
     expect(
-      screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+      (await screen.findAllByRole('progressbar', { name: fr.t(($) => $.common.loading) })).length,
     ).toBeGreaterThan(0)
   })
 })
