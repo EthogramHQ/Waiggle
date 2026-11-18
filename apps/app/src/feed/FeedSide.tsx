@@ -20,6 +20,7 @@ import { Notice } from '../ui/Notice'
 import { Reveal } from '../ui/Reveal'
 import { Loading } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
+import { SuggestionRowSkeleton } from '../ui/SuggestionList'
 import { Surface } from '../ui/Surface'
 import { TesterRow } from '../ui/TesterRow'
 import { Text } from '../ui/Text'
@@ -133,10 +134,17 @@ function SideSkeleton({
       </Text>
       <Loading shown={shown}>
         <ListGroup>
-          {Array.from({ length: rows }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
-            <ListRowSkeleton key={index} leading={leading} trailing="pill" />
-          ))}
+          {Array.from({ length: rows }, (_, index) =>
+            // Les proches à suivre ont leur ligne vide à elles, à la hauteur d'une vraie suggestion
+            // empilée (une ligne de liste en ferait 72 au lieu de ~149 : la section sautait à l'arrivée).
+            section === 'suggestions' ? (
+              // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+              <SuggestionRowSkeleton key={index} stacked />
+            ) : (
+              // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+              <ListRowSkeleton key={index} leading={leading} trailing="pill" />
+            ),
+          )}
         </ListGroup>
       </Loading>
     </Stack>

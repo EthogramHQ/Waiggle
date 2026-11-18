@@ -235,8 +235,10 @@ describe('the home showcase while it loads (R16)', () => {
     await renderWithProviders(<ShowcaseScreen />)
 
     expect(await screen.findByRole('header', { name: T.showcase })).toBeTruthy()
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
     expect(screen.getAllByTestId('ShowcaseCardSkeleton')).toHaveLength(4)
-    expect(screen.getByRole('progressbar', { name: fr.t(($) => $.common.loading) })).toBeTruthy()
     // Témoin : l'accueil est bien là, avec ses deux portes d'entrée.
     expect(screen.getByRole('button', { name: T.signUp })).toBeTruthy()
     expect(screen.getByRole('button', { name: T.haveAccount })).toBeTruthy()

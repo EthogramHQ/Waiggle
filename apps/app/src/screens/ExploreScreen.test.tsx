@@ -737,8 +737,11 @@ describe('ExploreScreen, the news of « Récents » and the member’s own proje
     mockSession(null, true)
     await renderExplore()
 
-    // Témoin : ni la page ni « Récents » ne sont dessinés pendant la lecture de la session.
-    expect(screen.queryByText(fr.t(($) => $.explore.recent))).toBeNull()
+    // R16 : la page vide d'Explorer est là pendant la lecture de la session (le scénario veut ses
+    // titres tout de suite) ; aucune nouveauté de « Récents » n'est calculée pour autant.
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
     expect(recentNewsViewers()).toEqual([])
   })
 })
@@ -1025,7 +1028,7 @@ describe('ExploreScreen, while its sections load (R16)', () => {
       }
       // Une zone « Chargement » par section qui attend (choix 4), soit trois au moins.
       expect(
-        screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+        (await screen.findAllByRole('progressbar', { name: fr.t(($) => $.common.loading) })).length,
       ).toBeGreaterThanOrEqual(3)
       // Témoin : « Récents » est là, sous elles.
       expect(screen.getByRole('header', { name: fr.t(($) => $.explore.recent) })).toBeTruthy()
