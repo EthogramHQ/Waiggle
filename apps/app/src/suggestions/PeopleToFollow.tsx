@@ -11,7 +11,12 @@ import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
 import { useSuspension } from '../moderation/suspension'
 import { Notice } from '../ui/Notice'
-import { type SuggestedMemberRow, SuggestionList } from '../ui/SuggestionList'
+import { Reveal } from '../ui/Reveal'
+import {
+  type SuggestedMemberRow,
+  SuggestionList,
+  SuggestionListSkeleton,
+} from '../ui/SuggestionList'
 import { useToast } from '../ui/theme/toast'
 import { useDismissSuggestion, useSuggestions } from './api'
 
@@ -61,34 +66,40 @@ export function PeopleToFollow({ max, stacked = false }: Props) {
     [toast, t],
   )
 
-  if (suggestions.isError || retrying) {
-    // Le titre « Proches à suivre » reste au-dessus du message (relecture design A8) : sans lui,
-    // l'erreur flottait seule au-dessus de la section suivante.
-    return (
-      <SuggestionList
-        members={[]}
-        notice={
-          <Notice
-            message={t(($) => $.suggestions.loadError)}
-            action={{
-              label: t(($) => $.common.retry),
-              onPress: () => {
-                setRetrying(true)
-                void suggestions.refetch().finally(() => setRetrying(false))
-              },
-            }}
-          />
-        }
-        onFollow={() => {}}
-        onOpenMember={() => {}}
-        onOpenProject={() => {}}
-        onDismiss={async () => ({ ok: true })}
-      />
-    )
-  }
+  // R16 (« Une section qui arrive seule garde sa hauteur pendant qu'elle charge ») : pendant la
+  // première lecture, le titre et autant de lignes vides que la liste en montrera ; à l'arrivée,
+  // elles fondent vers la liste (`Reveal`). Dans la colonne du Fil, `FeedSide` pose déjà ses lignes
+  // vides et ne monte cette section qu'une fois la liste lue : ce squelette sert au premier
+  // lancement (`FirstRun`), dans la colonne principale.
+  const unreadable = suggestions.isError || retrying
+  const loading = suggestions.data === undefined && !unreadable
   const members = suggestions.data?.members ?? []
-  // Rien à suggérer (ou pas encore lu) : ni titre ni cadre vide.
-  if (members.length === 0) return null
+  // Lue et vide (rien à suggérer) : ni titre ni cadre vide, et sans fondu.
+  if (!loading && !unreadable && members.length === 0) return null
+
+  // Le titre « Proches à suivre » reste au-dessus du message (relecture design A8) : sans lui,
+  // l'erreur flottait seule au-dessus de la section suivante.
+  const errorList = (
+    <SuggestionList
+      members={[]}
+      notice={
+        <Notice
+          message={t(($) => $.suggestions.loadError)}
+          action={{
+            label: t(($) => $.common.retry),
+            onPress: () => {
+              setRetrying(true)
+              void suggestions.refetch().finally(() => setRetrying(false))
+            },
+          }}
+        />
+      }
+      onFollow={() => {}}
+      onOpenMember={() => {}}
+      onOpenProject={() => {}}
+      onDismiss={async () => ({ ok: true })}
+    />
+  )
 
   const rowOf = (member: SuggestedMember): SuggestedMemberRow => {
     const project = member.latestProject
@@ -107,7 +118,7 @@ export function PeopleToFollow({ max, stacked = false }: Props) {
     }
   }
 
-  return (
+  const memberList = (
     <>
       {members.map((member) => (
         <FollowKeeper key={member.id} id={member.id} register={register} onFailed={failed} />
@@ -132,6 +143,12 @@ export function PeopleToFollow({ max, stacked = false }: Props) {
         onDismiss={dismiss}
       />
     </>
+  )
+
+  return (
+    <Reveal loading={loading} skeleton={<SuggestionListSkeleton count={max} stacked={stacked} />}>
+      {loading ? null : unreadable ? errorList : memberList}
+    </Reveal>
   )
 }
 

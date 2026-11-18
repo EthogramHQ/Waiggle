@@ -17,8 +17,10 @@ import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
 import { ExampleBadge } from './ExampleBadge'
+import { TextLineShape } from './ListGroup'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
@@ -138,6 +140,41 @@ export function TesterCard({ title, author, image, onTest, onOpen, example = fal
             maxWidth: width - 2 * space.xs,
           }}
         />
+      </View>
+    </View>
+  )
+}
+
+/**
+ * R16 (« Les squelettes », planche R16-Explorer-Listes) : la carte vide d'« Ils cherchent des
+ * testeurs », à la place d'une carte qui arrive, aux mesures de la vraie (mêmes largeur, photo,
+ * écarts) : la bande garde sa hauteur, et rien ne pousse « Récents » quand les projets arrivent.
+ * La photo est une carte vide (`SkeletonSurface`, avec sa lueur) ; dessous, le titre et l'auteur en
+ * lignes vides, à la hauteur des lignes écrites (`TextLineShape`).
+ *
+ * Le titre : deux lignes sur téléphone, où la carte est étroite (160 points) et où la plupart des
+ * titres passent à la ligne ; une sur ordinateur (256 points), où ils tiennent.
+ *
+ * Ni rôle ni nom : le `Loading` de l'écran (« Chargement… ») enveloppe toute la bande, une fois.
+ * `column` : le rang de la carte dans sa bande, le retard de sa lueur (150 ms par colonne).
+ */
+export function TesterCardSkeleton({ column = 0 }: { column?: number }) {
+  const { sizeClass } = useLayout()
+  const shape = sizeClass === 'compact' ? 'compact' : 'medium'
+  const width = CARD_WIDTH[shape]
+  const coverHeight = Math.round(width * COVER_RATIO[shape])
+  return (
+    <View style={{ width, gap: space.sm }}>
+      <SkeletonSurface height={coverHeight} radius="group" column={column} />
+      <View>
+        <TextLineShape variant="headline" width="85%" />
+        {shape === 'compact' ? <TextLineShape variant="headline" width="55%" /> : null}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        <Shape height={AUTHOR_DOT} width={AUTHOR_DOT} round />
+        <View style={{ flexGrow: 1 }}>
+          <TextLineShape variant="caption" width="50%" />
+        </View>
       </View>
     </View>
   )

@@ -18,12 +18,13 @@
 //   blocage d'Explorer (GET /v1/showcase).
 //
 // Rien ne bouge sous le doigt : la vitrine arrive **sous** les boutons de compte, sur téléphone comme
-// sur ordinateur. Tant qu'elle n'est pas lue, sa place reste vide ; elle ne repousse que ce qui la
-// suit (la phrase du cadenas et le pied).
+// sur ordinateur. Tant qu'elle n'est pas lue, elle garde sa place en cartes vides, sous son titre
+// (R16) : son arrivée ne repousse rien.
 //
 // Ce fichier assemble des composants de src/ui, sans écrire de style (règle des étages).
 import { SHOWCASE_MAX, type ShowcaseItem } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { useMediaSources } from '../api/media'
@@ -39,8 +40,10 @@ import { Hint } from '../ui/Hint'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { LegalLinks } from '../ui/LegalLinks'
 import { Logo } from '../ui/Logo'
+import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
-import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
+import { SHOWCASE_CARD_SHADOW, ShowcaseCard, ShowcaseCardSkeleton } from '../ui/ShowcaseCard'
+import { Loading } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
@@ -69,22 +72,24 @@ function VisitorShowcase() {
   // (scénario : « sans projet mis en avant, l'accueil reste celui de R11 »). Une erreur ne montre
   // rien de plus : la vitrine est un plus, l'accueil garde ses deux portes d'entrée.
   if (!showcase.isPending && items.length === 0) return <VisitorHome />
-  return <ShowcaseHome items={items} member={false} />
+  return <ShowcaseHome items={items} loading={showcase.isPending} member={false} />
 }
 
 function MemberShowcase() {
   const showcase = useMemberShowcase()
-  return <ShowcaseHome items={showcase.data?.items ?? []} member />
+  return <ShowcaseHome items={showcase.data?.items ?? []} loading={showcase.isPending} member />
 }
 
 type ShowcaseHomeProps = {
   /** Les projets de la vitrine, dans l'ordre de la modération ; vide pendant la lecture. */
   items: readonly ShowcaseItem[]
+  /** R16 : la vitrine se lit encore ; sa rangée garde sa place, en cartes vides. */
+  loading: boolean
   /** Un membre connecté : sa barre, pas de boutons de compte, les adresses des membres. */
   member: boolean
 }
 
-function ShowcaseHome({ items, member }: ShowcaseHomeProps) {
+function ShowcaseHome({ items, loading, member }: ShowcaseHomeProps) {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
@@ -131,33 +136,73 @@ function ShowcaseHome({ items, member }: ShowcaseHomeProps) {
       {t(($) => $.home.showcaseNote)}
     </Text>
   )
-  // « Des projets à voir » : rien tant qu'aucun projet n'est là (pas de titre au-dessus du vide).
-  // Sur téléphone, une bande qui défile de côté, la phrase dessous ; sur ordinateur, la phrase à
-  // droite du titre et les quatre cartes à parts égales (planche R12-Visiteur-Desktop).
+  // R16 (planches R16-Visiteur-390 et R16-Visiteur-1440 ; scénario : « la vitrine garde sa place
+  // avec quatre cartes vides : rien ne pousse le bas de la page ») : pendant la lecture, le vrai
+  // titre et la vraie phrase, et des cartes vides aux mesures des vraies (`ShowcaseCardSkeleton`),
+  // sous un seul « Chargement… ». À l'arrivée, elles fondent vers les cartes (`Reveal`). Une vitrine
+  // lue vide ne laisse rien (un visiteur passe alors à l'accueil de R11).
+  const skeletonCards = Array.from({ length: compact ? PHONE_CARDS : SHOWCASE_MAX }, (_, index) => (
+    <ShowcaseCardSkeleton
+      // biome-ignore lint/suspicious/noArrayIndexKey: des cartes vides identiques, jamais réordonnées.
+      key={index}
+      size={compact ? 'carousel' : 'fill'}
+      column={index}
+    />
+  ))
+  // Sur téléphone, une bande qui défile de côté, la phrase dessous ; ses cartes vides tiennent dans
+  // une seule case de la bande, sous un seul « Chargement… », à l'écart des vraies.
+  const phoneShowcase = (band: ReactNode) => (
+    <Stack gap="sm">
+      <Carousel
+        label={t(($) => $.home.showcase)}
+        previousLabel={t(($) => $.explore.previous)}
+        nextLabel={t(($) => $.explore.next)}
+        header={showcaseTitle}
+        bleed
+        cardShadow={SHOWCASE_CARD_SHADOW}
+      >
+        {band}
+      </Carousel>
+      {note}
+    </Stack>
+  )
+  // « Des projets à voir » : rien une fois lue sans projet (pas de titre au-dessus du vide). Sur
+  // téléphone, la bande ; sur ordinateur, la phrase à droite du titre et les quatre cartes à parts
+  // égales (planche R12-Visiteur-Desktop).
   const showcase =
-    cards.length === 0 ? null : compact ? (
-      <Stack gap="sm">
-        <Carousel
-          label={t(($) => $.home.showcase)}
-          previousLabel={t(($) => $.explore.previous)}
-          nextLabel={t(($) => $.explore.next)}
-          header={showcaseTitle}
-          bleed
-          cardShadow={SHOWCASE_CARD_SHADOW}
-        >
-          {cards}
-        </Carousel>
-        {note}
-      </Stack>
+    !loading && cards.length === 0 ? null : compact ? (
+      <Reveal
+        loading={loading}
+        skeleton={phoneShowcase(
+          <Loading key="loading">
+            <Row gap="md" align="start">
+              {skeletonCards}
+            </Row>
+          </Loading>,
+        )}
+      >
+        {phoneShowcase(cards)}
+      </Reveal>
     ) : (
       <Stack gap="md">
         <Row justify="between" align="baseline" gap="md" wrap>
           {showcaseTitle}
           {note}
         </Row>
-        <Row gap="lg" align="stretch">
-          {cards}
-        </Row>
+        <Reveal
+          loading={loading}
+          skeleton={
+            <Loading>
+              <Row gap="lg" align="stretch">
+                {skeletonCards}
+              </Row>
+            </Loading>
+          }
+        >
+          <Row gap="lg" align="stretch">
+            {cards}
+          </Row>
+        </Reveal>
       </Stack>
     )
 
