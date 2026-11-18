@@ -21,7 +21,7 @@ import { TextLineShape } from './ListGroup'
 import { ProjectCover } from './ProjectCover'
 import { Shape, SkeletonSurface } from './Skeleton'
 import { Stack } from './Stack'
-import { Tag } from './Tag'
+import { Tag, TagSkeleton } from './Tag'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -253,8 +253,8 @@ function ColumnPhoto({ name, source }: { name: string; source: ImageSource | nul
   )
 }
 
-/** Les étiquettes d'outils vides : trois, à la hauteur dessinée d'une étiquette (`Tag`). */
-const SKELETON_TOOLS = [72, 88, 64] as const
+/** Les étiquettes d'outils vides : trois (`TagSkeleton`, leur rang choisit leur largeur). */
+const SKELETON_TOOLS = [0, 1, 2] as const
 /** La largeur du bouton vide sous l'en-tête (« Suivre Léa »), quand il ne prend pas toute la ligne. */
 const SKELETON_ACTION = 152
 /** La largeur de la ligne vide des abonnés, celle de « 12 abonnés » écrit en `callout`. */
@@ -352,8 +352,10 @@ export function MemberHeaderSkeleton({
         <Stack gap="sm" align={column ? 'stretch' : 'center'}>
           <TextLineShape variant="caption" width={96} center={center} />
           <Stack direction="row" gap="sm" wrap justify={column ? 'start' : 'center'}>
-            {SKELETON_TOOLS.map((width) => (
-              <Shape key={width} height={layoutTokens.chipHeight} width={width} round />
+            {/* Les étiquettes vides d'« Outils populaires », dans la zone de 44 points d'une vraie
+                étiquette (36 dessinés) : la rangée garde la hauteur de celle qui arrive. */}
+            {SKELETON_TOOLS.map((index) => (
+              <TagSkeleton key={index} index={index} />
             ))}
           </Stack>
         </Stack>,
