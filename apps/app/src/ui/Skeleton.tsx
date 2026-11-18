@@ -43,6 +43,7 @@ import { MemberHeaderSkeleton } from './MemberHeader'
 import { ProjectCardSkeleton } from './ProjectCard'
 import { ProjectCoverSkeleton } from './ProjectCover'
 import { useGridColumns } from './ProjectGrid'
+import { TextFieldSkeleton } from './TextField'
 import { skeletonGlowMark } from './theme/document'
 import { useHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
@@ -491,10 +492,7 @@ export function SkeletonPage({ shape }: { shape: SkeletonPageShape | SkeletonSha
         <View style={{ gap: space.xl }}>
           {Array.from({ length: FORM_FIELDS }, (_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: des champs identiques, jamais réordonnés.
-            <View key={index} style={{ gap: space.sm }}>
-              <Shape height={LINE} width="30%" />
-              <SkeletonSurface radius="group" height={layout.controlHeight.regular} />
-            </View>
+            <TextFieldSkeleton key={index} />
           ))}
           <Shape height={layout.controlHeight.regular} width={BUTTON_WIDTH} round />
         </View>
