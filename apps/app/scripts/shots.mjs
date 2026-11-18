@@ -1146,6 +1146,14 @@ const catalogueTools = [
   { slug: 'cursor', name: 'Cursor', family: 'development', aliases: [], projectCount: 5 },
   { slug: 'arduino', name: 'Arduino', family: 'hardware', aliases: [], projectCount: 3 },
   { slug: 'claude-code', name: 'Claude Code', family: 'development', aliases: [], projectCount: 2 },
+  // R16 (planches R16-Outils) : vingt outils, de quoi remplir « De A à Z » sur cinq colonnes de
+  // quatre. Ceux-ci, peu utilisés, ne changent pas « Outils populaires » ni « Les plus utilisés ».
+  { slug: 'bolt', name: 'Bolt', family: 'no-code', aliases: [], projectCount: 2 },
+  { slug: 'canva', name: 'Canva', family: 'creation', aliases: [], projectCount: 2 },
+  { slug: 'gemini', name: 'Gemini', family: 'assistant', aliases: [], projectCount: 1 },
+  { slug: 'perplexity', name: 'Perplexity', family: 'assistant', aliases: [], projectCount: 1 },
+  { slug: 'replit', name: 'Replit', family: 'development', aliases: [], projectCount: 1 },
+  { slug: 'suno', name: 'Suno', family: 'creation', aliases: [], projectCount: 1 },
   { slug: 'zapier', name: 'Zapier', family: 'automation', aliases: [], projectCount: 0 },
 ].sort((a, b) => b.projectCount - a.projectCount)
 // Les « Autre » des projets visibles (« Pas encore dans le catalogue ») : deux noms tapés par des
@@ -1186,10 +1194,69 @@ const camille = {
   avatarUrl: null,
   followerCount: 12,
 }
+// R16 (planches R16-Recherche) : six projets et deux membres, de quoi remplir les colonnes en grand.
+const moreCarnProjects = [
+  ['Carnet de lecture', 'Les livres lus en famille, et ce qu’on en a pensé.', 'testable'],
+  ['Le carnet des plantes', 'Quand arroser chaque plante de la maison.', 'building'],
+  ['Carnet de voyage', 'Un récit de voyage écrit à partir des photos.', 'testable'],
+  ['Carnaval des masques', 'Des masques à imprimer pour le carnaval de l’école.', 'idea'],
+].map(([title, pitch, status], index) => ({
+  ...summaryOf(recipesProject),
+  id: `1a2b3c4d-0000-4000-8000-00000000002${index}`,
+  author: odile,
+  title,
+  pitch,
+  status,
+  excerpt: null,
+}))
+const carneiro = {
+  id: 'carneiro-id',
+  name: 'Inès Carneiro',
+  handle: 'ines_carneiro',
+  avatarUrl: null,
+  followerCount: 4,
+}
+// R16 (planches R16-Ruches-1920 et 1440) : l'onglet Ruches en grand, cinq ruches et deux
+// invitations (page `ruches-grand`, `hives: 'many'`), bâties sur les données de `myHives`.
+const [familleHive, amisHive] = myHives.hives
+const [firstInvitation] = myHives.invitations
+const manyHives = {
+  ...myHives,
+  hives: [
+    familleHive,
+    amisHive,
+    ...[
+      ['Cousins Moreau', 'heart', 7, 1],
+      ['Club lecture', 'book-open', 6, 0],
+      ['Atelier photo', 'camera', 5, 3],
+    ].map(([name, icon, memberCount, news], index) => ({
+      ...familleHive,
+      id: `0f5b8a64-2c1e-4c55-9d1a-6b7e4a3c2d2${index}`,
+      name,
+      icon,
+      memberCount,
+      news,
+    })),
+  ],
+  invitations: [
+    firstInvitation,
+    {
+      ...firstInvitation,
+      id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c99',
+      hive: {
+        ...firstInvitation.hive,
+        id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c98',
+        name: 'Jardins partagés',
+        icon: 'leaf',
+      },
+      inviter: { id: odile.id, name: odile.name, avatarUrl: null },
+    },
+  ],
+}
 const searchResultsOf = {
   carn: {
-    projects: { items: [coffeeProject, biscotteProject], more: false },
-    members: { items: [camille], more: false },
+    projects: { items: [coffeeProject, biscotteProject, ...moreCarnProjects], more: false },
+    members: { items: [camille, carneiro], more: false },
     tools: { items: [catalogueTools.find((t) => t.slug === 'notion')], more: false },
   },
 }
@@ -3233,11 +3300,13 @@ const fakeApi = (
         200,
         hives === 'none'
           ? noHives
-          : hives === 'invited'
-            ? invitedOnly
-            : hives === 'animator'
-              ? myHivesAnimator
-              : myHives,
+          : hives === 'many'
+            ? manyHives
+            : hives === 'invited'
+              ? invitedOnly
+              : hives === 'animator'
+                ? myHivesAnimator
+                : myHives,
       )
     }
     if (pathname === '/v1/hives' && method === 'POST') {
@@ -3691,6 +3760,8 @@ const waitingPages = [
   'accueil-attente',
   'explorer-attente',
   'ruche-attente',
+  'ruches-attente',
+  'recherche-attente',
 ]
 const pages = [
   // `layoutWidths` : le relevé de mise en page (--layout) ne mesure le catalogue qu'aux largeurs d'un
@@ -3925,6 +3996,22 @@ const pages = [
   { name: 'explorer-attente', path: '/explore', signedIn: true, prepare: holdApi() },
   // Une ruche (plan R16, choix 17) : les trois colonnes posées dès le squelette.
   { name: 'ruche-attente', path: `/hives/${familleId}`, signedIn: true, prepare: holdApi() },
+  // R16 (planches R16-Ruches-Squelette-1920 et R16-Recherche-Squelette-1920) : l'onglet Ruches et
+  // la recherche « carn » pendant que leurs lectures se taisent, aussi à 1 920.
+  {
+    name: 'ruches-attente',
+    path: '/hives',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
+  {
+    name: 'recherche-attente',
+    path: '/search?q=carn',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
   // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
@@ -3941,7 +4028,7 @@ const pages = [
     fullPage: true,
   },
   // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
-  { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
+  { name: 'outils', path: '/tools', signedIn: true, fullPage: true, bigScreens: true },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
   { name: 'fil-fini', path: '/feed', signedIn: true, feed: 'end', fullPage: true },
   // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
@@ -5123,7 +5210,7 @@ const pages = [
   },
   // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le
   // quota dépassé ; et l'onglet Ruches, avant les ruches.
-  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true },
+  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true, bigScreens: true },
   { name: 'recherche-vide', path: '/search?q=carnaval', signedIn: true },
   { name: 'recherche-429', path: '/search?q=quota', signedIn: true },
   // R6b : la recherche filtrée par une catégorie (« Animaux » : un projet sur deux), puis par une
@@ -5143,7 +5230,10 @@ const pages = [
   // les feuilles Créer et Inviter ; les réglages de l'animatrice ; la fenêtre « Quitter » ; le Fil
   // d'une ruche ; l'invitation du premier lancement ; publier pour une ruche ; l'Activité ; la page
   // d'un membre en tuiles.
-  { name: 'ruches', path: '/hives', signedIn: true, fullPage: true },
+  // R16 : Ruches, Recherche et Outils en grand, aussi à 1 920 et 2 560 (`bigScreens`).
+  { name: 'ruches', path: '/hives', signedIn: true, fullPage: true, bigScreens: true },
+  // R16 (planches R16-Ruches) : cinq ruches et deux invitations, en cartes sur 4 colonnes à 1 920.
+  { name: 'ruches-grand', path: '/hives', signedIn: true, hives: 'many', bigScreens: true },
   { name: 'ruches-vide', path: '/hives', signedIn: true, hives: 'none' },
   { name: 'ruche', path: `/hives/${familleId}`, signedIn: true, fullPage: true },
   {

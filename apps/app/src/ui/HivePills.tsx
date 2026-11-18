@@ -11,8 +11,13 @@
 //
 // Ce n'est pas ui/FilterPills (R6b) : là, des boutons radio qui filtrent une liste en miel ; ici,
 // des onglets qui changent tout le contenu du Fil.
+import { layout, radii, space } from '@ruche/brand'
 import { useTranslation } from 'react-i18next'
+import { View, type ViewStyle } from 'react-native'
+import { TextLineShape } from './ListGroup'
+import { Surface } from './Surface'
 import { Tabs } from './Tabs'
+import { useTheme } from './theme/ThemeProvider'
 
 /** Une ruche du sélecteur : son identifiant et son nom (`null` : retiré par la modération). */
 export type HivePill = { id: string; name: string | null }
@@ -50,3 +55,57 @@ export function HivePills({ hives, value, onChange, panelId }: Props) {
     />
   )
 }
+
+/** Les largeurs des pastilles vides, une par ruche à venir : des noms de longueurs différentes. */
+const EMPTY_WIDTHS = [72, 104, 88] as const
+/** La largeur de « Tout », vide, dans la goutte blanche de la pastille choisie. */
+const ALL_WIDTH = 32
+
+/**
+ * R16 (« Les squelettes ») : le filtre du Fil pendant la lecture des ruches. La même capsule de
+ * verre, à la même hauteur ; la goutte blanche de « Tout », choisi d'avance ; puis `count`
+ * pastilles vides à la place des ruches à venir. Quand les ruches arrivent, la rangée garde sa
+ * hauteur et sa place : seules les pastilles vides deviennent des noms.
+ *
+ * Sans rôle ni nom, cachée aux lecteurs d'écran : ce n'est pas encore un choix (le `Loading` de la
+ * colonne du Fil dit « Chargement… »). Rien ne s'y touche ni ne prend le focus.
+ */
+export function HivePillsSkeleton({ count = 2 }: { count?: number }) {
+  const { colors, shadows } = useTheme()
+  // Une pastille de `Tabs` (scroll) : sa hauteur à toucher et ses marges, sans texte.
+  const pill: ViewStyle = {
+    minHeight: layout.touchTarget,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.xs,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
+  return (
+    <View {...hiddenFromReaders} style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+      <Surface variant="glass" radius="pill" padding="xxs">
+        <View style={{ flexDirection: 'row', gap: space.xxs, overflow: 'hidden' }}>
+          <View style={[pill, { backgroundColor: colors.surfaceRaised, boxShadow: shadows.soft }]}>
+            <TextLineShape variant="callout" width={ALL_WIDTH} />
+          </View>
+          {Array.from({ length: count }, (_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: des pastilles identiques, jamais réordonnées.
+            <View key={index} style={pill}>
+              <TextLineShape
+                variant="callout"
+                width={EMPTY_WIDTHS[index % EMPTY_WIDTHS.length] ?? EMPTY_WIDTHS[0]}
+              />
+            </View>
+          ))}
+        </View>
+      </Surface>
+    </View>
+  )
+}
+
+/** Caché aux lecteurs d'écran, sur le web (`aria-hidden`) comme sur iOS et Android. */
+const hiddenFromReaders = {
+  'aria-hidden': true,
+  accessibilityElementsHidden: true,
+  importantForAccessibility: 'no-hide-descendants',
+} as const
