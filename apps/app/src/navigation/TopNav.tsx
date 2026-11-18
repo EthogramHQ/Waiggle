@@ -249,6 +249,7 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
       : []),
   ]
   const hrefOf = (key: NavKey) => links.find((link) => link.key === key)?.href ?? FEED_PATH
+  const active = activeFor(pathname)
 
   // Le champ, au milieu : il prend la place qui reste. En largeur moyenne, une loupe (et rien sur
   // la page de recherche, qui montre alors son propre champ).
@@ -289,7 +290,10 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
         <NavLinks
           label={t(($) => $.nav.label)}
           links={links}
-          active={activeFor(pathname)}
+          active={active}
+          // R16 : sur une page fille (la Recherche, les Outils sous Explorer), le lien allumé n'est
+          // pas la page ouverte : il y mène, au clavier comme au clic.
+          activeIsOpen={active !== null && pathname === hrefOf(active)}
           onPress={(key) => router.push(hrefOf(key))}
         />
         {/* Sans champ (largeur moyenne), une place vide qui pousse le reste à droite. */}
