@@ -467,7 +467,13 @@ function MemberSearch() {
   // Le bouton se montre sur « Tout » et « Projets », jamais « Membres » ni « Outils », dès qu'il y a
   // des résultats. Une catégorie déjà choisie le garde aussi quand rien n'est trouvé, pendant la
   // lecture ou après une panne (les onglets ont alors disparu) : c'est par lui qu'on la retire.
-  const filterShown = found ? tab === 'all' || tab === 'projects' : category !== null && !tooShort
+  // R16 : en grand, la recherche partie et sans réponse encore pose déjà la rangée des onglets et du
+  // filtre, à sa place (planche R16-Recherche-Squelette-1920) : à l'arrivée des résultats, rien ne
+  // descend. Sous 1 280 points, rien ne change.
+  const searching = !tooShort && !failed && !unsearchable && groups === null
+  const controlsWait = large && searching
+  const filterShown =
+    found || controlsWait ? tab === 'all' || tab === 'projects' : category !== null && !tooShort
   // Une catégorie dans l'adresse dont le nom n'est pas (encore) lu : le bouton dit « Catégorie »,
   // jamais « Toutes les catégories », qui mentirait sur le filtre appliqué.
   const filterLabel = chosen
@@ -663,8 +669,6 @@ function MemberSearch() {
   // Le panneau de droite : les membres et les outils trouvés, sur « Tout », à côté des projets. Sans
   // projet à montrer, ou sur un seul onglet, une seule colonne : rien ne reste vide à gauche.
   const withPanel = tab === 'all' && projectCards !== null && Boolean(memberList || toolList)
-  // La recherche est partie, sans réponse encore (ni panne, ni texte trop court).
-  const searching = !tooShort && !failed && !unsearchable && groups === null
   const shownResults = !large ? (
     // Sous 1 280 points, rien ne change : une colonne, les projets, puis les membres et les outils.
     <>
@@ -708,7 +712,7 @@ function MemberSearch() {
         {field}
 
         <Controls row={large}>
-          {groups && found ? (
+          {(groups && found) || controlsWait ? (
             <Segmented
               label={t(($) => $.search.tabsLabel)}
               value={tab}
@@ -716,7 +720,12 @@ function MemberSearch() {
               fill={false}
               options={[
                 { value: 'all', label: t(($) => $.search.tabs.all) },
-                ...GROUPS.map((group) => ({ value: group, ...tabLabel(group) })),
+                ...GROUPS.map((group) =>
+                  // Pendant la recherche : le vrai nom, une pièce vide à la place du nombre.
+                  controlsWait
+                    ? { value: group, label: t(($) => $.search.tabs[group]), waiting: true }
+                    : { value: group, ...tabLabel(group) },
+                ),
               ]}
             />
           ) : null}

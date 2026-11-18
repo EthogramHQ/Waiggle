@@ -94,8 +94,13 @@ export function DiscoverFeed({
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} section={errorMessage} />
     ) : (
       // La forme des cartes qui arrivent, dans leurs colonnes (R15) : celle du Fil, ou la compacte
-      // dans « Récents » sur ordinateur (le squelette lit la grille, comme la carte).
-      <SkeletonList count={3} shape="feed" />
+      // dans « Récents » sur ordinateur (le squelette lit la grille, comme la carte). R16 : la place
+      // du bouton des nouveautés au-dessus, vide, au même écart que dans `FeedList` : les cartes
+      // tombent là où les vraies arriveront.
+      <Stack gap="lg">
+        <NewsPlace />
+        <SkeletonList count={3} shape="feed" />
+      </Stack>
     )
   ) : (
     <FeedList
@@ -134,6 +139,17 @@ export function FeedSkeleton({ news, shown = false }: { news: ReactNode; shown?:
       </Loading>
     </Stack>
   )
+}
+
+/** Rien à faire : la place vide n'a pas de bouton. */
+const noop = () => {}
+
+/**
+ * R16 : la place du bouton des nouveautés d'un fil qui se lit encore (« Récents » d'Explorer), vide
+ * et à sa hauteur : le bouton y viendra plus tard sans rien pousser (`NewItemsBanner`, rien de neuf).
+ */
+export function NewsPlace() {
+  return <NewItemsBanner count={null} more={false} kinds={[]} authors={[]} onPress={noop} />
 }
 
 type FeedNewsProps = {

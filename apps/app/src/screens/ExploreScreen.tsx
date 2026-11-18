@@ -33,7 +33,7 @@ import { SessionGate } from '../accounts/SessionGate'
 import { useMediaSources } from '../api/media'
 import { categoryOf, useCategories } from '../categories/api'
 import { useDiscoverFeed } from '../feed/api'
-import { type CardOverlay, DiscoverFeed } from '../feed/FeedList'
+import { type CardOverlay, DiscoverFeed, NewsPlace } from '../feed/FeedList'
 import { useFollow } from '../follows/api'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
@@ -41,7 +41,7 @@ import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useMemberShowcase } from '../showcase/api'
 import { useTools } from '../tools/api'
-import { Carousel } from '../ui/Carousel'
+import { Carousel, CarouselShapes } from '../ui/Carousel'
 import { Columns } from '../ui/Columns'
 import { FilterPills } from '../ui/FilterPills'
 import { FollowButton } from '../ui/FollowButton'
@@ -56,7 +56,7 @@ import { SearchLink } from '../ui/SearchLink'
 import { SHOWCASE_CARD_SHADOW, ShowcaseCard, ShowcaseCardSkeleton } from '../ui/ShowcaseCard'
 import { SidePanel } from '../ui/SidePanel'
 import { Loading, LoadingShownContext, SkeletonCards } from '../ui/Skeleton'
-import { Row, Stack } from '../ui/Stack'
+import { Stack } from '../ui/Stack'
 import { Tag, TagSkeleton } from '../ui/Tag'
 import { TesterCard, TesterCardSkeleton } from '../ui/TesterCard'
 import { TesterRow } from '../ui/TesterRow'
@@ -81,6 +81,14 @@ const PANEL_TOOLS = 6
 const BAND_SKELETONS = 3
 /** Les étiquettes vides d'« Outils populaires », en bande : assez pour la remplir sur téléphone. */
 const TAG_SKELETONS = 6
+/**
+ * R16 : les pastilles vides des catégories de « Récents », après « Toutes » : huit, de quoi tenir sur
+ * deux lignes à 1 440 points et sur une à 1 920, comme une dizaine de vraies catégories.
+ */
+const CATEGORY_SKELETONS = 8
+
+/** Rien à faire : « Toutes », pendant la lecture de la session, ne filtre encore rien. */
+const noop = () => {}
 
 /**
  * Hook : vrai une fois qu'une lecture a abouti, en bien ou en mal, et ensuite pour toute la visite.
@@ -307,7 +315,8 @@ function SectionTitle({ children }: { children: string }) {
 
 /**
  * Les cartes vides d'une bande, sous un seul « Chargement… » : une seule case de la bande, à
- * l'écart des vraies cartes, avec l'écart d'une bande de cartes (`Carousel`) ou d'étiquettes.
+ * l'écart des vraies cartes, celui que donne le carrousel lui-même (`CarouselShapes`) : jamais
+ * recopié ici, il ne peut pas s'en écarter.
  */
 function BandSkeleton({
   children,
@@ -318,12 +327,9 @@ function BandSkeleton({
   shown?: boolean
   chips?: boolean
 }) {
-  const compact = useLayout().sizeClass === 'compact'
   return (
     <SectionLoading shown={shown}>
-      <Row gap={chips ? 'sm' : compact ? 'md' : 'xxl'} align="start">
-        {children}
-      </Row>
+      <CarouselShapes variant={chips ? 'chips' : 'cards'}>{children}</CarouselShapes>
     </SectionLoading>
   )
 }
@@ -443,9 +449,15 @@ function RecentSkeleton() {
     <GridCardsContext.Provider value="compact">
       <Stack gap="md">
         <SectionTitle>{t(($) => $.explore.recent)}</SectionTitle>
-        <SectionLoading shown={false}>
-          <SkeletonCards count={3} shape="feed" />
-        </SectionLoading>
+        {/* Les places de « Récents » qui charge (`Recent`) : la rangée des catégories, puis la
+            place du bouton des nouveautés et les cartes, au même écart que le fil (`DiscoverFeed`). */}
+        <CategoriesWaiting category={null} onChange={noop} />
+        <Stack gap="lg">
+          <NewsPlace />
+          <SectionLoading shown={false}>
+            <SkeletonCards count={3} shape="feed" />
+          </SectionLoading>
+        </Stack>
       </Stack>
     </GridCardsContext.Provider>
   )
@@ -548,8 +560,7 @@ type RecentCategoriesProps = {
  * projet visible, avec son icône, dans l'ordre de la feuille de publication (celui de l'API). Sur
  * téléphone, la rangée défile de côté ; sur ordinateur, elle passe à la ligne.
  *
- * Pendant la lecture des catégories, rien (la rangée arrive avec le fil, qui se lit en même temps).
- * En panne, la section le dit, avec « Réessayer » ; si un filtre de l'adresse s'applique, un lien
+ * Pendant la lecture des catégories, le vrai « Toutes » et des pastilles vides (R16). En panne, la section le dit, avec « Réessayer » ; si un filtre de l'adresse s'applique, un lien
  * le retire : on ne reste jamais coincé dans une catégorie.
  */
 function RecentCategories({ categories, category, onChange }: RecentCategoriesProps) {
@@ -557,7 +568,9 @@ function RecentCategories({ categories, category, onChange }: RecentCategoriesPr
   const compact = useLayout().sizeClass === 'compact'
   const list = categories.data?.categories
   if (!list) {
-    if (!categories.isError) return null
+    // R16 : pendant la lecture, le vrai « Toutes » et des pastilles vides, à la place de la rangée
+    // qui arrive (planche R16-Explorer-Listes) : les cartes de « Récents » ne descendent plus.
+    if (!categories.isError) return <CategoriesWaiting category={category} onChange={onChange} />
     return (
       <Stack gap="sm">
         <Notice
@@ -583,6 +596,33 @@ function RecentCategories({ categories, category, onChange }: RecentCategoriesPr
       allLabel={t(($) => $.explore.allCategories)}
       value={category}
       options={options}
+      scroll={compact}
+      onChange={onChange}
+    />
+  )
+}
+
+/**
+ * R16 : la rangée des catégories pendant leur lecture (ou celle de la session) : le vrai « Toutes »,
+ * qui se touche déjà, puis des pastilles vides à la place des catégories à venir, sur une ligne qui
+ * défile (téléphone) ou qui passe à la ligne (ordinateur), comme la vraie.
+ */
+function CategoriesWaiting({
+  category,
+  onChange,
+}: {
+  category: string | null
+  onChange: (code: string | null) => void
+}) {
+  const { t } = useTranslation()
+  const compact = useLayout().sizeClass === 'compact'
+  return (
+    <FilterPills
+      label={t(($) => $.explore.categoriesLabel)}
+      allLabel={t(($) => $.explore.allCategories)}
+      value={category}
+      options={[]}
+      waiting={CATEGORY_SKELETONS}
       scroll={compact}
       onChange={onChange}
     />

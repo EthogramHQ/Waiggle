@@ -29,6 +29,7 @@ import {
 import { Icon, type IconName } from './Icon'
 import { spaceToggles } from './keyboard'
 import { scrollToShow } from './Segmented'
+import { Shape } from './Skeleton'
 import { Text } from './Text'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -75,6 +76,13 @@ type Props<T extends string> = {
   groups?: readonly FilterPillGroup[]
   /** Une ligne qui défile de côté (téléphone) ; sinon, les pastilles passent à la ligne. */
   scroll?: boolean
+  /**
+   * R16 (planche R16-Explorer-Listes) : les choix ne sont pas encore lus (les catégories de
+   * « Récents »). Le vrai « Toutes », puis ce nombre de pastilles vides à la place des choix à
+   * venir, dans la même rangée : quand ils arrivent, la rangée garde sa place (et, à peu près, son
+   * nombre de lignes). Cachées aux lecteurs d'écran, rien ne s'y touche ni ne prend le focus.
+   */
+  waiting?: number
   /** Le choix touché, ou `null` pour « Toutes ». `NoInfer` : T se déduit des choix et de la valeur. */
   onChange: (value: NoInfer<T> | null) => void
 }
@@ -104,9 +112,12 @@ const GROUP_MIN_WIDTH = 280
 function PillGroup<T extends string>({
   group,
   reveal,
+  empty = 0,
 }: {
   group: FilterPillGroup<T>
   reveal: Reveal | null
+  /** Les pastilles vides à poser après les vraies (`waiting` de FilterPills). */
+  empty?: number
 }) {
   const { label, allLabel, value, options, onChange } = group
   const { colors } = useTheme()
@@ -249,9 +260,38 @@ function PillGroup<T extends string>({
           </Pressable>
         )
       })}
+      {empty > 0 ? <EmptyPills count={empty} /> : null}
     </View>
   )
 }
+
+/** Les largeurs des pastilles vides (une icône et un nom), qui varient comme des noms. */
+const EMPTY_WIDTHS = [104, 136, 96, 120, 88, 128, 112, 96] as const
+
+/**
+ * R16 : les pastilles vides des choix à venir, de la hauteur d'une vraie (la zone de 44 points),
+ * posées dans le groupe, après « Toutes » : elles passent à la ligne (ou défilent) comme les vraies.
+ * Ni rôle ni nom, cachées aux lecteurs d'écran : ce ne sont pas encore des choix.
+ */
+function EmptyPills({ count }: { count: number }) {
+  return Array.from({ length: count }, (_, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: des pastilles identiques, jamais réordonnées.
+    <View key={`empty-${index}`} {...hiddenFromReaders} style={{ flexShrink: 0 }}>
+      <Shape
+        height={layout.touchTarget}
+        width={EMPTY_WIDTHS[index % EMPTY_WIDTHS.length] ?? EMPTY_WIDTHS[0]}
+        round
+      />
+    </View>
+  ))
+}
+
+/** Caché aux lecteurs d'écran, sur le web (`aria-hidden`) comme sur iOS et Android. */
+const hiddenFromReaders = {
+  'aria-hidden': true,
+  accessibilityElementsHidden: true,
+  importantForAccessibility: 'no-hide-descendants',
+} as const
 
 /**
  * Le trait entre deux groupes, de la hauteur d'une ligne de pastilles : décoratif, caché aux
@@ -312,6 +352,7 @@ export function FilterPills<T extends string>({
   options,
   groups = [],
   scroll = false,
+  waiting = 0,
   onChange,
 }: Props<T>): ReactNode {
   const calm = useCalmMotion()
@@ -350,7 +391,7 @@ export function FilterPills<T extends string>({
       >
         {every.map((group, index) =>
           index === 0 ? (
-            <PillGroup key={`group-${group.label}`} group={group} reveal={null} />
+            <PillGroup key={`group-${group.label}`} group={group} reveal={null} empty={waiting} />
           ) : (
             <NextGroup key={`group-${group.label}`} group={group} />
           ),
@@ -361,7 +402,14 @@ export function FilterPills<T extends string>({
   // Dans la bande, groupes et traits sont côte à côte, enfants directs de la bande : chaque groupe
   // y mesure sa place sans intermédiaire.
   const content = every.flatMap((group, index) => {
-    const pills = <PillGroup key={`group-${group.label}`} group={group} reveal={reveal} />
+    const pills = (
+      <PillGroup
+        key={`group-${group.label}`}
+        group={group}
+        reveal={reveal}
+        empty={index === 0 ? waiting : 0}
+      />
+    )
     return index === 0 ? [pills] : [<Divider key={`divider-${group.label}`} />, pills]
   })
   return (

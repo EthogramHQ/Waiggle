@@ -10,6 +10,8 @@
 // restent sur une rangée qui défile de côté, plutôt que de laisser un choix seul sur une deuxième
 // rangée (relecture de design de R3, 4) ; la bande montre toujours le choix actif en entier.
 // Sur téléphone, avec le texte très agrandi, chaque choix prend sa propre ligne.
+// R16 (« rien ne bouge à l'arrivée ») : un choix peut attendre son nombre (`waiting`) : son nom,
+// une pièce vide à la place du nombre, et il ne se choisit pas encore.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type Ref, useEffect, useImperativeHandle, useRef } from 'react'
 import {
@@ -23,6 +25,7 @@ import {
   View,
 } from 'react-native'
 import { Icon, type IconName } from './Icon'
+import { TextLineShape } from './ListGroup'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useCalmMotion } from './theme/motion'
@@ -54,7 +57,25 @@ type Option<T extends string> = {
   icon?: IconName
   /** Le nom lu par les lecteurs d'écran, s'il diffère du texte affiché (« FR » → « Français »). */
   spokenLabel?: string
+  /**
+   * R16 (planche R16-Recherche-Squelette-1920) : le nombre de ce choix n'est pas encore lu (les
+   * onglets de la recherche, pendant qu'elle cherche). Son vrai nom, puis une pièce vide à la place
+   * du nombre : à l'arrivée, le nombre prend sa place et la rangée ne bouge pas. Le choix attend :
+   * désactivé (sauf s'il est déjà le choix actif), les flèches le sautent. La pièce est cachée aux
+   * lecteurs d'écran, qui lisent le nom seul.
+   */
+  waiting?: boolean
 }
+
+/** La pièce vide d'un nombre pas encore lu : la largeur d'un ou deux chiffres (planche R16). */
+const COUNT_WIDTH = 12
+
+/** Caché aux lecteurs d'écran, sur le web (`aria-hidden`) comme sur iOS et Android. */
+const hiddenFromReaders = {
+  'aria-hidden': true,
+  accessibilityElementsHidden: true,
+  importantForAccessibility: 'no-hide-descendants',
+} as const
 
 /** Ce qu'un écran peut demander au contrôle : poser le focus du clavier sur le choix actif. */
 export type SegmentedHandle = { focusChecked: () => void }
@@ -95,6 +116,8 @@ export function Segmented<T extends string>({
   // choix). Sans cela, Tab s'arrêtait sur chaque segment avant de quitter le groupe.
   const checkedIndex = options.findIndex((option) => option.value === value)
   const tabStop = checkedIndex === -1 ? 0 : checkedIndex
+  // Un choix qui attend son nombre ne se choisit pas encore ; le choix actif, lui, reste actif.
+  const waits = (index: number) => options[index]?.waiting === true && index !== checkedIndex
 
   // La bande qui défile : sa largeur visible, sa position, et la place de chaque choix, gardées
   // dans des refs (les lire ne redessine rien).
@@ -137,10 +160,20 @@ export function Segmented<T extends string>({
               // preventDefault : l'espace ne fait pas défiler la page. Une touche gardée enfoncée
               // (repeat) ne rechoisit pas dix fois le même choix.
               event.preventDefault()
-              if (!event.repeat) onChange(options[index]?.value ?? value)
+              if (!event.repeat && !waits(index)) onChange(options[index]?.value ?? value)
             } else if (step !== 0) {
               event.preventDefault()
-              const next = (index + step + options.length) % options.length
+              // Le voisin qui peut se choisir, en sautant ceux qui attendent leur nombre (et en
+              // faisant le tour) ; aucun : le focus reste où il est.
+              let next = index
+              for (let tried = 1; tried < options.length; tried += 1) {
+                const candidate = (index + step * tried + options.length * tried) % options.length
+                if (!waits(candidate)) {
+                  next = candidate
+                  break
+                }
+              }
+              if (next === index) return
               const option = options[next]
               if (option) onChange(option.value)
               refs.current[next]?.focus()
@@ -151,6 +184,7 @@ export function Segmented<T extends string>({
 
   const choices = options.map((option, index) => {
     const checked = option.value === value
+    const disabled = waits(index)
     return (
       <Pressable
         key={option.value}
@@ -160,6 +194,14 @@ export function Segmented<T extends string>({
         accessibilityRole="radio"
         accessibilityLabel={option.spokenLabel ?? option.label}
         aria-checked={checked}
+        // Désactivé : `aria-disabled` sur le web (react-native-web ignore accessibilityState), l'état
+        // `disabled` sur téléphone ; `disabled` fait aussi ignorer le toucher.
+        disabled={disabled}
+        {...(disabled
+          ? Platform.OS === 'web'
+            ? { 'aria-disabled': true }
+            : { accessibilityState: { checked, disabled: true } }
+          : null)}
         onPress={() => onChange(option.value)}
         onLayout={measurePlace(index)}
         {...keys(index)}
@@ -195,6 +237,13 @@ export function Segmented<T extends string>({
         >
           {option.label}
         </Text>
+        {option.waiting ? (
+          // La place du nombre (« 6 », « 20+ »), à la hauteur d'une ligne du libellé : la goutte
+          // et la rangée gardent leur taille quand il arrive.
+          <View {...hiddenFromReaders}>
+            <TextLineShape variant="callout" width={COUNT_WIDTH} />
+          </View>
+        ) : null}
       </Pressable>
     )
   })

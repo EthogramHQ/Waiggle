@@ -35,6 +35,9 @@ const fr = {
     'Les deux groupes à 390 points : les catégories passent entières à la ligne, sans trait en tête',
   scroll:
     'Bande qui défile (scroll, 320 points ici, un téléphone) : la pastille cochée, la dernière, se montre en entier',
+  waiting:
+    'Les choix pas encore lus (waiting, R16) : le vrai « Toutes », puis huit pastilles vides, qui passent à la ligne (ici 600 points)',
+  waitingScroll: 'Les mêmes dans la bande qui défile (320 points ici, un téléphone)',
   narrow:
     'Colonne étroite (150 points ici, le texte à 200 %) : les pastilles passent à la ligne, un nom long dans sa pastille',
   mosaic2: 'Mosaïque en deux colonnes (téléphone, 390 points ici)',
@@ -73,6 +76,9 @@ const en: typeof fr = {
   groupsNarrow: 'Both groups at 390 points: the categories wrap as a whole, with no leading line',
   scroll:
     'Scrolling strip (scroll, 320 points here, a phone): the checked pill, the last one, shows in full',
+  waiting:
+    'Choices not read yet (waiting, R16): the real “All”, then eight empty pills, which wrap (600 points here)',
+  waitingScroll: 'The same in the scrolling strip (320 points here, a phone)',
   narrow:
     'Narrow column (150 points here, text at 200%): the pills wrap, a long name inside its pill',
   mosaic2: 'Mosaic in two columns (phone, 390 points here)',
@@ -228,6 +234,23 @@ export function ToolFiltersCatalogue() {
                   {...explore}
                   value="science"
                   options={options}
+                  scroll
+                  onChange={noop}
+                />
+              </Frame>
+            </Example>
+            <Example caption={`${l.waiting} — ${l[scheme]}`}>
+              <Frame width={600}>
+                <FilterPills {...explore} value={null} options={[]} waiting={8} onChange={noop} />
+              </Frame>
+            </Example>
+            <Example caption={`${l.waitingScroll} — ${l[scheme]}`}>
+              <Frame width={320}>
+                <FilterPills
+                  {...explore}
+                  value={null}
+                  options={[]}
+                  waiting={8}
                   scroll
                   onChange={noop}
                 />

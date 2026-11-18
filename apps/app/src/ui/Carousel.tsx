@@ -27,7 +27,7 @@ import {
 } from 'react-native'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
-import { useLayout } from './theme/layout'
+import { type SizeClass, useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 
 type Props = {
@@ -74,6 +74,40 @@ export const shadowReachBelow = (name: ShadowName): number => {
   return Math.max(reach(shadows.day[name]), reach(shadows.night[name]))
 }
 
+/**
+ * L'écart entre deux cartes de la bande : des étiquettes serrées comme une ligne de texte, des
+ * cartes plus espacées sur ordinateur que sur téléphone. Un seul endroit pour la bande et sa forme
+ * vide (`CarouselShapes`) : changé ici, le squelette tombe toujours sur les vraies cartes.
+ */
+export const carouselGap = (variant: 'cards' | 'chips', sizeClass: SizeClass): number =>
+  variant === 'chips' ? space.sm : sizeClass === 'compact' ? space.md : space.xxl
+
+/**
+ * R16 (« rien ne bouge à l'arrivée ») : les pièces vides d'un carrousel qui charge, côte à côte, à
+ * l'écart de ses vraies cartes (`carouselGap`). Posées par l'écran comme une seule case de la bande
+ * (`Carousel`), sous son `Loading` : ni rôle ni nom à elles.
+ */
+export function CarouselShapes({
+  children,
+  variant = 'cards',
+}: {
+  children: ReactNode
+  variant?: 'cards' | 'chips'
+}) {
+  const { sizeClass } = useLayout()
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: carouselGap(variant, sizeClass),
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
 /** Les styles du web que les types de React Native ne connaissent pas (aimantation CSS). */
 const webOnly = (style: Record<string, string | number>): ViewStyle =>
   (Platform.OS === 'web' ? style : {}) as unknown as ViewStyle
@@ -103,7 +137,7 @@ export function Carousel({
   // négative, puis même marge à l'intérieur). Au moins quelques points, pour que l'anneau du
   // clavier de la première carte ne soit pas rogné ; jusqu'au bord de l'écran avec `bleed`.
   const edge = bleed && sizeClass === 'compact' ? padding : space.xs
-  const gap = variant === 'chips' ? space.sm : sizeClass === 'compact' ? space.md : space.xxl
+  const gap = carouselGap(variant, sizeClass)
   // L'air sous les cartes (relecture de design R12, point 3) : de quoi tenir leur ombre entière.
   // La bande s'allonge d'autant vers le bas, puis une marge négative la ramène : ce qui suit reste à
   // sa place, et passe par-dessus cette marge vide (dessiné après, il reçoit aussi les touchers).

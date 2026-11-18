@@ -48,6 +48,9 @@ const fr = {
     'Trop de choix pour la place (ici 280 points) : une rangée qui défile de côté, le choix actif toujours visible en entier.',
   results: 'Résultats',
   tabs: ['Tout', 'Projets 12', 'Membres 3', 'Outils 1'],
+  waiting:
+    'Pendant la recherche (R16) : les vrais noms des onglets, une pièce vide à la place de chaque nombre ; « Tout » reste choisi, les autres attendent.',
+  waitingTabs: ['Tout', 'Projets', 'Membres', 'Outils'],
   initials:
     'Les initiales d’un avatar sans photo suivent la taille du rond, de 96 à 20 points, et n’en sortent jamais, même avec le texte agrandi.',
   radioTitle: 'Pourquoi le signales-tu ?',
@@ -87,6 +90,9 @@ const en: typeof fr = {
     'Too many choices for the room (here 280 points): a row that scrolls sideways, the checked choice always fully in view.',
   results: 'Results',
   tabs: ['All', 'Projects 12', 'Members 3', 'Tools 1'],
+  waiting:
+    'While searching (R16): the real names of the tabs, an empty piece in place of each count; “All” stays checked, the others wait.',
+  waitingTabs: ['All', 'Projects', 'Members', 'Tools'],
   initials:
     'The initials of an avatar without a photo follow the size of the round, from 96 to 20 points, and never leave it, even with larger text.',
   radioTitle: 'Why are you reporting it?',
@@ -217,6 +223,21 @@ export function ControlsCatalogue() {
           onChange={setTab}
         />
       </View>
+
+      <Text variant="caption" tone="muted">
+        {l.waiting}
+      </Text>
+      <Segmented
+        label={l.results}
+        fill={false}
+        options={l.waitingTabs.map((label, index) => ({
+          value: String(index),
+          label,
+          waiting: index > 0,
+        }))}
+        value="0"
+        onChange={noop}
+      />
 
       {/* R3 : des initiales à toutes les tailles du rond, jusqu'au plus petit (carte d'un testeur). */}
       <Text variant="caption" tone="muted">
