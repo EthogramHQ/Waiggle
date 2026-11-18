@@ -53,7 +53,12 @@ import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { DeleteProjectDialog } from '../projects/DeleteProjectDialog'
-import { useProject, useProjectPreview } from '../projects/hooks'
+import {
+  type ShowcasePreview,
+  useProject,
+  useProjectPreview,
+  useShowcasePreview,
+} from '../projects/hooks'
 import { MakePrivateDialog } from '../projects/MakePrivateDialog'
 import { ProjectActions } from '../projects/ProjectActions'
 import { type HeaderProject, ProjectHeader } from '../projects/ProjectHeader'
@@ -133,6 +138,9 @@ function ProjectContent({ id, session }: { id: string; session: SessionData }) {
   // R14 (plan, choix 4) : ce qu'une liste déjà lue sait du projet (la page de son auteur, le Fil),
   // montré tant que l'API n'a pas répondu ; null si aucune ne le connaît.
   const preview = useProjectPreview(id)
+  // R17 : sinon, le peu qu'en sait la vitrine déjà lue (« À la une », l'accueil, la modération) : sa
+  // photo, qui sert de cible à la photo qui vole depuis la carte, son titre, son auteur, son statut.
+  const showcased = useShowcasePreview(id)
 
   if (project.error) {
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui
@@ -160,6 +168,10 @@ function ProjectContent({ id, session }: { id: string; session: SessionData }) {
   // (un lien direct), la page vide a la forme du haut de la page d'un projet (galerie et en-tête).
   if (project.data) return <ProjectView project={project.data} viewerId={session.user.id} />
   if (preview) return <ProjectView project={preview} viewerId={session.user.id} />
+  // R17 : toujours le même `ProjectView`, pour que la photo et le titre restent à leur place quand
+  // le projet arrive. La carte de la vitrine en sait moins qu'une liste : la vue n'en tire que ce
+  // qu'elle sait (voir `ViewProps`).
+  if (showcased) return <ProjectView project={showcased} viewerId={session.user.id} />
   return <ProjectWaiting />
 }
 
@@ -203,9 +215,11 @@ const previewHeader = (summary: ProjectSummary, viewerId: string): HeaderProject
 type ViewProps = {
   /**
    * Ce que la page sait du projet : le projet complet (`Project`, la réponse de l'API), ou son aperçu
-   * (`ProjectSummary`, tiré d'une liste en cache, R14) tant que l'API n'a pas répondu.
+   * (`ProjectSummary`, tiré d'une liste en cache, R14) tant que l'API n'a pas répondu ; R17, ou ce
+   * qu'en sait une carte de la vitrine (`ShowcasePreview`) : ni visibilité, ni dates, ni auteur par
+   * son identifiant. Seuls le projet complet a `visuals`, et une liste `visibility`.
    */
-  project: Project | ProjectSummary
+  project: Project | ProjectSummary | ShowcasePreview
   /** L'identifiant du membre connecté : l'aperçu en tire seul s'il est l'auteur. */
   viewerId: string
 }
@@ -341,10 +355,11 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   // règle que la feuille « Partager » (`useShareLink`) : un projet public se copie à son adresse
   // dans la langue du membre (`/fr/projects/<id>`), et le toast dit que tout le monde pourra
   // l'ouvrir (R12, Q18) ; un projet d'une ruche nomme la ruche (R10).
+  // R17 : une carte de la vitrine ne dit pas qui pourra l'ouvrir ; le lien n'est alors pas proposé
+  // (`shareable` attend le projet complet), on ne lui passe donc rien.
   const link = useShareLink({
     target: { kind: 'project', id: shown.id },
-    visibility: shown.visibility,
-    hive: shown.hive,
+    ...('visibility' in shown ? { visibility: shown.visibility, hive: shown.hive } : null),
   })
   const copyLink = async () => {
     if (!link.url) return
@@ -580,7 +595,14 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   // pastille « Suivre » près de l'auteur (`followable`), qui arrive avec le projet complet.
   const header = (
     <ProjectHeader
-      project={'visuals' in shown ? shown : previewHeader(shown, viewerId)}
+      project={
+        'visuals' in shown
+          ? shown
+          : 'visibility' in shown
+            ? previewHeader(shown, viewerId)
+            : // R17 : la carte de la vitrine, telle quelle : l'en-tête n'en montre que ce qu'elle sait.
+              shown
+      }
       titleRef={titleRef}
       followable={project !== null}
     />
