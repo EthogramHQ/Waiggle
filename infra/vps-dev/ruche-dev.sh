@@ -7,7 +7,7 @@
 #   ruche-dev run <branche> <commit> -- <cmd…>    prepare, puis la commande dans la copie
 #   ruche-dev apercu <branche> | stop             l'aperçu (API + appli) suit cette branche
 #   ruche-dev etat                                ce qui tourne, mémoire, copies de travail
-#   ruche-dev mails [n]                           les derniers e-mails de l'API d'aperçu (liens)
+#   ruche-dev mails [n]                           les n derniers e-mails de l'API d'aperçu (3)
 #   ruche-dev navigateurs                          Chromium pour Playwright (captures, parcours)
 #   ruche-dev post-receive                        appelé par le hook du dépôt nu
 #
@@ -198,8 +198,17 @@ etat() {
 }
 
 mails() {
-  journalctl -u ruche-dev-api --no-pager -n 2000 -o cat 2>/dev/null |
-    grep -iE 'to:|subject|sujet|https?://[^ ]+(verify|token|reset|invite)[^ ]*' | tail -n "${1:-20}"
+  # L'API écrit chaque e-mail entre « --- E-mail pour … --- » et « --- fin --- » (createConsoleMailer) :
+  # on montre les n derniers en entier, liens compris.
+  journalctl -u ruche-dev-api --no-pager -n 5000 -o cat 2>/dev/null |
+    awk -v n="${1:-3}" '
+      /^--- E-mail pour / { on = 1; b = "" }
+      on { b = b $0 "\n" }
+      /^--- fin ---/ { if (on) m[++k] = b; on = 0 }
+      END {
+        if (!k) { print "aucun e-mail depuis le démarrage de l API"; exit }
+        for (i = (k > n ? k - n + 1 : 1); i <= k; i++) printf "%s\n", m[i]
+      }'
 }
 
 # Chromium pour Playwright (captures, parcours), à la version que le dépôt demande : une fois par
