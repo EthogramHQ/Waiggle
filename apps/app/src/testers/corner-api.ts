@@ -126,11 +126,16 @@ const nextCursor = (last: { nextCursor: string | null }) => last.nextCursor ?? u
 
 // --- Les lectures ---
 
-/** Hook : le coin du projet (rôle de celui qui regarde, nombre de testeurs, liste pour l'auteur). */
-export const useTesterCorner = (projectId: string) =>
+/**
+ * Hook : le coin du projet (rôle de celui qui regarde, nombre de testeurs, liste pour l'auteur).
+ * `enabled` faux : rien n'est demandé (la feuille « Ton retour » tant que la garde de session n'a
+ * pas vu de membre, R16 ; comme `useMe` et `useProject`).
+ */
+export const useTesterCorner = (projectId: string, enabled = true) =>
   useQuery({
     queryKey: cornerKey(projectId),
     queryFn: () => read(`${cornerPath(projectId)}/testers`, TesterCorner),
+    enabled,
   })
 
 /** Hook : les appels du projet, 20 par page, du plus récent au plus ancien. */

@@ -21,7 +21,7 @@ import type { Project } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { nextAfterSignIn, useSignInAgain } from '../navigation/signInAgain'
 import { type HeldAction, useLeaveGuard } from '../navigation/useLeaveGuard'
@@ -48,7 +48,7 @@ import { useSubmitProject } from '../projects/useSubmitProject'
 import { Button } from '../ui/Button'
 import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Sheet, type SheetNotice, useSheetAside } from '../ui/Sheet'
-import { SkeletonList } from '../ui/Skeleton'
+import { Loading, SkeletonPage } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { type StateKind, StateMessage } from '../ui/StateMessage'
 import { SuspensionBanner } from '../ui/SuspensionBanner'
@@ -82,10 +82,28 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   return (
     <>
       {alone ? <HomeScreen /> : null}
-      <ProjectFormSheet id={id} uploadFailed={uploadFailed} />
+      {/* R16 : la garde commune, comme « Nouvelle mise à jour » (UpdateSheet.tsx). La publication
+          reste une feuille dans tous les états : en attente, la feuille et ses champs vides (la
+          forme `form`, à la largeur de la feuille) ; pour un visiteur, la feuille « Réservé aux
+          membres » ; si la session ne se lit pas, l'erreur dans la feuille, dont « Réessayer »
+          relit la session. Les quatre issues dessinent le même composant, placé au même endroit
+          par la garde : la feuille ouverte pendant l'attente ne se referme pas pour se rouvrir
+          quand la session arrive. Rien n'est demandé à l'API avant `signedIn`. */}
+      <SessionGate
+        loading={<ProjectFormSheet id={id} uploadFailed={uploadFailed} reading="pending" />}
+        signedOut={<ProjectFormSheet id={id} uploadFailed={uploadFailed} reading="signedOut" />}
+        error={(retry) => (
+          <ProjectFormSheet id={id} uploadFailed={uploadFailed} reading="error" onRetry={retry} />
+        )}
+      >
+        {() => <ProjectFormSheet id={id} uploadFailed={uploadFailed} reading="signedIn" />}
+      </SessionGate>
     </>
   )
 }
+
+/** Ce que la garde a lu de la session, quand elle dessine la feuille (`error` : elle ne se lit pas). */
+type Reading = 'pending' | 'error' | 'signedOut' | 'signedIn'
 
 /** Un état qui remplace le formulaire, dans la même feuille : titre, phrase et issues. */
 type SheetState = {
@@ -95,23 +113,31 @@ type SheetState = {
   actions?: { label: string; onPress: () => void }[]
 }
 
-/** Choisit ce que montre la feuille : un état (chargement, suspendu, introuvable…) ou le formulaire. */
+/**
+ * Choisit ce que montre la feuille : un état (chargement, suspendu, introuvable…) ou le formulaire.
+ * `reading` vient de la garde : rien n'est demandé à l'API avant `signedIn`.
+ */
 function ProjectFormSheet({
   id,
   uploadFailed,
+  reading,
+  onRetry,
 }: {
   id?: string | undefined
   uploadFailed: boolean
+  reading: Reading
+  /** Relit la session (`reading` vaut `error`) : le « Réessayer » de la feuille. */
+  onRetry?: () => void
 }) {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
   // Sans page d'avant, le Fil est posé sous la feuille (ProjectFormScreen) : la fermer y mène (`/feed`).
   const sheet = useRouteSheet('/feed')
-  const { state, session, retry } = useMemberSession()
+  const signedIn = reading === 'signedIn'
   // Le profil (sa suspension) d'abord : rien à taper tant qu'on ne sait pas si l'on peut publier.
-  const me = useMe(Boolean(session))
-  const project = useProject(id ?? '', Boolean(session && id && me.data))
+  const me = useMe(signedIn)
+  const project = useProject(id ?? '', Boolean(signedIn && id && me.data))
   const title = id ? t(($) => $.project.form.editTitle) : t(($) => $.project.form.newTitle)
 
   const shown = (content: ReactNode) => (
@@ -119,7 +145,13 @@ function ProjectFormSheet({
       {content}
     </Sheet>
   )
-  const loading = shown(<SkeletonList count={2} />)
+  // R16 : les champs vides du formulaire qui arrive (la forme `form` des pages, plan R16 choix 5),
+  // dans la feuille, à sa largeur ; un seul `progressbar` « Chargement » autour (choix 4).
+  const loading = shown(
+    <Loading>
+      <SkeletonPage shape="form" />
+    </Loading>,
+  )
   const stateSheet = ({ actions, ...rest }: SheetState) =>
     shown(<StateMessage level={2} {...rest} actions={actions ?? []} />)
   const seeProject = (projectId: string) => ({
@@ -150,17 +182,17 @@ function ProjectFormSheet({
           actions: [{ label: t(($) => $.common.retry), onPress: onRetry }],
         })
 
-  if (state === 'pending') return loading
+  if (reading === 'pending') return loading
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') {
+  if (reading === 'error') {
     return stateSheet({
       kind: 'error',
       title: t(($) => $.states.errorTitle),
       message: t(($) => $.account.loadError),
-      actions: [{ label: t(($) => $.common.retry), onPress: retry }],
+      actions: [{ label: t(($) => $.common.retry), onPress: () => onRetry?.() }],
     })
   }
-  if (!session) return signedOut(false)
+  if (reading === 'signedOut') return signedOut(false)
   if (!me.data) return me.error ? failed(me.error, () => void me.refetch()) : loading
   if (me.data.suspension) {
     // La feuille couvre la page, et avec elle le bandeau de la barre du haut (sur téléphone, il est
