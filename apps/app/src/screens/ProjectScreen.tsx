@@ -111,10 +111,20 @@ import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
  */
 export function ProjectScreen({ id }: { id: string }) {
   return (
-    <SessionGate width="page" loading={<LoadingScreen shape="project" fade={false} />}>
+    <SessionGate width="page" loading={<ProjectWaiting />}>
       {(session) => <ProjectContent id={id} session={session} />}
     </SessionGate>
   )
+}
+
+/**
+ * La page vide d'un projet, pendant l'attente de la session puis du projet (un lien direct, sans
+ * aperçu). R16 : avec, dès le début, le « Retour » du haut de la page qui arrive (`backLabel`) :
+ * sur téléphone, une page de projet n'a ni barre ni onglets, et l'attente restait 4 s sans issue.
+ */
+function ProjectWaiting() {
+  const { t } = useTranslation()
+  return <LoadingScreen shape="project" fade={false} backLabel={t(($) => $.project.page.back)} />
 }
 
 function ProjectContent({ id, session }: { id: string; session: SessionData }) {
@@ -150,7 +160,7 @@ function ProjectContent({ id, session }: { id: string; session: SessionData }) {
   // (un lien direct), la page vide a la forme du haut de la page d'un projet (galerie et en-tête).
   if (project.data) return <ProjectView project={project.data} viewerId={session.user.id} />
   if (preview) return <ProjectView project={preview} viewerId={session.user.id} />
-  return <LoadingScreen shape="project" fade={false} />
+  return <ProjectWaiting />
 }
 
 /**

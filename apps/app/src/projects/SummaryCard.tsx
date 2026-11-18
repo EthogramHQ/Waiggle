@@ -111,6 +111,11 @@ type Props = {
    * en plein vol. Le Fil garde sa règle (la verticale sur téléphone, plus haute).
    */
   galleryCover?: boolean
+  /**
+   * R16 : la carte d'un résultat de recherche (la Recherche en grand) : les mots cherchés et
+   * l'extrait qui a correspondu, transmis tels quels à ProjectCard (voir sa prop `match`).
+   */
+  match?: ComponentProps<typeof ProjectCard>['match']
 }
 
 export function SummaryCard({
@@ -123,6 +128,7 @@ export function SummaryCard({
   owner = false,
   size,
   galleryCover = false,
+  match,
 }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -204,6 +210,7 @@ export function SummaryCard({
       // qu'elle a ouvert ; à 1 (immobile) le reste du temps.
       bounceStyle={cover.bounceStyle}
       updated={updated}
+      match={match}
     />
   )
 }

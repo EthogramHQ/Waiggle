@@ -24,7 +24,7 @@
 // « Exemple » à côté de son statut ; elle décrit le lien elle aussi, entre le statut et l'auteur
 // (« Testable, Exemple, WaiggleBot »), pour qu'un lecteur d'écran ne prenne pas le projet pour un
 // vrai.
-import { layout, radii, type ShadowName, space } from '@ruche/brand'
+import { borders, layout, radii, type ShadowName, space } from '@ruche/brand'
 import { type ReactNode, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -201,13 +201,18 @@ export function ShowcaseCardSkeleton({
     >
       <SkeletonSurface height={height} column={column}>
         <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: space.sm }}>
-          {/* Le verre, plein : la matière d'une feuille, aux coins et aux marges du panneau. */}
+          {/* Le verre, plein, aux coins et aux marges du panneau, bordé du filet du vrai verre
+              (`panelBorder`), dans le rôle du panneau d'une carte vide (`skeletonPanel`), comme
+              `ProjectCardSkeleton` : de nuit, la feuille (`sheet`) avait la couleur exacte de la
+              carte vide et s'y confondait (planche R16-Nuit-390). */}
           <View
             style={{
               gap: space.sm,
               padding: space.md,
               borderRadius: radii.panel,
-              backgroundColor: colors.sheet,
+              borderWidth: borders.hairline,
+              borderColor: colors.panelBorder,
+              backgroundColor: colors.skeletonPanel,
             }}
           >
             <Shape height={SKELETON_LINE} width="70%" />

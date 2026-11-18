@@ -62,6 +62,7 @@ export function LoadingScreen({
   fade = true,
   fallback = '/feed',
   shape: givenShape,
+  backLabel,
 }: {
   /** La largeur de la page : sans elle, celle de sa forme ; sans l'une ni l'autre, `form`. */
   width?: Width
@@ -78,6 +79,14 @@ export function LoadingScreen({
    * pour une page de visiteur, à qui le Fil dirait « Réservé aux membres ».
    */
   fallback?: Href
+  /**
+   * R16 : le nom du « Retour » du haut de la page, posé dès le début de l'attente (écrit en toutes
+   * lettres sur ordinateur et tablette, l'icône seule nommée sur téléphone), comme sur la page qui
+   * arrive. La page d'un projet ouverte par son adresse, sur téléphone, n'a ni barre ni onglets :
+   * sans lui, elle restait 4 s sans issue. Il mène, comme « Revenir », à la page d'avant ou à
+   * `fallback`, et le remplace : « Revenir » ne vient pas s'y ajouter au bout de 4 s.
+   */
+  backLabel?: string
 }) {
   const { t } = useTranslation()
   const back = useGoBack(fallback)
@@ -85,19 +94,24 @@ export function LoadingScreen({
   const shape = givenShape ?? shapeOfWidth[width]
   // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
   // « Revenir » apparaît sous le squelette (rien ne bouge au-dessus), pour ne jamais laisser le
-  // membre sans issue.
+  // membre sans issue. Avec le « Retour » du haut (`backLabel`), l'issue est déjà là.
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     const timer = setTimeout(() => setSlow(true), SLOW_LOADING_MS)
     return () => clearTimeout(timer)
   }, [])
   return (
-    <Screen header={<TopNav />} width={width} fade={fade}>
+    <Screen
+      header={<TopNav />}
+      width={width}
+      fade={fade}
+      {...(backLabel === undefined ? null : { onBack: back, backLabel })}
+    >
       <Stack gap="xl" align="stretch">
         <Loading>
           <SkeletonPage shape={shape} />
         </Loading>
-        {slow ? (
+        {slow && backLabel === undefined ? (
           <Stack align="start">
             <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
           </Stack>

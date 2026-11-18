@@ -75,6 +75,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { Avatar } from './Avatar'
 import { describedBy } from './aria'
 import { ExampleBadge } from './ExampleBadge'
+import { HighlightedText } from './HighlightedText'
 import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
@@ -212,6 +213,14 @@ type Props = {
   /** R7a : le projet remonté par sa mise à jour (voir `ProjectCardUpdate`). */
   updated?: ProjectCardUpdate
   /**
+   * R16 (planches R16-Recherche-1440 et -1920) : la carte d'un résultat de recherche. `words`, les
+   * mots cherchés, surlignés de miel dans le titre et l'extrait (`HighlightedText`) ; `excerpt`, le
+   * passage de la description qui a correspondu, déjà prêt (« « … le carnet de balades… » »),
+   * montré à la place de l'accroche, même sur une compacte avec photo : il dit pourquoi le projet
+   * est trouvé. `excerpt` à null (le titre a correspondu) : l'accroche, comme ailleurs.
+   */
+  match?: { words: readonly string[]; excerpt: string | null }
+  /**
    * L'heure qu'il est, pour figer la date de la mise à jour (`updated.at`) : le catalogue et les
    * captures ; l'horloge de l'appareil sinon (comme `RelativeTime`).
    */
@@ -298,6 +307,7 @@ export function ProjectCard({
   coverRef,
   updated,
   now,
+  match,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -365,8 +375,12 @@ export function ProjectCard({
   // Le repère « Mis à jour » posé dans la rangée du bas, à côté du statut : celui d'une `badge`, et
   // celui d'une `full` qui n'a pas de rangée de l'auteur où se poser (carte compacte ou sans auteur).
   const mark = updated && !(change && author) ? updated.label : null
-  // R14 : sur une carte compacte avec photo, pas d'accroche (elle couvrirait la photo).
-  const showPitch = !compact || !image
+  // R16 : l'extrait qui a correspondu à une recherche, à la place de l'accroche.
+  const excerpt = match?.excerpt ?? null
+  // R14 : sur une carte compacte avec photo, pas d'accroche (elle couvrirait la photo). R16 :
+  // l'extrait d'une recherche, si : c'est lui qui dit pourquoi le projet est trouvé (planche
+  // R16-Recherche-1440), au prix d'un verre un peu plus haut.
+  const showPitch = !compact || !image || excerpt !== null
   // Sa ligne décrit le lien à la place de l'accroche, avec sa famille (« Nouveau : Un compte à
   // rebours… »), puis « et 2 autres changements » : la pastille de famille ne la dit qu'en couleur.
   const changeId = useId()
@@ -491,14 +505,34 @@ export function ProjectCard({
               milieu d'un mot (« Décollage » / « ! », essai du catalogue). Trois lignes : sans
               accroche, le titre est le seul texte qui nomme une compacte avec photo, et deux
               lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
-          <Text
-            variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
-            numberOfLines={compact ? 3 : 2}
-          >
-            {title}
-          </Text>
+          {/* R16 : dans un résultat de recherche, les mots cherchés y sont surlignés ; le titre
+              reste un seul texte, lu d'un tenant. */}
+          {match ? (
+            <HighlightedText
+              variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
+              numberOfLines={compact ? 3 : 2}
+              text={title}
+              words={match.words}
+            />
+          ) : (
+            <Text
+              variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
+              numberOfLines={compact ? 3 : 2}
+            >
+              {title}
+            </Text>
+          )}
           {change ? (
             <UpdateChange line={change.line} more={change.more} />
+          ) : showPitch && match && excerpt !== null ? (
+            <HighlightedText
+              variant="callout"
+              tone="secondary"
+              numberOfLines={2}
+              nativeID={pitchId}
+              text={excerpt}
+              words={match.words}
+            />
           ) : showPitch ? (
             <Text variant="callout" tone="secondary" numberOfLines={2} nativeID={pitchId}>
               {pitch}
