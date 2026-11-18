@@ -124,8 +124,10 @@ export function EmailChangeResultScreen({ step }: Props) {
   // au-dessus et au-dessous des autres textes, et tout bougerait sous le doigt (70 pt mesurés).
   // R16 : le squelette d'une colonne étroite (`form`), à la largeur de la page qui arrive. La page
   // reste hors de la garde commune (accounts/SessionGate.tsx) : elle parle aussi à un visiteur,
-  // ouvert depuis un autre appareil, et ne lui dit jamais « Réservé aux membres ».
-  if (step === 'done' && !refused && state === 'pending') return <LoadingScreen shape="form" />
+  // ouvert depuis un autre appareil, et ne lui dit jamais « Réservé aux membres ». Pour la même
+  // raison, « Revenir » mène à l'accueil (`/`), qui envoie un membre au Fil, et pas au Fil lui-même.
+  if (step === 'done' && !refused && state === 'pending')
+    return <LoadingScreen shape="form" fallback="/" />
 
   return (
     <Screen pageTitle={page.title}>
