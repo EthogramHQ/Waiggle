@@ -12,7 +12,8 @@ import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
 import { changeEmail } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
+import type { SessionData } from '../accounts/session'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
@@ -25,7 +26,7 @@ import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe (le message générique d'une
 // erreur inattendue peut en être un).
@@ -44,10 +45,23 @@ const fieldOf = (error: AuthErrorKey): keyof FieldErrors | null => {
   return null
 }
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, le squelette d'un
+ * formulaire ; la session ne se lit pas (trop de demandes, serveur en panne) : « Réessayer », on ne
+ * sait pas qui est là ; personne de connecté : « Réservé aux membres » (et retour ici ensuite).
+ */
 export function ChangeEmailScreen() {
+  return (
+    <SessionGate loading={<LoadingScreen shape="form" />}>
+      {(session) => <ChangeEmail session={session} />}
+    </SessionGate>
+  )
+}
+
+/** La page elle-même, une fois la session lue : ses hooks vivent ici, jamais dans la garde. */
+function ChangeEmail({ session }: { session: SessionData }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, session: data, retry: retrySession } = useMemberSession()
   // Arrivé par un lien direct : le retour mène à la rubrique « Compte » des réglages (R2).
   const back = useGoBack('/settings/account')
   const [newEmail, setNewEmail] = useState('')
@@ -72,12 +86,7 @@ export function ChangeEmailScreen() {
     focusWithoutScroll(messageRef.current)
   })
 
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
-  // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
-  if (!data) return <SignedOutScreen />
-  const current = data.user.email
+  const current = session.user.email
 
   const submit = async () => {
     if (busy.current || sentTo) return

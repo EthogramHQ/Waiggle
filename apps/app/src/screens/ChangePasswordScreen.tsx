@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { changePassword } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Callout } from '../ui/Callout'
@@ -23,7 +23,7 @@ import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
@@ -34,10 +34,21 @@ type FieldErrors = {
   next?: 'passwordTooShort' | 'passwordTooLong'
 }
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, le squelette d'un
+ * formulaire ; la session ne se lit pas (trop de demandes, serveur en panne) : « Réessayer », on ne
+ * sait pas qui est là ; personne de connecté : « Réservé aux membres » (et retour ici ensuite).
+ */
 export function ChangePasswordScreen() {
+  return (
+    <SessionGate loading={<LoadingScreen shape="form" />}>{() => <ChangePassword />}</SessionGate>
+  )
+}
+
+/** La page elle-même, une fois la session lue : ses hooks vivent ici, jamais dans la garde. */
+function ChangePassword() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, session: data, retry: retrySession } = useMemberSession()
   const back = useGoBack('/settings')
   const [current, setCurrent] = useState('')
   const [fresh, setFresh] = useState('')
@@ -57,12 +68,6 @@ export function ChangePasswordScreen() {
     focusMessage.current = false
     focusWithoutScroll(messageRef.current)
   })
-
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
-  // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
-  if (!data) return <SignedOutScreen />
 
   const submit = async () => {
     if (busy.current || retry.blocked) return

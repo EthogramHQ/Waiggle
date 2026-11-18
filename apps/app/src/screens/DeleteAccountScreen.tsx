@@ -11,7 +11,8 @@ import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { deleteAccount, downloadMyData } from '../accounts/api'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
+import type { SessionData } from '../accounts/session'
 import { useMediaSources } from '../api/media'
 import { useMember } from '../members/api'
 import { useRouteSheet } from '../navigation/useRouteSheet'
@@ -30,17 +31,31 @@ import { Text } from '../ui/Text'
 import { TextField, type TextFieldInput } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
 import { useCalmMotion } from '../ui/theme/motion'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, le squelette d'un
+ * formulaire ; la session ne se lit pas (trop de demandes, serveur en panne) : « Réessayer », on ne
+ * sait pas qui est là ; personne de connecté : « Réservé aux membres » (et retour ici ensuite).
+ */
 export function DeleteAccountScreen() {
+  return (
+    <SessionGate loading={<LoadingScreen shape="form" />}>
+      {(session) => <DeleteAccount session={session} />}
+    </SessionGate>
+  )
+}
+
+/** La feuille elle-même, une fois la session lue : ses hooks vivent ici, jamais dans la garde. */
+function DeleteAccount({ session: data }: { session: SessionData }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, session: data, retry: retrySession } = useMemberSession()
-  // Le profil, pour citer le pseudo qui redevient libre (lu dans le cache s'il y est déjà).
-  const me = useMe(Boolean(data))
+  // Le profil, pour citer le pseudo qui redevient libre (lu dans le cache s'il y est déjà). Il ne
+  // se demande qu'une fois la session lue : la garde ne dessine cette feuille qu'à ce moment.
+  const me = useMe()
   const [password, setPassword] = useState('')
   // Le refus du dernier essai : écrit dans le pied de la feuille, près du bouton touché (relecture
   // de design R2, B2) ; le champ, lui, passe en erreur sans répéter la phrase.
@@ -60,11 +75,6 @@ export function DeleteAccountScreen() {
   // lit pas, la feuille montre sa seule photo : rien d'autre n'en dépend.
   const member = useMember(me.data?.id ?? '', Boolean(me.data))
   const toSource = useMediaSources()
-
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
-  if (!data) return <SignedOutScreen />
 
   const onExport = async () => {
     setBusy('export')
