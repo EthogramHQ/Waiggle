@@ -42,7 +42,8 @@ import { usePathname, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
+import type { SessionData } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useBlock, useUnblock } from '../blocks/api'
@@ -54,6 +55,9 @@ import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { ProvisionalNameBanner } from '../profile/ProvisionalNameBanner'
+// L'aperçu d'un membre est lu à sa source (projects/hooks.ts), pas par members/api.ts qui le
+// réexporte : les tests de cette page remplacent members/api par de faux modules.
+import { useMemberPreview } from '../projects/hooks'
 import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Avatar } from '../ui/Avatar'
@@ -65,24 +69,20 @@ import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
-import { MemberHeader } from '../ui/MemberHeader'
+import { MemberHeader, MemberHeaderSkeleton } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { ProjectMosaic } from '../ui/ProjectMosaic'
 import { parisDateTime } from '../ui/parisTime'
 import { RemovedPart } from '../ui/RemovedPart'
+import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
+import { Loading, SkeletonPage } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
 
 /** Les parties d'un profil que la modération peut retirer (les autres sont celles d'un projet). */
 const PROFILE_FIELDS = ['name', 'handle', 'bio', 'favoriteTools', 'avatar'] as const
@@ -177,17 +177,27 @@ function RemovedProfileParts({ member }: { member: Member }) {
   )
 }
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, la page vide d'un membre
+ * (son en-tête vide, puis la mosaïque de 4 petites cartes) ; en erreur, « Réessayer » ; sans
+ * session, « Réservé aux membres ». Aucune requête avant la session (la page d'un membre est
+ * réservée aux membres). La fonction enfant ne fait que rendre `MemberContent`, qui porte les hooks.
+ */
 export function MemberScreen({ id }: { id: string }) {
-  const { t } = useTranslation()
-  const { state, session, retry } = useMemberSession()
-  // Pas de session : aucune requête (la page d'un membre est réservée aux membres).
-  const member = useMember(id, Boolean(session))
+  return (
+    <SessionGate width="page" loading={<LoadingScreen shape="member" />}>
+      {(session) => <MemberContent id={id} session={session} />}
+    </SessionGate>
+  )
+}
 
-  // R14 : le squelette prend la forme des petites cartes de la mosaïque, celles qui arrivent.
-  if (state === 'pending') return <LoadingScreen width="wide" shape="compact" />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  if (!session) return <SignedOutScreen width="page" />
+function MemberContent({ id, session }: { id: string; session: SessionData }) {
+  const { t } = useTranslation()
+  const member = useMember(id)
+  // R16 (plan, choix 10) : ce qu'une liste déjà lue sait du membre (son nom, sa photo : l'auteur
+  // d'une carte touchée), montré tant que l'API n'a pas répondu ; null si aucune ne le connaît.
+  const preview = useMemberPreview(id)
+
   if (member.error) {
     // Introuvable : un membre inconnu, ou qui m'a bloqué. La même page, le même texte : rien ne
     // trahit le blocage.
@@ -204,12 +214,34 @@ export function MemberScreen({ id }: { id: string }) {
       <LoadErrorScreen error={member.error} onRetry={() => void member.refetch()} width="page" />
     )
   }
-  if (!member.data) return <LoadingScreen width="wide" shape="compact" />
-  return <MemberView member={member.data} />
+  // R16 : la page complète, sinon son aperçu, sinon la page vide (un lien direct). Le complet et
+  // l'aperçu passent par le **même** `MemberPage`, à la même place : quand la réponse arrive, React
+  // garde la page (sa barre, son « Retour », le défilement) et l'aperçu fond vers le contenu. Un 404,
+  // plus haut, remplace l'aperçu par « Introuvable ».
+  if (member.data)
+    return <MemberPage member={member.data} preview={preview} viewerId={session.user.id} />
+  if (preview) return <MemberPage member={null} preview={preview} viewerId={session.user.id} />
+  return <LoadingScreen shape="member" />
 }
 
-function MemberView({ member }: { member: Member }) {
-  const { t, i18n } = useTranslation()
+/** Ce qu'une liste sait d'un membre : l'auteur d'un projet (id, nom, photo). */
+type MemberPreview = ProjectSummary['author']
+
+/**
+ * La page d'un membre, avec ou sans sa réponse : la barre, « Retour », « Partager », puis la zone qui
+ * attend (`Reveal`). Sans la réponse (`member` vaut `null`), l'aperçu : le nom et la photo pour de
+ * vrai, le reste vide, à la place de ce qui arrive ; puis le fondu vers le contenu (plan R16, choix 9).
+ */
+function MemberPage({
+  member,
+  preview,
+  viewerId,
+}: {
+  member: Member | null
+  preview: MemberPreview | null
+  viewerId: string
+}) {
+  const { t } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène au Fil (`/feed`).
@@ -218,6 +250,131 @@ function MemberView({ member }: { member: Member }) {
   // « Retour » (on change de page par la barre d'onglets). Sa page ouverte par /members/<id> en a un.
   const pathname = usePathname()
   const onBack = pathname === '/me' ? undefined : back
+  // R15 : sur ordinateur (1 100 points et plus, une fois la fenêtre connue : avant l'hydratation,
+  // la page du téléphone), le profil en colonne à gauche et les projets à droite.
+  const column = useLayout().sizeClass === 'wide'
+
+  // La feuille « Partager » ouverte ou non, et son bouton (un bouton à icône seule : son nom
+  // « Partager » est lu). Pendant l'aperçu, ni l'un ni l'autre : la feuille a besoin de savoir si
+  // la page est publique, que seule la réponse dit.
+  const [sharing, setSharing] = useState(false)
+  const shareButton = (
+    <IconButton
+      icon="share-network"
+      label={t(($) => $.share.action)}
+      onPress={() => setSharing(true)}
+    />
+  )
+
+  return (
+    <Screen
+      width="wide"
+      header={<TopNav />}
+      onBack={onBack}
+      pageTitle={member?.name ?? preview?.name}
+      // Sur sa propre page, la roue des réglages, en haut à droite (R3, F-Nav8) : on entre dans
+      // les réglages par « Moi ». Sur la rangée du « Retour » quand il y en a un (sa page ouverte
+      // par /members/<id>), pas sur une rangée à elle en dessous. Un bouton à icône seule : son
+      // nom (« Réglages ») est lu.
+      //
+      // R5a (F-Mb1) : « Partager », sur la page d'un autre membre comme sur la sienne (à côté de la
+      // roue). Un membre qui m'a bloqué n'a pas de page pour moi (« introuvable », plus haut) : rien
+      // à partager.
+      topAction={
+        member === null ? undefined : member.isMe ? (
+          <Row gap="sm" align="center">
+            {shareButton}
+            <IconButton
+              icon="gear-six"
+              label={t(($) => $.nav.settings)}
+              onPress={() => router.push('/settings')}
+            />
+          </Row>
+        ) : (
+          shareButton
+        )
+      }
+    >
+      <Reveal
+        loading={member === null}
+        skeleton={
+          preview ? (
+            <MemberPreviewShapes preview={preview} mine={preview.id === viewerId} column={column} />
+          ) : null
+        }
+      >
+        {member ? <MemberView member={member} column={column} /> : null}
+      </Reveal>
+      {/* La feuille « Partager » (R5a) : l'adresse de la page, par l'identifiant du membre, sans
+          rien d'autre ; à la fermeture, le focus revient au bouton Partager. */}
+      {member ? (
+        <ShareSheet
+          open={sharing}
+          onClose={() => setSharing(false)}
+          title={member.name}
+          target={{ kind: 'member', id: member.id }}
+          // R12 (plan, décision 11) : une page publique s'ouvre pour tout le monde, à son adresse
+          // dans la langue de qui partage ; sinon, seuls les membres pourront l'ouvrir.
+          visibility={member.publicPage ? 'web' : 'public'}
+          image={toSource(member.avatarUrl)}
+        />
+      ) : null}
+    </Screen>
+  )
+}
+
+/**
+ * R16 (planches R16-Membre-1440 et 390) : la page d'un membre ouverte depuis une carte, avant la
+ * réponse. Son nom et sa photo, venus de la carte, s'affichent pour de vrai, hors du « Chargement… »
+ * (ils n'attendent rien) ; le reste de l'en-tête est vide, à ses places (`MemberHeaderSkeleton`).
+ * Puis le titre des projets (« Projets », ou « Mes projets » sur sa propre page : on le sait déjà),
+ * et la mosaïque vide, 4 petites cartes, sous le seul « Chargement… » de la page, qui se montre
+ * après 160 ms (plan, choix 8). Même mise en page que la page qui arrive : en colonne sur
+ * ordinateur, l'un sous l'autre ailleurs.
+ */
+function MemberPreviewShapes({
+  preview,
+  mine,
+  column,
+}: {
+  preview: MemberPreview
+  mine: boolean
+  column: boolean
+}) {
+  const { t } = useTranslation()
+  const toSource = useMediaSources()
+  const header = (
+    <MemberHeaderSkeleton
+      layout={column ? 'column' : undefined}
+      name={preview.name}
+      avatar={toSource(preview.avatarUrl)}
+    />
+  )
+  const title = mine ? t(($) => $.me.myProjects) : t(($) => $.member.projects)
+  const projects = (
+    <>
+      {/* Le titre seul (sans nombre : 0 l'omet) ; le nombre le rejoint à l'arrivée. */}
+      <CountedTitle title={title} count={0} spokenCount={title} />
+      <Loading>
+        <SkeletonPage shape="compact" />
+      </Loading>
+    </>
+  )
+  return column ? (
+    <Columns sideFirst sideWidth="profile" side={header} main={projects} />
+  ) : (
+    <Stack gap="xl">
+      {header}
+      {projects}
+    </Stack>
+  )
+}
+
+/** Le contenu de la page, une fois la réponse arrivée : le profil, ses actions et ses projets. */
+function MemberView({ member, column }: { member: Member; column: boolean }) {
+  const { t, i18n } = useTranslation()
+  const router = useRouter()
+  const toSource = useMediaSources()
   const follow = useFollow({ kind: 'member', id: member.id })
   const { block } = useBlock()
   const { unblock } = useUnblock()
@@ -370,26 +527,11 @@ function MemberView({ member }: { member: Member }) {
     return undefined
   }
 
-  // La feuille « Partager » ouverte ou non, et son bouton (un bouton à icône seule : son nom
-  // « Partager » est lu).
-  const [sharing, setSharing] = useState(false)
-  const shareButton = (
-    <IconButton
-      icon="share-network"
-      label={t(($) => $.share.action)}
-      onPress={() => setSharing(true)}
-    />
-  )
-
   const followError = follow.expired
     ? t(($) => $.states.expired)
     : follow.error
       ? t(($) => $.follow.error)
       : undefined
-
-  // R15 : sur ordinateur (1 100 points et plus, une fois la fenêtre connue : avant l'hydratation,
-  // la page du téléphone), le profil en colonne à gauche et les projets à droite.
-  const column = useLayout().sizeClass === 'wide'
 
   // Le profil : l'en-tête, avec ce qu'on peut y faire. Centré au-dessus des projets, ou rangé à
   // gauche dans sa colonne (`layout="column"`, R15).
@@ -535,45 +677,20 @@ function MemberView({ member }: { member: Member }) {
   )
 
   return (
-    <Screen
-      width="wide"
-      header={<TopNav />}
-      onBack={onBack}
-      pageTitle={member.name}
-      // Sur sa propre page, la roue des réglages, en haut à droite (R3, F-Nav8) : on entre dans
-      // les réglages par « Moi ». Sur la rangée du « Retour » quand il y en a un (sa page ouverte
-      // par /members/<id>), pas sur une rangée à elle en dessous. Un bouton à icône seule : son
-      // nom (« Réglages ») est lu.
-      //
-      // R5a (F-Mb1) : « Partager », sur la page d'un autre membre comme sur la sienne (à côté de la
-      // roue). Un membre qui m'a bloqué n'a pas de page pour moi (« introuvable », plus haut) : rien
-      // à partager.
-      topAction={
-        member.isMe ? (
-          <Row gap="sm" align="center">
-            {shareButton}
-            <IconButton
-              icon="gear-six"
-              label={t(($) => $.nav.settings)}
-              onPress={() => router.push('/settings')}
-            />
-          </Row>
-        ) : (
-          shareButton
-        )
-      }
-    >
+    <>
       {/* R15 : sur ordinateur, le profil en colonne à gauche, lu d'abord (`sideFirst`), de 360
           points (`profile`), qui reste en place quand on descend dans les projets (`sticky` ; plus
           haut que la fenêtre, une fois son pied atteint) ; les projets prennent le reste. Plus
-          étroit, l'un sous l'autre. */}
+          étroit, l'un sous l'autre. R16 : la page est posée dans la zone qui attend (`Reveal`),
+          pas directement dans `Screen` : la pile reprend l'écart que `Screen` met entre ses
+          enfants (`xl`). */}
       {column ? (
         <Columns sideFirst sideWidth="profile" sticky side={profile} main={projects} />
       ) : (
-        <>
+        <Stack gap="xl">
           {profile}
           {projects}
-        </>
+        </Stack>
       )}
       {/* Bloquer et débloquer passent par la même fenêtre, qui dit ce qui change (J9, J10). */}
       {/* R9 : la case « Signaler aussi son profil » (`offerReport`), jamais cochée d'avance. */}
@@ -596,18 +713,6 @@ function MemberView({ member }: { member: Member }) {
           requestAnimationFrame(() => focusWithoutScroll(unblockedRef.current))
         }}
       />
-      {/* La feuille « Partager » (R5a) : l'adresse de la page, par l'identifiant du membre, sans
-          rien d'autre ; à la fermeture, le focus revient au bouton Partager. */}
-      <ShareSheet
-        open={sharing}
-        onClose={() => setSharing(false)}
-        title={member.name}
-        target={{ kind: 'member', id: member.id }}
-        // R12 (plan, décision 11) : une page publique s'ouvre pour tout le monde, à son adresse
-        // dans la langue de qui partage ; sinon, seuls les membres pourront l'ouvrir.
-        visibility={member.publicPage ? 'web' : 'public'}
-        image={toSource(member.avatarUrl)}
-      />
-    </Screen>
+    </>
   )
 }

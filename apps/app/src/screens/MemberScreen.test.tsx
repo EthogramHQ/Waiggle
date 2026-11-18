@@ -1025,8 +1025,11 @@ describe('the page of a member opened from a card, before the API answers (R16)'
     const names = await screen.findAllByText(containing(leaPage.name))
     expect(names.length).toBeGreaterThan(0)
     for (const name of names) expect(insideProgressbar(name as never)).toBe(false)
-    // Le reste de la page attend, sous un seul nom.
-    expect(screen.getByRole('progressbar', { name: fr.t(($) => $.common.loading) })).toBeTruthy()
+    // Le reste de la page attend, sous un seul nom. Attendu (`findBy…`), pas lu tout de suite :
+    // `Loading` reste caché aux lecteurs d'écran 160 ms avant de se montrer (plan R16, choix 8).
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
   })
 
   it('shows only the skeleton when no list knows the member (témoin)', async () => {

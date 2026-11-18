@@ -87,6 +87,58 @@ export const useProjectPreview = (id: string): ProjectSummary | null => {
   return useMemo(() => findProjectInLists(client, id), [client, id])
 }
 
+/**
+ * Les auteurs que connaît une donnée du cache : celui de chaque projet court d'une liste (voir
+ * `summariesIn`), et celui d'une page de projet complète (`['project', id]`, un `Project` porte son
+ * `author`) : on ouvre souvent la page d'un membre depuis celle d'un de ses projets.
+ */
+const authorsIn = (data: unknown): readonly ProjectSummary['author'][] => [
+  ...summariesIn(data).map((summary) => summary.author),
+  ...(isRecord(data) && isRecord(data.author) ? [data.author as ProjectSummary['author']] : []),
+]
+
+/** Les listes où chercher un auteur : celles des projets, plus les pages de projet lues. */
+const AUTHOR_KEYS = [...LIST_KEYS, ['project']] as const
+
+/**
+ * Le membre `id` tel que la donnée la plus fraîche le connaît (son nom, sa photo), ou `null` si
+ * aucune ne le connaît. Même règle que `findProjectInLists` : la réponse la plus récente gagne.
+ */
+export const findAuthorInLists = (
+  client: QueryClient,
+  id: string,
+): ProjectSummary['author'] | null => {
+  let found: { author: ProjectSummary['author']; at: number } | null = null
+  const queries: Query[] = AUTHOR_KEYS.flatMap((queryKey) =>
+    client.getQueryCache().findAll({ queryKey: [...queryKey] }),
+  )
+  for (const query of queries) {
+    const author = authorsIn(query.state.data).find((item) => item.id === id)
+    if (author && (!found || query.state.dataUpdatedAt > found.at)) {
+      found = { author, at: query.state.dataUpdatedAt }
+    }
+  }
+  return found?.author ?? null
+}
+
+/**
+ * Hook (R16, plan, choix 10) : l'aperçu d'un membre, ce qu'une liste déjà lue sait de lui (son nom
+ * et sa photo, l'auteur d'une carte), pour que sa page les montre avant la réponse de l'API ; `null`
+ * si aucune ne le connaît (un lien direct, une notification). Aucune requête : on ne lit que le
+ * cache, vidé à la connexion et à la déconnexion (rien d'un autre compte n'y reste).
+ *
+ * Comme l'aperçu d'un projet : rendu tel quel, jamais rangé sous `['member', id]` (un auteur n'a ni
+ * pseudo, ni bio, ni projets, ni ce que le membre qui lit en a fait), et lu une fois par membre
+ * (`useMemo`) : il ne change pas sous les yeux si un fil se relit pendant que la page attend.
+ *
+ * Il vit ici, à côté de `useProjectPreview` dont il partage la lecture des listes ; members/api.ts
+ * le réexporte (la page d'un membre l'y trouve aussi).
+ */
+export const useMemberPreview = (id: string): ProjectSummary['author'] | null => {
+  const client = useQueryClient()
+  return useMemo(() => findAuthorInLists(client, id), [client, id])
+}
+
 /** Range dans le cache le projet renvoyé par l'API après une modification. */
 export const useSetProject = () => {
   const queryClient = useQueryClient()
