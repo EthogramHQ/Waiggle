@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { enterActivates } from './keyboard'
+import { Shape } from './Skeleton'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -184,5 +185,24 @@ export function Tag({
         <View style={[box, pressed && { backgroundColor: colors.honeySoft }]}>{content}</View>
       )}
     </Pressable>
+  )
+}
+
+/** Les largeurs des étiquettes vides, qui changent d'une étiquette à la suivante (noms d'outils). */
+const SKELETON_WIDTHS = [88, 64, 104, 72, 96, 56] as const
+
+/**
+ * R16 (« Les squelettes ») : l'étiquette vide d'« Outils populaires », à la place d'une étiquette
+ * qui arrive : une pastille de la hauteur dessinée d'une vraie (36 points), dans la même zone de 44,
+ * si bien que la rangée garde sa hauteur. `index` : son rang dans la rangée, qui choisit sa largeur.
+ *
+ * Ni rôle ni nom : le `Loading` de l'écran (« Chargement… ») enveloppe toute la rangée, une fois.
+ */
+export function TagSkeleton({ index = 0 }: { index?: number }) {
+  const width = SKELETON_WIDTHS[index % SKELETON_WIDTHS.length] ?? SKELETON_WIDTHS[0]
+  return (
+    <View style={{ minHeight: layout.touchTarget, justifyContent: 'center' }}>
+      <Shape height={layout.chipHeight} width={width} round />
+    </View>
   )
 }

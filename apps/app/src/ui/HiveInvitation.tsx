@@ -58,6 +58,13 @@ type Props = {
    * l'a ; les autres ont « Rejoindre » en blanc, comme « Refuser ».
    */
   primary?: boolean
+  /**
+   * R16 (planches R16-Ruches) : dans une grille de cartes (`CardGrid`), la carte prend la hauteur
+   * de sa case, celle de la plus haute de la rangée, et ses boutons descendent au bas de la carte :
+   * les cartes d'une rangée ont la même hauteur et leurs boutons s'alignent (un nom de ruche sur
+   * deux lignes rendait une carte plus haute que sa voisine). Le parent doit grandir lui aussi.
+   */
+  fill?: boolean
 }
 
 /** Cache une vue et ce qu'elle contient aux lecteurs d'écran : web, iOS et Android. */
@@ -96,6 +103,7 @@ export function HiveInvitation({
   mode = 'received',
   refused = false,
   primary = true,
+  fill = false,
 }: Props) {
   const { t } = useTranslation()
   // « de Nora Benali », « d’Inès » : le nom relié au texte selon la langue (`{{nameOf}}`).
@@ -148,8 +156,10 @@ export function HiveInvitation({
   }, [refused])
 
   return (
-    <View ref={card}>
-      <Surface variant="grouped" padding="lg" gap="md">
+    // `fill` : la vue, puis la surface, prennent toute la hauteur donnée (`flex: 1`, dont la base
+    // de 0 % vaut la hauteur du contenu quand le parent n'a pas de hauteur fixée).
+    <View ref={card} style={fill ? { flex: 1 } : undefined}>
+      <Surface variant="grouped" padding="lg" gap="md" {...(fill ? { fit: 'fill' } : null)}>
         {/* L'en-tête : l'alvéole, qui invite où, la taille de la ruche et quand ; le « … » au bout. */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.md }}>
           {/* Un décor : la phrase nomme déjà la ruche. */}
@@ -198,7 +208,9 @@ export function HiveInvitation({
           ))}
         </Stack>
 
-        <Stack gap="sm">
+        {/* Au bas de la carte (`marginTop: 'auto'`) quand elle s'étire dans sa case : les boutons
+            des cartes d'une rangée sont à la même hauteur. Sinon, sans effet. */}
+        <View style={{ marginTop: 'auto', gap: space.sm }}>
           {refused ? (
             // À la place des boutons, aussi haut qu'eux côte à côte, et « Refuser ne prévient
             // personne. » reste dessous : la carte garde sa hauteur, rien ne remonte sous le doigt.
@@ -235,7 +247,7 @@ export function HiveInvitation({
           <Text variant="caption" tone="muted" {...(preview ? null : { nativeID: hintId })}>
             {t(($) => $.hives.invitations.refuseHint)}
           </Text>
-        </Stack>
+        </View>
       </Surface>
     </View>
   )

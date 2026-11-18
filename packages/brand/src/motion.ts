@@ -31,7 +31,10 @@ export const durations = {
   quick: 160, // appui, survol
   base: 320, // apparition, changement d'état
   medium: 420, // un élément qui se déplace sur l'écran
-  page: 180, // le fondu d'une page qui devient affichée sur le web (RF)
+  page: 180, // le fondu d'une page qui devient affichée sur le web (RF), et d'un squelette (R16)
+  skeletonGlow: 1800, // le passage de la lueur sur une carte vide (R16)
+  skeletonPause: 1200, // le repos entre deux passages de la lueur
+  skeletonStagger: 150, // le retard de la lueur d'une colonne de cartes à la suivante
   slow: 560, // transition entre deux écrans
   scheme: 600, // fondu entre le jour et la nuit
   long: 720, // une grande entrée (l'affiche d'un écran de marque)

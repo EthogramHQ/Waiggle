@@ -67,11 +67,24 @@ type Props<K extends string> = {
   links: readonly NavLinkEntry<K>[]
   /** La clé du lien de la page ouverte ; `null` sur une page qui n'est d'aucun lien. */
   active: K | null
+  /**
+   * R16 : faux quand la page ouverte n'est qu'une page fille du lien actif (Explorer sur la
+   * Recherche, « Tous les outils » ou la page d'un outil). Le lien reste marqué, mais il mène à
+   * sa page, au clavier comme au clic : avant, Entrée y restait sur place, alors que le clic du
+   * navigateur suivait l'adresse du lien. Vrai par défaut : sur sa page, le toucher ne fait rien.
+   */
+  activeIsOpen?: boolean
   /** Un lien a été touché (jamais celui de la page ouverte, ni deux fois de suite). */
   onPress: (key: K) => void
 }
 
-export function NavLinks<K extends string>({ label, links, active, onPress }: Props<K>) {
+export function NavLinks<K extends string>({
+  label,
+  links,
+  active,
+  activeIsOpen = true,
+  onPress,
+}: Props<K>) {
   const { colors, shadows } = useTheme()
   // La garde contre la double tape : le dernier lien touché, et quand. La seconde tape d'une double
   // tape arrive avant que la page ait changé ; sans garde, la même page s'ouvrait deux fois (deux
@@ -195,8 +208,9 @@ export function NavLinks<K extends string>({ label, links, active, onPress }: Pr
   const press = (entry: NavLinkEntry<K>) => (event?: PressEvent) => {
     // Sur le web, le `<a>` ne recharge pas la page : c'est le routeur qui en change.
     if (Platform.OS === 'web') event?.preventDefault?.()
-    // Déjà sur cette page : rien à empiler une seconde fois.
-    if (entry.key === active) return
+    // Déjà sur cette page : rien à empiler une seconde fois. Sur une de ses pages filles, le lien
+    // actif mène à la sienne (`activeIsOpen`).
+    if (entry.key === active && activeIsOpen) return
     const now = Date.now()
     const previous = lastTap.current
     lastTap.current = { key: entry.key, at: now }

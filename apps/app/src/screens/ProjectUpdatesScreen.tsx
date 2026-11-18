@@ -29,7 +29,7 @@ import type { Project, ProjectUpdate } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
@@ -55,23 +55,29 @@ import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
 import { UpdateTimeline } from '../ui/UpdateTimeline'
 import { useProjectUpdates } from '../updates/api'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
 
+/**
+ * La garde de session commune (R16, « La garde de session ») : pendant la lecture de la session, le
+ * squelette d'une liste (la frise) ; en erreur, « Réessayer » ; un visiteur, « Réservé aux membres » ;
+ * un membre, la page. Les largeurs restent celles d'avant (`page`).
+ */
 export function ProjectUpdatesScreen({ id }: { id: string }) {
-  const { t } = useTranslation()
-  const { state, session, retry } = useMemberSession()
-  // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
-  const project = useProject(id, Boolean(session))
+  return (
+    <SessionGate width="page" loading={<LoadingScreen shape="list" />}>
+      {() => <ProjectUpdates id={id} />}
+    </SessionGate>
+  )
+}
 
-  if (state === 'pending') return <LoadingScreen width="page" />
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  if (!session) return <SignedOutScreen width="page" />
+/**
+ * La page d'un membre connecté. Le projet n'est demandé qu'ici, donc jamais sans session
+ * (« public » veut dire « visible par les membres »).
+ */
+function ProjectUpdates({ id }: { id: string }) {
+  const { t } = useTranslation()
+  const project = useProject(id)
+
   if (project.error) {
     // « Introuvable » : le même écran que la page du projet, qu'il n'existe pas ou qu'il soit
     // privé (celui qui n'a pas le droit de le voir n'apprend même pas qu'il existe).
@@ -89,7 +95,7 @@ export function ProjectUpdatesScreen({ id }: { id: string }) {
       <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} width="page" />
     )
   }
-  if (!project.data) return <LoadingScreen width="page" />
+  if (!project.data) return <LoadingScreen shape="list" />
   return <UpdatesView project={project.data} />
 }
 

@@ -13,8 +13,9 @@ import { textStyles } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { StyleSheet } from 'react-native'
+import { emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { renderWithProviders } from '../testing/render'
-import { TextField } from './TextField'
+import { TextField, TextFieldSkeleton } from './TextField'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -136,5 +137,22 @@ describe('TextField, its counter', () => {
 
     expect(screen.getByLabelText(LABEL).props.maxLength).toBeUndefined()
     expect(screen.getByText(/^1001\s\/\s1000$/)).toBeTruthy()
+  })
+})
+
+// R16 (scénario, « les formulaires (profil, réglages) montrent […] des champs vides ») : le champ
+// vide d'un formulaire.
+describe('TextFieldSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <TextFieldSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
   })
 })

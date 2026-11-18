@@ -6,7 +6,7 @@
 // Il ne bouge jamais seul (relecture juridique de R3, jur-J7 : un carrousel qui défile seul attire
 // l'œil malgré soi) : ni minuteur, ni défilement au montage ; seulement le doigt, une flèche, Tab.
 // Il ressemble à Thumbnails, l'autre ScrollView horizontal de l'appli.
-import { type ShadowName, shadows, space } from '@ruche/brand'
+import { layout, type ShadowName, shadows, space } from '@ruche/brand'
 import {
   Children,
   isValidElement,
@@ -27,7 +27,7 @@ import {
 } from 'react-native'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
-import { useLayout } from './theme/layout'
+import { type SizeClass, useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 
 type Props = {
@@ -41,7 +41,8 @@ type Props = {
   children: ReactNode
   /**
    * Ce qui se pose à gauche des flèches, sur la même ligne : le titre de la section (et un lien
-   * « Tous les outils »). Sans lui, les flèches se rangent seules à droite, au-dessus de la bande.
+   * « Tous les outils »). Sans lui, les flèches se rangent seules à droite, au-dessus de la bande ;
+   * sur ordinateur, leur ligne y est gardée même quand les cartes tiennent (R16 : rien ne bouge).
    */
   header?: ReactNode
   /** cards : des cartes, bien espacées ; chips : des étiquettes, serrées comme une ligne de texte. */
@@ -73,6 +74,40 @@ export const shadowReachBelow = (name: ShadowName): number => {
   return Math.max(reach(shadows.day[name]), reach(shadows.night[name]))
 }
 
+/**
+ * L'écart entre deux cartes de la bande : des étiquettes serrées comme une ligne de texte, des
+ * cartes plus espacées sur ordinateur que sur téléphone. Un seul endroit pour la bande et sa forme
+ * vide (`CarouselShapes`) : changé ici, le squelette tombe toujours sur les vraies cartes.
+ */
+export const carouselGap = (variant: 'cards' | 'chips', sizeClass: SizeClass): number =>
+  variant === 'chips' ? space.sm : sizeClass === 'compact' ? space.md : space.xxl
+
+/**
+ * R16 (« rien ne bouge à l'arrivée ») : les pièces vides d'un carrousel qui charge, côte à côte, à
+ * l'écart de ses vraies cartes (`carouselGap`). Posées par l'écran comme une seule case de la bande
+ * (`Carousel`), sous son `Loading` : ni rôle ni nom à elles.
+ */
+export function CarouselShapes({
+  children,
+  variant = 'cards',
+}: {
+  children: ReactNode
+  variant?: 'cards' | 'chips'
+}) {
+  const { sizeClass } = useLayout()
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: carouselGap(variant, sizeClass),
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
 /** Les styles du web que les types de React Native ne connaissent pas (aimantation CSS). */
 const webOnly = (style: Record<string, string | number>): ViewStyle =>
   (Platform.OS === 'web' ? style : {}) as unknown as ViewStyle
@@ -102,7 +137,7 @@ export function Carousel({
   // négative, puis même marge à l'intérieur). Au moins quelques points, pour que l'anneau du
   // clavier de la première carte ne soit pas rogné ; jusqu'au bord de l'écran avec `bleed`.
   const edge = bleed && sizeClass === 'compact' ? padding : space.xs
-  const gap = variant === 'chips' ? space.sm : sizeClass === 'compact' ? space.md : space.xxl
+  const gap = carouselGap(variant, sizeClass)
   // L'air sous les cartes (relecture de design R12, point 3) : de quoi tenir leur ombre entière.
   // La bande s'allonge d'autant vers le bas, puis une marge négative la ramène : ce qui suit reste à
   // sa place, et passe par-dessus cette marge vide (dessiné après, il reçoit aussi les touchers).
@@ -120,21 +155,30 @@ export function Carousel({
   // Les positions où la bande s'arrête (téléphone : snapToOffsets). Sur le web, c'est le CSS
   // (scroll-snap) qui aimante, d'après chaque carte.
   const [offsets, setOffsets] = useState<number[]>([])
-  const [ends, setEnds] = useState({ start: true, end: false, fits: false })
+  // `measured` (R16, « La page ne bouge plus en arrivant ») : la largeur visible et celle du contenu
+  // sont toutes deux connues. Distinct de `fits` : « pas encore mesurée » ne veut pas dire « tient
+  // entière ». La page web pré-rendue ne mesure jamais rien ; elle s'ouvre donc sans flèche.
+  const [ends, setEnds] = useState({ measured: false, start: true, end: false, fits: false })
 
   const cards = Children.toArray(children)
 
-  // Après chaque mesure ou chaque arrêt : la bande est-elle au début, au bout, ou tient-elle
-  // entière ? Tant que rien n'est mesuré (premier rendu, tests), les deux flèches restent actives.
+  // Après chaque mesure ou chaque arrêt : la bande est-elle mesurée, au début, au bout, ou
+  // tient-elle entière ?
   const updateEnds = useCallback(() => {
     const measured = viewport.current > 0 && content.current > 0
     const next = {
+      measured,
       start: x.current <= 1,
       end: measured && x.current + viewport.current >= content.current - 1,
       fits: measured && content.current <= viewport.current + 1,
     }
     setEnds((prev) =>
-      prev.start === next.start && prev.end === next.end && prev.fits === next.fits ? prev : next,
+      prev.measured === next.measured &&
+      prev.start === next.start &&
+      prev.end === next.end &&
+      prev.fits === next.fits
+        ? prev
+        : next,
     )
   }, [])
 
@@ -199,15 +243,22 @@ export function Carousel({
     updateEnds()
   }
 
-  const showArrows = arrows && !ends.fits
+  // Les flèches n'existent qu'une fois la bande mesurée, et seulement si elle déborde (R16) : avant,
+  // elles se montraient puis disparaissaient quand les cartes tenaient, et « À la une » sautait de
+  // 9 puis de 18 points. Absentes de l'arbre, pas cachées : ni vues, ni lues, ni atteignables par Tab.
+  const showArrows = arrows && ends.measured && !ends.fits
+  // Là où des flèches peuvent venir (ordinateur), l'en-tête se pose d'emblée, avec au moins leur
+  // hauteur : qu'elles arrivent ou non, rien ne bouge dessous. Une hauteur minimale, jamais fixe :
+  // à 200 %, un titre sur deux lignes l'agrandit au lieu d'être coupé.
   const top =
-    header || showArrows ? (
+    header || arrows ? (
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: header ? 'space-between' : 'flex-end',
           gap: space.md,
+          ...(arrows ? { minHeight: layout.touchTarget } : null),
         }}
       >
         {/* Le titre peut passer à la ligne (texte agrandi) sans pousser les flèches hors de l'écran.

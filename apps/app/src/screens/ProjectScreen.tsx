@@ -30,6 +30,9 @@
 // R9 (7d) : l'auteur suspendu peut aussi « Rendre privé » un projet public (menu « … »,
 // projects/MakePrivateDialog.tsx) ; et l'auteur voit, à leur place, les parties retirées seules par
 // la modération (projects/ProjectRemovedPart.tsx), la photo retirée restant marquée dans sa galerie.
+// R16 (« Les squelettes ») : la garde de session commune (accounts/SessionGate.tsx) ; ouverte depuis
+// une carte, la page montre l'aperçu (photo, statut, titre, auteur, accroche) hors du
+// « Chargement… », et le reste a la forme de la page (`ProjectPageSkeleton`), puis arrive en fondu.
 import {
   type Project,
   type ProjectSummary,
@@ -39,7 +42,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
+import type { SessionData } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
@@ -57,6 +61,7 @@ import {
   hasRecipe,
   ProjectDescription,
   ProjectPageLayout,
+  ProjectPageSkeleton,
   ProjectRecipe,
 } from '../projects/ProjectPage'
 import {
@@ -84,7 +89,6 @@ import { ReactionCapsule } from '../ui/ReactionCapsule'
 import { ReactionFan } from '../ui/ReactionFan'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { ShareSheet, useShareLink } from '../ui/ShareSheet'
-import { SkeletonCard } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { useScreenFocused } from '../ui/screenFocus'
 import { TextLink } from '../ui/TextLink'
@@ -92,32 +96,44 @@ import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
 import { Comments } from './ProjectComments'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, la page vide d'un projet ;
+ * en erreur, « Réessayer » (on ne sait pas qui est là, on ne propose pas de se connecter) ; sans
+ * session, « Réservé aux membres ». Aucune requête avant la session (« public » veut dire « visible
+ * par les membres »). La fonction enfant ne fait que rendre `ProjectContent`, qui porte les hooks.
+ *
+ * RF (ui-1) : pendant le chargement, pas de fondu des pages. La page ouverte depuis une carte a son
+ * propre passage (la photo qui grandit, ou son fondu à elle, coverTransition.tsx), chargement
+ * compris ; et on ne peut pas savoir ici si elle vient d'une carte : `useCoverTarget` ne se lit pas
+ * avant l'arrivée de la page, il oublierait la carte touchée (ProjectView le lit).
+ */
 export function ProjectScreen({ id }: { id: string }) {
+  return (
+    <SessionGate width="page" loading={<ProjectWaiting />}>
+      {(session) => <ProjectContent id={id} session={session} />}
+    </SessionGate>
+  )
+}
+
+/**
+ * La page vide d'un projet, pendant l'attente de la session puis du projet (un lien direct, sans
+ * aperçu). R16 : avec, dès le début, le « Retour » du haut de la page qui arrive (`backLabel`) :
+ * sur téléphone, une page de projet n'a ni barre ni onglets, et l'attente restait 4 s sans issue.
+ */
+function ProjectWaiting() {
   const { t } = useTranslation()
-  const { state, session, retry } = useMemberSession()
-  // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
-  const project = useProject(id, Boolean(session))
+  return <LoadingScreen shape="project" fade={false} backLabel={t(($) => $.project.page.back)} />
+}
+
+function ProjectContent({ id, session }: { id: string; session: SessionData }) {
+  const { t } = useTranslation()
+  const project = useProject(id)
   // R14 (plan, choix 4) : ce qu'une liste déjà lue sait du projet (la page de son auteur, le Fil),
   // montré tant que l'API n'a pas répondu ; null si aucune ne le connaît.
   const preview = useProjectPreview(id)
 
-  // RF (ui-1) : pendant le chargement, pas de fondu des pages. La page ouverte depuis une carte a
-  // son propre passage (la photo qui grandit, ou son fondu à elle, coverTransition.tsx), chargement
-  // compris ; et on ne peut pas savoir ici si elle vient d'une carte : `useCoverTarget` ne se lit
-  // pas avant l'arrivée de la page, il oublierait la carte touchée (ProjectView le lit).
-  if (state === 'pending') return <LoadingScreen width="page" fade={false} />
-  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là,
-  // on propose de réessayer plutôt que de se connecter.
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  if (!session) return <SignedOutScreen width="page" />
   if (project.error) {
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui
     // n'a pas le droit de le voir n'apprend même pas qu'il existe. R5a : les alvéoles sur le miel,
@@ -140,10 +156,11 @@ export function ProjectScreen({ id }: { id: string }) {
   // complet et l'aperçu passent par le **même** `ProjectView`, à la même place : quand la réponse
   // arrive, React garde l'arbre et ne fait que le compléter. Le titre (qui a reçu le focus) et la
   // photo (posée par la carte qui grandit) restent les mêmes éléments : rien ne remonte, rien ne
-  // rejoue son arrivée. Un 404, plus haut, remplace l'aperçu par « Introuvable ».
+  // rejoue son arrivée. Un 404, plus haut, remplace l'aperçu par « Introuvable ». R16 : sans aperçu
+  // (un lien direct), la page vide a la forme du haut de la page d'un projet (galerie et en-tête).
   if (project.data) return <ProjectView project={project.data} viewerId={session.user.id} />
   if (preview) return <ProjectView project={preview} viewerId={session.user.id} />
-  return <LoadingScreen width="page" fade={false} />
+  return <ProjectWaiting />
 }
 
 /**
@@ -566,8 +583,9 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
       followable={project !== null}
     />
   )
-  // R14 : à la place de « Tester la démo » et de tout ce qui suit, un squelette pendant l'aperçu,
-  // nommé « Chargement… » pour le lecteur d'écran (le seul de la page).
+  // R14 : « Tester la démo » et ce qui l'accompagne attendent le projet complet. R16 : pendant
+  // l'aperçu, leur place et celle de tout ce qui suit ont la forme de la page, sous un seul
+  // « Chargement… » (`pending`, posé par `ProjectPageLayout`).
   const actions = project ? (
     <ProjectActions
       project={project}
@@ -576,9 +594,7 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
       }}
       onEdit={edit}
     />
-  ) : (
-    <SkeletonCard />
-  )
+  ) : null
 
   // Retiré par la modération (tranche 7a) : l'auteur, seul à le voir encore, lit en tête pourquoi,
   // et comment contester.
@@ -818,6 +834,9 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
       conversation={comments}
       report={reportLink}
       layers={layers}
+      // R16 : l'aperçu attend le projet complet ; ce qui en dépend arrive en fondu, au même endroit.
+      pending={project === null}
+      skeleton={(part) => <ProjectPageSkeleton part={part} />}
     />
   )
 }

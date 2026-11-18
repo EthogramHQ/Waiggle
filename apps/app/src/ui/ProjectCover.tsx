@@ -11,12 +11,14 @@
 //   ordinateur), la photo réservant sous elle la moitié qui dépasse ;
 // - `CoverSheet` : la feuille de la page qui chevauche le bas de la photo, sur téléphone.
 // `PhotoGallery` (la galerie de la page projet) s'en sert, et les donne à son `overlay`.
+// R16 : `ProjectCoverSkeleton`, la galerie vide d'une page de projet qui charge (en bas du fichier).
 import { borders, honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
 import { createContext, type ReactNode, useContext, useEffect, useId, useState } from 'react'
 import { View } from 'react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import type { ImageSource } from './image'
+import { SkeletonSurface } from './Skeleton'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -291,4 +293,21 @@ export function CoverSheet({ children }: { children: ReactNode }) {
       {children}
     </View>
   )
+}
+
+/**
+ * R16 (« Les squelettes », planche R16-Projet) : la galerie vide d'un projet, pendant que sa page
+ * charge sans rien en connaître. Une carte vide (`SkeletonSurface`, sa lueur comprise) à la hauteur
+ * de la galerie qui arrive (`layout.cover`), aux coins de la galerie (`tile`, ceux de
+ * `PhotoGallery`) : quand les photos la remplacent, rien ne bouge en dessous.
+ *
+ * Sans `shape`, elle choisit la hauteur comme la galerie : `hero` sur ordinateur, `medium` sur
+ * tablette, `band` sur téléphone. Sans rôle ni nom à elle : le `Loading` de la page la nomme.
+ * Ouverte depuis une carte, la page montre plutôt la vraie photo (l'aperçu, plan R16, choix 10).
+ */
+export function ProjectCoverSkeleton({ shape }: { shape?: CoverShape }): ReactNode {
+  const { sizeClass } = useLayout()
+  const chosen =
+    shape ?? (sizeClass === 'wide' ? 'hero' : sizeClass === 'medium' ? 'medium' : 'band')
+  return <SkeletonSurface height={layout.cover[chosen]} radius="tile" />
 }

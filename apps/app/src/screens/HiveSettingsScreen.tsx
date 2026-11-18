@@ -23,7 +23,7 @@ import {
 import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useHive, useHiveMembers, usePatchHive } from '../hives/api'
 import { DeleteHiveDialog, HandOverDialog } from '../hives/HiveDialogs'
@@ -42,21 +42,13 @@ import { SkeletonList } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 export function HiveSettingsScreen({ id }: { id: string }) {
-  const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen />
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (!session) return <SignedOutScreen />
-  // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
-  return <Settings id={id} />
+  // R16 : la garde commune (attente, erreur, visiteur), avec ses pages d'état de la largeur d'un
+  // formulaire, comme avant. Les lectures ne partent qu'avec une session : elles vivent dans
+  // `Settings`.
+  return <SessionGate>{() => <Settings id={id} />}</SessionGate>
 }
 
 function Settings({ id }: { id: string }) {

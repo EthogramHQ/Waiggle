@@ -292,6 +292,23 @@ const update = (
 })
 const line = (family, text) => ({ family, text })
 /** Le champ de la n-ième ligne (depuis 1) de la feuille « Nouvelle mise à jour » : « Changement 2 sur 3, … ». */
+/**
+ * Appuie sur `button` jusqu'à voir `effect` (six essais au plus). Une feuille ignore les tapes de ses
+ * 600 premières ms (`guardTaps`), comptées depuis l'arrivée de son contenu ; depuis R16, la garde de
+ * session commune l'a retardée, et sur une CI lente un seul clic tombait encore dans ces 600 ms
+ * (18/11/2026).
+ */
+const pressUntil = async (button, effect) => {
+  for (let attempt = 1; ; attempt++) {
+    await button.click()
+    try {
+      await effect.waitFor({ timeout: 1500 })
+      return
+    } catch (error) {
+      if (attempt >= 6) throw error
+    }
+  }
+}
 const updateLine = (page, n) => page.getByLabel(new RegExp(`^Changement ${n} sur `))
 /**
  * Une image PNG d'une seule couleur, fabriquée ici même (sans fichier ni dépendance) : une signature
@@ -1146,6 +1163,14 @@ const catalogueTools = [
   { slug: 'cursor', name: 'Cursor', family: 'development', aliases: [], projectCount: 5 },
   { slug: 'arduino', name: 'Arduino', family: 'hardware', aliases: [], projectCount: 3 },
   { slug: 'claude-code', name: 'Claude Code', family: 'development', aliases: [], projectCount: 2 },
+  // R16 (planches R16-Outils) : vingt outils, de quoi remplir « De A à Z » sur cinq colonnes de
+  // quatre. Ceux-ci, peu utilisés, ne changent pas « Outils populaires » ni « Les plus utilisés ».
+  { slug: 'bolt', name: 'Bolt', family: 'no-code', aliases: [], projectCount: 2 },
+  { slug: 'canva', name: 'Canva', family: 'creation', aliases: [], projectCount: 2 },
+  { slug: 'gemini', name: 'Gemini', family: 'assistant', aliases: [], projectCount: 1 },
+  { slug: 'perplexity', name: 'Perplexity', family: 'assistant', aliases: [], projectCount: 1 },
+  { slug: 'replit', name: 'Replit', family: 'development', aliases: [], projectCount: 1 },
+  { slug: 'suno', name: 'Suno', family: 'creation', aliases: [], projectCount: 1 },
   { slug: 'zapier', name: 'Zapier', family: 'automation', aliases: [], projectCount: 0 },
 ].sort((a, b) => b.projectCount - a.projectCount)
 // Les « Autre » des projets visibles (« Pas encore dans le catalogue ») : deux noms tapés par des
@@ -1186,10 +1211,69 @@ const camille = {
   avatarUrl: null,
   followerCount: 12,
 }
+// R16 (planches R16-Recherche) : six projets et deux membres, de quoi remplir les colonnes en grand.
+const moreCarnProjects = [
+  ['Carnet de lecture', 'Les livres lus en famille, et ce qu’on en a pensé.', 'testable'],
+  ['Le carnet des plantes', 'Quand arroser chaque plante de la maison.', 'building'],
+  ['Carnet de voyage', 'Un récit de voyage écrit à partir des photos.', 'testable'],
+  ['Carnaval des masques', 'Des masques à imprimer pour le carnaval de l’école.', 'idea'],
+].map(([title, pitch, status], index) => ({
+  ...summaryOf(recipesProject),
+  id: `1a2b3c4d-0000-4000-8000-00000000002${index}`,
+  author: odile,
+  title,
+  pitch,
+  status,
+  excerpt: null,
+}))
+const carneiro = {
+  id: 'carneiro-id',
+  name: 'Inès Carneiro',
+  handle: 'ines_carneiro',
+  avatarUrl: null,
+  followerCount: 4,
+}
+// R16 (planches R16-Ruches-1920 et 1440) : l'onglet Ruches en grand, cinq ruches et deux
+// invitations (page `ruches-grand`, `hives: 'many'`), bâties sur les données de `myHives`.
+const [familleHive, amisHive] = myHives.hives
+const [firstInvitation] = myHives.invitations
+const manyHives = {
+  ...myHives,
+  hives: [
+    familleHive,
+    amisHive,
+    ...[
+      ['Cousins Moreau', 'heart', 7, 1],
+      ['Club lecture', 'book-open', 6, 0],
+      ['Atelier photo', 'camera', 5, 3],
+    ].map(([name, icon, memberCount, news], index) => ({
+      ...familleHive,
+      id: `0f5b8a64-2c1e-4c55-9d1a-6b7e4a3c2d2${index}`,
+      name,
+      icon,
+      memberCount,
+      news,
+    })),
+  ],
+  invitations: [
+    firstInvitation,
+    {
+      ...firstInvitation,
+      id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c99',
+      hive: {
+        ...firstInvitation.hive,
+        id: '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c98',
+        name: 'Jardins partagés',
+        icon: 'leaf',
+      },
+      inviter: { id: odile.id, name: odile.name, avatarUrl: null },
+    },
+  ],
+}
 const searchResultsOf = {
   carn: {
-    projects: { items: [coffeeProject, biscotteProject], more: false },
-    members: { items: [camille], more: false },
+    projects: { items: [coffeeProject, biscotteProject, ...moreCarnProjects], more: false },
+    members: { items: [camille, carneiro], more: false },
     tools: { items: [catalogueTools.find((t) => t.slug === 'notion')], more: false },
   },
 }
@@ -3233,11 +3317,13 @@ const fakeApi = (
         200,
         hives === 'none'
           ? noHives
-          : hives === 'invited'
-            ? invitedOnly
-            : hives === 'animator'
-              ? myHivesAnimator
-              : myHives,
+          : hives === 'many'
+            ? manyHives
+            : hives === 'invited'
+              ? invitedOnly
+              : hives === 'animator'
+                ? myHivesAnimator
+                : myHives,
       )
     }
     if (pathname === '/v1/hives' && method === 'POST') {
@@ -3633,6 +3719,74 @@ const withLeaPhoto = async (page) => {
   )
   await page.reload({ waitUntil: 'networkidle' })
 }
+// R16 (« Les squelettes ») : les pages d'attente. Une lecture de l'API ne répond jamais (`() => {}`),
+// pour photographier le squelette de la page au lieu de son contenu. Les routes de la page passent
+// avant l'API simulée du contexte.
+// - `holdApi(keep)` : toute l'API se tait, sauf ce que `keep` garde (la session, le profil de Léa et
+//   son accord des règles : la barre du haut et la garde de session se lisent, la page attend ses
+//   données). La page est relue, comme un membre qui recharge : le squelette pré-rendu, puis celui
+//   de l'appli ;
+// - `openFromFeed(link, held)` : depuis le Fil chargé, on touche une carte (son titre ou le nom de
+//   son auteur) pendant que la lecture de la page ouverte se tait : la page montre tout de suite ce
+//   que la carte connaissait (plan R16, choix 10), et des pièces vides pour le reste.
+// Un membre qui recharge porte le repère `waiggle_member=1` (R12) : la barre du haut garde alors sa
+// place pendant le chargement (plan R16, choix 3). Les contextes des captures ne l'ont pas : on le
+// pose ici, pour photographier l'attente que voit vraiment un membre.
+const memberMarker = async (page) => {
+  await page
+    .context()
+    .addCookies([{ name: 'waiggle_member', value: '1', url: new URL(page.url()).origin }])
+}
+/**
+ * Le premier élément occupé visible. Une page peut en garder un caché (le squelette d'un onglet
+ * qu'on ne voit pas, celui qui attend ses 160 ms) avant celui qu'on attend : `first()` seul
+ * l'attendait 30 s, en vain, sur `recherche-attente` (CI, 18/11/2026).
+ */
+const firstBusy = (page) => page.locator('[aria-busy="true"]').filter({ visible: true }).first()
+/** Ce qu'une page d'attente laisse répondre : la session (hors de /v1), le profil, les règles. */
+const sessionReads = (pathname) => pathname === '/v1/me' || pathname === '/v1/me/rules'
+const holdApi =
+  (keep = sessionReads, { member = true, slow = false } = {}) =>
+  async (page) => {
+    if (member) await memberMarker(page)
+    await page.route(
+      (url) => url.pathname.startsWith('/v1/') && !keep(url.pathname),
+      () => {},
+    )
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await firstBusy(page).waitFor()
+    // Le temps que le squelette se montre (160 ms) et finisse son fondu ; `slow` : au-delà des 4 s
+    // après lesquelles « Revenir » apparaît sous le squelette d'une page entière.
+    await page.waitForTimeout(slow ? 4600 : 900)
+  }
+const openFromFeed = (link, held) => async (page) => {
+  await memberMarker(page)
+  await page.route(
+    (url) => held.test(url.pathname),
+    (route) => (route.request().method() === 'GET' ? undefined : route.fallback()),
+  )
+  await page.getByRole('link', { name: link, exact: true }).first().click()
+  await firstBusy(page).waitFor()
+  await page.waitForTimeout(900)
+}
+/** La lecture d'un projet seul (pas ses commentaires, ses mises à jour…). */
+const oneProjectRead = /^\/v1\/projects\/[^/]+$/
+/** Les lectures d'un membre : son profil et ses projets. */
+const memberReads = /^\/v1\/members\/[^/]+(\/projects)?$/
+// Les pages d'attente montrent « Chargement… » exprès (voir intendedUnfinished plus bas).
+const waitingPages = [
+  'fil-attente',
+  'fil-attente-calme',
+  'projet-attente-carte',
+  'projet-attente-lent',
+  'membre-attente-carte',
+  'accueil-attente',
+  'explorer-attente',
+  'ruche-attente',
+  'ruches-attente',
+  'recherche-attente',
+  'outils-attente',
+]
 const pages = [
   // `layoutWidths` : le relevé de mise en page (--layout) ne mesure le catalogue qu'aux largeurs d'un
   // téléphone, où il trouve les composants trop serrés. Depuis R12, il est si long qu'à 768 px sa
@@ -3795,7 +3949,7 @@ const pages = [
         () => {},
       )
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await page.locator('[aria-busy="true"]').first().waitFor()
+      await firstBusy(page).waitFor()
     },
   },
   {
@@ -3816,6 +3970,81 @@ const pages = [
       await page.getByRole('button', { name: 'Réessayer' }).first().waitFor()
     },
   },
+  // R16 (« Les squelettes », planches R16-Fil-390, R16-Fil-1440 et R16-Fil-1440-Nuit) : le Fil
+  // rechargé pendant que ses lectures se taisent (voir holdApi) : un seul squelette, les 4 cartes
+  // vides dans les colonnes du Fil, avec leur lueur, et les sections de côté qui gardent leur
+  // place. « fil-attente-calme » : le même sous « Réduire les animations », la lueur immobile.
+  { name: 'fil-attente', path: '/feed', signedIn: true, prepare: holdApi() },
+  {
+    name: 'fil-attente-calme',
+    path: '/feed',
+    signedIn: true,
+    reducedMotion: 'reduce',
+    prepare: holdApi(),
+  },
+  // La page d'un projet ouverte depuis une carte du Fil (planches R16-Projet-1440, -1440-Nuit et
+  // -390) : le titre, l'auteur, la photo, le statut et l'accroche de la carte, tout de suite ; des
+  // pièces vides pour la description, la recette et les commentaires.
+  {
+    name: 'projet-attente-carte',
+    path: '/feed',
+    signedIn: true,
+    prepare: openFromFeed('Mon agent de recettes', oneProjectRead),
+  },
+  // Le même projet ouvert par son adresse (rien de connu) : le squelette de la page entière, puis,
+  // au bout de 4 s, « Revenir » sous lui (scénario R16 : « Revenir » apparaît toujours après 4 s).
+  {
+    name: 'projet-attente-lent',
+    path: project,
+    signedIn: true,
+    prepare: holdApi(sessionReads, { slow: true }),
+  },
+  // La page d'un membre ouverte depuis une carte (planches R16-Membre-1440 et -390) : son nom tout
+  // de suite, l'en-tête vide et la mosaïque vide.
+  {
+    name: 'membre-attente-carte',
+    path: '/feed',
+    signedIn: true,
+    prepare: openFromFeed('Max Durand', memberReads),
+  },
+  // L'accueil d'un visiteur (planches R16-Visiteur-390 et -1440) : la vitrine garde sa place avec
+  // ses cartes vides, rien ne pousse le bas de la page. Un visiteur n'a pas de repère.
+  {
+    name: 'accueil-attente',
+    path: '/fr/',
+    signedIn: false,
+    prepare: holdApi(() => false, { member: false }),
+  },
+  // Explorer (planche R16-Explorer-Listes) : les vrais titres des sections, leurs pièces vides aux
+  // mesures des vraies (« À la une », les testeurs, les outils, « Récents »).
+  { name: 'explorer-attente', path: '/explore', signedIn: true, prepare: holdApi() },
+  // Une ruche (plan R16, choix 17) : les trois colonnes posées dès le squelette.
+  { name: 'ruche-attente', path: `/hives/${familleId}`, signedIn: true, prepare: holdApi() },
+  // R16 (planches R16-Ruches-Squelette-1920 et R16-Recherche-Squelette-1920) : l'onglet Ruches et
+  // la recherche « carn » pendant que leurs lectures se taisent, aussi à 1 920.
+  {
+    name: 'ruches-attente',
+    path: '/hives',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
+  {
+    name: 'recherche-attente',
+    path: '/search?q=carn',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
+  // R16 (planche R16-Outils-Squelette-1920) : « Tous les outils » pendant que ses lectures se
+  // taisent : les cartes vides des plus utilisés, puis la liste de A à Z, aussi à 1 920.
+  {
+    name: 'outils-attente',
+    path: '/tools',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
   // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
@@ -3832,7 +4061,7 @@ const pages = [
     fullPage: true,
   },
   // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
-  { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
+  { name: 'outils', path: '/tools', signedIn: true, fullPage: true, bigScreens: true },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
   { name: 'fil-fini', path: '/feed', signedIn: true, feed: 'end', fullPage: true },
   // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
@@ -3959,11 +4188,10 @@ const pages = [
     // La feuille ignore les tapes des 600 premières ms (`guardTaps`) : on attend plus que d'habitude.
     wait: 1500,
     prepare: async (page) => {
-      await page
-        .getByRole('button', { name: fr.project.updates.publish, exact: true })
-        .last()
-        .click()
-      await page.getByText(fr.project.updates.required).first().waitFor()
+      await pressUntil(
+        page.getByRole('button', { name: fr.project.updates.publish, exact: true }).last(),
+        page.getByText(fr.project.updates.required).first(),
+      )
     },
   },
   {
@@ -3973,11 +4201,10 @@ const pages = [
     wait: 1500, // « Annuler » ignore les tapes des 600 premières ms de la feuille
     prepare: async (page) => {
       await updateLine(page, 1).fill('Un compte à rebours de dix secondes')
-      await page
-        .getByRole('button', { name: fr.project.updates.cancel, exact: true })
-        .first()
-        .click()
-      await page.getByText(fr.project.updates.discardTitle).waitFor()
+      await pressUntil(
+        page.getByRole('button', { name: fr.project.updates.cancel, exact: true }).first(),
+        page.getByText(fr.project.updates.discardTitle),
+      )
     },
   },
   // R7a : les testeurs. La feuille d'inscription (page de Décollage !, d'Inès, « Testable » avec sa
@@ -5014,7 +5241,7 @@ const pages = [
   },
   // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le
   // quota dépassé ; et l'onglet Ruches, avant les ruches.
-  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true },
+  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true, bigScreens: true },
   { name: 'recherche-vide', path: '/search?q=carnaval', signedIn: true },
   { name: 'recherche-429', path: '/search?q=quota', signedIn: true },
   // R6b : la recherche filtrée par une catégorie (« Animaux » : un projet sur deux), puis par une
@@ -5034,7 +5261,10 @@ const pages = [
   // les feuilles Créer et Inviter ; les réglages de l'animatrice ; la fenêtre « Quitter » ; le Fil
   // d'une ruche ; l'invitation du premier lancement ; publier pour une ruche ; l'Activité ; la page
   // d'un membre en tuiles.
-  { name: 'ruches', path: '/hives', signedIn: true, fullPage: true },
+  // R16 : Ruches, Recherche et Outils en grand, aussi à 1 920 et 2 560 (`bigScreens`).
+  { name: 'ruches', path: '/hives', signedIn: true, fullPage: true, bigScreens: true },
+  // R16 (planches R16-Ruches) : cinq ruches et deux invitations, en cartes sur 4 colonnes à 1 920.
+  { name: 'ruches-grand', path: '/hives', signedIn: true, hives: 'many', bigScreens: true },
   { name: 'ruches-vide', path: '/hives', signedIn: true, hives: 'none' },
   { name: 'ruche', path: `/hives/${familleId}`, signedIn: true, fullPage: true },
   {
@@ -5314,7 +5544,8 @@ const pages = [
 const unfinished = unfinishedTexts(fr)
 // Les pages qui montrent l'un de ces textes exprès : le catalogue (les états « chargement » et
 // « erreur » de StateMessage) et « erreur » (une lecture qui échoue, LoadErrorScreen).
-const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur']
+// R16 : les pages d'attente des squelettes (waitingPages, plus haut).
+const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur', ...waitingPages]
 // Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
 // (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
 // Depuis Miel 2 (R1), un squelette ou le logo du lancement n'affichent plus « Chargement… » :
@@ -5437,6 +5668,12 @@ const runQueue = async (jobs, work) => {
       try {
         await work(job)
       } catch (error) {
+        // Le nom de la capture en échec : la pile de l'erreur ne dit que la ligne du script, pas
+        // la page (deux pannes de la CI sans nom, le 18/11/2026).
+        const { shot, device, scheme } = job ?? {}
+        console.error(
+          `Capture en échec : ${shot?.name ?? '?'} ${device?.name ?? device ?? ''} ${scheme ?? ''}`,
+        )
         failure ??= { error }
       }
     }
@@ -5855,6 +6092,9 @@ const capture = async ({ shot, device, scheme }) => {
   const context = await browser.newContext({
     viewport: device.viewport,
     colorScheme: scheme.colorScheme,
+    // R16 : une page peut se photographier sous « Réduire les animations » (`reducedMotion:
+    // 'reduce'`), le réglage du système que lisent la feuille de la page et useCalmMotion.
+    reducedMotion: shot.reducedMotion ?? 'no-preference',
     locale: 'fr-FR',
     timezoneId: SHOT_TIMEZONE,
     deviceScaleFactor: device.scale ?? scale,

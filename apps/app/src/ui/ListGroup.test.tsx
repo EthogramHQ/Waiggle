@@ -6,9 +6,10 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { Platform, StyleSheet, type ViewStyle } from 'react-native'
 import { arrivedFocusSuite, MORE, type PageState } from '../testing/arrivedFocus'
+import { emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { renderWithProviders } from '../testing/render'
 import { FeedEnd, useFirstArrived } from './FeedEnd'
-import { ListGroup, ListRow } from './ListGroup'
+import { ListGroup, ListRow, ListRowSkeleton } from './ListGroup'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -371,3 +372,19 @@ arrivedFocusSuite('ListRow, a touchable row as the first arrived', () => (names,
 arrivedFocusSuite('ListRow, a plain row as the first arrived', () => (names, state) => (
   <RowList names={names} state={state} touchable={false} />
 ))
+
+// R16 (scénario, « Les listes […] montrent des lignes […] vides ») : la ligne vide d'une liste.
+describe('ListRowSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <ListRowSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
+  })
+})

@@ -23,7 +23,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useCategories } from '../categories/api'
@@ -48,17 +48,21 @@ import { useTapGuard } from '../ui/tapGuard'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { type CategoryFilterChoice, CategoryFilterSheet } from './CategoryFilterSheet'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen } from './states'
 import { type ToolEditResult, ToolEditSheet } from './ToolEditSheet'
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, la mosaïque vide de la
+ * page, en grand comme la page qui arrive ; la session ne se lit pas : « Réessayer », pas « Me
+ * connecter » ; personne de connecté : « Réservé aux membres » (pages d'état à la largeur `page`,
+ * comme avant). Rien de la page n'est demandé avant : les lectures vivent dans `MemberToolPage`.
+ */
 export function TagScreen({ slug }: { slug: string }) {
-  const { state, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen width="wide" />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts). Rien de la
-  // page n'est demandé avant : les lectures vivent dans `MemberToolPage`.
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  if (state === 'signedOut') return <SignedOutScreen width="page" />
-  return <MemberToolPage slug={slug} />
+  return (
+    <SessionGate width="page" loading={<LoadingScreen shape="grid" width="wide" />}>
+      {() => <MemberToolPage slug={slug} />}
+    </SessionGate>
+  )
 }
 
 /** Un paramètre d'adresse : Expo Router rend un tableau quand il est répété ; on garde le premier. */
@@ -146,7 +150,8 @@ function MemberToolPage({ slug }: { slug: string }) {
       </Screen>
     )
   }
-  return <LoadingScreen width="wide" />
+  // La même mosaïque vide que pendant la lecture de la session : rien ne saute de l'une à l'autre.
+  return <LoadingScreen shape="grid" width="wide" />
 }
 
 type ViewProps = {

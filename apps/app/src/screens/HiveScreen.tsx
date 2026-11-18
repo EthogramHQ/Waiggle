@@ -20,15 +20,17 @@
 // L'onglet vient de l'adresse, lue après l'hydratation (la page web est pré-rendue sans connaître
 // l'adresse, comme le coin des testeurs) ; changer d'onglet remplace le paramètre, sans entrée
 // d'historique : le Retour du navigateur quitte la ruche au lieu de repasser par chaque onglet.
-import type { HiveMember, HivePage, ProjectSummary } from '@ruche/contracts'
+import type { HiveMember, HivePage, MyHives, ProjectSummary } from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import {
+  myHivesQueryKey,
   useHive,
   useHiveActivity,
   useHiveMembers,
@@ -51,13 +53,18 @@ import { Columns } from '../ui/Columns'
 import { Hint } from '../ui/Hint'
 import { HiveActivityRow } from '../ui/HiveActivityRow'
 import { HiveBadge } from '../ui/HiveBadge'
+import {
+  HIVE_HEADER_BADGE_SIZE,
+  HiveColumnTitleSkeleton,
+  HiveHeaderSkeleton,
+} from '../ui/HiveHeaderSkeleton'
 import { HiveMemberList } from '../ui/HiveMemberList'
-import { ListGroup } from '../ui/ListGroup'
+import { ListGroup, ListRowSkeleton } from '../ui/ListGroup'
 import { Mascot } from '../ui/Mascot'
 import { MetaLine } from '../ui/MetaLine'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { SkeletonList } from '../ui/Skeleton'
+import { Loading, SkeletonList, SkeletonRows } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Switch } from '../ui/Switch'
@@ -69,7 +76,7 @@ import { TileMosaic } from '../ui/TileMosaic'
 import { useTapGuard } from '../ui/tapGuard'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
-import { LoadingScreen, NotFoundState, SessionErrorScreen, SignedOutScreen } from './states'
+import { NotFoundState, SignedOutScreen } from './states'
 
 /** Les trois onglets, tels qu'ils s'écrivent dans l'adresse (`?tab=`). */
 type TabKey = 'activity' | 'projects' | 'members'
@@ -77,13 +84,83 @@ const TAB_KEYS: readonly string[] = ['activity', 'projects', 'members']
 const isTabKey = (value: string | undefined): value is TabKey =>
   value !== undefined && TAB_KEYS.includes(value)
 
+/**
+ * R16 : les lignes vides de la colonne des membres, autant que la ruche a de membres, jusqu'à 12
+ * (une liste plus longue dépasse la fenêtre : la suite ne se voit pas, rien à garder en place).
+ */
+const MAX_EMPTY_MEMBER_ROWS = 12
+/** Sans rien de connu sur la ruche (page rechargée), trois lignes vides. */
+const DEFAULT_EMPTY_MEMBER_ROWS = 3
+/** Les lignes vides de l'Actualité et des projets à tester, sur la page vide. */
+const EMPTY_ACTIVITY_ROWS = 4
+const EMPTY_TESTER_ROWS = 2
+
+const emptyMemberRows = (memberCount: number | undefined) =>
+  Math.min(memberCount ?? DEFAULT_EMPTY_MEMBER_ROWS, MAX_EMPTY_MEMBER_ROWS)
+
 export function HiveScreen({ id }: { id: string }) {
-  const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen />
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (!session) return <SignedOutScreen />
-  // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
-  return <Hive id={id} />
+  // R16 : la garde commune (attente, erreur, visiteur) ; son attente est déjà la page vide de la
+  // ruche, à ses places. Les lectures ne partent qu'avec une session : elles vivent dans `Hive`.
+  return (
+    <SessionGate width="page" loading={<HiveSkeleton id={id} />}>
+      {() => <Hive id={id} />}
+    </SessionGate>
+  )
+}
+
+/**
+ * R16 (« La page ne bouge plus en arrivant ») : la page vide d'une ruche, aux places de la vraie.
+ * Le haut (l'alvéole, le nom, les visages), puis, sur ordinateur, les trois colonnes : les membres à
+ * gauche, l'Actualité au centre, les projets à tester à droite. Sans elles, la colonne de droite
+ * remontait de 161 points à l'arrivée de la page.
+ * Le nombre de membres, s'il est déjà connu (la liste des ruches, en cache), donne le nombre de
+ * lignes vides de la colonne de gauche. Un seul `Loading` (« Chargement… ») pour toute la page ; le
+ * Retour est déjà là, hors de lui : une issue dès la première image.
+ */
+function HiveSkeleton({ id }: { id: string }) {
+  const { columns } = useLayout()
+  const back = useGoBack('/hives')
+  // Lu dans le cache, sans requête : la liste des ruches, si on vient de l'onglet Ruches.
+  const known = useQueryClient()
+    .getQueryData<MyHives>(myHivesQueryKey)
+    ?.hives.find((hive) => hive.id === id)
+  return (
+    <Screen width="page" header={<TopNav />} onBack={back}>
+      <Loading>
+        <Stack gap="xl">
+          <HiveHeaderSkeleton />
+          {columns ? (
+            <Columns
+              sideFirst
+              gap="xl"
+              side={
+                <Stack gap="md">
+                  {/* Le titre « Membres » de la vraie colonne, en ligne vide à sa hauteur. */}
+                  <HiveColumnTitleSkeleton column="members" />
+                  <SkeletonRows count={emptyMemberRows(known?.memberCount)} />
+                </Stack>
+              }
+              main={<SkeletonRows count={EMPTY_ACTIVITY_ROWS} />}
+              aside={
+                <Stack gap="sm">
+                  {/* Le titre du groupe (« Papi Jean cherche des testeurs »). */}
+                  <HiveColumnTitleSkeleton column="testers" />
+                  <ListGroup>
+                    {Array.from({ length: EMPTY_TESTER_ROWS }, (_, index) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+                      <ListRowSkeleton key={index} leading="square" trailing="pill" />
+                    ))}
+                  </ListGroup>
+                </Stack>
+              }
+            />
+          ) : (
+            <SkeletonRows count={EMPTY_ACTIVITY_ROWS} />
+          )}
+        </Stack>
+      </Loading>
+    </Screen>
+  )
 }
 
 function Hive({ id }: { id: string }) {
@@ -100,7 +177,7 @@ function Hive({ id }: { id: string }) {
     if (key === 'unauthorized') return <SignedOutScreen expired />
     return <HiveLoadError errorText={t(($) => $.errors[key])} onRetry={() => void hive.refetch()} />
   }
-  return <LoadingScreen />
+  return <HiveSkeleton id={id} />
 }
 
 /** La ruche ne se charge pas (panne, réseau) : on le dit, avec « Réessayer » et « Revenir ». */
@@ -306,6 +383,7 @@ function HivePageView({ page }: { page: HivePage }) {
   const membersPanel = (
     <MembersPanel
       members={shownMembers}
+      memberCount={summary.memberCount}
       loadFailed={members.isError && shownMembers === undefined}
       onRetry={() => void members.refetch()}
       canRemove={animates}
@@ -423,7 +501,7 @@ function HiveHead({ page, desktop }: { page: HivePage; desktop: boolean }) {
         : null
   return (
     <Row gap="md" align="center">
-      <HiveBadge icon={summary.icon} name={summary.name} size={64} />
+      <HiveBadge icon={summary.icon} name={summary.name} size={HIVE_HEADER_BADGE_SIZE} />
       <Stack gap="xxs" grow>
         <Text variant="title1" heading={1}>
           {summary.name ?? t(($) => $.hives.unnamed)}
@@ -741,6 +819,8 @@ function HiveProjects({
 type MembersPanelProps = {
   /** La liste à montrer (figée pendant un retrait) ; undefined tant qu'elle se charge. */
   members: HiveMember[] | undefined
+  /** R16 : le nombre de membres de la page, déjà là : autant de lignes vides pendant l'attente. */
+  memberCount: number
   loadFailed: boolean
   onRetry: () => void
   canRemove: boolean
@@ -757,6 +837,7 @@ type MembersPanelProps = {
  */
 function MembersPanel({
   members,
+  memberCount,
   loadFailed,
   onRetry,
   canRemove,
@@ -786,7 +867,16 @@ function MembersPanel({
         action={{ label: t(($) => $.common.retry), onPress: onRetry, role: 'button' }}
       />
     )
-  else list = <SkeletonList count={3} />
+  // R16 : la liste charge à part (sa propre requête) ; ses lignes vides sont celles de la vraie
+  // liste (une photo, le nom, le pseudo), autant que la ruche a de membres : la liste qui arrive
+  // prend leur place sans pousser « Inviter un proche » ni ce qui suit (avant : trois cartes vides,
+  // 263 points de plus que la liste d'une ruche de quatre).
+  else
+    list = (
+      <Loading>
+        <SkeletonRows count={emptyMemberRows(memberCount)} />
+      </Loading>
+    )
   return (
     <Stack gap="lg">
       <Stack gap="md">

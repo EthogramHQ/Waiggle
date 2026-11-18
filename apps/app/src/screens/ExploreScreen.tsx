@@ -17,15 +17,23 @@
 // panneau qui reste en place au défilement, avec « Ils cherchent des testeurs » et « Outils
 // populaires » en lignes, lu après « Récents » (comme le panneau du Fil). En dessous, la page
 // d'avant, sections l'une sous l'autre ; sur téléphone, celle de R12.
-import { CategoryCode, type ProjectSummary } from '@ruche/contracts'
+import { CategoryCode, type FeedItem, type ProjectSummary } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { useMediaSources } from '../api/media'
 import { categoryOf, useCategories } from '../categories/api'
 import { useDiscoverFeed } from '../feed/api'
-import { type CardOverlay, DiscoverFeed } from '../feed/FeedList'
+import { type CardOverlay, DiscoverFeed, NewsPlace } from '../feed/FeedList'
 import { useFollow } from '../follows/api'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
@@ -33,30 +41,30 @@ import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useMemberShowcase } from '../showcase/api'
 import { useTools } from '../tools/api'
-import { Carousel } from '../ui/Carousel'
+import { Carousel, CarouselShapes } from '../ui/Carousel'
 import { Columns } from '../ui/Columns'
 import { FilterPills } from '../ui/FilterPills'
 import { FollowButton } from '../ui/FollowButton'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
-import { ListGroup, ListRow } from '../ui/ListGroup'
+import { ListGroup, ListRow, ListRowSkeleton } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { GridCardsContext } from '../ui/ProjectGrid'
+import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
 import { SearchLink } from '../ui/SearchLink'
-import { SHOWCASE_CARD_SHADOW, ShowcaseCard } from '../ui/ShowcaseCard'
+import { SHOWCASE_CARD_SHADOW, ShowcaseCard, ShowcaseCardSkeleton } from '../ui/ShowcaseCard'
 import { SidePanel } from '../ui/SidePanel'
-import { SkeletonList } from '../ui/Skeleton'
+import { Loading, LoadingShownContext, SkeletonCards } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
-import { Tag } from '../ui/Tag'
-import { TesterCard } from '../ui/TesterCard'
+import { Tag, TagSkeleton } from '../ui/Tag'
+import { TesterCard, TesterCardSkeleton } from '../ui/TesterCard'
 import { TesterRow } from '../ui/TesterRow'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 /** Le nombre d'outils de « Outils populaires » : les autres sont dans « Tous les outils ». */
 const POPULAR_TOOLS = 10
@@ -69,16 +77,80 @@ const POPULAR_TOOLS = 10
 const PANEL_TESTERS = 4
 const PANEL_TOOLS = 6
 
-export function ExploreScreen() {
-  const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen width="wide" />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  if (!session) return <SignedOutScreen />
-  return <MemberExplore userId={session.user.id} />
+/** R16 (plan, choix 11) : les cartes vides d'une bande d'Explorer, trois, comme sur la planche. */
+const BAND_SKELETONS = 3
+/** Les étiquettes vides d'« Outils populaires », en bande : assez pour la remplir sur téléphone. */
+const TAG_SKELETONS = 6
+/**
+ * R16 : les pastilles vides des catégories de « Récents », après « Toutes » : dix, comme une dizaine
+ * de vraies catégories (deux lignes à 1 440 et à 1 920 points, une à 2 560).
+ */
+const CATEGORY_SKELETONS = 10
+
+/** Rien à faire : « Toutes », pendant la lecture de la session, ne filtre encore rien. */
+const noop = () => {}
+
+/**
+ * Hook : vrai une fois qu'une lecture a abouti, en bien ou en mal, et ensuite pour toute la visite.
+ * React Query v5 efface l'erreur pendant qu'on relance une lecture ratée (« Réessayer ») : sans ce
+ * verrou, la section repasserait en cartes vides sous le doigt, et le focus partirait avec
+ * « Réessayer ».
+ */
+const useSettled = (settledNow: boolean) => {
+  const [settled, setSettled] = useState(settledNow)
+  // Rempli pendant le rendu : aucun rendu intermédiaire sans la décision.
+  if (settledNow && !settled) setSettled(true)
+  return settled || settledNow
 }
 
-function MemberExplore({ userId }: { userId: string }) {
+export function ExploreScreen() {
+  // R16 (plan, choix 2 et 14) : la garde de session commune. Pendant la lecture de la session (c'est
+  // aussi la page pré-rendue du web), Explorer vide, aux places d'Explorer : les titres réels de ses
+  // sections, leurs cartes et lignes vides ; un visiteur lit « Réservé aux membres » ; une lecture
+  // ratée propose « Réessayer ».
+  //
+  // Le squelette de la session s'est-il montré ? Les sections qui prennent sa suite montrent alors
+  // le leur tout de suite, aux mêmes places, sans les 160 ms où `Loading` reste invisible (les
+  // cartes vides disparaîtraient un instant). Un `ref` : le savoir ne redessine rien.
+  const sessionSkeletonShown = useRef(false)
+  const onSessionSkeletonShown = useCallback(() => {
+    sessionSkeletonShown.current = true
+  }, [])
+  return (
+    <SessionGate
+      width="page"
+      loading={
+        <LoadingShownContext.Provider value={onSessionSkeletonShown}>
+          <ExploreWaiting />
+        </LoadingShownContext.Provider>
+      }
+    >
+      {(session) => (
+        <MemberExplore userId={session.user.id} skeletonShown={sessionSkeletonShown.current} />
+      )}
+    </SessionGate>
+  )
+}
+
+type LayoutProps = {
+  /** « À la une ». */
+  featured: ReactNode
+  /** « Ils cherchent des testeurs », en carrousel ou, dans le panneau, en lignes (`rows`). */
+  testers: (rows: boolean) => ReactNode
+  /** « Outils populaires », de même. */
+  tools: (rows: boolean) => ReactNode
+  /** « Récents ». */
+  recent: ReactNode
+  /** Ce qui enveloppe les sections (le « Chargement… » unique de la page qui attend la session). */
+  wrap?: (sections: ReactNode) => ReactNode
+}
+
+/**
+ * La page d'Explorer, sans ses données : son haut, puis ses sections à leur place selon la largeur.
+ * La même pour la page qui attend la session (`ExploreWaiting`) et pour celle du membre : rien ne
+ * bouge quand l'une remplace l'autre.
+ */
+function ExploreLayout({ featured, testers, tools, recent, wrap = (node) => node }: LayoutProps) {
   const { t } = useTranslation()
   const router = useRouter()
   const { sizeClass, xwide } = useLayout()
@@ -87,6 +159,97 @@ function MemberExplore({ userId }: { userId: string }) {
   // pas hydratée (`useHydrated`) : la page pré-rendue, qui ne connaît pas la fenêtre, est donc celle
   // sans panneau, et le premier affichage du navigateur la reprend sans écart.
   const withPanel = xwide
+  return (
+    <Screen
+      width="wide"
+      header={<TopNav />}
+      title={t(($) => $.explore.title)}
+      // « Moins de mots » (16/11/2026) : l'onglet Explorer allumé dit déjà où l'on est ; le titre
+      // reste lu par les lecteurs d'écran (niveau 1), caché à l'œil.
+      titleHidden
+      pageTitle={t(($) => $.explore.title)}
+    >
+      {compact ? (
+        <SearchLink
+          label={t(($) => $.search.label)}
+          placeholder={t(($) => $.search.placeholder)}
+          href="/search"
+          onPress={(event) => {
+            // Sur le web, le routeur ouvre la page sans que le navigateur la recharge.
+            event?.preventDefault?.()
+            router.push('/search')
+          }}
+        />
+      ) : null}
+      {wrap(
+        withPanel ? (
+          // Le panneau à droite, lu après « Récents » (comme celui du Fil) ; il reste en place au
+          // défilement (`sticky`) ; plus haut que la fenêtre, une fois son pied atteint.
+          <Columns
+            sideWidth="panel"
+            sticky
+            main={
+              <Stack gap="xl">
+                {featured}
+                {recent}
+              </Stack>
+            }
+            side={
+              <SidePanel>
+                {testers(true)}
+                {tools(true)}
+              </SidePanel>
+            }
+          />
+        ) : (
+          // L'écart des sections est celui de la colonne de `Screen` : une seule pile, pour que la
+          // page qui attend la session (posée dans un seul « Chargement… ») ait les mêmes places.
+          <Stack gap="xl">
+            {featured}
+            {testers(false)}
+            {tools(false)}
+            {recent}
+          </Stack>
+        ),
+      )}
+    </Screen>
+  )
+}
+
+/**
+ * R16 : vrai dans la page qui attend la session. Elle est une seule zone qui charge, sous un seul
+ * « Chargement… » (comme toute page gardée, `sessionError.test.tsx`) : ses sections posent alors
+ * leurs pièces sans `Loading` à elles.
+ */
+const WholePageLoading = createContext(false)
+
+/** Les pièces d'une section qui charge, sous son « Chargement… », sauf dans la page entière. */
+function SectionLoading({ children, shown }: { children: ReactNode; shown: boolean }) {
+  if (useContext(WholePageLoading)) return children
+  return <Loading shown={shown}>{children}</Loading>
+}
+
+/**
+ * R16 : Explorer pendant la lecture de la session, aux places d'Explorer (planche
+ * R16-Explorer-Listes). Rien n'y lit l'API : on ne sait pas encore qui regarde.
+ */
+function ExploreWaiting() {
+  return (
+    <ExploreLayout
+      featured={<FeaturedSkeleton />}
+      testers={(rows) => <TestersSkeleton rows={rows} />}
+      tools={(rows) => <PopularToolsSkeleton rows={rows} />}
+      recent={<RecentSkeleton />}
+      wrap={(sections) => (
+        <Loading>
+          <WholePageLoading.Provider value={true}>{sections}</WholePageLoading.Provider>
+        </Loading>
+      )}
+    />
+  )
+}
+
+function MemberExplore({ userId, skeletonShown }: { userId: string; skeletonShown: boolean }) {
   // Les abonnements faits ou défaits ici, auteur par auteur, depuis l'ouverture de la page. Ils
   // l'emportent sur ce que dit le fil : après « Suivre Nora », le fil relu dit que Nora est suivie,
   // et sa pastille doit rester là, « Tu suis Nora », sous le doigt qui vient de la toucher (et
@@ -132,55 +295,171 @@ function MemberExplore({ userId }: { userId: string }) {
   )
 
   return (
-    <Screen
-      width="wide"
-      header={<TopNav />}
-      title={t(($) => $.explore.title)}
-      // « Moins de mots » (16/11/2026) : l'onglet Explorer allumé dit déjà où l'on est ; le titre
-      // reste lu par les lecteurs d'écran (niveau 1), caché à l'œil.
-      titleHidden
-      pageTitle={t(($) => $.explore.title)}
+    <ExploreLayout
+      featured={<Featured shown={skeletonShown} />}
+      testers={(rows) => <Testers rows={rows} shown={skeletonShown} />}
+      tools={(rows) => <PopularTools rows={rows} shown={skeletonShown} />}
+      recent={recent}
+    />
+  )
+}
+
+/** Le titre d'une section d'Explorer : le vrai, lu, hors de tout « Chargement… ». */
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <Text variant="heading" heading={2}>
+      {children}
+    </Text>
+  )
+}
+
+/**
+ * Les cartes vides d'une bande, sous un seul « Chargement… » : une seule case de la bande, à
+ * l'écart des vraies cartes, celui que donne le carrousel lui-même (`CarouselShapes`) : jamais
+ * recopié ici, il ne peut pas s'en écarter.
+ */
+function BandSkeleton({
+  children,
+  shown = false,
+  chips = false,
+}: {
+  children: ReactNode
+  shown?: boolean
+  chips?: boolean
+}) {
+  return (
+    <SectionLoading shown={shown}>
+      <CarouselShapes variant={chips ? 'chips' : 'cards'}>{children}</CarouselShapes>
+    </SectionLoading>
+  )
+}
+
+/**
+ * Des lignes vides dans le groupe blanc d'une vraie liste, sous un seul « Chargement… » : le
+ * panneau des grands écrans (planche R16-Explorer-Listes : une vignette carrée, puis « Tester » ou
+ * le nombre de projets à droite).
+ */
+function RowsSkeleton({
+  count,
+  trailing,
+  shown = false,
+}: {
+  count: number
+  trailing: 'pill' | 'line'
+  shown?: boolean
+}) {
+  return (
+    <SectionLoading shown={shown}>
+      <ListGroup>
+        {Array.from({ length: count }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+          <ListRowSkeleton key={index} leading="square" trailing={trailing} />
+        ))}
+      </ListGroup>
+    </SectionLoading>
+  )
+}
+
+/**
+ * R16 : « À la une » qui se lit : son titre et sa bande, en cartes vides aux mesures des vraies.
+ * `shown` : montrées tout de suite (elles prennent la suite du squelette de la session).
+ */
+function FeaturedSkeleton({ shown = false }: { shown?: boolean }) {
+  return (
+    <FeaturedBand>
+      <BandSkeleton key="loading" shown={shown}>
+        {Array.from({ length: BAND_SKELETONS }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: des cartes vides, jamais réordonnées.
+          <ShowcaseCardSkeleton key={index} column={index} />
+        ))}
+      </BandSkeleton>
+    </FeaturedBand>
+  )
+}
+
+/** R16 : « Ils cherchent des testeurs » qui se lit, en carrousel ou en lignes (`rows`). */
+function TestersSkeleton({ rows, shown = false }: { rows: boolean; shown?: boolean }) {
+  const { t } = useTranslation()
+  const title = <SectionTitle>{t(($) => $.explore.testers)}</SectionTitle>
+  if (rows) {
+    return (
+      <Stack gap="md" align="stretch">
+        {title}
+        <RowsSkeleton count={PANEL_TESTERS} trailing="pill" shown={shown} />
+      </Stack>
+    )
+  }
+  return (
+    <Carousel
+      label={t(($) => $.explore.carousel)}
+      previousLabel={t(($) => $.explore.previous)}
+      nextLabel={t(($) => $.explore.next)}
+      header={title}
+      bleed
     >
-      {compact ? (
-        <SearchLink
-          label={t(($) => $.search.label)}
-          placeholder={t(($) => $.search.placeholder)}
-          href="/search"
-          onPress={(event) => {
-            // Sur le web, le routeur ouvre la page sans que le navigateur la recharge.
-            event?.preventDefault?.()
-            router.push('/search')
-          }}
-        />
-      ) : null}
-      {withPanel ? (
-        // Le panneau à droite, lu après « Récents » (comme celui du Fil) ; il reste en place au
-        // défilement (`sticky`) ; plus haut que la fenêtre, une fois son pied atteint.
-        <Columns
-          sideWidth="panel"
-          sticky
-          main={
-            <Stack gap="xl">
-              <Featured />
-              {recent}
-            </Stack>
-          }
-          side={
-            <SidePanel>
-              <Testers rows />
-              <PopularTools rows />
-            </SidePanel>
-          }
-        />
-      ) : (
-        <>
-          <Featured />
-          <Testers />
-          <PopularTools />
-          {recent}
-        </>
-      )}
-    </Screen>
+      <BandSkeleton key="loading" shown={shown}>
+        {Array.from({ length: BAND_SKELETONS }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: des cartes vides, jamais réordonnées.
+          <TesterCardSkeleton key={index} column={index} />
+        ))}
+      </BandSkeleton>
+    </Carousel>
+  )
+}
+
+/** R16 : « Outils populaires » qui se lit, en bande d'étiquettes ou en lignes (`rows`). */
+function PopularToolsSkeleton({ rows, shown = false }: { rows: boolean; shown?: boolean }) {
+  const { t } = useTranslation()
+  const { header, allTools } = usePopularToolsHeader(rows)
+  if (rows) {
+    return (
+      <Stack gap="md" align="stretch">
+        {header}
+        <RowsSkeleton count={PANEL_TOOLS} trailing="line" shown={shown} />
+        {allTools}
+      </Stack>
+    )
+  }
+  return (
+    <Carousel
+      variant="chips"
+      label={t(($) => $.explore.popularTools)}
+      previousLabel={t(($) => $.explore.previousTools)}
+      nextLabel={t(($) => $.explore.nextTools)}
+      header={header}
+      bleed
+    >
+      <BandSkeleton key="loading" shown={shown} chips>
+        {Array.from({ length: TAG_SKELETONS }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: des étiquettes vides, jamais réordonnées.
+          <TagSkeleton key={index} index={index} />
+        ))}
+      </BandSkeleton>
+    </Carousel>
+  )
+}
+
+/**
+ * R16 : « Récents » pendant la lecture de la session : son titre, puis les cartes vides que dessine
+ * le fil « Découvrir » en attendant ses projets (`DiscoverFeed`), aux colonnes des compactes.
+ */
+function RecentSkeleton() {
+  const { t } = useTranslation()
+  return (
+    <GridCardsContext.Provider value="compact">
+      <Stack gap="md">
+        <SectionTitle>{t(($) => $.explore.recent)}</SectionTitle>
+        {/* Les places de « Récents » qui charge (`Recent`) : la rangée des catégories, puis la
+            place du bouton des nouveautés et les cartes, au même écart que le fil (`DiscoverFeed`). */}
+        <CategoriesWaiting category={null} onChange={noop} />
+        <Stack gap="lg">
+          <NewsPlace />
+          <SectionLoading shown={false}>
+            <SkeletonCards count={3} shape="feed" />
+          </SectionLoading>
+        </Stack>
+      </Stack>
+    </GridCardsContext.Provider>
   )
 }
 
@@ -281,8 +560,7 @@ type RecentCategoriesProps = {
  * projet visible, avec son icône, dans l'ordre de la feuille de publication (celui de l'API). Sur
  * téléphone, la rangée défile de côté ; sur ordinateur, elle passe à la ligne.
  *
- * Pendant la lecture des catégories, rien (la rangée arrive avec le fil, qui se lit en même temps).
- * En panne, la section le dit, avec « Réessayer » ; si un filtre de l'adresse s'applique, un lien
+ * Pendant la lecture des catégories, le vrai « Toutes » et des pastilles vides (R16). En panne, la section le dit, avec « Réessayer » ; si un filtre de l'adresse s'applique, un lien
  * le retire : on ne reste jamais coincé dans une catégorie.
  */
 function RecentCategories({ categories, category, onChange }: RecentCategoriesProps) {
@@ -290,7 +568,9 @@ function RecentCategories({ categories, category, onChange }: RecentCategoriesPr
   const compact = useLayout().sizeClass === 'compact'
   const list = categories.data?.categories
   if (!list) {
-    if (!categories.isError) return null
+    // R16 : pendant la lecture, le vrai « Toutes » et des pastilles vides, à la place de la rangée
+    // qui arrive (planche R16-Explorer-Listes) : les cartes de « Récents » ne descendent plus.
+    if (!categories.isError) return <CategoriesWaiting category={category} onChange={onChange} />
     return (
       <Stack gap="sm">
         <Notice
@@ -323,6 +603,33 @@ function RecentCategories({ categories, category, onChange }: RecentCategoriesPr
 }
 
 /**
+ * R16 : la rangée des catégories pendant leur lecture (ou celle de la session) : le vrai « Toutes »,
+ * qui se touche déjà, puis des pastilles vides à la place des catégories à venir, sur une ligne qui
+ * défile (téléphone) ou qui passe à la ligne (ordinateur), comme la vraie.
+ */
+function CategoriesWaiting({
+  category,
+  onChange,
+}: {
+  category: string | null
+  onChange: (code: string | null) => void
+}) {
+  const { t } = useTranslation()
+  const compact = useLayout().sizeClass === 'compact'
+  return (
+    <FilterPills
+      label={t(($) => $.explore.categoriesLabel)}
+      allLabel={t(($) => $.explore.allCategories)}
+      value={category}
+      options={[]}
+      waiting={CATEGORY_SKELETONS}
+      scroll={compact}
+      onChange={onChange}
+    />
+  )
+}
+
+/**
  * « À la une » (R12, planche R12-A-La-Une ; scénario « La vitrine ») : les projets de la vitrine de
  * l'accueil, dans l'ordre choisi par la modération, en cartes qu'on fait défiler de côté, sur
  * téléphone comme sur ordinateur (« la même rangée »). C'est le chemin le plus court vers la vitrine
@@ -331,56 +638,68 @@ function RecentCategories({ categories, category, onChange }: RecentCategoriesPr
  * - La lecture est celle d'un membre, GET /v1/showcase (`useMemberShowcase`) : l'API y applique les
  *   règles de blocage d'Explorer. Jamais la route des visiteurs.
  * - Une carte ouvre la page du projet des membres (`/projects/<id>`, plan R12, choix 7).
- * - Sans projet mis en avant, ni titre ni place vide : la section n'existe pas. Pendant la lecture
- *   non plus (rien à annoncer tant qu'on ne sait pas s'il y en aura).
- * - En panne, rien non plus, comme sur l'accueil (ShowcaseScreen) : la vitrine est un plus, et les
- *   sections d'Explorer, elles, disent chacune leur panne.
+ * - Sans projet mis en avant, ni titre ni place vide : la section n'existe pas.
+ * - R16 : pendant la lecture, son titre et des cartes vides (scénario : « Une section qui arrive
+ *   seule garde sa hauteur pendant qu'elle charge ») ; elles fondent vers les vraies (`Reveal`).
+ *   Lue vide, ou en panne, la section part : c'est le seul cas où « Récents » remonte.
+ * - En panne, rien, comme sur l'accueil (ShowcaseScreen) : la vitrine est un plus, et les
+ *   sections d'Explorer, elles, disent chacune leur panne (Louis, 16/11/2026, R12).
  */
-function Featured() {
+function Featured({ shown }: { shown: boolean }) {
   const { t } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
-  const items = useMemberShowcase().data?.items ?? []
-  if (items.length === 0) return null
-  const title = (
-    <Text variant="heading" heading={2}>
-      {t(($) => $.explore.featured)}
-    </Text>
+  const showcase = useMemberShowcase()
+  const items = showcase.data?.items ?? []
+  if (!showcase.isPending && items.length === 0) return null
+  return (
+    <Reveal loading={showcase.isPending} skeleton={<FeaturedSkeleton shown={shown} />}>
+      {showcase.isPending ? null : (
+        <FeaturedBand>
+          {items.map((item) => (
+            <ShowcaseCard
+              key={item.id}
+              title={item.title}
+              author={{ name: item.author.name, avatar: toSource(item.author.avatarUrl) }}
+              image={
+                item.cover
+                  ? {
+                      source: toSource(item.cover.url),
+                      thumbhash: item.cover.thumbhash,
+                      label: item.title,
+                    }
+                  : null
+              }
+              // Le statut, déjà traduit ; « Testable » en miel, comme sur la vitrine de l'accueil.
+              status={{
+                label: t(($) => $.project.status[item.status]),
+                strong: item.status === 'testable',
+              }}
+              onPress={() => router.push({ pathname: '/projects/[id]', params: { id: item.id } })}
+              size="carousel"
+              // R12b : « Exemple » sur le projet d'un compte d'exemples, mis à la une comme un autre.
+              example={item.author.example === true}
+            />
+          ))}
+        </FeaturedBand>
+      )}
+    </Reveal>
   )
+}
+
+/** La bande d'« À la une », avec son titre : la même pour les cartes vides et les vraies. */
+function FeaturedBand({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   return (
     <Carousel
       label={t(($) => $.explore.featured)}
       previousLabel={t(($) => $.explore.featuredPrevious)}
       nextLabel={t(($) => $.explore.featuredNext)}
-      header={title}
+      header={<SectionTitle>{t(($) => $.explore.featured)}</SectionTitle>}
       bleed
       cardShadow={SHOWCASE_CARD_SHADOW}
     >
-      {items.map((item) => (
-        <ShowcaseCard
-          key={item.id}
-          title={item.title}
-          author={{ name: item.author.name, avatar: toSource(item.author.avatarUrl) }}
-          image={
-            item.cover
-              ? {
-                  source: toSource(item.cover.url),
-                  thumbhash: item.cover.thumbhash,
-                  label: item.title,
-                }
-              : null
-          }
-          // Le statut, déjà traduit ; « Testable » en miel, comme sur la vitrine de l'accueil.
-          status={{
-            label: t(($) => $.project.status[item.status]),
-            strong: item.status === 'testable',
-          }}
-          onPress={() => router.push({ pathname: '/projects/[id]', params: { id: item.id } })}
-          size="carousel"
-          // R12b : « Exemple » sur le projet d'un compte d'exemples, mis à la une comme un autre.
-          example={item.author.example === true}
-        />
-      ))}
+      {children}
     </Carousel>
   )
 }
@@ -393,42 +712,46 @@ function Featured() {
  * `rows` (R15, le panneau des grands écrans) : les premiers en lignes (`TesterRow`), comme dans le
  * panneau du Fil, au lieu du carrousel. Le chargement, la panne et l'absence de projet se disent de
  * la même façon.
+ *
+ * R16 : pendant la lecture, son titre et des cartes (ou lignes) vides aux mesures des vraies ; elles
+ * fondent vers les vraies (`Reveal`). `shown` : montrées tout de suite (voir `ExploreScreen`).
  */
-function Testers({ rows = false }: { rows?: boolean }) {
+function Testers({ rows, shown }: { rows: boolean; shown: boolean }) {
   const { t } = useTranslation()
-  const router = useRouter()
-  const openDemo = useOpenDemo()
-  const toSource = useMediaSources()
   const feed = useDiscoverFeed({ testers: true })
-  const projects = (feed.data?.pages[0]?.items ?? []).flatMap((item) =>
-    item.kind === 'project' && item.project.demoUrl
-      ? [{ project: item.project, demoUrl: item.project.demoUrl }]
-      : [],
-  )
-  const title = (
-    <Text variant="heading" heading={2}>
-      {t(($) => $.explore.testers)}
-    </Text>
-  )
-
-  if (!feed.data) {
-    return (
-      <Stack gap="md">
-        {title}
-        {feed.isError ? (
-          // L'échec se dit dans la section ; le reste de la page (outils, « Récents ») reste.
-          // Son propre texte : « Le fil n'a pas pu se charger », dit aussi par « Récents », ne
-          // disait pas lequel (relecture de design de R3, #3).
+  const loading = !useSettled(feed.data !== undefined || feed.isError)
+  return (
+    <Reveal loading={loading} skeleton={<TestersSkeleton rows={rows} shown={shown} />}>
+      {loading ? null : feed.data ? (
+        <TestersLoaded items={feed.data.pages[0]?.items ?? []} rows={rows} />
+      ) : (
+        <Stack gap="md">
+          <SectionTitle>{t(($) => $.explore.testers)}</SectionTitle>
+          {/* L'échec se dit dans la section ; le reste de la page (outils, « Récents ») reste.
+              Son propre texte : « Le fil n'a pas pu se charger », dit aussi par « Récents », ne
+              disait pas lequel (relecture de design de R3, #3). */}
           <Notice
             message={t(($) => $.explore.testersError)}
             action={{ label: t(($) => $.common.retry), onPress: () => void feed.refetch() }}
           />
-        ) : (
-          <SkeletonList count={1} />
-        )}
-      </Stack>
-    )
-  }
+        </Stack>
+      )}
+    </Reveal>
+  )
+}
+
+/** « Ils cherchent des testeurs », lue : les projets qui ont une démo, ou la phrase de l'état vide. */
+function TestersLoaded({ items, rows }: { items: ReadonlyArray<FeedItem>; rows: boolean }) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const openDemo = useOpenDemo()
+  const toSource = useMediaSources()
+  const projects = items.flatMap((item) =>
+    item.kind === 'project' && item.project.demoUrl
+      ? [{ project: item.project, demoUrl: item.project.demoUrl }]
+      : [],
+  )
+  const title = <SectionTitle>{t(($) => $.explore.testers)}</SectionTitle>
   if (projects.length === 0) {
     return (
       <Stack gap="md">
@@ -501,43 +824,70 @@ function Testers({ rows = false }: { rows?: boolean }) {
  * `rows` (R15, le panneau des grands écrans) : les six premiers en lignes, chacun avec sa tuile et
  * son nombre de projets, menant à sa page ; « Tous les outils » passe sous la liste (la largeur du
  * panneau ne le tient pas à côté du titre).
+ *
+ * R16 : pendant la lecture, son titre et des étiquettes (ou lignes) vides, qui fondent vers les
+ * vraies (`Reveal`) ; avant, rien, et la section arrivée poussait « Récents ». Lue sans outil, elle
+ * part.
  */
-function PopularTools({ rows = false }: { rows?: boolean }) {
+function PopularTools({ rows, shown }: { rows: boolean; shown: boolean }) {
+  const tools = useTools()
+  const loading = !useSettled(tools.data !== undefined || tools.isError)
+  if (!loading && tools.data?.tools.length === 0) return null
+  return (
+    <Reveal loading={loading} skeleton={<PopularToolsSkeleton rows={rows} shown={shown} />}>
+      {loading ? null : <PopularToolsLoaded rows={rows} tools={tools} />}
+    </Reveal>
+  )
+}
+
+/**
+ * Le titre d'« Outils populaires » et son lien « Tous les outils » : à côté du titre dans la bande
+ * (à 200 %, le lien passe dessous), sous la liste dans le panneau (`rows`).
+ */
+function usePopularToolsHeader(rows: boolean) {
   const { t } = useTranslation()
   const router = useRouter()
-  const compact = useLayout().sizeClass === 'compact'
-  const tools = useTools()
-  const list = tools.data?.tools.slice(0, rows ? PANEL_TOOLS : POPULAR_TOOLS) ?? []
-  const title = (
-    <Text variant="heading" heading={2}>
-      {t(($) => $.explore.popularTools)}
-    </Text>
-  )
+  const title = <SectionTitle>{t(($) => $.explore.popularTools)}</SectionTitle>
   const allTools = (
     <TextLink label={t(($) => $.explore.allTools)} onPress={() => router.push('/tools')} />
   )
   const header = rows ? (
     title
   ) : (
-    // Le titre à gauche, « Tous les outils » au bout de la ligne ; à 200 %, le lien passe dessous.
     <Stack direction="row" gap="md" align="center" justify="between" wrap>
       {title}
       {allTools}
     </Stack>
   )
+  return { header, allTools: rows ? allTools : null }
+}
+
+/** « Outils populaires », lue : les outils, ou la panne avec « Réessayer ». */
+function PopularToolsLoaded({
+  rows,
+  tools,
+}: {
+  rows: boolean
+  tools: ReturnType<typeof useTools>
+}) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const compact = useLayout().sizeClass === 'compact'
+  const list = tools.data?.tools.slice(0, rows ? PANEL_TOOLS : POPULAR_TOOLS) ?? []
+  const { header, allTools } = usePopularToolsHeader(rows)
 
   if (!tools.data) {
-    // En attente : rien (la ligne est basse) ; en échec, on le dit, avec « Réessayer ».
-    return tools.isError ? (
+    // En échec, on le dit, avec « Réessayer ».
+    return (
       <Stack gap="md">
         {header}
         <Notice
           message={t(($) => $.explore.toolsError)}
           action={{ label: t(($) => $.common.retry), onPress: () => void tools.refetch() }}
         />
-        {rows ? allTools : null}
+        {allTools}
       </Stack>
-    ) : null
+    )
   }
   if (list.length === 0) return null
   if (rows) {

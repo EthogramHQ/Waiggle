@@ -18,11 +18,17 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import { Linking, Platform, StyleSheet } from 'react-native'
 import { SummaryCard } from '../projects/SummaryCard'
 import { categoryName } from '../testing/categories'
+import { drawnSizes, emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { FollowButton } from './FollowButton'
-import { ProjectCard } from './ProjectCard'
+import {
+  PROJECT_CARD_COMPACT_HEIGHT,
+  PROJECT_CARD_HEIGHT,
+  ProjectCard,
+  ProjectCardSkeleton,
+} from './ProjectCard'
 import { TAP_GUARD_MS } from './tapGuard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -529,3 +535,38 @@ const allNodesUnder = (root: TreeNode): TreeNode[] => {
   visit(root)
   return found
 }
+
+// R16 (plan, choix 4) : la carte vide du Fil vit dans le composant qu'elle imite, avec ses mesures.
+// Le Fil, la mosaïque et Explorer en posent plusieurs dans un seul « Chargement » (ui/Skeleton.tsx).
+describe('ProjectCardSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <ProjectCardSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
+  })
+
+  it('takes the height of the card it stands for, full or compact', async () => {
+    const view = await renderWithProviders(
+      <PieceHost>
+        <ProjectCardSkeleton />
+      </PieceHost>,
+    )
+    expect(drawnSizes().heights).toContain(PROJECT_CARD_HEIGHT)
+    await view.unmount()
+
+    await renderWithProviders(
+      <PieceHost>
+        <ProjectCardSkeleton size="compact" />
+      </PieceHost>,
+    )
+    expect(drawnSizes().heights).toContain(PROJECT_CARD_COMPACT_HEIGHT)
+    expect(drawnSizes().heights).not.toContain(PROJECT_CARD_HEIGHT)
+  })
+})

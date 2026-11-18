@@ -101,7 +101,9 @@ export function PublicMemberScreen({ id, preview = false, onClose }: Props) {
       />
     )
   }
-  if (!member.data) return <LoadingScreen width="wide" fallback={fallback} />
+  // R16 : la page vide a la forme de la page d'un membre (son en-tête vide, puis la mosaïque de 4
+  // petites cartes). Un visiteur n'a pas d'aperçu : aucune liste ne lui a montré ce membre.
+  if (!member.data) return <LoadingScreen width="wide" shape="member" fallback={fallback} />
   return (
     <PublicMemberView
       member={member.data}

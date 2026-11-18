@@ -7,7 +7,19 @@
 // flèches cochent le choix voisin en faisant le tour, Espace et Entrée cochent le choix qui a le
 // focus. Avant (point de liste de R1), la page « Signaler » demandait sept Tab pour traverser
 // ses motifs.
-import { borders, layout, radii, space } from '@ruche/brand'
+// R16 : `ListRowSkeleton`, la ligne vide d'une liste qui charge (en bas du fichier), et
+// `TextLineShape`, une ligne de texte vide à la hauteur d'une ligne écrite ; un groupe qui charge
+// garde son titre lu et visible (`pending`).
+import {
+  borders,
+  layout,
+  maxHeadingScale,
+  maxTextScale,
+  radii,
+  space,
+  type TextVariant,
+  textStyles,
+} from '@ruche/brand'
 import {
   Children,
   createContext,
@@ -20,10 +32,19 @@ import {
   useId,
   useRef,
 } from 'react'
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
 import { RadioMark } from './Radio'
+import { Reveal } from './Reveal'
+import { Loading, Shape } from './Skeleton'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -36,7 +57,16 @@ type GroupProps = {
    * s'enregistre dès que tu le touches. », puis la phrase sur les e-mails du compte).
    */
   footer?: string | readonly string[]
-  children: ReactNode
+  /** Les lignes ; rien tant qu'elles chargent (`pending`). */
+  children?: ReactNode
+  /**
+   * R16 : le groupe dont les lignes chargent (« Par e-mail » des Réglages, « Les plus utilisés »
+   * d'Outils sur téléphone). Son titre est déjà là, vu et lu ; seules les lignes vides (`rows`,
+   * des `ListRowSkeleton`) passent sous un seul « Chargement… ». Quand `loading` devient faux, elles
+   * fondent vers les vraies lignes et le pied arrive avec elles (`Reveal`). À garder une fois les
+   * lignes arrivées (`loading: false`) : le groupe garde le même arbre, le fondu peut jouer.
+   */
+  pending?: { loading: boolean; rows: ReactNode }
   /** Annoncé comme un groupe de boutons radio (une liste de choix). */
   radio?: boolean
   /**
@@ -72,6 +102,13 @@ type RadioSlot = {
 const RadioSlotContext = createContext<RadioSlot | null>(null)
 
 /**
+ * R16 : le rang d'une ligne dans son groupe (0 pour la première). Seule la ligne vide le lit, pour
+ * varier la longueur de ses formes d'une ligne à la suivante, comme des noms de longueurs
+ * différentes ; l'écran pose ses lignes vides sans compter.
+ */
+const RowRankContext = createContext(0)
+
+/**
  * La largeur que garde le nom d'une ligne (en points) avant que le côté droit passe dessous : de quoi
  * lire quelques mots. Mesuré à 320 points et 200 % : « Membres bloqués » laissait 38 points à
  * « Sam Petit » (R4, M6). Exportée : la ligne de choix des réglages (ChoiceRow, R8) range son nom et
@@ -90,6 +127,7 @@ export function ListGroup({
   radio = false,
   list = false,
   label,
+  pending,
 }: GroupProps) {
   const { colors, shadows } = useTheme()
   const rows = Children.toArray(children)
@@ -130,74 +168,103 @@ export function ListGroup({
   })
   const notes = footer === undefined ? [] : typeof footer === 'string' ? [footer] : footer
   const asList = list && !radio
+  const heading = title ? (
+    <View style={{ paddingHorizontal: space.lg }}>
+      {/* Un groupe est une section de la page : titre de niveau 2. */}
+      <Text variant="caption" weight={600} tone="muted" heading={2}>
+        {title}
+      </Text>
+    </View>
+  ) : null
+  const notesBlock =
+    notes.length > 0 ? (
+      <View style={{ paddingHorizontal: space.lg, gap: space.xs }}>
+        {notes.map((note, index) => (
+          // Deux phrases du pied peuvent être identiques : leur rang les distingue, et la liste
+          // ne change pas d'ordre.
+          // biome-ignore lint/suspicious/noArrayIndexKey: une phrase du pied n'a pas d'autre identité que sa place
+          <Text key={index} variant="caption" tone="muted">
+            {note}
+          </Text>
+        ))}
+      </View>
+    ) : null
+  // Le groupe blanc et ses lignes, séparées d'un filet. `real` : les vraies lignes, avec leurs
+  // rôles (groupe de choix, liste) ; sinon des lignes vides, sans rôle ni nom (le `Loading` qui les
+  // enveloppe dit « Chargement… »).
+  const box = (items: ReturnType<typeof Children.toArray>, real: boolean) => (
+    <View
+      {...(real && radio ? { accessibilityRole: 'radiogroup' as const } : null)}
+      {...(real && radio && (title ?? label) ? { accessibilityLabel: title ?? label } : null)}
+      {...(real && asList ? { role: 'list' as const } : null)}
+      style={{
+        backgroundColor: colors.surface,
+        borderRadius: radii.group,
+        borderWidth: borders.hairline,
+        borderColor: colors.groupBorder,
+        boxShadow: shadows.soft,
+        overflow: 'hidden',
+      }}
+    >
+      {items.map((row, i) => {
+        const separator =
+          i > 0 ? (
+            <View
+              style={{
+                height: borders.hairline,
+                backgroundColor: colors.groupSeparator,
+                marginLeft: space.lg,
+              }}
+            />
+          ) : null
+        const key = (row as { key?: string }).key ?? i
+        // Son rang, que lit la ligne vide (R16) ; sans effet sur une vraie ligne.
+        const ranked = <RowRankContext.Provider value={i}>{row}</RowRankContext.Provider>
+        // Une liste (R7b) : la ligne et son trait dans un même élément de liste.
+        if (real && asList) {
+          return (
+            <View key={key} role="listitem">
+              {separator}
+              {ranked}
+            </View>
+          )
+        }
+        return (
+          <Fragment key={key}>
+            {separator}
+            {real && choices[i] ? (
+              <RadioSlotContext.Provider value={slot(i)}>{ranked}</RadioSlotContext.Provider>
+            ) : (
+              ranked
+            )}
+          </Fragment>
+        )
+      })}
+    </View>
+  )
+  if (pending) {
+    // R16 : le titre hors du « Chargement… », lu tout de suite ; les lignes vides, puis les vraies
+    // et le pied, à la même place (le titre ne bouge pas quand elles arrivent).
+    return (
+      <View style={{ gap: space.sm }}>
+        {heading}
+        <Reveal
+          loading={pending.loading}
+          skeleton={<Loading>{box(Children.toArray(pending.rows), false)}</Loading>}
+        >
+          <View style={{ gap: space.sm }}>
+            {box(rows, true)}
+            {notesBlock}
+          </View>
+        </Reveal>
+      </View>
+    )
+  }
   return (
     <View style={{ gap: space.sm }}>
-      {title ? (
-        <View style={{ paddingHorizontal: space.lg }}>
-          {/* Un groupe est une section de la page : titre de niveau 2. */}
-          <Text variant="caption" weight={600} tone="muted" heading={2}>
-            {title}
-          </Text>
-        </View>
-      ) : null}
-      <View
-        {...(radio ? { accessibilityRole: 'radiogroup' as const } : null)}
-        {...(radio && (title ?? label) ? { accessibilityLabel: title ?? label } : null)}
-        {...(asList ? { role: 'list' as const } : null)}
-        style={{
-          backgroundColor: colors.surface,
-          borderRadius: radii.group,
-          borderWidth: borders.hairline,
-          borderColor: colors.groupBorder,
-          boxShadow: shadows.soft,
-          overflow: 'hidden',
-        }}
-      >
-        {rows.map((row, i) => {
-          const separator =
-            i > 0 ? (
-              <View
-                style={{
-                  height: borders.hairline,
-                  backgroundColor: colors.groupSeparator,
-                  marginLeft: space.lg,
-                }}
-              />
-            ) : null
-          const key = (row as { key?: string }).key ?? i
-          // Une liste (R7b) : la ligne et son trait dans un même élément de liste.
-          if (asList) {
-            return (
-              <View key={key} role="listitem">
-                {separator}
-                {row}
-              </View>
-            )
-          }
-          return (
-            <Fragment key={key}>
-              {separator}
-              {choices[i] ? (
-                <RadioSlotContext.Provider value={slot(i)}>{row}</RadioSlotContext.Provider>
-              ) : (
-                row
-              )}
-            </Fragment>
-          )
-        })}
-      </View>
-      {notes.length > 0 ? (
-        <View style={{ paddingHorizontal: space.lg, gap: space.xs }}>
-          {notes.map((note, index) => (
-            // Deux phrases du pied peuvent être identiques : leur rang les distingue, et la liste
-            // ne change pas d'ordre.
-            // biome-ignore lint/suspicious/noArrayIndexKey: une phrase du pied n'a pas d'autre identité que sa place
-            <Text key={index} variant="caption" tone="muted">
-              {note}
-            </Text>
-          ))}
-        </View>
-      ) : null}
+      {heading}
+      {box(rows, true)}
+      {notesBlock}
     </View>
   )
 }
@@ -551,5 +618,147 @@ export function ListRow({
     >
       {content}
     </Pressable>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// R16 (« Les squelettes ») : la ligne vide d'une liste
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Une ligne de texte vide : une forme de la hauteur d'une ligne écrite dans ce style (`textStyles`
+ * de la marque), la forme elle-même un peu plus basse que les lettres et centrée dedans. Deux lignes
+ * vides empilées prennent ainsi la place des deux lignes écrites qui arrivent : rien ne saute.
+ * Exportée pour les autres pièces vides qui imitent du texte (l'en-tête et la carte d'un membre).
+ *
+ * Elle grandit avec le texte (relecture R16, A3) : un téléphone réglé à 200 % agrandit les vraies
+ * lignes ; une ligne vide restée à 100 % faisait sauter la page à leur arrivée (Outils, 390 points,
+ * texte doublé : 71 points par ligne vide, 158 par vraie ligne). Sur téléphone, elle suit le réglage
+ * du système (`fontScale`), avec la même borne que `Text` ; sur le web, où `fontScale` vaut
+ * toujours 1, ses hauteurs s'écrivent en `em`, relatives à la taille de ses lettres : un texte
+ * agrandi par le navigateur (ou l'essai « texte à 200 % ») l'agrandit avec le reste.
+ */
+export function TextLineShape(props: TextLineProps): ReactNode {
+  return Platform.OS === 'web' ? <WebTextLine {...props} /> : <NativeTextLine {...props} />
+}
+
+type TextLineProps = {
+  variant: TextVariant
+  width: `${number}%` | number
+  /** Centrée sur sa ligne, comme un texte centré (l'en-tête d'un membre sur téléphone). */
+  center?: boolean
+}
+
+/**
+ * L'agrandissement le plus fort qu'un texte de ce style reçoit (`Text`) : 2 pour le texte courant,
+ * 1,5 pour un grand style (titre de section et plus grand), qu'un titre de page ou de section porte.
+ */
+const scaleCap = (variant: TextVariant) =>
+  textStyles[variant].size >= textStyles.heading.size ? maxHeadingScale : maxTextScale
+
+/** Sur téléphone : les hauteurs en points, multipliées par le réglage de taille du texte. */
+function NativeTextLine({ variant, width, center = false }: TextLineProps): ReactNode {
+  // Hook : la taille de l'écran et le réglage de taille du texte, relus quand ils changent.
+  const { fontScale } = useWindowDimensions()
+  const scale = Math.min(Math.max(fontScale, 1), scaleCap(variant))
+  const { size, lineHeight } = textStyles[variant]
+  return (
+    <View
+      style={{
+        height: Math.round(lineHeight * scale),
+        justifyContent: 'center',
+        ...(center ? { alignItems: 'center' } : null),
+      }}
+    >
+      <Shape height={Math.round(size * SHAPE_TO_TEXT * scale)} width={width} />
+    </View>
+  )
+}
+
+/**
+ * Sur le web : la ligne pose la taille des lettres du style (`fontSize`), et ses hauteurs s'écrivent
+ * en `em` (une part de cette taille) : à texte normal, les mêmes points qu'au téléphone. `fontSize`
+ * sur une vue et une hauteur en `em` manquent aux types de React Native ; react-native-web les passe
+ * tels quels au navigateur (comme la largeur réservée de `Wordmark`).
+ */
+function WebTextLine({ variant, width, center = false }: TextLineProps): ReactNode {
+  const { size, lineHeight } = textStyles[variant]
+  const line = {
+    fontSize: size,
+    height: `${(lineHeight / size).toFixed(4)}em`,
+    justifyContent: 'center',
+    ...(center ? { alignItems: 'center' } : null),
+  } as unknown as ViewStyle
+  return (
+    <View style={line}>
+      <Shape height={`${SHAPE_TO_TEXT}em`} width={width} />
+    </View>
+  )
+}
+
+/** La forme d'une ligne vide, en part de la taille des lettres : un peu moins que leur hauteur. */
+const SHAPE_TO_TEXT = 0.75
+
+/** Les largeurs des deux lignes d'une ligne vide, qui varient d'une ligne à la suivante. */
+const ROW_WIDTHS = [
+  ['55%', '80%'],
+  ['40%', '65%'],
+  ['50%', '75%'],
+] as const
+
+/** La place d'un avatar ou d'une tuile en tête de ligne (ceux de `HiveMemberList`, `InitialTile`). */
+const ROW_LEADING = 40
+/** Une pastille à droite (« Tester », un statut) ; une courte ligne (un compte). */
+const ROW_PILL_WIDTH = 64
+const ROW_SHORT_LINE = 24
+
+/**
+ * La ligne vide d'une liste (plan R16, choix 4 et 11) : à poser dans un `ListGroup` (le groupe
+ * blanc, ses filets), cinq fois pour une liste qui charge, ou autant que la liste aura de lignes.
+ * Elle reprend les marges et la hauteur d'une `ListRow` : en tête, un rond (la photo d'un membre)
+ * ou une tuile (un outil) ; puis le nom et une précision, deux lignes dont la largeur change d'une
+ * ligne à la suivante (le groupe lui donne son rang) ; à droite, si la vraie ligne en a, une tuile,
+ * une pastille ou une courte ligne.
+ *
+ * Sans rôle ni nom : c'est le `Loading` de la zone (ui/Skeleton.tsx) qui dit « Chargement… », une
+ * seule fois pour toutes ses lignes.
+ */
+export function ListRowSkeleton({
+  leading = 'round',
+  trailing = 'none',
+}: {
+  /** En tête : `round`, une photo ; `square`, une tuile ; `none`, rien. */
+  leading?: 'round' | 'square' | 'none'
+  /** À droite : `square`, une vignette ; `pill`, une pastille ; `line`, un compte ; `none`, rien. */
+  trailing?: 'square' | 'pill' | 'line' | 'none'
+}): ReactNode {
+  const rank = useContext(RowRankContext)
+  const [name, detail] = ROW_WIDTHS[rank % ROW_WIDTHS.length] ?? ROW_WIDTHS[0]
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        minHeight: layout.controlHeight.regular,
+        paddingHorizontal: space.lg,
+        paddingVertical: space.md,
+      }}
+    >
+      {leading === 'none' ? null : (
+        <Shape height={ROW_LEADING} width={ROW_LEADING} round={leading === 'round'} />
+      )}
+      {/* Les deux lignes de la vraie ligne : le nom (en gras, la taille du texte courant) et la
+          précision (plus petite), chacune à la hauteur de sa ligne écrite. */}
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: MIN_NAME, gap: space.xxs }}>
+        <TextLineShape variant="body" width={name} />
+        <TextLineShape variant="callout" width={detail} />
+      </View>
+      {trailing === 'square' ? <Shape height={ROW_LEADING} width={ROW_LEADING} /> : null}
+      {trailing === 'pill' ? (
+        <Shape height={layout.controlHeight.small} width={ROW_PILL_WIDTH} round />
+      ) : null}
+      {trailing === 'line' ? <TextLineShape variant="caption" width={ROW_SHORT_LINE} /> : null}
+    </View>
   )
 }

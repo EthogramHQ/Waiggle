@@ -9,16 +9,17 @@ import { layout, space } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { Carousel } from '../ui/Carousel'
+import { Carousel, CarouselShapes } from '../ui/Carousel'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { ProjectCover } from '../ui/ProjectCover'
 import { SidePanel } from '../ui/SidePanel'
+import { Loading } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
-import { TesterCard } from '../ui/TesterCard'
+import { TesterCard, TesterCardSkeleton } from '../ui/TesterCard'
 import { TesterRow } from '../ui/TesterRow'
 import { TestLink } from '../ui/TestLink'
 import { Text } from '../ui/Text'
@@ -38,6 +39,8 @@ const fr = {
   intro:
     'Les pièces de l’onglet Explorer. Le carrousel défile sous le doigt et s’arrête sur une carte ; sur ordinateur, deux flèches le font défiler d’une page, et elles disparaissent quand tout tient. Il ne bouge jamais seul. « Tester » est un lien vers un site externe, posé sur la photo, hors de tout autre lien.',
   testers: 'Carrousel de cartes de testeurs (avec photo, sans photo, titre long)',
+  testersWaiting:
+    'Le même carrousel qui charge (R16) : ses cartes vides, à l’écart des vraies (CarouselShapes)',
   tools: 'Carrousel serré d’étiquettes avec leur nombre (« Outils populaires »)',
   tags: 'Étiquettes : avec nombre, sans nombre, touchables ou non',
   testLink:
@@ -59,6 +62,8 @@ const en: typeof fr = {
   intro:
     'The pieces of the Explore tab. The carousel scrolls under the finger and stops on a card; on a computer, two arrows scroll it by a page, and they disappear when everything fits. It never moves on its own. “Try” is a link to an external site, placed on the photo, outside any other link.',
   testers: 'Carousel of tester cards (with a photo, without, long title)',
+  testersWaiting:
+    'The same carousel while loading (R16): its empty cards, spaced like the real ones (CarouselShapes)',
   tools: 'Tight carousel of tags with their count (“Popular tools”)',
   tags: 'Tags: with a count, without, tappable or not',
   testLink:
@@ -139,6 +144,27 @@ export function ExploreCatalogue() {
                     onOpen={noop}
                   />
                 ))}
+              </Carousel>
+            </Example>
+
+            <Example caption={`${l.testersWaiting} — ${l[scheme]}`}>
+              <Carousel
+                label={t(($) => $.explore.carousel)}
+                previousLabel={t(($) => $.explore.previous)}
+                nextLabel={t(($) => $.explore.next)}
+                header={
+                  <Text variant="heading" heading={3}>
+                    {t(($) => $.explore.testers)}
+                  </Text>
+                }
+              >
+                <Loading key="loading" shown>
+                  <CarouselShapes>
+                    {[0, 1, 2].map((column) => (
+                      <TesterCardSkeleton key={column} column={column} />
+                    ))}
+                  </CarouselShapes>
+                </Loading>
               </Carousel>
             </Example>
 

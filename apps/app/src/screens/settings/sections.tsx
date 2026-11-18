@@ -21,7 +21,6 @@ import { ListGroup, ListRow, type PressEvent } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { Stack } from '../../ui/Stack'
 import { Switch } from '../../ui/Switch'
-import { Text } from '../../ui/Text'
 import type { Appearance } from '../../ui/theme/appearance'
 import { useHydrated } from '../../ui/theme/hydration'
 import { useTheme } from '../../ui/theme/ThemeProvider'
@@ -159,7 +158,9 @@ function DataSection() {
         <ListRow
           label={t(($) => $.account.export.button)}
           icon="download-simple"
-          trailing={exporting ? <Text tone="muted">{t(($) => $.common.loading)}</Text> : undefined}
+          // R16 (plan, choix 12) : plus de « Chargement… » écrit. L'export est une action en cours,
+          // pas une lecture : la ligne garde l'indicateur d'un bouton occupé (`busy`), à droite.
+          busy={exporting}
           onPress={() => void onExport()}
           disabled={exporting} // pas de deuxième export tant que le premier n'est pas fini
         />

@@ -66,6 +66,7 @@ import { AmbiancesCatalogue } from './ambiances'
 import { BeforeAfterCatalogue } from './avant-apres'
 import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
+import { SearchCardsCatalogue } from './cartes-recherche'
 import { InvalidChoicesCatalogue } from './champs-invalides'
 import { LoadingCatalogue } from './chargement'
 import { TestersCornerHeadsCatalogue } from './coin-entetes'
@@ -94,6 +95,7 @@ import { AmbientHostCatalogue } from './fluidite-lumiere'
 import { FormSamples } from './formulaire'
 import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
+import { CardGridCatalogue } from './grille-cartes'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
 import { LightCatalogue } from './lumiere'
@@ -119,6 +121,7 @@ import { ToolHeaderCatalogue } from './outils-entete'
 import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
 import { AdminGesturesCatalogue } from './outils-gestes'
+import { ToolsWideCatalogue } from './outils-grand'
 import { ToolPageSheetsCatalogue } from './outils-page'
 import { LegalPagesCatalogue } from './pages-legales'
 import { HivePillsCatalogue } from './pastilles'
@@ -858,6 +861,8 @@ export function CatalogueScreen() {
       <NavigationCatalogue />
       <TopBarCatalogue />
       <CardsCatalogue />
+      {/* R16 : la carte d'un résultat de recherche, en grand (cartes-recherche.tsx). */}
+      <SearchCardsCatalogue />
       <FeedCatalogue />
       <ExploreCatalogue />
       <ToolsCatalogue />
@@ -951,6 +956,12 @@ export function CatalogueScreen() {
       <LightCatalogue />
       <AmbiancesCatalogue />
       <LoadingCatalogue />
+      {/* Tranche R16 : la grille de cartes commune, la carte d'une ruche et sa pièce vide
+          (grille-cartes.tsx). */}
+      <CardGridCatalogue />
+      {/* Tranche R16 : la carte d'un outil, sa pièce vide et la liste en colonnes d'Outils en grand
+          (outils-grand.tsx). */}
+      <ToolsWideCatalogue />
       <FeedEndCatalogue />
       <MascotCatalogue />
     </Screen>

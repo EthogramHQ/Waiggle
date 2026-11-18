@@ -30,6 +30,7 @@ import { useMentionable } from '../mentions/api'
 import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { useMe } from '../profile/hooks'
+import { CommentRowsSkeleton } from '../projects/ProjectPage'
 import { Button } from '../ui/Button'
 import { excerpt } from '../ui/CommentAction'
 import { CommentCard, plainCommentText } from '../ui/CommentCard'
@@ -40,6 +41,7 @@ import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from
 import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
 import { Sheet } from '../ui/Sheet'
+import { Loading } from '../ui/Skeleton'
 import { Surface } from '../ui/Surface'
 import type { SheetReveal } from '../ui/sheetReveal'
 import { Text } from '../ui/Text'
@@ -547,7 +549,11 @@ export function Comments({
         )}
       </>
     ) : comments.isPending ? (
-      <Text tone="muted">{t(($) => $.project.comments.loading)}</Text>
+      // R16 (plan, choix 12) : des lignes vides, de la forme des commentaires qui arrivent, plutôt
+      // qu'un texte qui attend ; leur nom lu reste « Chargement des commentaires… ».
+      <Loading label={t(($) => $.project.comments.loading)}>
+        <CommentRowsSkeleton />
+      </Loading>
     ) : null
 
   const emptyLabel = closed

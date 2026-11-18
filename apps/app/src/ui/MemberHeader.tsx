@@ -8,16 +8,20 @@
 // - `layout="column"`, la colonne du profil à gauche de la page sur ordinateur : une bannière floue
 //   tirée de sa photo, la photo qui en chevauche le bas, puis le nom, le pseudo, la bio, les outils
 //   et les actions, rangés à gauche, comme une fiche qu'on lit de haut en bas.
-import { borders, radii, readableWidth, space } from '@ruche/brand'
+// R16 : `MemberHeaderSkeleton`, le même en-tête pendant que la page charge (en bas du fichier).
+import { borders, layout as layoutTokens, radii, readableWidth, space } from '@ruche/brand'
 import type { ReactNode, Ref } from 'react'
 import { Image, View } from 'react-native'
 import { Avatar } from './Avatar'
+import { DelayedShapes } from './DelayedShapes'
 import { ExampleBadge } from './ExampleBadge'
 import type { Focusable } from './focus'
 import type { ImageSource } from './image'
+import { TextLineShape } from './ListGroup'
 import { ProjectCover } from './ProjectCover'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { Stack } from './Stack'
-import { Tag } from './Tag'
+import { Tag, TagSkeleton } from './Tag'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -244,6 +248,166 @@ function ColumnPhoto({ name, source }: { name: string; source: ImageSource | nul
         }}
       >
         <Avatar name={name} source={source} label={name} size={COLUMN_AVATAR} />
+      </View>
+    </View>
+  )
+}
+
+/** Les étiquettes d'outils vides : trois (`TagSkeleton`, leur rang choisit leur largeur). */
+const SKELETON_TOOLS = [0, 1, 2] as const
+/** La largeur du bouton vide sous l'en-tête (« Suivre Léa »), quand il ne prend pas toute la ligne. */
+const SKELETON_ACTION = 152
+/** La largeur de la ligne vide des abonnés, celle de « 12 abonnés » écrit en `callout`. */
+const SKELETON_FOLLOWERS = 88
+
+/**
+ * R16 (plan, choix 4 et 10 ; planches R16-Membre-1440 et 390) : l'en-tête d'un membre pendant que
+ * sa page charge, dans ses deux formes (`layout`, comme `MemberHeader`) : la colonne du profil sur
+ * ordinateur, l'en-tête centré ailleurs. Les mêmes places et les mêmes hauteurs que l'en-tête qui
+ * arrive : la photo, le nom, puis en formes vides le pseudo, deux lignes de bio, le titre et trois
+ * étiquettes d'outils, et le bouton d'action (`action={false}` pour l'omettre).
+ *
+ * Ouverte depuis une carte, la page connaît déjà le nom et la photo (l'aperçu, `useMemberPreview`) :
+ * donnés (`name`, `avatar`), ils s'affichent pour de vrai, le nom en titre de la page. L'écran pose
+ * alors cet en-tête **hors** de son `Loading` (le nom se lit, il n'attend rien). Sans eux, tout est
+ * formes, sans rôle ni nom à elles : le `Loading` de l'écran les nomme.
+ *
+ * Hors du `Loading`, les formes vides attendraient moins que lui : elles se montreraient tout de
+ * suite, et une page arrivée en moins de 160 ms ferait clignoter un en-tête à moitié vide (scénario
+ * R16, « Quand on le voit »). `delayShapes` les fait donc attendre avec lui (`DelayedShapes`), le
+ * nom et la photo restant montrés d'emblée. Par défaut, dès que le nom est connu : c'est justement
+ * le cas où l'écran pose l'en-tête hors de son `Loading`.
+ */
+export function MemberHeaderSkeleton({
+  layout,
+  name,
+  avatar = null,
+  heading = 1,
+  action = true,
+  delayShapes = name !== undefined,
+}: {
+  layout?: 'column' | undefined
+  /** Le nom déjà connu (l'aperçu) ; absent, une forme vide. */
+  name?: string | undefined
+  /** Sa photo déjà connue, avec le nom ; sans elle, ses initiales. */
+  avatar?: ImageSource | null | undefined
+  /** Le niveau du nom, quand il est connu (comme `MemberHeader`). */
+  heading?: 1 | 2 | 3
+  /**
+   * Le nombre d'abonnés et le bouton vides sous l'en-tête : `false` quand la vraie page n'en a pas.
+   */
+  action?: boolean
+  /**
+   * Les formes vides (pseudo, bio, outils, abonnés et bouton) attendent 160 ms avant de se montrer,
+   * comme le `Loading` de la page ; vrai par défaut quand `name` est donné (voir plus haut).
+   */
+  delayShapes?: boolean
+}): ReactNode {
+  const column = layout === 'column'
+  const center = !column
+  // Les formes qui attendent, ou telles quelles (l'en-tête tout vide, déjà sous le `Loading`).
+  const shapes = (node: ReactNode) => (delayShapes ? <DelayedShapes>{node}</DelayedShapes> : node)
+  const photo =
+    name === undefined ? (
+      column ? (
+        <ColumnPhotoShape />
+      ) : (
+        <Shape height={96} width={96} round />
+      )
+    ) : column ? (
+      <ColumnPhoto name={name} source={avatar} />
+    ) : (
+      <Avatar name={name} source={avatar} label={name} size={96} />
+    )
+  return (
+    <Stack gap="lg" align={column ? 'stretch' : 'center'}>
+      {photo}
+      <Stack gap="sm" align="stretch">
+        <Stack gap="xxs" align="stretch">
+          {name === undefined ? (
+            <TextLineShape variant={column ? 'display' : 'title1'} width="70%" center={center} />
+          ) : (
+            <Text
+              variant={column ? 'display' : 'title1'}
+              align={center ? 'center' : undefined}
+              heading={heading}
+              breakAnywhere
+            >
+              {name}
+            </Text>
+          )}
+          {shapes(<TextLineShape variant="callout" width="35%" center={center} />)}
+        </Stack>
+        {/* La bio : deux lignes, à la largeur de lecture de la vraie bio. */}
+        {shapes(
+          <View
+            style={center ? { width: '100%', maxWidth: readableWidth, alignSelf: 'center' } : null}
+          >
+            <TextLineShape variant="body" width="95%" center={center} />
+            <TextLineShape variant="body" width="75%" center={center} />
+          </View>,
+        )}
+      </Stack>
+      {shapes(
+        <Stack gap="sm" align={column ? 'stretch' : 'center'}>
+          <TextLineShape variant="caption" width={96} center={center} />
+          <Stack direction="row" gap="sm" wrap justify={column ? 'start' : 'center'}>
+            {/* Les étiquettes vides d'« Outils populaires », dans la zone de 44 points d'une vraie
+                étiquette (36 dessinés) : la rangée garde la hauteur de celle qui arrive. */}
+            {SKELETON_TOOLS.map((index) => (
+              <TagSkeleton key={index} index={index} />
+            ))}
+          </Stack>
+        </Stack>,
+      )}
+      {action
+        ? shapes(
+            // Le nombre d'abonnés (« 12 abonnés », une ligne de `callout`) au-dessus du bouton,
+            // comme sur la vraie page : sans lui, tout ce qui suit l'en-tête (« Projets » sur
+            // téléphone) descendait à l'arrivée. L'écart `xs` garde la hauteur de ce qui arrive sur
+            // la page d'un autre membre : la ligne (21), `md` (12) puis « Suivre » en taille
+            // `compact` (44), soit 77 points, comme la ligne, 4 et le bouton vide (52). Sur sa
+            // propre page (`sm`, puis « Modifier mon profil » en taille `regular`), 4 points de
+            // plus.
+            // Étirée sur toute la ligne (`alignSelf`), même dans l'en-tête centré : le bouton vide
+            // y prend toute la largeur, et la ligne des abonnés se centre elle-même (`center`).
+            <View style={{ alignSelf: 'stretch', gap: space.xs }}>
+              <TextLineShape variant="callout" width={SKELETON_FOLLOWERS} center={center} />
+              <Shape
+                height={layoutTokens.controlHeight.regular}
+                width={column ? SKELETON_ACTION : '100%'}
+                round
+              />
+            </View>,
+          )
+        : null}
+    </Stack>
+  )
+}
+
+/**
+ * La bannière et la photo de la colonne, vides : une carte vide de la hauteur de la bannière (sa
+ * lueur comprise), et le rond de la photo qui en chevauche le bas, dans son anneau, comme
+ * `ColumnPhoto`.
+ */
+function ColumnPhotoShape() {
+  const { colors } = useTheme()
+  return (
+    <View>
+      <SkeletonSurface height={BANNER} radius="tile" />
+      <View
+        style={{
+          alignSelf: 'flex-start',
+          marginTop: -(COLUMN_AVATAR / 2 + RING),
+          marginLeft: space.lg,
+          padding: RING,
+          borderRadius: radii.pill,
+          backgroundColor: colors.glass,
+          borderWidth: borders.hairline,
+          borderColor: colors.glassBorder,
+        }}
+      >
+        <Shape height={COLUMN_AVATAR} width={COLUMN_AVATAR} round />
       </View>
     </View>
   )

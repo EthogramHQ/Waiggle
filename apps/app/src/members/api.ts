@@ -19,3 +19,10 @@ export const getMember = async (id: string): Promise<Member> => {
 /** Hook : la page d'un membre. `enabled: false` (personne de connecté) : aucune requête. */
 export const useMember = (id: string, enabled = true) =>
   useQuery({ queryKey: ['member', id], queryFn: () => getMember(id), enabled })
+
+/**
+ * R16 : ce qu'une liste déjà lue sait d'un membre (nom, photo), pour la page qui s'ouvre, sans
+ * requête. Écrit dans projects/hooks.ts, à côté de l'aperçu d'un projet dont il partage la lecture
+ * du cache, et réexporté ici, avec les autres lectures d'un membre.
+ */
+export { useMemberPreview } from '../projects/hooks'

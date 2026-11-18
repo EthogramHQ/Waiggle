@@ -8,7 +8,7 @@
 // Ces pages n'ont pas d'autre titre que celui de leur état : il est donc de niveau 1 (`level`),
 // comme le titre de la page qu'elles remplacent.
 import { type Href, usePathname, useRouter } from 'expo-router'
-import { type ComponentProps, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { nextAfterSignIn } from '../navigation/signInAgain'
@@ -17,7 +17,7 @@ import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { Honeycomb } from '../ui/Illustrations'
 import { Screen } from '../ui/Screen'
-import { SkeletonList } from '../ui/Skeleton'
+import { Loading, SkeletonPage, type SkeletonPageShape, type SkeletonShape } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 
@@ -27,48 +27,91 @@ import { StateMessage } from '../ui/StateMessage'
 type Width = 'form' | 'page' | 'wide'
 
 /**
- * Pendant le chargement : le squelette de la page (Miel 2), des formes pleines à la place du
- * contenu qui arrive, plutôt que le mot « Chargement… » seul. Pour un lecteur d'écran, le squelette
- * s'appelle « Chargement… » et se dit occupé (ui/Skeleton.tsx). Une page large (projet, membre) a
- * trois cartes, un formulaire deux.
+ * R16 : la forme de la page qui arrive, pour que son squelette pose les mêmes masses (le Fil, un
+ * projet, un membre, une grille de cartes, une liste, un formulaire). Sans elle, `width` choisit.
+ */
+export type PageShape = SkeletonPageShape
+/** R14 : une forme de cartes seule (`compact`, la mosaïque d'un membre ; `card`, la carte simple). */
+type CardShape = SkeletonShape
+
+/** Sans forme donnée, la largeur choisit (plan R16, choix 5) : aucun appel d'avant ne change. */
+const shapeOfWidth: Record<Width, PageShape> = { form: 'form', page: 'list', wide: 'grid' }
+/** Sans largeur donnée, la forme choisit la sienne : celle de la page qui arrive. */
+const widthOfShape: Record<CardShape | PageShape, Width> = {
+  feed: 'wide',
+  grid: 'wide',
+  member: 'wide',
+  compact: 'wide',
+  project: 'page',
+  list: 'page',
+  card: 'page',
+  form: 'form',
+}
+
+/**
+ * Pendant le chargement : le squelette de la page (Miel 2 ; R16, à la forme de chaque page), des
+ * pièces vides à la place du contenu qui arrive, plutôt que le mot « Chargement… » seul. Pour un
+ * lecteur d'écran, toute la page vide s'appelle « Chargement… » une seule fois et se dit occupée
+ * (`Loading`, ui/Skeleton.tsx) ; elle ne se montre qu'au bout de 160 ms (sauf dans la page web
+ * pré-rendue, où elle est là tout de suite).
  * Pas de titre d'onglet propre : la page web pré-rendue (celle que montrent les aperçus d'un lien
  * partagé) en reste à ce stade, et y lirait « Chargement… ».
  */
 export function LoadingScreen({
-  width = 'form',
+  width: givenWidth,
   fade = true,
   fallback = '/feed',
-  shape,
+  shape: givenShape,
+  backLabel,
 }: {
+  /** La largeur de la page : sans elle, celle de sa forme ; sans l'une ni l'autre, `form`. */
   width?: Width
   /** RF : faux pour une page qui a son propre passage (un projet ouvert depuis une carte). */
   fade?: boolean
   /**
-   * R14 : la forme des cartes du squelette, celle de la page qui arrive (`compact`, les petites
-   * cartes de la mosaïque d'un membre) ; la carte simple par défaut.
+   * R16 : la forme de la page qui arrive (le Fil, un projet, un membre, une grille de cartes, une
+   * liste, un formulaire) ; R14 : `compact`, les petites cartes de la mosaïque d'un membre. Sans
+   * elle, la largeur choisit : `form` → `form`, `page` → `list`, `wide` → `grid`.
    */
-  shape?: ComponentProps<typeof SkeletonList>['shape']
+  shape?: CardShape | PageShape
   /**
    * Où mène « Revenir » sans page d'avant : le Fil (`/feed`, plan R12, décision 9) ; l'accueil (`/`)
    * pour une page de visiteur, à qui le Fil dirait « Réservé aux membres ».
    */
   fallback?: Href
+  /**
+   * R16 : le nom du « Retour » du haut de la page, posé dès le début de l'attente (écrit en toutes
+   * lettres sur ordinateur et tablette, l'icône seule nommée sur téléphone), comme sur la page qui
+   * arrive. La page d'un projet ouverte par son adresse, sur téléphone, n'a ni barre ni onglets :
+   * sans lui, elle restait 4 s sans issue. Il mène, comme « Revenir », à la page d'avant ou à
+   * `fallback`, et le remplace : « Revenir » ne vient pas s'y ajouter au bout de 4 s.
+   */
+  backLabel?: string
 }) {
   const { t } = useTranslation()
   const back = useGoBack(fallback)
+  const width = givenWidth ?? (givenShape ? widthOfShape[givenShape] : 'form')
+  const shape = givenShape ?? shapeOfWidth[width]
   // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
   // « Revenir » apparaît sous le squelette (rien ne bouge au-dessus), pour ne jamais laisser le
-  // membre sans issue.
+  // membre sans issue. Avec le « Retour » du haut (`backLabel`), l'issue est déjà là.
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     const timer = setTimeout(() => setSlow(true), SLOW_LOADING_MS)
     return () => clearTimeout(timer)
   }, [])
   return (
-    <Screen header={<TopNav />} width={width} fade={fade}>
+    <Screen
+      header={<TopNav />}
+      width={width}
+      fade={fade}
+      {...(backLabel === undefined ? null : { onBack: back, backLabel })}
+    >
       <Stack gap="xl" align="stretch">
-        <SkeletonList count={width === 'form' ? 2 : 3} shape={shape} />
-        {slow ? (
+        <Loading>
+          <SkeletonPage shape={shape} />
+        </Loading>
+        {slow && backLabel === undefined ? (
           <Stack align="start">
             <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
           </Stack>

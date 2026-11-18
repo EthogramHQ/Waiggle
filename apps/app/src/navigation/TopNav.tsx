@@ -32,14 +32,16 @@
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Platform } from 'react-native'
 import { useSession } from '../accounts/api'
+import { hasMemberMarker } from '../accounts/memberMarker'
 import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { type NavLinkEntry, NavLinks, NavPhotoLink } from '../ui/NavLinks'
-import { TopBarPlaceholder } from '../ui/ScreenTopBar'
+import { declareTopBarReserve, TopBarPlaceholder } from '../ui/ScreenTopBar'
 import { SearchButton, SearchField } from '../ui/SearchField'
 import { SearchLink } from '../ui/SearchLink'
 import { Row, Stack } from '../ui/Stack'
@@ -112,6 +114,19 @@ const useQueryParam = (): string | undefined => {
     return undefined
   }
 }
+
+/**
+ * R16 (scénario « La page ne bouge plus en arrivant » ; plan, choix 3 ; relecture de sécurité C1 et
+ * C2) : faut-il garder la place de la capsule pendant que la session se lit ?
+ * - sur téléphone et tablette (pas de page pré-rendue), oui, comme depuis R13 ;
+ * - sur le web, seulement si le repère `waiggle_member=1` existe, posé pour un membre (R12) : un
+ *   visiteur qui ouvre une page lisible sans compte (Règles, Confidentialité) voyait la place vide,
+ *   puis le titre remonter de 63 points à la réponse « personne ». Le repère n'est lu qu'une fois
+ *   la page hydratée : la page pré-rendue ne le connaît pas, et le premier rendu doit être le sien.
+ * Le repère ne décide que de cette place vide : jamais d'un lien, d'une capsule ni d'un contenu.
+ */
+const keepsPlaceWhileLoading = (hydrated: boolean): boolean =>
+  Platform.OS !== 'web' || (hydrated && hasMemberMarker())
 
 /** L'attente après la dernière frappe avant d'écrire l'adresse : celle de la page de recherche. */
 const ADDRESS_DELAY_MS = 250
@@ -201,12 +216,16 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   const toSource = useMediaSources(shown)
   // Cette page est-elle celle qui est affichée ? (hors d'un navigateur, oui : ui/screenFocus.ts).
   const focusedScreen = useScreenFocused()
+  // R16 : la page est-elle hydratée ? Le repère de membre ne se lit qu'après (voir plus bas).
+  const hydrated = useHydrated()
+  const keepsPlace = keepsPlaceWhileLoading(hydrated)
 
   // R13 (relecture du plan, décision 1) : sur écran large, pendant que la session se charge (une
   // requête partie après le démarrage de l'appli), la place de la capsule, vide et cachée aux
   // lecteurs d'écran : sinon le titre remonterait, puis redescendrait quand la capsule arrive. Sur
-  // téléphone, la capsule n'existe pas : rien à garder.
-  if (!session) return isPending && shown ? <TopBarPlaceholder /> : null
+  // téléphone, la capsule n'existe pas : rien à garder. R16 : sur le web, seulement pour un membre
+  // probable (voir `keepsPlaceWhileLoading`).
+  if (!session) return isPending && shown && keepsPlace ? <TopBarPlaceholder /> : null
   const banner = suspension ? (
     // Ailleurs que sur l'accueil, rien d'imposé : le bandeau suit la mémoire de l'appareil.
     <SuspensionBanner suspension={suspension} initiallyOpen={openSuspension ? true : undefined} />
@@ -230,6 +249,7 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
       : []),
   ]
   const hrefOf = (key: NavKey) => links.find((link) => link.key === key)?.href ?? FEED_PATH
+  const active = activeFor(pathname)
 
   // Le champ, au milieu : il prend la place qui reste. En largeur moyenne, une loupe (et rien sur
   // la page de recherche, qui montre alors son propre champ).
@@ -270,7 +290,10 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
         <NavLinks
           label={t(($) => $.nav.label)}
           links={links}
-          active={activeFor(pathname)}
+          active={active}
+          // R16 : sur une page fille (la Recherche, les Outils sous Explorer), le lien allumé n'est
+          // pas la page ouverte : il y mène, au clavier comme au clic.
+          activeIsOpen={active !== null && pathname === hrefOf(active)}
           onPress={(key) => router.push(hrefOf(key))}
         />
         {/* Sans champ (largeur moyenne), une place vide qui pousse le reste à droite. */}
@@ -313,3 +336,12 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
     </Stack>
   )
 }
+
+// R16 (choix 3 : « la réserve vaut partout ») : la place vide que la barre rend ne suffit pas.
+// L'écran (`Screen`) pose son contenu sous la hauteur *mesurée* de la barre, et la mesure n'arrive
+// qu'après une image : au rechargement d'Explorer ou de Ruches, le titre d'un membre se dessinait
+// d'abord en haut, puis descendait de 63 points. Avec le repère de membre, la barre déclare donc sa
+// place, que l'écran réserve avant toute mesure, sur toutes les pages qui portent cette barre. Sous
+// condition : la bande (ui/ScreenTopBar.tsx) ne pose la question qu'une fois la page hydratée et
+// sur écran large ; sans repère (un visiteur), rien n'est réservé, comme la barre ne rend rien.
+declareTopBarReserve(TopNav, () => Platform.OS === 'web' && hasMemberMarker())

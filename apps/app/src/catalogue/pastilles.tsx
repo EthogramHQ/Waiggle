@@ -25,6 +25,8 @@ const fr = {
   unnamed: 'Une ruche dont le nom a été retiré : « Ruche sans nom »',
   long: 'Un nom long (40 caractères)',
   many: 'Huit ruches dans une bande de téléphone (320 points ici) : la pastille choisie, la dernière, se montre en entier',
+  waiting:
+    'Pendant la lecture des ruches (waiting) : le vrai « Tout », choisi, puis les pastilles vides des ruches à venir, dans la même capsule',
   hives: ['Famille', 'Amis du jeudi', 'Atelier IA', 'Voisins', 'Club photo', 'Cousins', 'Bureau'],
   last: 'Randonnée',
   longName: 'Les cousins de Bretagne et de Normandie',
@@ -42,6 +44,8 @@ const en: typeof fr = {
   unnamed: 'A hive whose name was removed: “Unnamed hive”',
   long: 'A long name (40 characters)',
   many: 'Eight hives in a phone strip (320 points here): the chosen pill, the last one, shows in full',
+  waiting:
+    'While the hives load (waiting): the real “All”, chosen, then the empty pills of the hives to come, in the same capsule',
   hives: [
     'Family',
     'Thursday friends',
@@ -98,6 +102,9 @@ export function HivePillsCatalogue() {
           <Stack gap="md">
             <Example caption={`${l.all} — ${l[scheme]}`}>
               <HivePills hives={two} value={ALL_HIVES} onChange={noop} panelId={PANEL} />
+            </Example>
+            <Example caption={`${l.waiting} — ${l[scheme]}`}>
+              <HivePills hives={[]} value={ALL_HIVES} onChange={noop} panelId={PANEL} waiting />
             </Example>
             <Example caption={`${l.hive} — ${l[scheme]}`}>
               <HivePills hives={two} value={idOf(0)} onChange={noop} panelId={PANEL} />

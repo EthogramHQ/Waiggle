@@ -163,17 +163,23 @@ for (const script of scripts) {
 //       par navigation/lazyScreen.tsx, qui pré-rend la page de chargement.
 //    c. Geist Mono, la police des outils et des versions, se charge après l'hydratation : aucune
 //       page ne la précharge (`<link rel="preload">`) ni ne la déclare (`@font-face`), sinon chaque
-//       visiteur la télécharge avant de voir la page.
+//       visiteur la télécharge avant de voir la page. Seule compte une face qui télécharge un
+//       fichier (`url(`) : la face de secours `GeistMono-400-fallback` (R16, ui/theme/fontFallback.ts)
+//       ne fait que régler une police déjà sur l'appareil (`local("Consolas")`), rien n'est chargé.
 const preloads = /<link\b[^>]*\brel=["']?preload\b[^>]*>/gi
 const fontFaces = /@font-face\s*\{[^}]*\}/gi
 const geistMono = /geist-?mono/i
+// Une face qui fait télécharger un fichier ; `local(...)` ne lit qu'une police de l'appareil.
+const downloads = /\burl\(/i
 // Les pages fautives, regroupées par défaut : le même défaut vient d'ordinaire de toutes les pages.
 const faulty = { suspended: [], preload: [], fontFace: [] }
 for (const page of pages) {
   const html = readFileSync(join(dist, page), 'utf8')
   if (html.includes('<!--$!-->')) faulty.suspended.push(page)
   if ([...html.matchAll(preloads)].some(([link]) => geistMono.test(link))) faulty.preload.push(page)
-  if ([...html.matchAll(fontFaces)].some(([face]) => geistMono.test(face))) {
+  if (
+    [...html.matchAll(fontFaces)].some(([face]) => geistMono.test(face) && downloads.test(face))
+  ) {
     faulty.fontFace.push(page)
   }
 }

@@ -39,6 +39,21 @@ jest.mock('../api/media', () => ({
 jest.mock('../profile/api', () => ({ getMe: jest.fn(), updateProfile: jest.fn() }))
 // Le nombre de la cloche, dans la barre d'un membre.
 jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
+// R16 : la carte vide de la vitrine, telle quelle, dans une vue marquée de son nom.
+jest.mock('../ui/ShowcaseCard', () => {
+  const actual = jest.requireActual('../ui/ShowcaseCard')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  return {
+    ...actual,
+    ShowcaseCardSkeleton: (props: Record<string, unknown>) =>
+      createElement(
+        View,
+        { testID: 'ShowcaseCardSkeleton' },
+        createElement(actual.ShowcaseCardSkeleton, props),
+      ),
+  }
+})
 jest.mock('expo-router', () => {
   const kit = () => require('./Public.testkit').mockNav
   return {
@@ -198,6 +213,35 @@ describe('the home showcase seen by a visitor (R12)', () => {
     const inside = screen.getByText('English').props.lang
     expect([lang, inside]).toContain('en')
     expect(pathOf(english.props.href)).toBe('/en/')
+  })
+})
+
+// --- R16 : la vitrine garde sa place (docs/scenarios/refonte.md, « Le squelette a la forme de sa
+// page ») : pendant sa lecture, quatre cartes vides (choix 11), sous son titre, si bien que rien ne
+// pousse le bas de la page à son arrivée. Les cartes vides n'ont ni rôle ni nom (choix 4) : leur
+// faux module les entoure d'une vue marquée de leur nom.
+describe('the home showcase while it loads (R16)', () => {
+  /** La vitrine ne répond pas encore ; le reste du faux serveur répond comme d'habitude. */
+  const holdShowcase = () => {
+    const answer = globalThis.fetch
+    globalThis.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).includes('/showcase') ? new Promise<Response>(() => {}) : answer(input, init),
+    ) as typeof fetch
+  }
+
+  it('keeps its row with four empty cards under its title, beside both account buttons', async () => {
+    onComputer()
+    holdShowcase()
+    await renderWithProviders(<ShowcaseScreen />)
+
+    expect(await screen.findByRole('header', { name: T.showcase })).toBeTruthy()
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
+    expect(screen.getAllByTestId('ShowcaseCardSkeleton')).toHaveLength(4)
+    // Témoin : l'accueil est bien là, avec ses deux portes d'entrée.
+    expect(screen.getByRole('button', { name: T.signUp })).toBeTruthy()
+    expect(screen.getByRole('button', { name: T.haveAccount })).toBeTruthy()
   })
 })
 

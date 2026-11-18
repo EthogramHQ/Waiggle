@@ -54,7 +54,11 @@
 //   rangée de l'auteur ni sa place dans le verre.
 // Dans une case de la mosaïque (`CardStretchContext`), la carte s'étire à la hauteur de la case :
 // les cartes d'une rangée prennent la hauteur de la plus haute.
-import { layout, pressScale, radii, space } from '@ruche/brand'
+//
+// R16 (« Les squelettes ») : `ProjectCardSkeleton`, la carte vide qui tient sa place pendant le
+// chargement, à sa hauteur, avec son panneau en bas (voir en fin de fichier). Et la catégorie en
+// attente (`category="pending"`) : tant que son nom charge, la carte en garde la place, vide.
+import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import {
   type ComponentProps,
@@ -71,13 +75,15 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { Avatar } from './Avatar'
 import { describedBy } from './aria'
 import { ExampleBadge } from './ExampleBadge'
+import { HighlightedText } from './HighlightedText'
 import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
-import { GridCardsContext } from './ProjectGrid'
+import { GridCardsContext, GridColumnContext } from './ProjectGrid'
 import { RelativeTime } from './RelativeTime'
+import { Shape, SkeletonSurface } from './Skeleton'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
 import { Tag } from './Tag'
@@ -195,8 +201,10 @@ type Props = {
   /**
    * R6a : la catégorie principale du projet, son nom traduit et son icône (`optionOf` de
    * `projects/categories.ts`, lue de l'API) ; absente pour un projet d'avant R6a.
+   * R16 : `'pending'`, le projet a une catégorie mais son nom n'est pas encore arrivé (la liste des
+   * catégories charge) : la carte garde la place exacte de l'étiquette, vide, sans rien dire.
    */
-  category?: { label: string; icon: IconName }
+  category?: { label: string; icon: IconName } | 'pending'
   /**
    * La vue qui entoure la photo, pour qui veut la mesurer (`measureInWindow`) : la photo de la carte
    * qui s'agrandit en page du projet (le mouvement de R4).
@@ -204,6 +212,14 @@ type Props = {
   coverRef?: Ref<View>
   /** R7a : le projet remonté par sa mise à jour (voir `ProjectCardUpdate`). */
   updated?: ProjectCardUpdate
+  /**
+   * R16 (planches R16-Recherche-1440 et -1920) : la carte d'un résultat de recherche. `words`, les
+   * mots cherchés, surlignés de miel dans le titre et l'extrait (`HighlightedText`) ; `excerpt`, le
+   * passage de la description qui a correspondu, déjà prêt (« « … le carnet de balades… » »),
+   * montré à la place de l'accroche, même sur une compacte avec photo : il dit pourquoi le projet
+   * est trouvé. `excerpt` à null (le titre a correspondu) : l'accroche, comme ailleurs.
+   */
+  match?: { words: readonly string[]; excerpt: string | null }
   /**
    * L'heure qu'il est, pour figer la date de la mise à jour (`updated.at`) : le catalogue et les
    * captures ; l'horloge de l'appareil sinon (comme `RelativeTime`).
@@ -291,6 +307,7 @@ export function ProjectCard({
   coverRef,
   updated,
   now,
+  match,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -312,8 +329,10 @@ export function ProjectCard({
   // mosaïque d'un membre, où l'écran donne la taille.
   const chosenByGrid = compact && givenSize === undefined
   // R14 : la carte compacte ne montre pas la catégorie (la page du projet l'a) ; le reste du dessin
-  // l'ignore donc comme si elle était absente.
-  const category = compact ? undefined : givenCategory
+  // l'ignore donc comme si elle était absente. R16 : une catégorie en attente n'a encore ni nom ni
+  // icône ; seule sa place compte (`categoryPending`).
+  const category = compact || givenCategory === 'pending' ? undefined : givenCategory
+  const categoryPending = !compact && givenCategory === 'pending'
   // Dans une case de la mosaïque, chaque étage de la carte grandit jusqu'à la hauteur de la case.
   // Une compacte choisie par sa grille aussi (R15) : les cartes d'une rangée de « Récents » ont la
   // même hauteur, celle de la plus haute, au lieu de bas en escalier (un titre de trois lignes).
@@ -356,8 +375,12 @@ export function ProjectCard({
   // Le repère « Mis à jour » posé dans la rangée du bas, à côté du statut : celui d'une `badge`, et
   // celui d'une `full` qui n'a pas de rangée de l'auteur où se poser (carte compacte ou sans auteur).
   const mark = updated && !(change && author) ? updated.label : null
-  // R14 : sur une carte compacte avec photo, pas d'accroche (elle couvrirait la photo).
-  const showPitch = !compact || !image
+  // R16 : l'extrait qui a correspondu à une recherche, à la place de l'accroche.
+  const excerpt = match?.excerpt ?? null
+  // R14 : sur une carte compacte avec photo, pas d'accroche (elle couvrirait la photo). R16 :
+  // l'extrait d'une recherche, si : c'est lui qui dit pourquoi le projet est trouvé (planche
+  // R16-Recherche-1440), au prix d'un verre un peu plus haut.
+  const showPitch = !compact || !image || excerpt !== null
   // Sa ligne décrit le lien à la place de l'accroche, avec sa famille (« Nouveau : Un compte à
   // rebours… »), puis « et 2 autres changements » : la pastille de famille ne la dit qu'en couleur.
   const changeId = useId()
@@ -384,10 +407,18 @@ export function ProjectCard({
   const hint = [changeDescription, categoryDescription].filter(Boolean).join('. ')
   const hasPhoto = Boolean(image)
   // La colonne du haut de la photo : la catégorie (avec photo) et l'emplacement (« Suivre »).
-  const topColumn = Boolean(overlay) || (hasPhoto && Boolean(category))
+  // Une catégorie en attente y garde déjà sa place (R16) : la colonne existe avant l'étiquette, et
+  // « Suivre », dessous, ne descend pas quand elle arrive.
+  const topColumn = Boolean(overlay) || (hasPhoto && (Boolean(category) || categoryPending))
   // L'étiquette dessinée : décor pour les lecteurs d'écran (la description du lien la dit), et le
   // doigt passe au travers, vers la carte (`pointerEvents` en propriété : sur le web, seule cette
   // forme devient du CSS).
+  // R16 (« La page ne bouge plus en arrivant ») : tant que son nom charge, la même vue, vide, à la
+  // hauteur de l'étiquette (la zone à toucher autour de sa pastille, celle de `Tag`). Sans texte
+  // inventé, ni rôle, ni nom : une place, rien à lire. À l'arrivée, l'étiquette s'y pose ; sur une
+  // carte sans photo, le verre ne grandit plus de 52 points (l'étiquette et l'écart sous elle), et
+  // l'auteur, posé au-dessus du titre mesuré, ne remonte plus. Sa largeur ne compte pas : la
+  // place est vide, et l'étiquette, en début de ligne, ne pousse rien à côté d'elle.
   const categoryTag = category ? (
     <View
       pointerEvents="none"
@@ -396,6 +427,13 @@ export function ProjectCard({
     >
       <Tag label={category.label} icon={category.icon} kind="category" onGlass />
     </View>
+  ) : categoryPending ? (
+    <View
+      testID="category-pending"
+      pointerEvents="none"
+      {...decorative}
+      style={{ alignSelf: 'flex-start', minHeight: layout.touchTarget }}
+    />
   ) : null
 
   // La carte s'enfonce un peu sous le doigt, comme les boutons (`Pressed`), mais toute entière :
@@ -467,14 +505,34 @@ export function ProjectCard({
               milieu d'un mot (« Décollage » / « ! », essai du catalogue). Trois lignes : sans
               accroche, le titre est le seul texte qui nomme une compacte avec photo, et deux
               lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
-          <Text
-            variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
-            numberOfLines={compact ? 3 : 2}
-          >
-            {title}
-          </Text>
+          {/* R16 : dans un résultat de recherche, les mots cherchés y sont surlignés ; le titre
+              reste un seul texte, lu d'un tenant. */}
+          {match ? (
+            <HighlightedText
+              variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
+              numberOfLines={compact ? 3 : 2}
+              text={title}
+              words={match.words}
+            />
+          ) : (
+            <Text
+              variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
+              numberOfLines={compact ? 3 : 2}
+            >
+              {title}
+            </Text>
+          )}
           {change ? (
             <UpdateChange line={change.line} more={change.more} />
+          ) : showPitch && match && excerpt !== null ? (
+            <HighlightedText
+              variant="callout"
+              tone="secondary"
+              numberOfLines={2}
+              nativeID={pitchId}
+              text={excerpt}
+              words={match.words}
+            />
           ) : showPitch ? (
             <Text variant="callout" tone="secondary" numberOfLines={2} nativeID={pitchId}>
               {pitch}
@@ -778,5 +836,127 @@ function UpdateChange({
         ) : null}
       </View>
     </View>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// R16 (« Les squelettes ») : la carte vide
+// ---------------------------------------------------------------------------------------------
+
+/** Les formes de la carte vide, en points : une ligne de texte, le titre, la photo de l'auteur. */
+const SKELETON_LINE = 14
+const SKELETON_TITLE = 22
+const SKELETON_AVATAR = 28
+/** « Tester » : la hauteur d'un contrôle compact (`TestLink size="compact"`) et à peu près sa largeur. */
+const SKELETON_TESTER = { height: layout.controlHeight.compact, width: 96 }
+/** Le statut : une pastille plus basse, et le total des réactions, un petit trait au bout. */
+const SKELETON_PILL = { height: 2 * SKELETON_LINE, width: 72 }
+const SKELETON_TOTAL = 28
+
+/**
+ * La carte de projet vide (planches R16-Fil et R16-Membre ; plan R16, choix 4) : à la place d'une
+ * `ProjectCard` qui arrive, de sa hauteur exacte (`PROJECT_CARD_HEIGHT` ou
+ * `PROJECT_CARD_COMPACT_HEIGHT`, les mêmes constantes que la carte, jamais recopiées) : quand la
+ * vraie carte la remplace, rien ne saute. C'est une carte vide (`SkeletonSurface`, crème de jour,
+ * la feuille de nuit, avec sa lueur) et, en bas, un panneau plein à la place du verre, aux mêmes
+ * marges, avec les rangées de la vraie carte :
+ * - la grande : l'auteur et la date, le titre, deux lignes d'accroche, puis « Tester », le statut et
+ *   le total des réactions ;
+ * - la compacte (la mosaïque d'un membre, « Récents » d'Explorer) : le titre, puis le statut et le
+ *   total.
+ *
+ * Elle n'a ni rôle ni nom : un seul `Loading` (« Chargement… ») enveloppe toutes les cartes vides
+ * d'une zone, et un lecteur d'écran ne l'entend qu'une fois, pas une fois par carte.
+ *
+ * Sans `size`, elle choisit comme la carte : la compacte dans une grille de compactes sur
+ * ordinateur (`GridCardsContext`), la grande ailleurs. Sans `column`, elle prend celle de sa case
+ * dans une `ProjectGrid` (`GridColumnContext`), 0 hors d'une grille : sa lueur passe 150 ms plus
+ * tard d'une colonne à la suivante, et traverse ainsi la rangée.
+ */
+export function ProjectCardSkeleton({
+  size: givenSize,
+  column,
+  author = true,
+}: {
+  size?: ProjectCardSize
+  /** Le rang de la carte dans sa rangée (0 pour la première) : le retard de sa lueur. */
+  column?: number
+  /**
+   * La rangée de l'auteur, dans la grande carte. Faux sur la page d'un membre, où la vraie carte
+   * n'en a pas (R14, `author` absent) : le panneau vide garde la même forme que celui qui arrive.
+   */
+  author?: boolean
+}): ReactNode {
+  const { colors } = useTheme()
+  const wide = useLayout().sizeClass === 'wide'
+  const gridCards = useContext(GridCardsContext)
+  const gridColumn = useContext(GridColumnContext)
+  const compact =
+    (givenSize ?? (gridCards === 'compact' && wide ? 'compact' : 'full')) === 'compact'
+  return (
+    <SkeletonSurface
+      height={compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT}
+      column={column ?? gridColumn}
+    >
+      {/* Le panneau en bas, à la marge du verre de la vraie carte. */}
+      <View style={{ flexGrow: 1, justifyContent: 'flex-end', padding: INSET }}>
+        {/* Le verre, plein : sans flou (rien derrière à flouter), bordé du filet du vrai verre
+            (`panelBorder`), dans le rôle du panneau d'une carte vide (`skeletonPanel`) : la crème de
+            jour, et de nuit un ton un peu plus clair que la carte (planche R16-Fil-1440-Nuit), là où
+            la feuille de nuit avait la couleur exacte de la carte vide et s'y confondait. */}
+        <View
+          style={{
+            gap: ROW_GAP,
+            padding: compact ? COMPACT_PANEL_PADDING : PANEL_PADDING,
+            borderRadius: radii.panel,
+            borderWidth: borders.hairline,
+            borderColor: colors.panelBorder,
+            backgroundColor: colors.skeletonPanel,
+          }}
+        >
+          {author && !compact ? (
+            // L'auteur à gauche, la date à droite, à la hauteur d'une zone à toucher.
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: space.sm,
+                minHeight: layout.touchTarget,
+              }}
+            >
+              <Shape height={SKELETON_AVATAR} width={SKELETON_AVATAR} round />
+              <View style={{ flexGrow: 1 }}>
+                <Shape height={SKELETON_LINE} width="45%" />
+              </View>
+              <Shape height={SKELETON_LINE} width={SKELETON_TOTAL * 2} />
+            </View>
+          ) : null}
+          <Shape height={SKELETON_TITLE} width={compact ? '80%' : '70%'} />
+          {compact ? null : (
+            <>
+              <Shape height={SKELETON_LINE} width="92%" />
+              <Shape height={SKELETON_LINE} width="65%" />
+            </>
+          )}
+          {/* La rangée du bas : « Tester » (grande carte), le statut, puis le total au bout. */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.sm,
+              ...(compact ? null : { minHeight: layout.touchTarget }),
+            }}
+          >
+            {compact ? null : (
+              <Shape height={SKELETON_TESTER.height} width={SKELETON_TESTER.width} round />
+            )}
+            <View style={{ flexGrow: 1 }}>
+              <Shape height={SKELETON_PILL.height} width={SKELETON_PILL.width} round />
+            </View>
+            <Shape height={SKELETON_LINE} width={SKELETON_TOTAL} />
+          </View>
+        </View>
+      </View>
+    </SkeletonSurface>
   )
 }

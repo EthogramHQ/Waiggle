@@ -15,12 +15,12 @@
 // - « Tester » passe par `useOpenDemo` (`/out?url=…&project=…`) ; « Signaler la ruche » ouvre
 //   `/report?kind=hive&id=<id>` ; « Réglages de la ruche » ouvre `/hives/<id>/settings` ;
 // - le reste est dans `Hives.testkit.tsx` (faux serveur, routeur, textes).
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { passTapGuard } from '../testing/dialog'
 import { leaMe } from '../testing/fixtures'
 import { sevenDaySuspension } from '../testing/moderation'
 import { reportsOpened } from '../testing/navigation'
-import { mockSession, renderWithProviders } from '../testing/render'
+import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import { ToastProvider } from '../ui/theme/toast'
 import { HiveScreen } from './HiveScreen'
@@ -29,6 +29,7 @@ import {
   biscotte,
   chooseInMenu,
   control,
+  famille,
   fullPage,
   getControl,
   heldReply,
@@ -36,6 +37,7 @@ import {
   hiveServer,
   isSelected,
   lea,
+  memberPage,
   membersAndInvited,
   membersLeaAnimator,
   membersText,
@@ -78,6 +80,51 @@ jest.mock('../ui/theme/hydration', () => ({
   ...jest.requireActual('../ui/theme/hydration'),
   useHydrated: () => mockHydrated,
 }))
+
+// R16 : la ligne vide d'une liste, telle quelle, dans une vue marquée de son nom (elle n'a ni rôle
+// ni nom à elle, plan R16, choix 4) : le test la compte.
+jest.mock('../ui/ListGroup', () => {
+  const actual = jest.requireActual('../ui/ListGroup')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  return {
+    ...actual,
+    ListRowSkeleton: (props: Record<string, unknown>) =>
+      createElement(
+        View,
+        { testID: 'ListRowSkeleton' },
+        createElement(actual.ListRowSkeleton, props),
+      ),
+  }
+})
+
+// R16 : les colonnes de la page, telles quelles, chacune dans une vue marquée de sa place (`side`,
+// à gauche sur la page d'une ruche ; `main` ; `aside`, à droite) : une colonne n'a ni rôle ni nom.
+// Une colonne absente (`aside` sans projet à tester) reste absente.
+jest.mock('../ui/Columns', () => {
+  const actual = jest.requireActual('../ui/Columns')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  const slot = (place: string, content: unknown) =>
+    content === undefined || content === null
+      ? content
+      : createElement(View, { testID: `columns-${place}` }, content)
+  return {
+    ...actual,
+    Columns: (props: Record<string, unknown>) =>
+      createElement(
+        actual.Columns,
+        props.rows === undefined
+          ? {
+              ...props,
+              side: slot('side', props.side),
+              main: slot('main', props.main),
+              aside: slot('aside', props.aside),
+            }
+          : props,
+      ),
+  }
+})
 
 const path = `/hives/${hiveId}`
 
@@ -466,5 +513,76 @@ describe('who can open the page', () => {
     // Témoin : rien de la ruche ne paraît, ni ses onglets ni ses membres.
     expect(screen.queryByRole('tab', { name: T.activityTab })).toBeNull()
     expect(shown(odile.name)).toBe(false)
+  })
+})
+
+// --- R16 : la page ne bouge plus en arrivant ---
+
+// docs/scenarios/refonte.md, « La page ne bouge plus en arrivant » : sur ordinateur, la colonne de
+// droite remontait de 161 points à 1,3 s. La cause est la colonne des membres, à gauche : trois
+// lignes vides tant que les membres chargent (une requête à part), bien moins que la vraie liste.
+// Désormais, autant de lignes vides que la ruche a de membres (le nombre est dans la page, déjà
+// là ; la liste des membres ne montre pas les invitations, contrat `HiveMembers`) ; et le squelette
+// de la page pose déjà ses trois colonnes (plan R16, choix 17).
+describe('the hive page while it loads, on a computer (R16)', () => {
+  let restoreWindow: () => void
+  beforeEach(() => {
+    restoreWindow = setDesktopWindow()
+  })
+  afterEach(() => restoreWindow())
+
+  const MEMBERS = /^\/v1\/hives\/[^/]+\/members$/
+  const PAGE = new RegExp(`^/v1/hives/${hiveId}$`)
+
+  /** La colonne de gauche, celle des membres, même cachée aux lecteurs d'écran. */
+  const side = () => screen.getByTestId('columns-side', { includeHiddenElements: true })
+  const emptyRows = () =>
+    within(side()).queryAllByTestId('ListRowSkeleton', { includeHiddenElements: true })
+
+  it('draws as many empty member rows as the hive has members while they load', async () => {
+    // « Famille » : 4 membres ; puis la même page avec 2 membres seulement. Le nombre vient de la
+    // page, pas d'un compte fixe.
+    for (const count of [4, 2]) {
+      hiveServer.pages.set(hiveId, { ...memberPage, summary: { ...famille, memberCount: count } })
+      const held = heldReply()
+      hiveServer.answer('GET', MEMBERS, () => held.reply)
+      const view = await openHive()
+
+      // Témoin : la page est là, et la liste des membres attend encore sa réponse.
+      expect(hiveServer.received('GET', MEMBERS)).toHaveLength(1)
+      expect(emptyRows()).toHaveLength(count)
+
+      view.unmount()
+      resetHiveMocks(path, { id: hiveId })
+    }
+  })
+
+  it('keeps the three desktop columns while the hive loads', async () => {
+    const held = heldReply()
+    hiveServer.answer('GET', PAGE, () => held.reply)
+    await renderWithProviders(
+      <ToastProvider>
+        <HiveScreen id={hiveId} />
+      </ToastProvider>,
+    )
+    await waitFor(() => expect(hiveServer.received('GET', PAGE)).toHaveLength(1))
+
+    // La page n'est pas encore arrivée : son squelette pose déjà la colonne des membres à gauche,
+    // la colonne principale et celle de droite.
+    expect(shown(T.activityTab)).toBe(false)
+    for (const place of ['side', 'main', 'aside']) {
+      expect(
+        screen.queryAllByTestId(`columns-${place}`, { includeHiddenElements: true }),
+      ).toHaveLength(1)
+    }
+
+    // Témoin : la page arrivée (avec un projet à tester) garde ses trois colonnes.
+    await held.release({ status: 200, body: memberPage })
+    await waitFor(() => expect(shown(T.activityTab) || shown(T.tabsLabel)).toBe(true))
+    for (const place of ['side', 'main', 'aside']) {
+      expect(
+        screen.queryAllByTestId(`columns-${place}`, { includeHiddenElements: true }),
+      ).toHaveLength(1)
+    }
   })
 })

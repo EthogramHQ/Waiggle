@@ -13,7 +13,15 @@
 // dessin (`waitBeeMarkup`) est fabriqué ici, dans le thème, qui seul lit les jetons. Jest ne dessine
 // rien : on lit les règles de `documentCss` (src/testing/css.ts).
 import { layout, palettes } from '@ruche/brand'
-import { type CssRule, compactValue, parseCss, splitTopLevel, underMedia } from '../../testing/css'
+import {
+  type CssRule,
+  compactMedia,
+  compactValue,
+  glowAttributesIn,
+  parseCss,
+  splitTopLevel,
+  underMedia,
+} from '../../testing/css'
 import { bee, beeViewBox } from '../logo.generated'
 import { documentCss, waitBeeMarkup } from './document'
 
@@ -84,6 +92,11 @@ const sendsBeeAwayAtTenSeconds = (rule: CssRule) =>
     (segment) => atTenSeconds(segment) && hides(sheet.keyframes[nameOf(segment) ?? '']),
   )
 
+/** R16 : une règle qui vise la lueur d'un squelette (son attribut `data-…`, testing/css.ts). */
+const stopsGlow = (rule: CssRule) =>
+  rule.selectors.length > 0 &&
+  rule.selectors.every((selector) => glowAttributesIn(selector).length > 0)
+
 describe('the web page before the app starts', () => {
   it('hides the pre-rendered page above 700 px before hydration, by day too', () => {
     // Témoin : la règle de nuit, déjà là, cache la page sur tout appareil en mode sombre.
@@ -124,7 +137,9 @@ describe('the web page before the app starts', () => {
 
     // « Réduire les animations » n'arrête que le vol de l'abeille : ni la page, ni `reveal`, ni la
     // sortie de l'abeille (un `animation: none` trop large garderait la page cachée pour toujours).
-    const calm = sheet.rules.filter((rule) => underMedia(rule, REDUCED))
+    // R16 : la règle qui arrête la lueur des squelettes est sous ce même réglage ; elle a son test à
+    // part (plus bas) et ne vise ni la page ni l'abeille.
+    const calm = sheet.rules.filter((rule) => underMedia(rule, REDUCED) && !stopsGlow(rule))
     expect(calm).not.toEqual([]) // témoin : l'abeille vole, et s'arrête sous ce réglage
     for (const rule of calm) {
       expect(rule.selectors.every((selector) => selector.includes('[data-wait]'))).toBe(true)
@@ -210,6 +225,30 @@ describe('the web page before the app starts', () => {
     const written = documentCss.match(/#[0-9a-fA-F]{3,8}\b|\b(rgb|rgba|hsl|hsla)\([^)]*\)/g) ?? []
     expect(written.length).toBeGreaterThan(0) // témoin : le fond de la page est bien écrit
     for (const colour of written) expect(known).toContain(colour.toLowerCase())
+  })
+})
+
+// R16 (scénario, « Sous « Réduire les animations », elle ne bouge plus » ; plan, choix 6 et relecture
+// de l'interface C1) : sur le web, la lueur des squelettes pré-rendus est une animation CSS qui part
+// avant que l'appli démarre ; `useCalmMotion` ne peut donc pas l'arrêter à temps. C'est la feuille
+// de la page qui le fait, sous `prefers-reduced-motion`, sans attendre l'hydratation.
+describe('the skeleton glow on the web page', () => {
+  it('stops the skeleton glow for visitors who reduce motion, before the page hydrates', () => {
+    const rules = sheet.rules.filter((rule) => underMedia(rule, REDUCED) && stopsGlow(rule))
+    expect(rules).not.toEqual([])
+    for (const rule of rules) {
+      // Sous ce seul réglage : ni la largeur ni le thème n'y changent rien.
+      expect(
+        rule.media.every((media) => compactMedia(media).includes('prefers-reduced-motion')),
+      ).toBe(true)
+      // Avant comme après l'hydratation : le sélecteur ne dépend pas de `data-hydrated`.
+      for (const selector of rule.selectors) expect(selector).not.toContain('data-hydrated')
+      // L'animation s'arrête (toute entière, ou par son nom).
+      const stopped =
+        compactValue(rule.declarations.animation ?? '') === 'none' ||
+        compactValue(rule.declarations['animation-name'] ?? '') === 'none'
+      expect(stopped).toBe(true)
+    }
   })
 })
 

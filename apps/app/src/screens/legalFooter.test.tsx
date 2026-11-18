@@ -10,7 +10,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { hrefOf, pathOf, visited } from '../testing/navigation'
 import { mockSession, renderWithI18n, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
-import { HomeScreen } from './HomeScreen'
+import { VisitorHome } from './ShowcaseScreen'
 import { SignInScreen } from './SignInScreen'
 import { SignUpScreen } from './SignUpScreen'
 
@@ -53,7 +53,7 @@ beforeEach(() => {
 })
 
 const screens = [
-  ['the visitor home', () => <HomeScreen />],
+  ['the visitor home', () => <VisitorHome />],
   ['the sign-in page', () => <SignInScreen />],
   ['the sign-up page', () => <SignUpScreen />],
 ] as const

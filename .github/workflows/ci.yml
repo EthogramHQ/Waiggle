@@ -87,18 +87,20 @@ jobs:
   # seul le temps des captures est partagé. `fail-fast: false` laisse l'autre part finir quand l'une
   # échoue, pour avoir les images et les erreurs des deux d'un coup.
   shots:
-    name: Screenshots (${{ matrix.shard }}/2)
+    name: Screenshots (${{ matrix.shard }}/3)
     if: github.event_name != 'schedule'
     runs-on: ubuntu-26.04
     # 30 minutes par part : la tâche entière prenait 16 à 18 min sur main fin octobre (l'installation
     # de Chromium a pris jusqu'à 8 min sur un runner lent, 26/10/2026) et passait 20 min avec les
     # pages de RF (2/11/2026) ; coupée en deux, chaque part garde la marge. Si le navigateur se
-    # bloque, on n'attend pas des heures.
+    # bloque, on n'attend pas des heures. Trois parts depuis R16 (18/11/2026) : avec les pages
+    # d'attente et les très grands écrans, chacune des deux parts prenait 25 à 30 min, et la seconde
+    # a dépassé la limite ; à trois, chaque part retrouve sa marge sans relever la limite.
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -119,7 +121,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: pnpm --filter @ruche/app exec playwright install --with-deps chromium
-      - run: pnpm --filter @ruche/app shots -- --shard ${{ matrix.shard }}/2
+      - run: pnpm --filter @ruche/app shots -- --shard ${{ matrix.shard }}/3
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always() # même en cas d'échec : les images aident à comprendre pourquoi
         with:
@@ -127,8 +129,8 @@ jobs:
           path: apps/app/shots/
           retention-days: 14
 
-  # Le résultat des deux parts sous un seul nom, « Screenshots » : c'est ce nom que la protection
-  # de main exige avant une fusion, et les parts s'appellent « Screenshots (1/2) » et « (2/2) ».
+  # Le résultat des trois parts sous un seul nom, « Screenshots » : c'est ce nom que la protection
+  # de main exige avant une fusion, et les parts s'appellent « Screenshots (1/3) », « (2/3) » et « (3/3) ».
   # `needs.shots.result` vaut « success » seulement si toutes les parts de la matrice ont réussi ;
   # `if: always()` fait tourner cette tâche même quand une part échoue, pour qu'elle échoue à son
   # tour au lieu d'être sautée (une vérification sautée compterait comme réussie).

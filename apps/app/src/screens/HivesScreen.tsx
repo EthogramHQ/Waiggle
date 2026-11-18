@@ -26,13 +26,14 @@ import { useRouter } from 'expo-router'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useAcceptInvitation, useMyHives, useRefuseInvitation } from '../hives/api'
 import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
 import { Button } from '../ui/Button'
+import { CardGrid, useCardColumns, useWideTemplate } from '../ui/CardGrid'
 import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import {
@@ -42,43 +43,116 @@ import {
   holdsFocus,
   moveReaderTo,
 } from '../ui/focus'
+import { HiveCard, HiveCardSkeleton, hiveCardGrid } from '../ui/HiveCard'
 import { HiveInvitation } from '../ui/HiveInvitation'
-import { HiveRow } from '../ui/HiveRow'
+import { HiveRow, HiveRowSkeleton } from '../ui/HiveRow'
 import { ListGroup } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { SkeletonList } from '../ui/Skeleton'
+import { Loading } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { useScreenShownCount } from '../ui/screenFocus'
 import { Text } from '../ui/Text'
 import { useTapGuard } from '../ui/tapGuard'
 import { useCalmMotion } from '../ui/theme/motion'
-import { SessionErrorScreen, SignedOutScreen } from './states'
+import { SignedOutScreen } from './states'
 
 export function HivesScreen() {
-  const { state, session, retry } = useMemberSession()
-  // Pendant la lecture de la session : le titre et le squelette, comme pendant celle des ruches.
-  if (state === 'pending') return <HivesLoading />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (!session) return <SignedOutScreen />
-  // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
-  return <Hives />
+  // R16 : la garde commune. Pendant la lecture de la session, le squelette de l'onglet, le même que
+  // pendant celle des ruches ; une session illisible propose de réessayer ; un visiteur, de se
+  // connecter. Les lectures ne partent qu'avec une session : elles vivent dans `Hives`.
+  return <SessionGate loading={<HivesLoading />}>{() => <Hives />}</SessionGate>
 }
 
-/** L'attente : le titre de l'onglet reste, deux cartes grises à la place du contenu. */
+/**
+ * Les propriétés de la page communes à tous ses états : le titre « Ruches », lu mais jamais
+ * affiché ; dès 1 280 points, le gabarit large de R15 (`width="wide"`), en dessous la largeur d'un
+ * formulaire, comme avant R16. Le squelette les prend aussi : rien ne bouge à l'arrivée.
+ */
+const usePageFrame = () => {
+  const { t } = useTranslation()
+  const wide = useWideTemplate()
+  return {
+    wide,
+    frame: {
+      title: t(($) => $.hives.title),
+      titleHidden: true,
+      header: <TopNav />,
+      width: wide ? 'wide' : 'form',
+    } as const,
+  }
+}
+
+/** Les lignes vides de l'attente, sous 1 280 points. */
+const LOADING_ROWS = 3
+
+/**
+ * L'attente (planche R16-Ruches-Squelette-1920) : « Créer une ruche » à sa place, « Mes ruches »,
+ * puis une rangée de cartes vides aux colonnes de la page finie (4 à 1 920, 3 à 1 440) ; sous
+ * 1 280, trois lignes vides de la forme des vraies. Aucune place pour les invitations : souvent
+ * absentes, elles s'ajoutent au-dessus quand elles arrivent (choix 8 des planches).
+ */
 function HivesLoading() {
   const { t } = useTranslation()
+  const router = useRouter()
+  const guard = useTapGuard()
+  const { wide, frame } = usePageFrame()
   return (
-    <Screen title={t(($) => $.hives.title)} titleHidden header={<TopNav />}>
-      <SkeletonList count={2} />
+    <Screen
+      {...frame}
+      // Déjà vrai pendant l'attente (la planche) : le titre caché ne laisse au haut de la page que
+      // ce bouton, qui ne doit pas arriver après le reste.
+      titleAside={
+        <Button
+          label={t(($) => $.hives.create)}
+          icon="plus"
+          variant="secondary"
+          size="compact"
+          onPress={guard(() => router.push('/hives/new'))}
+        />
+      }
+    >
+      <Stack gap="md" align="stretch">
+        <Text variant="heading" heading={2}>
+          {t(($) => $.hives.mine)}
+        </Text>
+        <Loading>
+          {wide ? (
+            <EmptyCardRow />
+          ) : (
+            <ListGroup>
+              {Array.from({ length: LOADING_ROWS }, (_, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: des lignes vides identiques.
+                <HiveRowSkeleton key={index} />
+              ))}
+            </ListGroup>
+          )}
+        </Loading>
+      </Stack>
     </Screen>
+  )
+}
+
+/**
+ * Une rangée de cartes vides, autant que la grille aura de colonnes. Un composant à part, posé
+ * dans la page : le nombre de colonnes se lit sur la largeur que `Screen` publie à son contenu.
+ */
+function EmptyCardRow() {
+  const { columns } = useCardColumns(hiveCardGrid.minWidth, hiveCardGrid.gap)
+  return (
+    <CardGrid {...hiveCardGrid} list={false}>
+      {Array.from({ length: columns }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: des cartes vides identiques.
+        <HiveCardSkeleton key={index} />
+      ))}
+    </CardGrid>
   )
 }
 
 function Hives() {
   const { t } = useTranslation()
+  const { frame } = usePageFrame()
   const mine = useMyHives()
   // Les ruches d'abord : une relecture qui échoue (après un geste) garde ce qui est affiché.
   if (mine.data) return <HivesView mine={mine.data} />
@@ -88,7 +162,7 @@ function Hives() {
     // La session a expiré pendant la visite : se reconnecter, pas réessayer.
     if (key === 'unauthorized') return <SignedOutScreen expired />
     return (
-      <Screen title={t(($) => $.hives.title)} titleHidden header={<TopNav />}>
+      <Screen {...frame}>
         <StateMessage
           kind="error"
           title={t(($) => $.hives.loadError)}
@@ -140,6 +214,7 @@ function HivesView({ mine }: { mine: MyHives }) {
   const accept = useAcceptInvitation()
   const refuse = useRefuseInvitation()
   const reasonId = useId()
+  const { wide, frame } = usePageFrame()
 
   // Les invitations refusées, gardées à leur place jusqu'au prochain passage sur l'onglet : quand
   // la page redevient affichée (`useScreenShownCount` avance), on les oublie. Le nombre se compare
@@ -271,7 +346,8 @@ function HivesView({ mine }: { mine: MyHives }) {
   )
   const limitText =
     limit === null || suspended ? null : (
-      <Text variant="caption" tone="secondary" nativeID={reasonId}>
+      // `readable` : en grand, la phrase reste à une longueur de ligne confortable.
+      <Text variant="caption" tone="secondary" nativeID={reasonId} readable>
         {limit}
       </Text>
     )
@@ -298,7 +374,8 @@ function HivesView({ mine }: { mine: MyHives }) {
   // Ni ruche ni invitation : l'état vide, avec la mascotte.
   if (mine.hives.length === 0 && invitations.length === 0) {
     return (
-      <Screen title={t(($) => $.hives.title)} titleHidden header={<TopNav />}>
+      // En grand, l'état vide reste calé sur la marge de gauche du gabarit (choix 10 des planches).
+      <Screen {...frame}>
         <StateMessage
           kind="empty"
           title={t(($) => $.hives.emptyTitle)}
@@ -316,13 +393,39 @@ function HivesView({ mine }: { mine: MyHives }) {
     )
   }
 
+  // Les invitations, une carte chacune (et son échec dessous) : en colonne, ou dans la grille.
+  // En grand, chaque carte prend la hauteur de sa case (`grow`, puis `fill`) : les invitations d'une
+  // rangée ont la même hauteur, même quand un nom de ruche passe sur deux lignes.
+  const invitationCards = invitations.map((invitation, index) => (
+    <Stack key={invitation.id} gap="sm" align="stretch" grow={wide}>
+      <HiveInvitation
+        fill={wide}
+        invitation={invitation}
+        onAccept={() => onAccept(invitation, index)}
+        onRefuse={() => onRefuse(invitation, index)}
+        onReport={() =>
+          router.push({
+            pathname: '/report',
+            params: { kind: 'hive', id: invitation.hive.id },
+          })
+        }
+        refused={Boolean(refused[invitation.id])}
+        // Une seule action miel par écran (R10) : « Rejoindre » en miel sur la première
+        // carte qui a encore ses boutons, en blanc sur les autres.
+        primary={index === invitations.findIndex((one) => !refused[one.id])}
+      />
+      {failure?.id === invitation.id ? (
+        // La ref sur un cadre, pas sur `Notice` : une `Notice` à ref attend le focus et
+        // cesse d'être annoncée ; celle-ci garde son annonce, le focus reste au bouton.
+        <Stack ref={failureNotice} align="stretch">
+          <Notice message={failure.text} />
+        </Stack>
+      ) : null}
+    </Stack>
+  ))
+
   return (
-    <Screen
-      title={t(($) => $.hives.title)}
-      titleHidden
-      titleAside={createButton}
-      header={<TopNav />}
-    >
+    <Screen {...frame} titleAside={createButton}>
       <Stack gap="xl" align="stretch">
         {limitText}
 
@@ -347,32 +450,12 @@ function HivesView({ mine }: { mine: MyHives }) {
               </Text>
               <CountBadge count={waiting} />
             </Row>
-            {invitations.map((invitation, index) => (
-              <Stack key={invitation.id} gap="sm" align="stretch">
-                <HiveInvitation
-                  invitation={invitation}
-                  onAccept={() => onAccept(invitation, index)}
-                  onRefuse={() => onRefuse(invitation, index)}
-                  onReport={() =>
-                    router.push({
-                      pathname: '/report',
-                      params: { kind: 'hive', id: invitation.hive.id },
-                    })
-                  }
-                  refused={Boolean(refused[invitation.id])}
-                  // Une seule action miel par écran (R10) : « Rejoindre » en miel sur la première
-                  // carte qui a encore ses boutons, en blanc sur les autres.
-                  primary={index === invitations.findIndex((one) => !refused[one.id])}
-                />
-                {failure?.id === invitation.id ? (
-                  // La ref sur un cadre, pas sur `Notice` : une `Notice` à ref attend le focus et
-                  // cesse d'être annoncée ; celle-ci garde son annonce, le focus reste au bouton.
-                  <Stack ref={failureNotice} align="stretch">
-                    <Notice message={failure.text} />
-                  </Stack>
-                ) : null}
-              </Stack>
-            ))}
+            {wide ? (
+              // En grand : les invitations sur les colonnes des ruches (planches R16-Ruches).
+              <CardGrid {...hiveCardGrid}>{invitationCards}</CardGrid>
+            ) : (
+              invitationCards
+            )}
           </Stack>
         ) : null}
 
@@ -381,16 +464,30 @@ function HivesView({ mine }: { mine: MyHives }) {
             <Text variant="heading" heading={2} focusRef={hivesTitle}>
               {t(($) => $.hives.mine)}
             </Text>
-            <ListGroup list>
-              {mine.hives.map((hive) => (
-                <HiveRow
-                  key={hive.id}
-                  hive={hive}
-                  onPress={openHive(hive.id)}
-                  toSource={toSource}
-                />
-              ))}
-            </ListGroup>
+            {wide ? (
+              // En grand : une carte par ruche, autant de colonnes que la place le permet.
+              <CardGrid {...hiveCardGrid}>
+                {mine.hives.map((hive) => (
+                  <HiveCard
+                    key={hive.id}
+                    hive={hive}
+                    onPress={openHive(hive.id)}
+                    toSource={toSource}
+                  />
+                ))}
+              </CardGrid>
+            ) : (
+              <ListGroup list>
+                {mine.hives.map((hive) => (
+                  <HiveRow
+                    key={hive.id}
+                    hive={hive}
+                    onPress={openHive(hive.id)}
+                    toSource={toSource}
+                  />
+                ))}
+              </ListGroup>
+            )}
           </Stack>
         ) : null}
       </Stack>

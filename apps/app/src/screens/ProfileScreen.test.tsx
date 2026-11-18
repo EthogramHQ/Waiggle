@@ -67,6 +67,23 @@ const catalogue: ToolList = {
 /** Le champ des outils favoris : une liste à choix (combobox), nommée « Outils favoris ». */
 const toolField = () => screen.getByRole('combobox', { name: fr.t(($) => $.profile.fields.tools) })
 
+// R16 : la pièce vide, telle quelle, dans une vue marquée de son nom (elle n'a ni rôle ni nom à
+// elle, choix 4) : le test la compte.
+jest.mock('../ui/TextField', () => {
+  const actual = jest.requireActual('../ui/TextField')
+  const { createElement } = require('react')
+  const { View } = require('react-native')
+  return {
+    ...actual,
+    TextFieldSkeleton: (props: Record<string, unknown>) =>
+      createElement(
+        View,
+        { testID: 'TextFieldSkeleton' },
+        createElement(actual.TextFieldSkeleton, props),
+      ),
+  }
+})
+
 beforeEach(() => {
   // Une seule lecture réseau attendue (R6b) : le catalogue des outils, GET /v1/tools. Une requête
   // égarée reçoit « introuvable », jamais le réseau.
@@ -677,5 +694,20 @@ describe('ProfileScreen, leftovers of R5b', () => {
 
     expect(await screen.findByDisplayValue('Léa')).toBeTruthy()
     await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+  })
+})
+
+// --- R16 : un formulaire qui charge (docs/scenarios/refonte.md, « Le squelette a la forme de sa
+// page ») : des champs vides à la place des vrais, aucun indicateur qui tourne, aucun
+// « Chargement… » écrit ; un lecteur d'écran entend toujours « Chargement… », une seule fois.
+describe('the profile form while the profile loads (R16)', () => {
+  it('shows empty fields under a single loading name, without any written « Chargement… »', async () => {
+    jest.mocked(getMe).mockReturnValue(new Promise(() => {}))
+    await renderWithProviders(<ProfileScreen />)
+
+    const loading = fr.t(($) => $.common.loading)
+    expect((await screen.findAllByTestId('TextFieldSkeleton')).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('progressbar', { name: loading })).toHaveLength(1)
+    expect(screen.queryByText(loading)).toBeNull()
   })
 })

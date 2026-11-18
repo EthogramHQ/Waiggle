@@ -25,7 +25,7 @@ import { ProjectCard, type ProjectCardSize } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
-import { useCategory } from './useCategory'
+import { useCategoryTag } from './useCategory'
 
 /** Une journée, en millisecondes. */
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -111,6 +111,11 @@ type Props = {
    * en plein vol. Le Fil garde sa règle (la verticale sur téléphone, plus haute).
    */
   galleryCover?: boolean
+  /**
+   * R16 : la carte d'un résultat de recherche (la Recherche en grand) : les mots cherchés et
+   * l'extrait qui a correspondu, transmis tels quels à ProjectCard (voir sa prop `match`).
+   */
+  match?: ComponentProps<typeof ProjectCard>['match']
 }
 
 export function SummaryCard({
@@ -123,6 +128,7 @@ export function SummaryCard({
   owner = false,
   size,
   galleryCover = false,
+  match,
 }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -149,8 +155,10 @@ export function SummaryCard({
     [coverSource, onTarget],
   )
   // La catégorie principale, nommée par l'API (R6b) ; aucune étiquette pour un projet d'avant R6a,
-  // pendant le chargement ou la panne des catégories, ni pour un code inconnu : jamais le code brut.
-  const category = useCategory(project.primaryCategory)
+  // pendant la panne des catégories, ni pour un code inconnu : jamais le code brut. R16 : pendant
+  // leur chargement, `'pending'` : la carte garde la place de l'étiquette, que rien ne pousse à
+  // l'arrivée de la liste (avant, le verre d'une carte sans photo grandissait de 52 points au Fil).
+  const category = useCategoryTag(project.primaryCategory)
   const updated = useUpdated(project, update)
   return (
     <ProjectCard
@@ -202,6 +210,7 @@ export function SummaryCard({
       // qu'elle a ouvert ; à 1 (immobile) le reste du temps.
       bounceStyle={cover.bounceStyle}
       updated={updated}
+      match={match}
     />
   )
 }

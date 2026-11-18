@@ -4,9 +4,10 @@
 // emplacement à sa place, téléphone et ordinateur.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Text } from 'react-native'
+import { emptyPiece, PieceHost } from '../testing/emptyPiece'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
-import { hasRecipe, ProjectPageLayout, ProjectRecipe } from './ProjectPage'
+import { hasRecipe, ProjectPageLayout, ProjectPageSkeleton, ProjectRecipe } from './ProjectPage'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 jest.mock('expo-router', () => ({
@@ -164,5 +165,22 @@ describe('ProjectPageLayout', () => {
     } finally {
       restore()
     }
+  })
+})
+
+// R16 (scénario : depuis une carte, « le squelette ne couvre que la description, la recette et les
+// commentaires ») : le bas vide de la page d'un projet, assemblé de pièces, sans rôle ni nom à lui.
+describe('ProjectPageSkeleton (R16)', () => {
+  it('draws its empty piece without any role or name of its own', async () => {
+    await renderWithProviders(
+      <PieceHost>
+        <ProjectPageSkeleton />
+      </PieceHost>,
+    )
+
+    const { drawn, spoken } = emptyPiece()
+    // Des formes, d'abord : une pièce qui ne dessine rien ne garde aucune place.
+    expect(drawn).toBeGreaterThan(0)
+    expect(spoken).toEqual([])
   })
 })

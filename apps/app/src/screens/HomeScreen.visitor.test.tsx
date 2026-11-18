@@ -2,6 +2,10 @@
 // anglais, le choix de la langue, « Créer un compte », le dessin de R2, et l'accueil quand la
 // session ne peut pas se lire.
 //
+// R16 : le Fil passe à la garde de session (`SessionGate`) ; l'accueil des visiteurs (`VisitorHome`,
+// celui de la vitrine vide, ShowcaseScreen.tsx) se teste donc pour lui-même, et le Fil ne le montre
+// plus jamais : ni à un visiteur, ni pendant la lecture de la session.
+//
 // Avec Testing Library, on affiche l'écran en mémoire, puis on le manipule comme le ferait un
 // utilisateur (lire un texte, appuyer sur un bouton) ; on cherche les éléments par leur rôle et leur
 // nom, pas par leur code interne. Ce fichier est une part de l'ancien HomeScreen.test.tsx, coupé
@@ -19,6 +23,7 @@ import { mockSession, renderWithI18n, setDesktopWindow } from '../testing/render
 import { containing, fr } from '../testing/text'
 import { HomeScreen } from './HomeScreen'
 import { mockPush, mockScreenProps, resetHomeMocks } from './HomeScreen.testkit'
+import { VisitorHome } from './ShowcaseScreen'
 
 // Le choix de la langue enregistre la langue sur le compte : on remplace aussi ces appels.
 jest.mock('../profile/api', () => ({ getMe: jest.fn(), updateProfile: jest.fn() }))
@@ -66,7 +71,7 @@ beforeEach(resetHomeMocks)
 
 describe('HomeScreen', () => {
   it('welcomes the visitor in French by default', async () => {
-    await renderWithI18n(<HomeScreen />)
+    await renderWithI18n(<VisitorHome />)
 
     // Le logo sert de titre à la page : les lecteurs d'écran l'annoncent avec la phrase d'accueil.
     expect(screen.getByRole('header', { name: `Bienvenue sur ${appName}` })).toBeTruthy()
@@ -90,13 +95,13 @@ describe('HomeScreen', () => {
   })
 
   it('welcomes the visitor in English when that is their language', async () => {
-    await renderWithI18n(<HomeScreen />, 'en')
+    await renderWithI18n(<VisitorHome />, 'en')
 
     expect(screen.getByRole('header', { name: `Welcome to ${appName}` })).toBeTruthy()
   })
 
   it('lets the visitor switch language', async () => {
-    await renderWithI18n(<HomeScreen />)
+    await renderWithI18n(<VisitorHome />)
 
     await fireEvent.press(screen.getByRole('radio', { name: 'English' }))
 
@@ -115,8 +120,18 @@ describe('HomeScreen', () => {
     expect(useSuggestions).not.toHaveBeenCalled()
   })
 
-  it('invites a visitor to create an account or sign in', async () => {
+  it('shows the sign-in screen, never the visitor home, to a visitor', async () => {
+    // R16 (sécurité, plan 2, A1) : le Fil passe à la garde de session commune. Un visiteur y lit
+    // « Réservé aux membres » ; l'accueil des visiteurs vit à `/` (ShowcaseScreen).
     await renderWithI18n(<HomeScreen />)
+
+    expect(screen.getByRole('header', { name: fr.t(($) => $.states.signedOutTitle) })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: `Bienvenue sur ${appName}` })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.home.haveAccount) })).toBeNull()
+  })
+
+  it('invites a visitor to create an account or sign in', async () => {
+    await renderWithI18n(<VisitorHome />)
 
     await fireEvent.press(screen.getByRole('button', { name: 'Créer un compte' }))
     await fireEvent.press(screen.getByRole('button', { name: 'J’ai déjà un compte' }))
@@ -137,7 +152,7 @@ describe('HomeScreen', () => {
 
 describe('the visitor home after the redesign (R2)', () => {
   it('offers « Créer un compte » first, then « J’ai déjà un compte », in that order', async () => {
-    await renderWithI18n(<HomeScreen />)
+    await renderWithI18n(<VisitorHome />)
 
     const buttons = screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)
     const create = buttons.indexOf(fr.t(($) => $.home.signUp))
@@ -147,13 +162,13 @@ describe('the visitor home after the redesign (R2)', () => {
   })
 
   it('says the privacy sentence of decision D2, in English too', async () => {
-    await renderWithI18n(<HomeScreen />, 'en')
+    await renderWithI18n(<VisitorHome />, 'en')
 
     expect(screen.getByText(createI18n('en').t(($) => $.home.membersOnly))).toBeTruthy()
   })
 
   it('announces « Le code source » (pied, R11) as a link to an external site', async () => {
-    await renderWithI18n(<HomeScreen />)
+    await renderWithI18n(<VisitorHome />)
 
     const link = screen.getByRole('link', {
       name: containing(fr.t(($) => $.legal.links.sourceCode)),
@@ -170,7 +185,7 @@ describe('the visitor home after the redesign (R2)', () => {
   it('shows the same welcome, both buttons and the language choice on a computer', async () => {
     const restore = setDesktopWindow()
     try {
-      await renderWithI18n(<HomeScreen />)
+      await renderWithI18n(<VisitorHome />)
 
       expect(screen.getByRole('header', { name: `Bienvenue sur ${appName}` })).toBeTruthy()
       expect(screen.getByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeTruthy()
@@ -215,10 +230,17 @@ describe('the home screen when the session cannot be read', () => {
     expect(screen.queryByRole('button', { name: fr.t(($) => $.states.back) })).toBeNull()
   })
 
-  it('still shows the visitor home while the session is being read (the pre-rendered page)', async () => {
+  // R16 (choix 14, sécurité, plan 2, A1) : pendant la lecture de la session, le squelette du Fil,
+  // jamais l'accueil des visiteurs, qui apparaissait un instant à un membre (c'était aussi la page
+  // pré-rendue : elle devient le squelette).
+  it('shows the feed skeleton, never the visitor home, while the session is read', async () => {
     mockSession(null, true)
     await renderWithI18n(<HomeScreen />)
 
-    expect(screen.getByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeTruthy()
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.home.haveAccount) })).toBeNull()
   })
 })

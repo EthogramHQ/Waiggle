@@ -106,9 +106,10 @@ export function useAppFonts(): boolean {
   return loaded
 }
 
-// Sur le web, après le nom de la police de la marque, la famille du système qui la remplace tant
-// qu'elle n'est pas arrivée (R13) : sans empattement pour Funnel, à chasse fixe pour Geist Mono.
-// Sans elle, le navigateur prendrait sa police par défaut, souvent à empattements (Times).
+// Sur le web, en dernier, la famille du système qui remplace la police de la marque tant qu'elle
+// n'est pas arrivée, si même sa police de secours calibrée manque (R13) : sans empattement pour
+// Funnel, à chasse fixe pour Geist Mono. Sans elle, le navigateur prendrait sa police par défaut,
+// souvent à empattements (Times).
 const genericFamilies: Record<FontFamily, string> = {
   display: 'sans-serif',
   text: 'sans-serif',
@@ -116,12 +117,18 @@ const genericFamilies: Record<FontFamily, string> = {
 }
 
 /**
- * La valeur de `fontFamily` d'un texte : sur le web, `'FunnelSans-600, sans-serif'` ; sur
- * téléphone, le nom seul, `'FunnelSans-600'` (une liste n'y veut rien dire et casserait la
- * police). `name` est le nom d'une police livrée (fontName).
+ * La valeur de `fontFamily` d'un texte : sur le web,
+ * `'FunnelSans-600, FunnelSans-600-fallback, sans-serif'` ; sur téléphone, le nom seul,
+ * `'FunnelSans-600'` (une liste n'y veut rien dire et casserait la police). `name` est le nom
+ * d'une police livrée (fontName).
+ *
+ * Sur le web, la liste se lit dans l'ordre (R16, « La page ne bouge plus en arrivant ») : la police
+ * de la marque si elle est arrivée ; sinon sa police de secours calibrée, une police du système
+ * réglée à sa largeur et à ses hauteurs (ui/theme/fontFallback.ts, posée par app/+html.tsx), pour
+ * que rien ne bouge quand la marque arrive ; sinon la famille du système, seule.
  */
 export const fontStack = (family: FontFamily, name: string): string =>
-  Platform.OS === 'web' ? `${name}, ${genericFamilies[family]}` : name
+  Platform.OS === 'web' ? `${name}, ${name}-fallback, ${genericFamilies[family]}` : name
 
 /**
  * Police à chasse fixe (toutes les lettres ont la même largeur), pour les prompts et le code

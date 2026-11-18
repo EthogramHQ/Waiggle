@@ -54,6 +54,14 @@ export type GridCards = 'feed' | 'compact'
 export const GridCardsContext = createContext<GridCards>('feed')
 
 /**
+ * R16 (« Les squelettes ») : le rang de la case dans sa rangée (0 pour la première), posé par la
+ * grille autour de chaque carte. Seule la carte vide le lit (`ProjectCardSkeleton`) : sa lueur
+ * passe 150 ms plus tard d'une colonne à la suivante, et traverse la rangée sans que l'écran ait à
+ * compter les colonnes. Hors d'une grille, 0.
+ */
+export const GridColumnContext = createContext(0)
+
+/**
  * Hook : le nombre de colonnes d'une grille de cartes posée ici, et la ligne cachée qui mesure le
  * texte agrandi (`probe`, à poser dans la grille). Partagé par `ProjectGrid` et le squelette du fil
  * (`SkeletonList`), qui dessine ainsi ses formes dans les mêmes colonnes que les cartes qui
@@ -121,7 +129,7 @@ export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: 
           {Array.from({ length: columns }, (_, c) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: idem, une case est une place dans la rangée
             <View key={c} style={{ flex: 1 }}>
-              {row[c] ?? null}
+              <GridColumnContext.Provider value={c}>{row[c] ?? null}</GridColumnContext.Provider>
             </View>
           ))}
         </View>

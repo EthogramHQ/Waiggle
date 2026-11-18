@@ -51,7 +51,7 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import {
   useDecide,
@@ -94,13 +94,7 @@ import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 /**
  * Le temps de lire ce qui vient de changer : pendant ces 600 ms après une décision, un appui sur
@@ -175,18 +169,25 @@ const keepDecided = <Item extends { target: StoredReportTarget; part: PartOut | 
 /** Les refus qui rendent une décision sans objet : la file est relue, le détail le dit. */
 const settledElsewhere: ReadonlySet<string> = new Set(['alreadyDecided', 'notFound'])
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, des lignes vides à la
+ * largeur de la page qui arrive (`page`, scénario R16 : rien ne bouge à l'arrivée) ; en erreur, « Réessayer » ; sans session, « Réservé aux
+ * membres ». La vérification de l'administrateur reste ici, dans `Moderation`, après la garde :
+ * la garde ne sait que si quelqu'un est connecté, pas ce qu'il a le droit de voir.
+ */
 export function ModerationScreen() {
+  return <SessionGate loading={<LoadingScreen shape="list" />}>{() => <Moderation />}</SessionGate>
+}
+
+function Moderation() {
   const { t } = useTranslation()
-  const { state, session, retry } = useMemberSession()
-  // Le profil dit si le membre est administrateur ; personne de connecté : on ne demande rien.
-  const me = useMe(Boolean(session))
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (!session) return <SignedOutScreen />
+  // Le profil dit si le membre est administrateur. `Moderation` n'est dessiné qu'avec une
+  // session : la demande part au même moment qu'avant la garde commune.
+  const me = useMe()
   if (!me.data) {
     if (me.isError) return <LoadErrorScreen error={me.error} onRetry={() => void me.refetch()} />
-    return <LoadingScreen />
+    // La même forme que l'attente de la garde : le squelette continue, sans changer de dessin.
+    return <LoadingScreen shape="list" />
   }
   // Un membre qui n'est pas administrateur : la page n'existe pas pour lui, rien n'est demandé.
   if (!me.data.isAdmin) return <NotFoundState title={t(($) => $.states.notFoundTitle)} />

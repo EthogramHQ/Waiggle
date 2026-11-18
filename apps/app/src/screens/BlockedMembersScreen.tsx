@@ -8,7 +8,7 @@
 // @x. » le confirme en haut de la liste, et la liste se relit : la ligne s'en va.
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useBlockedMembers, useUnblock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
@@ -23,16 +23,19 @@ import { RelativeTime } from '../ui/RelativeTime'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SignedOutScreen } from './states'
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, le squelette d'une liste,
+ * à la largeur d'un formulaire comme la page ; la session ne se lit pas : « Réessayer », pas « Me
+ * connecter » ; un visiteur : « Réservé aux membres » (et retour ici après la connexion).
+ */
 export function BlockedMembersScreen() {
-  const { state, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  // Un visiteur : se connecter d'abord (et revenir ici ensuite).
-  if (state === 'signedOut') return <SignedOutScreen />
-  return <BlockedMembers />
+  return (
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
+      {() => <BlockedMembers />}
+    </SessionGate>
+  )
 }
 
 function BlockedMembers() {

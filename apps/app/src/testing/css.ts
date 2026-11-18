@@ -169,3 +169,19 @@ export const compareSpecificity = (
   a: [number, number, number],
   b: [number, number, number],
 ): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+
+/**
+ * R16 (plan, choix 6) : la lueur d'un squelette porte sur le web un attribut `data-…` (par `dataSet`,
+ * que react-native-web écrit en attribut), visé par une règle `@media (prefers-reduced-motion)` de
+ * `documentCss` qui l'arrête avant même l'hydratation. Le nom exact de l'attribut est laissé au
+ * code : on reconnaît celui dont le nom ou la valeur parle de la lueur ou du squelette
+ * (`data-skeleton-glow`, `data-skeleton="glow"`…). Rend, pour un sélecteur, chaque attribut trouvé :
+ * son nom tel que l'écrit `dataSet` (`skeletonGlow`) et la valeur exigée, s'il y en a une.
+ */
+export const glowAttributesIn = (selector: string): { key: string; value: string | null }[] =>
+  [...selector.matchAll(/\[data-([a-z0-9-]+)(?:\s*=\s*["']?([^"'\]]*)["']?)?\]/gi)]
+    .filter(([, name = '', value = '']) => /glow|skeleton/i.test(`${name} ${value}`))
+    .map(([, name = '', value]) => ({
+      key: name.replace(/-([a-z0-9])/g, (_, letter: string) => letter.toUpperCase()),
+      value: value ?? null,
+    }))

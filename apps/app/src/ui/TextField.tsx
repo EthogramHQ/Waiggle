@@ -32,6 +32,8 @@ import {
 } from 'react-native'
 import { comboboxLinks, describedBy, invalid } from './aria'
 import { Icon } from './Icon'
+// R16 : la ligne de texte vide, à la hauteur d'une ligne écrite (pour le champ vide, en bas).
+import { TextLineShape } from './ListGroup'
 import { Text, type Tone } from './Text'
 import { fontName, fontStack } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
@@ -145,6 +147,9 @@ type Props = {
 
 // Vrai quand le champ est dans un FieldGroup : il ne dessine alors pas son propre groupe.
 const InGroup = createContext(false)
+
+/** La hauteur d'un champ de plusieurs lignes (la bio), au repos ; son champ vide la reprend (R16). */
+const MULTILINE_HEIGHT = 96
 
 /** Le cadre blanc d'un groupe de champs. */
 function GroupFrame({
@@ -464,7 +469,9 @@ export function TextField({
               paddingVertical: padY,
               // Sur le web, le navigateur dessine son propre contour : le groupe s'en charge déjà.
               outlineWidth: 0,
-              ...(inputProps.multiline ? { minHeight: 96, textAlignVertical: 'top' } : null),
+              ...(inputProps.multiline
+                ? { minHeight: MULTILINE_HEIGHT, textAlignVertical: 'top' }
+                : null),
               // Le champ qui grandit : sa hauteur à lui, d'une ligne à `maxLines` (voir plus haut).
               ...(grows ? { minHeight: layout.touchTarget, height: growHeight } : null),
             }}
@@ -648,4 +655,55 @@ function Message({
       ) : null}
     </View>
   )
+}
+
+// ---------------------------------------------------------------------------------------------
+// R16 (« Les squelettes ») : le champ vide d'un formulaire qui charge
+// ---------------------------------------------------------------------------------------------
+
+/** La largeur de l'étiquette vide, puis celles des lignes vides de la saisie, en part du champ. */
+const SKELETON_LABEL = '30%'
+const SKELETON_VALUE = '45%'
+const SKELETON_LINES = ['90%', '60%'] as const
+
+/**
+ * Le champ vide d'un formulaire qui charge (plan R16, choix 4 ; planche R16-Explorer-Listes, « Mon
+ * profil ») : le même cadre blanc qu'un vrai champ (`GroupFrame`), aux mêmes marges, avec à la place
+ * de l'étiquette une ligne vide de sa hauteur, et dans la saisie, haute comme la vraie (44 points,
+ * 96 en `multiline`), une ligne vide où viendra la valeur. Le formulaire garde ainsi sa hauteur
+ * quand les vrais champs arrivent. Dans un `FieldGroup`, il ne dessine que sa ligne, comme un champ.
+ *
+ * Sans rôle ni nom : c'est le `Loading` de la zone (ui/Skeleton.tsx) qui dit « Chargement… », une
+ * seule fois pour tous les champs.
+ */
+export function TextFieldSkeleton({
+  multiline = false,
+}: {
+  /** Un champ de plusieurs lignes (la bio) : la hauteur d'un `TextField multiline`, deux lignes. */
+  multiline?: boolean
+}): ReactNode {
+  const inGroup = useContext(InGroup)
+  const row = (
+    <View style={{ paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm }}>
+      {/* L'étiquette, en petit au-dessus, comme celle d'un vrai champ. */}
+      <TextLineShape variant="caption" width={SKELETON_LABEL} />
+      {/* La saisie : sa hauteur et son écart, ceux de la vraie (voir TextField). */}
+      <View
+        style={{
+          marginTop: space.xxs,
+          minHeight: multiline ? MULTILINE_HEIGHT : layout.touchTarget,
+          paddingVertical: space.xs,
+          justifyContent: multiline ? 'flex-start' : 'center',
+        }}
+      >
+        {multiline ? (
+          SKELETON_LINES.map((width) => <TextLineShape key={width} variant="body" width={width} />)
+        ) : (
+          <TextLineShape variant="body" width={SKELETON_VALUE} />
+        )}
+      </View>
+    </View>
+  )
+  if (inGroup) return row
+  return <GroupFrame state="idle">{row}</GroupFrame>
 }

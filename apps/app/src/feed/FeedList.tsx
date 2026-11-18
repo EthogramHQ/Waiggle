@@ -18,7 +18,7 @@ import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
-import { SkeletonList } from '../ui/Skeleton'
+import { Loading, SkeletonList, SkeletonPage } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { useScrollLight } from '../ui/scrollLight'
@@ -94,8 +94,13 @@ export function DiscoverFeed({
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} section={errorMessage} />
     ) : (
       // La forme des cartes qui arrivent, dans leurs colonnes (R15) : celle du Fil, ou la compacte
-      // dans « Récents » sur ordinateur (le squelette lit la grille, comme la carte).
-      <SkeletonList count={3} shape="feed" />
+      // dans « Récents » sur ordinateur (le squelette lit la grille, comme la carte). R16 : la place
+      // du bouton des nouveautés au-dessus, vide, au même écart que dans `FeedList` : les cartes
+      // tombent là où les vraies arriveront.
+      <Stack gap="lg">
+        <NewsPlace />
+        <SkeletonList count={3} shape="feed" />
+      </Stack>
     )
   ) : (
     <FeedList
@@ -113,6 +118,38 @@ export function DiscoverFeed({
       overlay={overlay ? (project) => overlay(project, followed) : undefined}
     />
   )
+}
+
+/**
+ * R16 (« Le Fil n'a plus qu'un squelette ») : le Fil qui charge, à la forme du Fil qui arrive. La
+ * place du bouton des nouveautés d'abord (téléphone ; sur ordinateur, il est à côté du titre), au
+ * même écart que dans `FeedList`, puis quatre cartes vides dans les colonnes du Fil (planche R16-Fil).
+ * Un seul « Chargement… » pour toutes les cartes ; la place du bouton reste dehors : elle est vide.
+ *
+ * `shown` : montré tout de suite, sans les 160 ms d'attente de `Loading`. Le Fil le demande quand ce
+ * squelette prend la suite d'un autre déjà à l'écran (celui de la lecture de la session) : sinon les
+ * cartes vides disparaîtraient 160 ms entre les deux.
+ */
+export function FeedSkeleton({ news, shown = false }: { news: ReactNode; shown?: boolean }) {
+  return (
+    <Stack gap="lg">
+      {news}
+      <Loading shown={shown}>
+        <SkeletonPage shape="feed" />
+      </Loading>
+    </Stack>
+  )
+}
+
+/** Rien à faire : la place vide n'a pas de bouton. */
+const noop = () => {}
+
+/**
+ * R16 : la place du bouton des nouveautés d'un fil qui se lit encore (« Récents » d'Explorer), vide
+ * et à sa hauteur : le bouton y viendra plus tard sans rien pousser (`NewItemsBanner`, rien de neuf).
+ */
+export function NewsPlace() {
+  return <NewItemsBanner count={null} more={false} kinds={[]} authors={[]} onPress={noop} />
 }
 
 type FeedNewsProps = {

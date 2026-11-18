@@ -965,7 +965,9 @@ describe('StateMessage', () => {
   it('needs no title while loading', async () => {
     await renderWithProviders(<StateMessage kind="loading" message="Chargement…" />)
 
-    expect(screen.getByText('Chargement…')).toBeTruthy()
+    // R16 (plan, choix 12) : « Chargement… » n'est plus écrit, c'est le nom lu de l'attente, dessinée
+    // en rangées vides (StateMessage.test.tsx), qui se montre après 160 ms.
+    expect(await screen.findByRole('progressbar', { name: 'Chargement…' })).toBeTruthy()
     expect(screen.queryByRole('header')).toBeNull()
   })
 

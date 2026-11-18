@@ -737,8 +737,11 @@ describe('ExploreScreen, the news of « Récents » and the member’s own proje
     mockSession(null, true)
     await renderExplore()
 
-    // Témoin : ni la page ni « Récents » ne sont dessinés pendant la lecture de la session.
-    expect(screen.queryByText(fr.t(($) => $.explore.recent))).toBeNull()
+    // R16 : la page vide d'Explorer est là pendant la lecture de la session (le scénario veut ses
+    // titres tout de suite) ; aucune nouveauté de « Récents » n'est calculée pour autant.
+    expect(
+      await screen.findByRole('progressbar', { name: fr.t(($) => $.common.loading) }),
+    ).toBeTruthy()
     expect(recentNewsViewers()).toEqual([])
   })
 })
@@ -954,5 +957,87 @@ describe('ExploreScreen, the news of « Récents » under a category filter (rea
 
     expect(screen.queryByRole('button', { name: /nouve/ })).toBeNull()
     expect(screen.queryByText(/nouve/, { includeHiddenElements: true })).toBeNull()
+  })
+})
+
+// --- R16 : les sections qui arrivent seules gardent leur place (docs/scenarios/refonte.md, « Le
+// squelette a la forme de sa page ») ---
+// « À la une », « Ils cherchent des testeurs » et « Outils populaires » arrivent chacune à son
+// heure. Pendant leur lecture, chacune garde son titre, lu pour de vrai, et une rangée vide : rien
+// ne pousse « Récents » à leur arrivée (plus de 500 points le 17/11).
+describe('ExploreScreen, while its sections load (R16)', () => {
+  /** Une lecture de React Query avant sa première réponse. */
+  const pendingQuery = () => ({
+    data: undefined,
+    status: 'pending',
+    isPending: true,
+    isLoading: true,
+    isSuccess: false,
+    isError: false,
+    error: null,
+    hasNextPage: false,
+    isFetchingNextPage: false,
+    isRefetching: false,
+    fetchNextPage: jest.fn().mockResolvedValue(undefined),
+    refetch: jest.fn().mockResolvedValue(undefined),
+  })
+
+  /** Les trois sections attendent : la vitrine des membres, les testeurs, les outils. */
+  const everySectionLoads = () => {
+    mockFeeds({ testers: pendingQuery() as unknown as Feed })
+    jest.mocked(useTools).mockReturnValue(pendingQuery() as unknown as ReturnType<typeof useTools>)
+    // La réponse du `beforeEach` pour tout le reste (catégories, fils).
+    const answer = jest.mocked(request).getMockImplementation() as
+      | ((...args: unknown[]) => unknown)
+      | undefined
+    jest
+      .mocked(request)
+      .mockImplementation(((path: string, ...rest: unknown[]) =>
+        String(path).startsWith('/v1/showcase')
+          ? new Promise(() => {})
+          : answer?.(path, ...rest)) as typeof request)
+  }
+
+  /** Vrai si l'élément est dans une zone « Chargement » (un `progressbar`). */
+  const insideProgressbar = (element: { parent: unknown; props: Record<string, unknown> }) => {
+    let node = element.parent as { parent: unknown; props: Record<string, unknown> } | null
+    while (node) {
+      if (node.props.role === 'progressbar' || node.props.accessibilityRole === 'progressbar')
+        return true
+      node = node.parent as typeof node
+    }
+    return false
+  }
+
+  it.each([
+    ['on a phone', false],
+    ['on a computer', true],
+  ])('keeps the title of each section and an empty row while it loads, %s', async (_, desktop) => {
+    const restore = desktop ? setDesktopWindow() : () => {}
+    try {
+      everySectionLoads()
+      await renderExplore()
+
+      for (const name of [
+        fr.t(($) => $.explore.featured),
+        fr.t(($) => $.explore.testers),
+        fr.t(($) => $.explore.popularTools),
+      ]) {
+        const title = await screen.findByRole('header', { name })
+        expect(insideProgressbar(title as never)).toBe(false)
+      }
+      // Une zone « Chargement » par section qui attend (choix 4), soit trois au moins. On attend
+      // qu'elles soient toutes là : chacune se montre après ses 160 ms (choix 8), pas toutes à la même
+      // image ; lire le nombre à la première trouvée rougissait la CI au hasard (18/11).
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+        ).toBeGreaterThanOrEqual(3),
+      )
+      // Témoin : « Récents » est là, sous elles.
+      expect(screen.getByRole('header', { name: fr.t(($) => $.explore.recent) })).toBeTruthy()
+    } finally {
+      restore()
+    }
   })
 })

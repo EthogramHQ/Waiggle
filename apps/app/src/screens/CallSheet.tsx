@@ -30,7 +30,7 @@ import {
 import { usePathname, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { pickImage } from '../media/pick'
@@ -63,10 +63,25 @@ export function CallSheet({ id }: ScreenProps) {
   return (
     <>
       {alone ? <ProjectScreen id={id} /> : null}
-      <CallSheetStates id={id} />
+      {/* R16 : la garde commune, comme « Nouvelle mise à jour » (UpdateSheet.tsx). En attente, la
+          feuille et ses lignes vides ; pour un visiteur, la feuille « Réservé aux membres » ; si la
+          session ne se lit pas, l'erreur dans la feuille, dont « Réessayer » relit la session. Les
+          quatre issues dessinent le même composant, placé au même endroit par la garde : la
+          feuille ouverte pendant l'attente reste la même quand la session arrive (une couche, un
+          Modal, ne se referme pas pour se rouvrir). Rien n'est demandé à l'API avant `signedIn`. */}
+      <SessionGate
+        loading={<CallSheetStates id={id} reading="pending" />}
+        signedOut={<CallSheetStates id={id} reading="signedOut" />}
+        error={(retry) => <CallSheetStates id={id} reading="error" onRetry={retry} />}
+      >
+        {(session) => <CallSheetStates id={id} reading="signedIn" memberId={session.user.id} />}
+      </SessionGate>
     </>
   )
 }
+
+/** Ce que la garde a lu de la session, quand elle dessine la feuille (`error` : elle ne se lit pas). */
+type Reading = 'pending' | 'error' | 'signedOut' | 'signedIn'
 
 /** Un état qui remplace le formulaire, dans la même feuille : titre, phrase et issues. */
 type SheetState = {
@@ -76,17 +91,32 @@ type SheetState = {
   actions?: { label: string; onPress: () => void }[]
 }
 
-/** Choisit ce que montre la feuille : un état (chargement, suspendu, introuvable…) ou le formulaire. */
-function CallSheetStates({ id }: { id: string }) {
+/**
+ * Choisit ce que montre la feuille : un état (chargement, suspendu, introuvable…) ou le formulaire.
+ * `reading` vient de la garde : rien n'est demandé à l'API avant `signedIn`, et `memberId` (le
+ * membre connecté, pour son brouillon) n'est donné qu'avec lui.
+ */
+function CallSheetStates({
+  id,
+  reading,
+  memberId,
+  onRetry,
+}: {
+  id: string
+  reading: Reading
+  memberId?: string
+  /** Relit la session (`reading` vaut `error`) : le « Réessayer » de la feuille. */
+  onRetry?: () => void
+}) {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
   // Fermer revient à la page d'avant, sinon au coin des testeurs (arrivée par un lien direct).
   const sheet = useRouteSheet({ pathname: '/projects/[id]/testers', params: { id } })
-  const { state, session, retry } = useMemberSession()
+  const signedIn = reading === 'signedIn'
   // Le profil (sa suspension) d'abord : rien à taper tant qu'on ne sait pas si l'on peut écrire.
-  const me = useMe(Boolean(session))
-  const project = useProject(id, Boolean(session && me.data))
+  const me = useMe(signedIn)
+  const project = useProject(id, signedIn && Boolean(me.data))
   const title = t(($) => $.project.testers.calls.sheetTitle)
 
   const shown = (content: ReactNode) => (
@@ -125,17 +155,17 @@ function CallSheetStates({ id }: { id: string }) {
           actions: [{ label: t(($) => $.common.retry), onPress: onRetry }],
         })
 
-  if (state === 'pending') return loading
+  if (reading === 'pending') return loading
   // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') {
+  if (reading === 'error') {
     return stateSheet({
       kind: 'error',
       title: t(($) => $.states.errorTitle),
       message: t(($) => $.account.loadError),
-      actions: [{ label: t(($) => $.common.retry), onPress: retry }],
+      actions: [{ label: t(($) => $.common.retry), onPress: () => onRetry?.() }],
     })
   }
-  if (!session) return signedOut(false)
+  if (reading === 'signedOut' || !memberId) return signedOut(false)
   if (!me.data) return me.error ? failed(me.error, () => void me.refetch()) : loading
   if (me.data.suspension) {
     // Comme « Nouvelle mise à jour » : le bandeau replié (la date de fin, « Détails » vers le
@@ -182,12 +212,7 @@ function CallSheetStates({ id }: { id: string }) {
     })
   }
   return (
-    <CallForm
-      project={project.data}
-      memberId={session.user.id}
-      open={sheet.open}
-      close={sheet.close}
-    />
+    <CallForm project={project.data} memberId={memberId} open={sheet.open} close={sheet.close} />
   )
 }
 

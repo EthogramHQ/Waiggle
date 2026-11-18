@@ -24,7 +24,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
@@ -38,15 +38,20 @@ import { Screen } from '../ui/Screen'
 import { SentFeedbackGroup, SentFeedbackMessage } from '../ui/SentFeedback'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SignedOutScreen } from './states'
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, des rangées vides, à la
+ * largeur de la page d'aujourd'hui (`form` : `shape="list"` seul choisirait `page`, plus large) ;
+ * la session ne se lit pas : « Réessayer », pas « Me connecter » ; un visiteur : « Réservé aux
+ * membres ». La page reçoit l'identifiant du membre, lu dans la session que la garde lui passe.
+ */
 export function MyTesterMessagesScreen() {
-  const { state, session, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (state === 'signedOut' || !session) return <SignedOutScreen />
-  return <MyTesterMessages memberId={session.user.id} />
+  return (
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
+      {(session) => <MyTesterMessages memberId={session.user.id} />}
+    </SessionGate>
+  )
 }
 
 /** Les messages d'un même projet ; `project` null : les projets qu'on ne voit plus, ensemble. */

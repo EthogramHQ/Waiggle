@@ -6,7 +6,7 @@
 // jur-J7 : aucun minuteur, aucun défilement sans geste). Il ressemble à Thumbnails, le seul autre
 // ScrollView horizontal de l'appli.
 
-import { space } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { Platform, ScrollView, type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
@@ -34,7 +34,7 @@ type Node = {
 }
 
 /** La bande elle-même : l'élément natif du ScrollView horizontal (RCTScrollView en test). */
-const scrollViewProps = (): Record<string, unknown> => {
+const bandNode = (): Node => {
   let found: Node | null = null
   const visit = (node: Node | string) => {
     if (typeof node === 'string' || found) return
@@ -43,8 +43,30 @@ const scrollViewProps = (): Record<string, unknown> => {
   }
   visit(screen.root as unknown as Node)
   if (!found) throw new Error('no horizontal ScrollView rendered')
-  return (found as Node).props
+  return found
 }
+const scrollViewProps = (): Record<string, unknown> => bandNode().props
+
+/**
+ * R16 : la bande est mesurée, comme le navigateur le fait après le premier dessin. La fausse
+ * ScrollView de Jest ne mesure rien : on lui fait dire sa largeur visible (`onLayout`), puis celle
+ * de tout son contenu (`onContentSizeChange`). Avant, ni la page pré-rendue ni un test ne savent si
+ * les cartes tiennent.
+ */
+const measureViewport = (viewport: number) =>
+  fireEvent(bandNode() as never, 'layout', {
+    persist: () => {},
+    nativeEvent: { layout: { x: 0, y: 0, width: viewport, height: 240 } },
+  })
+const measureContent = (content: number) =>
+  fireEvent(bandNode() as never, 'contentSizeChange', content, 240)
+const measureBand = async (viewport: number, content: number) => {
+  await measureViewport(viewport)
+  await measureContent(content)
+}
+
+/** Une bande plus large que sa colonne : 1 500 points de cartes dans 600 de place. */
+const overflowing = () => measureBand(600, 1500)
 
 const titles = ['Carnet de cafés', 'Mon agent de recettes', 'Jardin partagé']
 
@@ -108,6 +130,8 @@ describe('Carousel', () => {
     const restore = setDesktopWindow()
     try {
       await renderWithProviders(band())
+      // R16 : les flèches attendent de savoir que la bande déborde.
+      await overflowing()
 
       expect(screen.getByRole('button', { name: previous })).toBeTruthy()
       expect(screen.getByRole('button', { name: next })).toBeTruthy()
@@ -120,6 +144,7 @@ describe('Carousel', () => {
     const restore = setDesktopWindow()
     try {
       await renderWithProviders(band())
+      await overflowing()
       expect(scrollTo()).not.toHaveBeenCalled()
 
       await fireEvent.press(screen.getByRole('button', { name: next }))
@@ -227,5 +252,105 @@ describe('Carousel, the shadow of its cards (design review R12, point 3)', () =>
     expect(content.paddingBottom).toBe(space.xs)
     expect(content.paddingTop).toBe(space.xs)
     expect(Number(scroller.marginBottom ?? 0)).toBe(0)
+  })
+})
+
+// R16 (« La page ne bouge plus en arrivant », plan, choix 16) : sur ordinateur, les flèches se
+// montraient tant que la bande n'était pas mesurée, puis disparaissaient quand les cartes tenaient
+// (« À la une » sautait de 9 puis de 18 points). Désormais, tant que la bande n'est pas mesurée
+// (la page pré-rendue comprise, qui ne mesure jamais rien), les flèches sont absentes de l'arbre :
+// ni vues, ni lues, ni atteignables au clavier. Elles n'apparaissent que si la bande déborde, et
+// l'en-tête garde la hauteur d'une flèche avec ou sans elles : rien ne bouge.
+describe('Carousel, its arrows wait for the band to be measured (R16)', () => {
+  let restoreWindow: () => void
+  beforeEach(() => {
+    restoreWindow = setDesktopWindow()
+  })
+  afterEach(() => {
+    restoreWindow()
+    jest.restoreAllMocks()
+  })
+
+  /** La bande d'« À la une » : un titre à gauche, les flèches à droite. */
+  const featured = () => (
+    <Carousel
+      label={label}
+      previousLabel={previous}
+      nextLabel={next}
+      header={<Text variant="headline">À la une</Text>}
+    >
+      {cards}
+    </Carousel>
+  )
+
+  /** Les flèches présentes dans l'arbre, même cachées aux lecteurs d'écran. */
+  const arrowsInTree = () =>
+    [previous, next].filter(
+      (name) =>
+        screen.queryByRole('button', { name, includeHiddenElements: true }) !== null ||
+        screen.queryByLabelText(name, { includeHiddenElements: true }) !== null,
+    )
+
+  it('shows no arrow before the band is measured, prerendered page included', async () => {
+    // La page web pré-rendue : rien n'y est jamais mesuré.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await renderWithProviders(featured())
+
+    // Témoin : la bande, son titre et ses cartes sont là.
+    expect(screen.getByText('À la une')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Carnet de cafés' })).toBeTruthy()
+    expect(arrowsInTree()).toEqual([])
+
+    // La largeur visible seule ne dit pas encore si les cartes tiennent.
+    await measureViewport(600)
+    expect(arrowsInTree()).toEqual([])
+  })
+
+  it('shows both arrows once the band overflows its column', async () => {
+    await renderWithProviders(featured())
+    // « Une fois » : pas avant que la bande soit mesurée.
+    expect(arrowsInTree()).toEqual([])
+
+    await overflowing()
+
+    // Au début de la bande : on ne peut qu'avancer.
+    expect(screen.getByRole('button', { name: previous })).toBeDisabled()
+    expect(screen.getByRole('button', { name: next })).not.toBeDisabled()
+  })
+
+  it('shows no arrow when every card fits', async () => {
+    await renderWithProviders(featured())
+    // À aucun moment : ni avant la mesure, ni entre les deux mesures, ni après.
+    expect(arrowsInTree()).toEqual([])
+    await measureViewport(1200)
+    expect(arrowsInTree()).toEqual([])
+    await measureContent(900)
+    expect(arrowsInTree()).toEqual([])
+
+    // Témoin : la même bande, devenue plus large que sa colonne, montre ses flèches.
+    await measureContent(1500)
+    expect(arrowsInTree()).toEqual([previous, next])
+  })
+
+  it('keeps the header as tall as an arrow, with or without its arrows', async () => {
+    await renderWithProviders(featured())
+
+    // L'en-tête (le titre et la place des flèches) : la première pièce de la région. Il n'a ni rôle
+    // ni nom ; seule sa hauteur compte ici. Au moins la taille d'une flèche, jamais une hauteur
+    // fixe (à 200 %, un titre sur deux lignes serait coupé).
+    const header = () => {
+      const region = screen.getByLabelText(label) as unknown as Node
+      const first = region.children.find((child): child is Node => typeof child !== 'string')
+      if (!first) throw new Error('no header in the carousel')
+      return StyleSheet.flatten(first.props.style as StyleProp<ViewStyle>) ?? {}
+    }
+    expect(screen.getByText('À la une')).toBeTruthy()
+    expect(header().minHeight).toBe(layout.touchTarget)
+    expect(header().height).toBeUndefined()
+
+    await overflowing()
+    expect(screen.getByRole('button', { name: next })).toBeTruthy()
+    expect(header().minHeight).toBe(layout.touchTarget)
+    expect(header().height).toBeUndefined()
   })
 })
