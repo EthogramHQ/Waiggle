@@ -19,9 +19,18 @@
 // Quand on le voit (R16) : une page qui arrive en moins de 160 ms ne montre aucun squelette. `Loading`
 // pose sa place tout de suite, mais reste invisible et caché aux lecteurs d'écran pendant ce délai,
 // puis se montre en fondu. La page web pré-rendue, elle, ne peut rien attendre : son squelette se
-// montre tout de suite, et reste là quand l'appli démarre.
+// montre tout de suite, et reste là quand l'appli démarre. Un `Loading` qui prend la place d'un autre
+// continue la même attente, au lieu d'en recommencer une (voir `Loading`).
 import { borders, durations, layout, type Palette, type Radius, radii, space } from '@ruche/brand'
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import Animated, {
@@ -299,6 +308,58 @@ const hiddenFromReaders = {
   importantForAccessibility: 'no-hide-descendants',
 } as const
 
+// ---------------------------------------------------------------------------------------------
+// La continuité entre deux attentes (R16)
+// ---------------------------------------------------------------------------------------------
+
+/** Une attente à l'écran : depuis quand elle attend (en ms, `Date.now()`), et si elle se voit. */
+type Wait = { since: number; shown: boolean }
+
+/**
+ * Les `Loading` montés en ce moment, partout dans l'appli. Un objet par `Loading`, qu'il tient à
+ * jour lui-même. Une simple variable du module suffit : on n'y garde que ce qui est à l'écran, et
+ * chacun s'en retire en se démontant (un test qui démonte sa page la laisse donc vide).
+ */
+const mounted = new Set<Wait>()
+
+/**
+ * Les `Loading` qui viennent de quitter l'écran, dans le passage en cours (une seule mise à jour de
+ * React, un « commit ») : la garde de session qui passe la main à l'écran, un morceau de page arrivé
+ * à la place de son attente, un écran qui change de forme d'attente. Vidé juste après ce passage
+ * (une microtâche : elle s'exécute dès que React a fini d'écrire l'écran), pour qu'une attente
+ * montée plus tard, seule, reste une première attente.
+ */
+let leaving: Wait | null = null
+
+/** Retient qu'une attente quitte l'écran dans ce passage, en fusionnant avec ses voisines. */
+const noteLeaving = (wait: Wait) => {
+  if (!leaving) {
+    // Une promesse plutôt que `queueMicrotask`, que les fausses horloges des tests remplacent.
+    void Promise.resolve().then(() => {
+      leaving = null
+    })
+  }
+  leaving = {
+    since: Math.min(wait.since, leaving?.since ?? wait.since),
+    shown: wait.shown || (leaving?.shown ?? false),
+  }
+}
+
+/**
+ * Ce qu'un `Loading` qui se monte peut reprendre, deviné pendant son rendu : React dessine le
+ * nouveau avant de démonter l'ancien, qui est donc encore là. Si une attente se voit, il se montre
+ * tout de suite ; sinon il reprend la date de la plus ancienne. Vérifié une fois à l'écran (voir
+ * `Loading`) : seule une attente qui part dans le même passage se continue.
+ */
+const guessWait = (now: number): Wait => {
+  let since = now
+  for (const wait of mounted) {
+    if (wait.shown) return { since: wait.since, shown: true }
+    since = Math.min(since, wait.since)
+  }
+  return { since, shown: false }
+}
+
 /**
  * Le cadre qui nomme et marque occupé une zone qui charge : « Chargement… », dans la langue de
  * l'appli, une seule fois pour toutes les pièces qu'il enveloppe. Le rôle « progressbar » (sans
@@ -310,6 +371,13 @@ const hiddenFromReaders = {
  * d'écran pendant 160 ms (`durations.quick`) : une page qui arrive plus vite ne montre aucun
  * squelette. Puis il se montre en fondu (180 ms). « Tout de suite » se décide au montage : dans la
  * page web pré-rendue (avant que l'appli démarre), il est déjà montré, et le reste.
+ *
+ * La continuité (R16) : un `Loading` qui prend la place d'un autre, dans le même passage (la garde
+ * de session passe la main à un écran qui attend encore ses données), continue la même attente.
+ * L'ancien se voyait : le nouveau se montre tout de suite, sans fondu (sinon la page vide
+ * disparaissait 160 ms, puis revenait en fondu : elle clignotait). L'ancien attendait encore : le
+ * nouveau se montre quand l'ancien l'aurait fait (l'attente se compte une fois). Un `Loading` monté
+ * seul garde ses 160 ms, même si un autre se voit ailleurs dans la page.
  */
 export function Loading({
   children,
@@ -328,18 +396,57 @@ export function Loading({
   const { t } = useTranslation()
   const hydrated = useHydrated()
   // useState(() => …) : calculé une seule fois, au montage. L'hydratation qui suit ne change rien.
-  const [atOnce] = useState(() => shown || !hydrated)
-  const [visible, setVisible] = useState(atOnce)
-  const opacity = useSharedValue(atOnce ? 1 : 0)
+  // `decided` : montré d'office (demandé, ou la page pré-rendue), rien à reprendre d'une autre.
+  const [decided] = useState(() => shown || !hydrated)
+  // Le moment du montage, et l'attente devinée pendant ce premier rendu.
+  const [born] = useState(Date.now)
+  const [start, setStart] = useState<Wait>(() =>
+    decided ? { since: born, shown: true } : guessWait(born),
+  )
+  const [visible, setVisible] = useState(start.shown)
+  const opacity = useSharedValue(start.shown ? 1 : 0)
   const onShown = useContext(LoadingShownContext)
+
+  // Sa place dans `mounted`, tenue à jour (l'objet est le même du montage au démontage).
+  const self = useRef<Wait>(start)
+  self.current.shown = visible
+  // useLayoutEffect : avant que l'écran se dessine, et dans le même passage que le démontage de
+  // l'ancien `Loading` (React démonte d'abord, puis monte : `leaving` est déjà écrit ici). Au montage
+  // seulement : `start` et `decided` ne servent qu'à ce moment.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lu une fois, au montage
+  useLayoutEffect(() => {
+    const mine = self.current
+    if (!decided) {
+      // La vérification de `guessWait` : seule une attente qui part dans ce passage se continue ;
+      // sinon, c'est une première attente, qui compte ses 160 ms depuis son montage.
+      const taken: Wait = leaving ?? { since: born, shown: false }
+      if (taken.shown !== start.shown || taken.since !== start.since) {
+        mine.since = taken.since
+        mine.shown = taken.shown
+        setStart(taken)
+        setVisible(taken.shown)
+        opacity.value = taken.shown ? 1 : 0
+      }
+    }
+    mounted.add(mine)
+    return () => {
+      mounted.delete(mine)
+      noteLeaving(mine)
+    }
+  }, [])
+
   useEffect(() => {
     if (visible) return
-    const timer = setTimeout(() => {
-      setVisible(true)
-      opacity.value = fade(1, 'page')
-    }, durations.quick)
+    // Le reste des 160 ms, comptées depuis le début de l'attente (la sienne, ou celle qu'il continue).
+    const timer = setTimeout(
+      () => {
+        setVisible(true)
+        opacity.value = fade(1, 'page')
+      },
+      Math.max(0, start.since + durations.quick - Date.now()),
+    )
     return () => clearTimeout(timer)
-  }, [visible, opacity])
+  }, [visible, opacity, start.since])
   useEffect(() => {
     if (visible) onShown?.()
   }, [visible, onShown])
