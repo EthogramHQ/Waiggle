@@ -28,7 +28,9 @@ import { borders, layout, radii, type ShadowName, space } from '@ruche/brand'
 import { type ReactNode, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { Avatar } from './Avatar'
+import { useCoverSource } from './coverTransition'
 import { ExampleBadge } from './ExampleBadge'
 import type { ImageSource } from './image'
 import { Pressed } from './Pressed'
@@ -58,6 +60,12 @@ type Props = {
    * « Exemple » à côté du statut. Absent ou faux : rien.
    */
   example?: boolean
+  /**
+   * R17 (« La carte qui devient la page ») : l'identifiant du projet. Avec lui, la photo de la carte
+   * vole jusqu'à la couverture de la page du projet (`useCoverSource`), et la carte rebondit au
+   * Retour du navigateur (R14). Absent (le catalogue, un aperçu) : la carte ouvre simplement.
+   */
+  coverId?: string
 }
 
 /**
@@ -93,7 +101,13 @@ export function ShowcaseCard({
   onPress,
   size = 'carousel',
   example = false,
+  coverId,
 }: Props) {
+  // La carte qui devient la page (R4, R17). Un hook s'appelle toujours, dans le même ordre (règle
+  // des hooks de React) : sans `coverId`, sous un identifiant vide qu'aucune page ne porte, et
+  // `capture` ni `ref` ne servent.
+  const cover = useCoverSource(coverId ?? '')
+  const open = coverId ? () => cover.capture(onPress) : onPress
   // Les identifiants des textes qui décrivent le lien : le statut, « Exemple » s'il est là, puis
   // l'auteur, dans l'ordre où l'œil les lit.
   const { t } = useTranslation()
@@ -104,32 +118,41 @@ export function ShowcaseCard({
   const describedIds = [statusId, example ? exampleId : null, authorId].filter(Boolean).join(' ')
   const { width, height } = SIZES[size]
   return (
-    <View
+    <Animated.View
       // `fill` : une part égale de la rangée (base nulle, puis toute la place libre), sans jamais
       // déborder (minWidth 0 : sans lui, un long titre élargirait sa carte aux dépens des voisines).
-      style={
+      // R14 : le rebond du Retour du navigateur, une échelle à 1 le reste du temps.
+      style={[
         width === undefined
           ? { flexGrow: 1, flexBasis: 0, minWidth: 0 }
-          : { width, maxWidth: '100%' }
-      }
+          : { width, maxWidth: '100%' },
+        cover.bounceStyle,
+      ]}
     >
       <Pressed
         label={title}
         role="link"
-        onPress={onPress}
+        onPress={open}
         describedBy={describedIds}
         // Sur téléphone, `describedBy` ne vaut rien (aria.ts) : « Exemple » passe par l'indice du
         // lien, comme dans TesterCard (relecture de l'interface de R12b).
         {...(example ? { hint: t(($) => $.common.example) } : null)}
         radius="sheet"
       >
-        <ProjectCover
-          height={height}
-          grow
-          image={image}
-          shadow={SHOWCASE_CARD_SHADOW}
-          radius="sheet"
-        >
+        {/* La carte, à sa hauteur minimale, grandit avec son texte. R17 : la photo est sur une
+            couche à elle, posée sous le statut et le panneau (comme dans ProjectCard) : c'est elle
+            seule qui vole jusqu'à la page du projet, sans le verre ni le statut. */}
+        <View style={{ minHeight: height, flexGrow: 1 }}>
+          {/* La photo garde son nom lu, comme avant (le test « named for screen readers »). */}
+          <View ref={coverId ? cover.ref : undefined} style={{ position: 'absolute', inset: 0 }}>
+            <ProjectCover
+              height={height}
+              grow
+              image={image}
+              shadow={SHOWCASE_CARD_SHADOW}
+              radius="sheet"
+            />
+          </View>
           {/* Le statut en haut, le panneau en bas ; la place entre eux est la photo. */}
           <View
             style={{
@@ -162,9 +185,9 @@ export function ShowcaseCard({
               </Row>
             </Surface>
           </View>
-        </ProjectCover>
+        </View>
       </Pressed>
-    </View>
+    </Animated.View>
   )
 }
 

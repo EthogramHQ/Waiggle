@@ -25,9 +25,20 @@
 // Pendant le vol, la photo est cachée au lecteur d'écran et ne prend pas le doigt ; à l'arrivée, le
 // focus du clavier va au titre de la page (sur le web), pour que la lecture reparte du haut.
 //
-// Sur le web, l'API View Transitions du navigateur n'est pas utilisée : la page du projet ne dessine
-// sa photo qu'une fois le projet lu, et le navigateur photographie la page juste après la navigation,
-// donc l'écran de chargement. La même mesure sert partout.
+// R17 (« La carte qui devient la page », web) : un navigateur qui sait animer un passage de page
+// (l'API View Transitions, ui/pageTransition.web.ts) fait voler la photo lui-même. Il photographie
+// la page d'avant, puis la nouvelle (le moteur attend que la page du projet soit arrivée, 250 ms au
+// plus), et fait glisser d'une image à l'autre tout élément qui porte le même nom
+// (`view-transition-name: wg-cover`) dans les deux. Alors :
+// - la carte ne mesure plus rien : `capture` confie sa photo au moteur (`shareCover`) et ouvre tout
+//   de suite ;
+// - la page du projet se pose d'un coup, lisible et touchable (le navigateur anime une image de la
+//   page, pas la page elle-même), et marque sa boîte `data-cover-target="<id>"`, où le moteur pose
+//   le nom à l'arrivée ; son titre prend le focus à la fin du passage (`afterPassage`) ;
+// - son « Retour » part tout de suite, la photo confiée au moteur avec la carte d'origine pour
+//   arrivée (`to`).
+// Sans l'API (un navigateur plus ancien), sur iOS et Android, la mesure ci-dessus sert, comme avant.
+// Sous « Réduire les animations », rien n'est confié : le passage est un fondu croisé.
 //
 // R14 (« Entrer dans un projet et en sortir »), le retour sans page vide :
 // - la page de la carte, restée dans la pile sous le projet, ne rejoue pas son fondu au retour
@@ -55,6 +66,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated'
 import { type Focusable, focusWithoutScroll } from './focus'
+import { afterPassage, passageBusy, passagesAnimated, shareCover } from './pageTransition'
 import { fade, spring, useCalmMotion } from './theme/motion'
 
 /** Un cadre dans la fenêtre, en points : sa position (coin en haut à gauche) et sa taille. */
@@ -173,6 +185,11 @@ type Stage = {
    * remontée ensuite (passage en colonnes) ne le relit plus, la carte en attente étant déjà oubliée.
    */
   fromCard: boolean
+  /**
+   * R17 : la page est arrivée pendant un passage animé par le navigateur (web, View Transitions).
+   * Elle se pose d'un coup : c'est le navigateur qui fait voler la photo et fondre le reste.
+   */
+  shared: boolean
 }
 
 /** Ce qu'une photo de page sait faire au départ : jouer le plan, puis appeler `then`. */
@@ -189,6 +206,11 @@ type Store = {
   origins: Map<string, Entry>
   stages: Map<string, Stage>
   leavers: Map<string, Leaver>
+  /**
+   * R17 : la boîte de la photo de chaque page de projet montée (`CoverArrival`), que son « Retour »
+   * confie au moteur des passages (web) : c'est elle qui vole jusqu'à la carte.
+   */
+  boxes: Map<string, unknown>
 }
 
 // Un contexte React : une valeur rendue disponible à tous les composants placés dessous, sans la
@@ -207,6 +229,7 @@ export function CoverTransitionProvider({ children }: { children: ReactNode }) {
     origins: new Map(),
     stages: new Map(),
     leavers: new Map(),
+    boxes: new Map(),
   }))
   return <CoverContext.Provider value={store}>{children}</CoverContext.Provider>
 }
@@ -215,14 +238,21 @@ export function CoverTransitionProvider({ children }: { children: ReactNode }) {
 const stageOf = (store: Store, id: string): Stage => {
   let stage = store.stages.get(id)
   if (!stage) {
+    // R17 : une page qui arrive pendant un passage du navigateur part déjà pleine (opacités à 1) :
+    // le navigateur la photographie dès qu'elle est là, et une photo à 0 laisserait un trou dans
+    // l'image d'arrivée. Lu à la création, au premier affichage de la page : la décision ne change
+    // plus ensuite. Hors du web, `passageBusy()` est toujours faux.
+    const shared = Platform.OS === 'web' && passageBusy()
+    const start = shared ? 1 : 0
     stage = {
-      progress: makeMutable(0),
-      photo: makeMutable(0),
-      rest: makeMutable(0),
+      progress: makeMutable(start),
+      photo: makeMutable(start),
+      rest: makeMutable(start),
       arrived: false,
       users: 0,
       left: false,
       fromCard: false,
+      shared,
     }
     store.stages.set(id, stage)
   }
@@ -335,6 +365,17 @@ export function useCoverSource(id: string) {
         then()
         return
       }
+      // R17 (web) : le navigateur fera voler la photo. Rien à mesurer : elle est confiée au moteur
+      // des passages, qui la nomme si elle se voit assez, puis la page s'ouvre tout de suite (`then`
+      // lance la navigation, que le moteur entoure du passage). Aucun cadre gardé : la page ne
+      // grandira pas d'elle-même.
+      if (passagesAnimated()) {
+        store.frames.delete(id)
+        store.pending = { id, at: Date.now() }
+        shareCover({ from: node, id })
+        then()
+        return
+      }
       // Une seule ouverture, que la mesure réponde ou que le délai passe d'abord.
       let done = false
       const open = (frame: Frame | null) => {
@@ -410,6 +451,16 @@ export function useCoverTarget(id: string) {
         then()
         if (origin) refocus(linkOf(origin.node))
       }
+      // R17 (web) : le navigateur anime le retour. La page part tout de suite ; sa photo est confiée
+      // au moteur, avec la carte d'origine pour arrivée, si cette carte est encore affichée (le
+      // moteur ne la nomme que si elle se voit assez). Sinon, la page fond simplement.
+      if (!calm && passagesAnimated()) {
+        const box = store?.boxes.get(id)
+        const card = origin?.node && store?.entries.has(origin) ? origin.node : null
+        if (box && card) shareCover({ from: box, id, to: card })
+        quit()
+        return
+      }
       const leaver = store?.leavers.get(id)
       if (!leaver) {
         quit()
@@ -417,7 +468,7 @@ export function useCoverTarget(id: string) {
       }
       leaver(departure(), quit)
     },
-    [store, id, departure, fromCard],
+    [store, id, departure, fromCard, calm],
   )
 
   return { arrival, departure, leave, fromCard }
@@ -432,6 +483,14 @@ type ArrivalProps = {
   children: ReactNode
 }
 
+/**
+ * L'attribut `data-cover-target="<id>"` de la photo d'une page (R17), à étaler sur sa boîte.
+ * react-native-web transforme `dataSet` en attributs data- ; `dataSet` n'existe pas dans les types
+ * de React Native (d'où l'objet), et rien n'est posé hors du web.
+ */
+const coverTargetMark = (id: string): object =>
+  Platform.OS === 'web' ? { dataSet: { coverTarget: id } } : {}
+
 /** Ce que rend le style animé quand rien ne bouge : aucune transformation. */
 const still = [{ translateX: 0 }, { translateY: 0 }, { scaleX: 1 }, { scaleY: 1 }]
 
@@ -443,8 +502,12 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
   const store = useContext(CoverContext)
   const { arrival, fromCard } = useCoverTarget(id)
   const stage = store ? stageOf(store, id) : null
-  // En vol : caché au lecteur d'écran et sans prise au doigt. Hors du fournisseur, jamais.
-  const [flying, setFlying] = useState(() => Boolean(stage && !stage.arrived))
+  // R17 : arrivée pendant un passage du navigateur (web) : rien ne vole dans la page, elle se pose
+  // d'un coup. Décidé au premier affichage.
+  const [shared] = useState(() => Boolean(stage?.shared && !stage.arrived))
+  // En vol : caché au lecteur d'écran et sans prise au doigt. Hors du fournisseur, jamais ; ni quand
+  // le navigateur fait voler une image de la photo (`shared`) : la vraie est déjà à sa place.
+  const [flying, setFlying] = useState(() => Boolean(stage && !stage.arrived) && !shared)
   const box = useRef<View>(null)
   const mounted = useRef(true)
   // Les valeurs de secours, quand il n'y a pas de fournisseur (les hooks s'appellent toujours, dans
@@ -472,8 +535,13 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
     rest.value = 1
     setFlying(false)
     // Seulement venue d'une carte : une page ouverte par son adresse garde le focus en haut, comme
-    // toute page qui se charge.
-    if (fromCard && Platform.OS === 'web') focusWithoutScroll(title.current?.current)
+    // toute page qui se charge. R17 : à la fin du passage du navigateur s'il y en a un
+    // (`afterPassage`, tout de suite sinon) ; le focus pendant le vol se verrait sur l'image d'arrivée.
+    if (fromCard && Platform.OS === 'web') {
+      afterPassage(() => {
+        if (mounted.current) focusWithoutScroll(title.current?.current)
+      })
+    }
   }, [stage, progress, photo, rest, fromCard])
 
   // L'état de la page compte ses photos ; il s'oublie après la dernière (un peu plus tard : une
@@ -505,6 +573,11 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
   // Un filet de sécurité pose la photo si cette mesure ne vient jamais.
   useEffect(() => {
     if (!stage || stage.arrived) return
+    // R17 : le navigateur anime le passage ; la page est déjà pleine, elle se pose.
+    if (shared) {
+      land()
+      return
+    }
     if (arrival.kind === 'fade') {
       photo.value = fade(1)
       rest.value = fade(1)
@@ -513,7 +586,17 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
     }
     const timer = setTimeout(land, LAND_MAX)
     return () => clearTimeout(timer)
-  }, [stage, arrival.kind, photo, rest, land])
+  }, [stage, shared, arrival.kind, photo, rest, land])
+
+  // R17 : la boîte de la photo, que le « Retour » de la page confie au moteur des passages (web).
+  useEffect(() => {
+    if (!store) return
+    const mine = box.current
+    store.boxes.set(id, mine)
+    return () => {
+      if (store.boxes.get(id) === mine) store.boxes.delete(id)
+    }
+  }, [store, id])
 
   // Le vol commence quand la photo connaît sa place dans la fenêtre.
   const onLayout = () => {
@@ -622,6 +705,10 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
     <Animated.View
       ref={box}
       onLayout={onLayout}
+      // R17 (web) : la place de la photo dans la page, où le moteur des passages pose le nom de la
+      // photo qui vole (`[data-cover-target="<id>"]`). Sur la boîte extérieure, le cadre qui rogne :
+      // pas sur la photo décalée dedans par le défilement.
+      {...coverTargetMark(id)}
       // Pendant le vol, la photo est un décor : cachée au lecteur d'écran (iOS, Android, web) et
       // traversée par le doigt. pointerEvents en propriété, jamais en style (le web l'ignorerait).
       pointerEvents={flying ? 'none' : 'auto'}
