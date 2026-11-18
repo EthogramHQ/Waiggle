@@ -22,6 +22,11 @@ export type SharedCover = {
   from: unknown
   /** L'identifiant du projet : la page d'arrivée porte `data-cover-target="<id>"`. */
   id: string
+  /**
+   * L'élément d'arrivée, quand on le connaît déjà : au retour, la carte d'origine (elle doit se voir
+   * à 75 % sous la barre du haut). Absent : la couverture `data-cover-target="<id>"` de la page.
+   */
+  to?: unknown
 }
 
 /** Joue la navigation `mutate`, entourée du passage de cette sorte. Hors du web : tout de suite. */
@@ -40,3 +45,23 @@ export const arrivalStyle = (): ArrivalStyle => 'none'
 
 /** Prépare le vol de la photo d'une carte pour le prochain passage. Hors du web : rien. */
 export const shareCover = (_cover: SharedCover): void => {}
+
+/** L'annonce en attente, lue par le relais du web (navigation/passageRelay.ts). Hors du web : aucune. */
+export const takeHint = (): PassageKind | null => null
+
+/** Notre propre retour part : le `popstate` qui suit n'est pas le Retour du navigateur. Web seul. */
+export const expectPopState = (): void => {}
+
+/** Un `popstate` du navigateur (web seul). */
+export const notePopState = (): void => {}
+
+/** Vrai pendant un passage. Hors du web : jamais, la pile native anime. */
+export const passageBusy = (): boolean => false
+
+/** Vrai si le navigateur anime le prochain passage (View Transitions). Hors du web : jamais. */
+export const passagesAnimated = (): boolean => false
+
+/** Joue `task` à la fin du passage en cours. Hors du web : tout de suite. */
+export const afterPassage = (task: () => void): void => {
+  task()
+}

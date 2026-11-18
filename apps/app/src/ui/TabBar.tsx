@@ -40,6 +40,7 @@ import { linkProps } from './SettingsNav'
 import { Surface } from './Surface'
 import { Text } from './Text'
 import { TabBarSpaceContext, type TabKey } from './tabBarSpace'
+import { passageTabBarMark } from './theme/document'
 import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -483,6 +484,8 @@ export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactN
           // pointerEvents box-none : la bande autour de la barre laisse passer les touchers vers la
           // page ; seule la barre les prend.
           <View
+            // R17 : la barre d'onglets reste en place pendant un passage (`wg-tabbar`).
+            {...passageTabBarMark}
             pointerEvents="box-none"
             style={{
               position: 'absolute',

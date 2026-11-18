@@ -5700,6 +5700,11 @@ const shoot = async (page, options, label) => {
 }
 
 const settle = async (page) => {
+  // R17 : jamais de capture en plein passage de page (View Transitions) ; le moteur retire
+  // `data-passage` de <html> à la fin du passage (2 s au plus, son filet).
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-passage'), null, {
+    timeout: 5000,
+  })
   let last = await scrollHeight(page)
   let steady = 0
   for (let i = 0; i < 40 && steady < 2; i++) {

@@ -6,4 +6,7 @@ import './src/strict-browser'
 // Le relais du Retour du navigateur doit être posé avant Expo Router : Chromium appelle les
 // écouteurs de `popstate` dans l'ordre de pose (voir src/navigation/backRelay.ts).
 import './src/navigation/backRelay'
+// Le relais des passages de page (R17) : il doit remplacer l'entonnoir des navigations d'Expo Router
+// avant que l'appli ne démarre, et s'inscrire au relais du Retour (voir src/navigation/passageRelay.ts).
+import './src/navigation/passageRelay'
 import 'expo-router/entry'

@@ -24,7 +24,7 @@
 //
 // Le contenu reste présent et lisible par le lecteur d'écran pendant le fondu : seule l'opacité
 // change, le focus du clavier n'est pas touché.
-import { durations, easings } from '@ruche/brand'
+import { durations, easings, space } from '@ruche/brand'
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Platform, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native'
 import Animated, {
@@ -36,7 +36,12 @@ import Animated, {
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 import { CoverReturnScope, useCoverReturn } from './coverTransition'
+import { type ArrivalStyle, arrivalStyle } from './pageTransition'
 import { useScreenShownCount } from './screenFocus'
+import { useCalmMotion } from './theme/motion'
+
+/** Vrai si la page qui arrive de cette façon fond d'elle-même (sans l'API View Transitions). */
+const fades = (how: ArrivalStyle) => how === 'fade-up' || how === 'fade'
 
 /**
  * Le temps au bout duquel la page est pleine quoi qu'il arrive (jur-RF5), compté depuis le début du
@@ -82,26 +87,46 @@ export function ScreenFade({ children, fade = true, style }: Props) {
   // L'état garde le dernier nombre vu, pour reconnaître une arrivée (un nombre qui monte) au rendu
   // même qui la montre. Au montage : une route neuve (0) attend invisible, sauf sur la première page
   // de la visite ; une route déjà affichée (1 et plus) est là, sans fondu.
-  const [state, setState] = useState<{ seen: number; phase: Phase }>(() => ({
-    seen: count,
-    phase: count === 0 && pageShownBefore ? 'waiting' : 'rest',
-  }))
-  let { phase } = state
+  // R17 : sous « Réduire les animations », jamais de déplacement, un fondu seul.
+  const calm = useCalmMotion()
+  // R17 : la page n'attend invisible que si elle doit fondre. Le navigateur qui anime le passage
+  // (`vt`) la photographie : vide, il photographierait une page vide.
+  const [state, setState] = useState<{ seen: number; phase: Phase; rise: boolean }>(() => {
+    const how = arrivalStyle()
+    return {
+      seen: count,
+      phase: count === 0 && pageShownBefore && fades(how) ? 'waiting' : 'rest',
+      rise: how === 'fade-up' && !calm,
+    }
+  })
+  let { phase, rise } = state
   if (count !== state.seen) {
     // Une arrivée : la page fond, sauf la première arrivée d'une page montée sans attendre (la
     // première de la visite). Un « setState » pendant le rendu : React recommence aussitôt ce rendu
     // avec le nouvel état, avant de rien poser à l'écran.
     // R14 : le retour d'un projet ouvert par une carte de la page arrive sans fondu. Le drapeau est
     // seulement lu ici (un rendu peut se jouer deux fois) ; il retombe dans l'effet plus bas.
+    // R17 : la sorte de l'arrivée vient du moteur des passages (ui/pageTransition) : le navigateur
+    // anime (`vt`) ou la page d'avant revient (`none`) : là tout de suite ; sinon, un fondu, en
+    // montant de 12 points vers une page plus profonde (`fade-up`), sur place entre deux onglets.
+    const how = arrivalStyle()
     const arrival = count > state.seen && (state.seen > 0 || state.phase === 'waiting')
-    phase = arrival && !back.opened ? 'armed' : 'rest'
-    setState({ seen: count, phase })
+    phase = arrival && !back.opened && fades(how) ? 'armed' : 'rest'
+    rise = how === 'fade-up' && !calm
+    setState({ seen: count, phase, rise })
   }
   const active = web && fade && phase !== 'rest'
 
   // L'opacité animée (une « valeur partagée » de Reanimated : elle vit sur le fil des animations).
   const level = useSharedValue(1)
-  const animated = useAnimatedStyle(() => ({ opacity: level.value }))
+  // R17 : le déplacement vertical de la page qui monte (de `space.md` à 0, sans l'API View
+  // Transitions). Au repos, aucune transformation : une transformation, même nulle, ferait du
+  // contenu le cadre de ses éléments `position: fixed` sur le web.
+  const shift = useSharedValue(0)
+  const animated = useAnimatedStyle(() => ({
+    opacity: level.value,
+    transform: shift.value === 0 ? [] : [{ translateY: shift.value }],
+  }))
   // Le numéro du fondu en cours : une fin d'animation arrivée après un fondu plus récent ne compte
   // pas.
   const run = useRef(0)
@@ -134,26 +159,27 @@ export function ScreenFade({ children, fade = true, style }: Props) {
     const settle = (finished: number) => {
       if (finished === run.current) setState((s) => ({ ...s, phase: 'rest' }))
     }
+    // R17 : la page plus profonde monte en `base` (320 ms, le prototype B validé) ; le fondu sur
+    // place, ou sous « Réduire les animations », dure `page` (180 ms).
+    const timing = {
+      duration: rise ? durations.base : durations.page,
+      easing: Easing.bezier(...easings.exit),
+      // Sans lui, Reanimated sauterait le fondu quand l'appareil demande moins de mouvement.
+      reduceMotion: ReduceMotion.Never,
+    }
     level.value = 0
-    level.value = withTiming(
-      1,
-      {
-        duration: durations.page,
-        easing: Easing.bezier(...easings.exit),
-        // Sans lui, Reanimated sauterait le fondu quand l'appareil demande moins de mouvement.
-        reduceMotion: ReduceMotion.Never,
-      },
-      (finished) => {
-        'worklet'
-        if (finished) scheduleOnRN(settle, id)
-      },
-    )
+    level.value = withTiming(1, timing, (finished) => {
+      'worklet'
+      if (finished) scheduleOnRN(settle, id)
+    })
+    shift.value = rise ? space.md : 0
+    if (rise) shift.value = withTiming(0, timing)
     // La couche fixe à 0 attend une image : la valeur animée n'est à l'écran qu'à l'image suivante.
     const frame = requestAnimationFrame(() =>
       setState((s) => (s.phase === 'armed' ? { ...s, phase: 'fading' } : s)),
     )
     return () => cancelAnimationFrame(frame)
-  }, [phase, web, fade, level])
+  }, [phase, web, fade, level, shift, rise])
 
   // La garde (jur-RF5) : pleine au plus tard 400 ms après le début (ou le montage d'une page qui
   // attend), même si l'animation ne finit pas. Posée directement, sans animation. Le minuteur repart
@@ -167,10 +193,11 @@ export function ScreenFade({ children, fade = true, style }: Props) {
     const timer = setTimeout(() => {
       run.current += 1
       level.value = 1
+      shift.value = 0
       setState((s) => ({ ...s, phase: 'rest' }))
     }, GUARD_MS)
     return () => clearTimeout(timer)
-  }, [guarded, since, level])
+  }, [guarded, since, level, shift])
 
   // Deux couches : l'extérieure porte l'opacité fixe (0 tant que l'animation n'est pas à l'écran),
   // l'intérieure l'opacité animée. pointerEvents en propriété, jamais en style : le web ignorerait
@@ -185,7 +212,12 @@ export function ScreenFade({ children, fade = true, style }: Props) {
   // dessous. La couche garde aussi `none`, qui suffit dans l'appli de téléphone.
   const hidden = active && (phase === 'waiting' || phase === 'armed')
   return (
-    <View pointerEvents={active ? 'none' : 'auto'} style={[style, hidden ? styles.hidden : null]}>
+    // R17 : tant qu'elle attend, la page qui montera est déjà 12 points plus bas (sa place de
+    // départ), posée par ce même rendu ; la couche animée prend le relais avec l'opacité.
+    <View
+      pointerEvents={active ? 'none' : 'auto'}
+      style={[style, hidden ? styles.hidden : null, hidden && rise ? styles.lowered : null]}
+    >
       <Animated.View style={[styles.fill, active ? styles.stack : null, web ? animated : null]}>
         {/* Les cartes du contenu lèvent le drapeau de la page (toujours posé : même arbre). */}
         <CoverReturnScope value={back}>{children}</CoverReturnScope>
@@ -209,6 +241,7 @@ const styles = StyleSheet.create({
   // couche : le contenu se range comme sans elles.
   fill: { flexGrow: 1, flexShrink: 1, minHeight: 0 },
   hidden: { opacity: 0 },
+  lowered: { transform: [{ translateY: space.md }] },
   // Une pile à part pour le contenu, le temps du fondu : rien en lui ne passe sur le bouclier.
   stack: { zIndex: 0 },
   // Le bouclier : toute la couche, par-dessus le contenu.
