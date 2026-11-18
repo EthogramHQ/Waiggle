@@ -21,7 +21,8 @@ import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from '../ui/Button'
 import { DelayedShapes } from '../ui/DelayedShapes'
-import { ListGroup, ListRowSkeleton, TextLineShape } from '../ui/ListGroup'
+import { HiveColumnTitleSkeleton, HiveHeaderSkeleton } from '../ui/HiveHeaderSkeleton'
+import { ListGroup, ListRow, ListRowSkeleton, TextLineShape } from '../ui/ListGroup'
 import { LoadingLogo, restMoment } from '../ui/LoadingLogo'
 import { ProjectCoverSkeleton } from '../ui/ProjectCover'
 import {
@@ -86,7 +87,16 @@ const fr = {
   rowKinds:
     'Les lignes vides d’une liste (ListRowSkeleton) : rond, tuile, rien en tête ; vignette, pastille, ligne courte au bout',
   lines:
-    'Une ligne de texte vide à la hauteur d’une ligne écrite (TextLineShape) : title2, body, caption',
+    'Une ligne de texte vide à la hauteur d’une ligne écrite (TextLineShape) : title2, body, caption ; elle grandit avec la taille du texte (téléphone : fontScale ; web : em)',
+  pendingGroup:
+    'ListGroup pending : le titre lu tout de suite, les lignes vides sous « Chargement… », puis les vraies lignes et le pied sous le même titre',
+  pendingTitle: 'Par e‑mail',
+  pendingArrive: 'Faire arriver les lignes',
+  pendingAgain: 'Recommencer le groupe',
+  pendingRow: 'Commentaires sur tes projets',
+  pendingFooter: 'Les e‑mails de sécurité partent toujours.',
+  hiveHeader:
+    'Le haut vide d’une ruche (HiveHeaderSkeleton) : l’alvéole à la taille de la vraie, le nom, le nombre ; puis les titres vides des colonnes (HiveColumnTitleSkeleton : members, testers)',
   cover: 'La galerie vide d’un projet (ProjectCoverSkeleton) : band (téléphone), medium (tablette)',
   projectParts:
     'Le bas vide de la page d’un projet (ProjectPageShapes) : les actions, la description, le prompt, la recette, les commentaires',
@@ -134,7 +144,17 @@ const en: typeof fr = {
   rows: 'Empty rows (SkeletonRows, 5 ListRowSkeleton rows), as StateMessage kind="loading"',
   rowKinds:
     'The empty rows of a list (ListRowSkeleton): round, tile, nothing at the start; thumbnail, pill, short line at the end',
-  lines: 'An empty text line as tall as a written one (TextLineShape): title2, body, caption',
+  lines:
+    'An empty text line as tall as a written one (TextLineShape): title2, body, caption; it grows with the text size (phone: fontScale; web: em)',
+  pendingGroup:
+    'ListGroup pending: the title read at once, the empty rows under “Loading…”, then the real rows and the footer under the same title',
+  pendingTitle: 'By email',
+  pendingArrive: 'Make the rows arrive',
+  pendingAgain: 'Start the group again',
+  pendingRow: 'Comments on your projects',
+  pendingFooter: 'Security emails are always sent.',
+  hiveHeader:
+    'A hive’s empty top (HiveHeaderSkeleton): the badge at the real one’s size, the name, the count; then the empty column titles (HiveColumnTitleSkeleton: members, testers)',
   cover: 'A project’s empty gallery (ProjectCoverSkeleton): band (phone), medium (tablet)',
   projectParts:
     'The empty bottom of a project page (ProjectPageShapes): the actions, the description, the prompt, the recipe, the comments',
@@ -325,6 +345,22 @@ function Pieces({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] }) 
           </ListGroup>
         </Loading>
       </Example>
+      <Example caption={of(l.pendingGroup)}>
+        <PendingGroupDemo l={l} />
+      </Example>
+      <Example caption={of(l.hiveHeader)}>
+        <Loading shown>
+          <Stack gap="lg">
+            <HiveHeaderSkeleton />
+            <Sized width={NARROW}>
+              <Stack gap="md">
+                <HiveColumnTitleSkeleton column="members" />
+                <HiveColumnTitleSkeleton column="testers" />
+              </Stack>
+            </Sized>
+          </Stack>
+        </Loading>
+      </Example>
       <Example caption={of(l.lines)}>
         <Loading shown>
           <Sized width={NARROW}>
@@ -426,6 +462,42 @@ function Replay({ l, children }: { l: Labels; children: (key: number) => ReactNo
         onPress={() => setRound((was) => was + 1)}
       />
       {children(round)}
+    </Stack>
+  )
+}
+
+/**
+ * Un groupe dont les lignes chargent (`ListGroup pending`), à la main : « Faire arriver le contenu »
+ * passe `loading` à faux, les lignes vides fondent vers la vraie ligne et le pied ; le titre ne
+ * bouge pas. « Recommencer » remonte l'exemple. Même compteur que `RevealDemo`.
+ */
+function PendingGroupDemo({ l }: { l: Labels }) {
+  const [step, setStep] = useState(0)
+  const loading = step % 2 === 0
+  const round = Math.floor(step / 2)
+  return (
+    <Stack gap="md" align="start">
+      <Button
+        label={loading ? l.pendingArrive : l.pendingAgain}
+        variant="secondary"
+        size="small"
+        onPress={() => setStep((was) => was + 1)}
+      />
+      <Sized key={round} width={NARROW}>
+        <ListGroup
+          title={l.pendingTitle}
+          footer={l.pendingFooter}
+          pending={{
+            loading,
+            rows: [
+              <ListRowSkeleton key="a" leading="none" />,
+              <ListRowSkeleton key="b" leading="none" />,
+            ],
+          }}
+        >
+          <ListRow label={l.pendingRow} onPress={() => {}} />
+        </ListGroup>
+      </Sized>
     </Stack>
   )
 }

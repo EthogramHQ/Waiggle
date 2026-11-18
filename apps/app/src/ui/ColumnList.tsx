@@ -49,6 +49,11 @@ export function ColumnList({ children, columns: imposed }: Props) {
   // Autant de lignes par colonne qu'il faut pour toutes les poser : les premières colonnes sont
   // pleines, la dernière prend le reste.
   const perColumn = Math.ceil(rows.length / columns)
+  // Les colonnes qui reçoivent des lignes, et seulement elles (relecture de design R16, point 1) :
+  // deux outils trouvés par « Clau » sur 5 colonnes en dessinaient 3 vides, filets compris, et la
+  // liste semblait cassée. Chacune garde la largeur d'une colonne : le groupe blanc ne prend que
+  // leur part de la place (2 colonnes sur 5 : 40 %) et s'arrête après la dernière.
+  const drawn = Math.ceil(rows.length / perColumn)
   const separator = (
     <View
       style={{
@@ -69,10 +74,14 @@ export function ColumnList({ children, columns: imposed }: Props) {
         // Le groupe rogne ce qui dépasse : l'anneau de focus d'une ligne se dessine à l'intérieur
         // (comme dans un `ListGroup`).
         overflow: 'hidden',
+        // Moins de colonnes que la place n'en tient : le groupe se pose à gauche, à leur largeur.
+        ...(drawn < columns
+          ? { alignSelf: 'flex-start', width: `${(drawn / columns) * 100}%` as const }
+          : null),
       }}
     >
       <View style={{ flexDirection: 'row' }}>
-        {Array.from({ length: columns }, (_, c) => (
+        {Array.from({ length: drawn }, (_, c) => (
           <View
             // biome-ignore lint/suspicious/noArrayIndexKey: une colonne est une place dans la liste
             key={c}

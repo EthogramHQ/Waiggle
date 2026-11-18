@@ -227,21 +227,26 @@ function SearchAndFamilies({
 
 /**
  * Sous le champ, pendant le chargement : en grand, les deux titres et sous chacun ses pièces vides
- * (2 rangées de 5 cartes, 20 lignes réparties en colonnes) ; sous 1 280, cinq lignes vides. Les
- * titres restent hors de la zone « Chargement » : ils sont lus tout de suite.
+ * (2 rangées de 5 cartes, 20 lignes réparties en colonnes) ; sous 1 280, le titre « Les plus
+ * utilisés » et cinq lignes vides. Les titres restent hors de la zone « Chargement » : ils sont lus
+ * tout de suite.
  */
 function LoadingSections({ wide }: { wide: boolean }) {
   const { t } = useTranslation()
+  // Sur téléphone, le titre « Les plus utilisés » est déjà là, lu et à sa place (relecture de
+  // design R16, point 4 : sans lui, la liste descendait de 25 points à l'arrivée).
   if (!wide)
     return (
-      <Loading>
-        <ListGroup>
-          {Array.from({ length: LOADING_ROWS }, (_, index) => (
+      <ListGroup
+        title={t(($) => $.tools.mostUsed)}
+        pending={{
+          loading: true,
+          rows: Array.from({ length: LOADING_ROWS }, (_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: des lignes vides identiques.
             <ListRowSkeleton key={index} leading="square" />
-          ))}
-        </ListGroup>
-      </Loading>
+          )),
+        }}
+      />
     )
   return (
     <>
