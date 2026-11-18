@@ -6,7 +6,8 @@
 // « Me connecter » à un membre bien connecté dont la session ne se lit pas (un 429, une panne).
 // Ici, chaque état a sa page, la même partout :
 // - en attente : le squelette de la page (`loading`), et rien d'autre de l'écran ;
-// - en erreur : « Réessayer » (`SessionErrorScreen`), jamais « Me connecter » ;
+// - en erreur : « Réessayer » (`SessionErrorScreen`), jamais « Me connecter » ; ou l'erreur que
+//   l'écran donne à la place (`error` : une feuille la garde dans la feuille) ;
 // - sans session (un 401 compris, voir session.ts) : « Réservé aux membres » (`SignedOutScreen`),
 //   dont « Me connecter » ramène ici ensuite (`next`, calculé au toucher par `nextAfterSignIn`) ; ou
 //   ce que l'écran donne à la place (`signedOut` : une feuille, une « Page introuvable ») ;
@@ -43,6 +44,13 @@ type Props = {
    * (`undefined`), « Réservé aux membres ».
    */
   signedOut?: ReactNode
+  /**
+   * Ce que l'écran montre à la place de la page « Réessayer » quand la session ne se lit pas (une
+   * panne, un 429, le réseau) : une feuille garde son erreur dans la feuille, comme avant R16, au
+   * lieu d'une page sur toute la fenêtre. Une fonction, comme `children`, sans hook : elle reçoit
+   * `retry`, qui relit la session (à brancher sur son « Réessayer »). Sans elle, la page de la garde.
+   */
+  error?: (retry: () => void) => ReactNode
   /** La largeur des pages d'état (erreur, réservé aux membres, squelette par défaut). */
   width?: Width
   /**
@@ -57,6 +65,7 @@ type Props = {
 export function SessionGate({
   loading,
   signedOut,
+  error,
   width = 'form',
   withBack = true,
   children,
@@ -64,7 +73,11 @@ export function SessionGate({
   const { state, session, retry } = useMemberSession()
   if (state === 'pending') return loading ?? <LoadingScreen width={width} />
   if (state === 'error')
-    return <SessionErrorScreen onRetry={retry} width={width} withBack={withBack} />
+    return error ? (
+      error(retry)
+    ) : (
+      <SessionErrorScreen onRetry={retry} width={width} withBack={withBack} />
+    )
   // `signedOut !== undefined` et non `??` : une feuille passe `null` pour ne rien montrer du tout.
   if (state === 'signedOut')
     return signedOut !== undefined ? signedOut : <SignedOutScreen width={width} />

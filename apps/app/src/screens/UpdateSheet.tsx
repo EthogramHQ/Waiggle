@@ -63,15 +63,18 @@ export function UpdateSheet({ id, announce }: ScreenProps) {
     <>
       {alone ? <ProjectScreen id={id} /> : null}
       {/* R16 : la garde commune. En attente, la feuille et ses lignes vides ; pour un visiteur, la
-          feuille « Réservé aux membres » (une feuille reste une feuille) ; si la session ne se lit
-          pas, la page « Réessayer » de la garde. Les trois issues dessinent le même composant
-          (`UpdateSheetStates`, que la garde place au même endroit) : la feuille déjà ouverte
-          pendant l'attente reste la même quand la session arrive, au lieu de se refermer et de se
-          rouvrir (elle est une couche, un Modal). Ce composant ne lit rien tant que la garde ne lui
-          dit pas qu'un membre est là (`reading`). */}
+          feuille « Réservé aux membres » ; si la session ne se lit pas, l'erreur dans la feuille,
+          dont « Réessayer » relit la session (une feuille reste une feuille, comme avant R16). Les
+          quatre issues dessinent le même composant (`UpdateSheetStates`, que la garde place au
+          même endroit) : la feuille déjà ouverte pendant l'attente reste la même quand la session
+          arrive, au lieu de se refermer et de se rouvrir (elle est une couche, un Modal). Ce
+          composant ne lit rien tant que la garde ne lui dit pas qu'un membre est là (`reading`). */}
       <SessionGate
         loading={<UpdateSheetStates id={id} announce={announce} reading="pending" />}
         signedOut={<UpdateSheetStates id={id} announce={announce} reading="signedOut" />}
+        error={(retry) => (
+          <UpdateSheetStates id={id} announce={announce} reading="error" onRetry={retry} />
+        )}
       >
         {() => <UpdateSheetStates id={id} announce={announce} reading="signedIn" />}
       </SessionGate>
@@ -79,8 +82,8 @@ export function UpdateSheet({ id, announce }: ScreenProps) {
   )
 }
 
-/** Ce que la garde a lu de la session, quand elle dessine la feuille (jamais une erreur : sa page). */
-type Reading = 'pending' | 'signedOut' | 'signedIn'
+/** Ce que la garde a lu de la session, quand elle dessine la feuille (`error` : elle ne se lit pas). */
+type Reading = 'pending' | 'error' | 'signedOut' | 'signedIn'
 
 /** Un état qui remplace le formulaire, dans la même feuille : titre, phrase et issues. */
 type SheetState = {
@@ -98,10 +101,13 @@ function UpdateSheetStates({
   id,
   announce,
   reading,
+  onRetry,
 }: {
   id: string
   announce: string | undefined
   reading: Reading
+  /** Relit la session (`reading` vaut `error`) : le « Réessayer » de la feuille. */
+  onRetry?: () => void
 }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -151,6 +157,15 @@ function UpdateSheetStates({
         })
 
   if (reading === 'pending') return loading
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (reading === 'error') {
+    return stateSheet({
+      kind: 'error',
+      title: t(($) => $.states.errorTitle),
+      message: t(($) => $.account.loadError),
+      actions: [{ label: t(($) => $.common.retry), onPress: () => onRetry?.() }],
+    })
+  }
   if (reading === 'signedOut') return signedOut(false)
   if (!me.data) return me.error ? failed(me.error, () => void me.refetch()) : loading
   if (me.data.suspension) {
