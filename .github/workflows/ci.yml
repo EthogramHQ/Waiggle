@@ -72,7 +72,7 @@ jobs:
       - run: node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
       # Relecture des scripts du serveur : shellcheck repère les erreurs classiques du shell
       # (guillemets oubliés, variables vides…). Il est déjà installé sur les machines de GitHub.
-      - run: shellcheck -x infra/*.sh infra/server/*.sh
+      - run: shellcheck -x infra/*.sh infra/server/*.sh infra/vps-dev/*.sh
 
   # Photographie l'appli web (catalogue des composants et écrans, sur téléphone et ordinateur, de
   # jour et de nuit) et joint les images à la vérification : page de la vérification, rubrique

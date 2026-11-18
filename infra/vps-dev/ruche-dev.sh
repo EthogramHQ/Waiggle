@@ -14,6 +14,9 @@
 # Aucune donnée réelle ici : la base de l'aperçu est une base PGlite propre au serveur, et les
 # e-mails ne partent jamais (MAIL_PROVIDER=console, lus par « mails »).
 set -euo pipefail
+# Un hook du dépôt nu reçoit GIT_DIR, GIT_QUARANTINE_PATH… : ils feraient agir « git » des copies
+# de travail sur le dépôt nu lui-même. Chaque commande ici dit elle-même où elle agit.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_QUARANTINE_PATH GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PUSH_OPTION_COUNT
 
 DEV_HOME=${DEV_HOME:-/srv/ruche-dev}
 REPO=$DEV_HOME/waiggle.git
@@ -68,7 +71,8 @@ prepare() {
 with_lock() {
   local branch=$1
   shift
-  local lock=$DEV_HOME/locks/$(slug "$branch").lock
+  local lock
+  lock=$DEV_HOME/locks/$(slug "$branch").lock
   mkdir -p "$DEV_HOME/locks"
   exec 9>"$lock"
   if ! flock -n 9; then
@@ -148,24 +152,31 @@ EOF
 post_receive() {
   local active=""
   [ -s "$APERCU/branche" ] && active=$(cat "$APERCU/branche")
-  local old new ref
-  while read -r old new ref; do
+  local _old new ref
+  while read -r _old new ref; do
     case "$ref" in refs/heads/*) ;; *) continue ;; esac
     local branch=${ref#refs/heads/}
     [ "$new" = 0000000000000000000000000000000000000000 ] && continue
     printf '%s %s %s\n' "$(date -Is)" "$branch" "${new:0:9}" >>"$LOGS/pushes.log"
     if [ "$branch" = "$active" ]; then
-      # En arrière-plan : le push du PC rend la main tout de suite.
-      (
-        before=$(cat "$BRANCHES/$(slug "$branch")/node_modules/.ruche-dev-lock" 2>/dev/null || true)
-        with_lock "$branch" prepare "$branch" "$new" >/dev/null 2>>"$LOGS/apercu.log"
-        after=$(cat "$BRANCHES/$(slug "$branch")/node_modules/.ruche-dev-lock" 2>/dev/null || true)
-        if [ "$before" != "$after" ]; then sudo systemctl restart ruche-dev-api ruche-dev-app; fi
-        echo "$(date -Is) aperçu à jour : $branch ${new:0:9}" >>"$LOGS/apercu.log"
-      ) </dev/null >/dev/null 2>&1 &
-      echo "ruche-dev : aperçu de $branch mis à jour (${new:0:9})"
+      # Dans une session à part (setsid) : le push du PC rend la main tout de suite, et la mise à
+      # jour survit à la fin de sa connexion SSH.
+      setsid -f /usr/local/bin/ruche-dev suivre "$branch" "$new" </dev/null >/dev/null 2>&1
+      echo "ruche-dev : aperçu de $branch en cours de mise à jour (${new:0:9})"
     fi
   done
+}
+
+suivre() {
+  local branch=$1 sha=$2 before after
+  before=$(cat "$BRANCHES/$(slug "$branch")/node_modules/.ruche-dev-lock" 2>/dev/null || true)
+  if ! with_lock "$branch" prepare "$branch" "$sha" >/dev/null 2>>"$LOGS/apercu.log"; then
+    echo "$(date -Is) ÉCHEC de la mise à jour : $branch ${sha:0:9}" >>"$LOGS/apercu.log"
+    return 1
+  fi
+  after=$(cat "$BRANCHES/$(slug "$branch")/node_modules/.ruche-dev-lock" 2>/dev/null || true)
+  if [ "$before" != "$after" ]; then sudo systemctl restart ruche-dev-api ruche-dev-app; fi
+  echo "$(date -Is) aperçu à jour : $branch ${sha:0:9}" >>"$LOGS/apercu.log"
 }
 
 etat() {
@@ -197,7 +208,7 @@ navigateurs() {
   local dir=${1:-}
   [ -n "$dir" ] || dir=$(find "$BRANCHES" -mindepth 1 -maxdepth 1 -type d | head -1)
   [ -x "$dir/apps/app/node_modules/.bin/playwright" ] || die "aucune copie avec Playwright : lancer d'abord un « prepare »"
-  sudo env PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" "$dir/apps/app/node_modules/.bin/playwright" install-deps chromium >"$LOGS/navigateurs.log" 2>&1
+  sudo env PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" "$dir/apps/app/node_modules/.bin/playwright" install-deps chromium 2>&1 | tee "$LOGS/navigateurs.log" >/dev/null
   "$dir/apps/app/node_modules/.bin/playwright" install chromium
 }
 
@@ -209,5 +220,6 @@ etat) etat ;;
 mails) mails "${2:-}" ;;
 navigateurs) navigateurs "${2:-}" ;;
 post-receive) post_receive ;;
+suivre) suivre "${2:-}" "${3:-}" ;;
 *) die "commande inconnue : « ${1:-} » (prepare, run, apercu, etat, mails, navigateurs)" ;;
 esac

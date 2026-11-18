@@ -2,7 +2,7 @@
 # Prépare le serveur de développement (« ruche-dev », Debian 13, OVH) : l'aperçu en direct des
 # branches et les commandes lourdes (tests, typecheck, captures), loin du PC de développement.
 # Ce serveur n'est PAS la production (voir docs/adr/0003-hebergement.md) : il n'a ni vraie base,
-# ni secret, ni domaine public, et ne s'ouvre qu'au réseau Tailscale. Voir docs/adr/0007-vps-dev.md.
+# ni secret, ni domaine public, et ne s'ouvre qu'au réseau Tailscale. Voir docs/adr/0007-serveur-de-developpement.md.
 #
 # Il se lance depuis le PC, par SSH, une étape à la fois (« bash -s » lit le script sur l'entrée
 # standard : rien n'est copié sur le serveur). Chaque étape peut être relancée sans dégâts.
