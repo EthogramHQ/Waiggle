@@ -145,6 +145,9 @@ export function ThemeProvider({ children, appearance: forced }: Props) {
     // app/+html.tsx) : des « variables CSS » que la règle lit, et qui suivent le thème choisi.
     document.documentElement.style.setProperty('--focus-ring', theme.colors.focusRing)
     document.documentElement.style.setProperty('--focus-halo', focusHalo(theme.colors))
+    // Le fond plein du verre des barres pendant un passage de page (R17, relecture du design C1,
+    // 18/11/2026 ; documentCss) : la couleur du fond de la page, dans le thème choisi.
+    document.documentElement.style.setProperty('--passage-fill', theme.colors.background)
     // La page est dans son vrai thème : elle peut se montrer (voir documentCss, theme/document.ts).
     if (hydrated) document.documentElement.setAttribute('data-hydrated', '')
   }, [scheme, theme.colors, hydrated, ownsDocument])

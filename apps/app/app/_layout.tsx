@@ -14,11 +14,18 @@ import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { EditorPreload } from '../src/navigation/chunks/preload'
+import { sheetRoutes } from '../src/navigation/sheetRoutes'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
-import { AmbientHost, hostedNavigationTheme, usePageStackOptions } from '../src/ui/AmbientHost'
+import {
+  AmbientHost,
+  hostedNavigationTheme,
+  usePageStackOptions,
+  useTabScreenOptions,
+} from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
+import { HoneyWaveHost } from '../src/ui/HoneyWaveHost'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
 import { useAppFonts } from '../src/ui/theme/fonts'
@@ -30,6 +37,8 @@ const isWeb = Platform.OS === 'web'
 const webNavigationTheme = hostedNavigationTheme(DefaultTheme)
 // Les routes qui sont des feuilles (R6a) : voir ThemedChrome.
 const sheetRoute = { presentation: 'transparentModal', animation: 'none' } as const
+// Les routes des quatre onglets (R17) : voir ThemedChrome.
+const tabRoutes = ['feed', 'explore', 'hives', 'me'] as const
 
 export default function RootLayout() {
   // Sur le web, les pages sont préparées à l'avance (« pré-rendues ») en français, puis passent à la
@@ -80,27 +89,31 @@ export default function RootLayout() {
               pour que sa goutte glisse d'un onglet à l'autre. AppTabBar décide où elle se montre ;
               TabBarHost mesure sa hauteur et la donne aux écrans (la place à réserver en bas) et
               aux toasts, qui vivent donc à l'intérieur pour ne jamais la couvrir. */}
-          <TabBarHost bar={launching ? null : <AppTabBar />}>
-            {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
-            <ToastProvider>
-              {/* R4 : la carte qui devient la page. Le fournisseur garde le cadre de la photo
+          {/* R17 : la vague de miel à l'entrée (connexion, « Continuer » après la vérification),
+              posée une fois au-dessus de tout, barre d'onglets et toasts compris. */}
+          <HoneyWaveHost>
+            <TabBarHost bar={launching ? null : <AppTabBar />}>
+              {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
+              <ToastProvider>
+                {/* R4 : la carte qui devient la page. Le fournisseur garde le cadre de la photo
                   touchée, que la page du projet lit pour la faire grandir depuis la carte. */}
-              <CoverTransitionProvider>
-                {/* R9 : la feuille du nom ou du pseudo provisoire, au-dessus de l'appli, après le
+                <CoverTransitionProvider>
+                  {/* R9 : la feuille du nom ou du pseudo provisoire, au-dessus de l'appli, après le
                     lancement. R11 : l'écran « Accepter » des règles, au-dessus de tout tant que le
                     membre n'a pas accepté la version en vigueur ; la feuille du pseudo l'attend. */}
-                {launching ? (
-                  <LaunchScreen />
-                ) : (
-                  <>
-                    <ThemedChrome />
-                    <RulesGate />
-                    <ProvisionalNameGate />
-                  </>
-                )}
-              </CoverTransitionProvider>
-            </ToastProvider>
-          </TabBarHost>
+                  {launching ? (
+                    <LaunchScreen />
+                  ) : (
+                    <>
+                      <ThemedChrome />
+                      <RulesGate />
+                      <ProvisionalNameGate />
+                    </>
+                  )}
+                </CoverTransitionProvider>
+              </ToastProvider>
+            </TabBarHost>
+          </HoneyWaveHost>
         </ThemeProvider>
       </I18nextProvider>
     </QueryClientProvider>
@@ -124,30 +137,25 @@ function ThemedChrome() {
   // pages sont transparentes : la lumière commune de l'hôte se voit derrière elles. Sur téléphone,
   // chaque page garde le fond de l'appli (et sa propre lumière, ui/Screen.tsx).
   const screenOptions = usePageStackOptions()
+  const tabOptions = useTabScreenOptions()
   const stack = (
     <Stack screenOptions={screenOptions}>
-      {/* R6a : publier et modifier sont des feuilles posées sur la page d'où l'on vient. Une
-          fenêtre transparente (`transparentModal`) garde cette page dessinée dessous ; la feuille
-          anime elle-même son entrée (`animation: 'none'`). Ouverte sans page d'avant, la feuille
-          pose le fil dessous (ProjectFormScreen) : pas d'`initialRouteName` ici, qui ferait
-          croire à toutes les pages qu'elles ont une page d'avant (relecture du plan, ui-I1). */}
-      <Stack.Screen name="projects/new" options={sheetRoute} />
-      <Stack.Screen name="projects/[id]/edit" options={sheetRoute} />
-      {/* R7a : la feuille « Nouvelle mise à jour », posée de même sur la page du projet. */}
-      <Stack.Screen name="projects/[id]/update" options={sheetRoute} />
-      {/* R7b : les feuilles « Nouvel appel » et « Ton retour », posées de même sur le coin des
-          testeurs : leur adresse à elles, et donc le Retour du navigateur pour les fermer. */}
-      <Stack.Screen name="projects/[id]/testers/new-call" options={sheetRoute} />
-      <Stack.Screen name="projects/[id]/testers/new-feedback" options={sheetRoute} />
-      {/* R9 : « Signaler » est une feuille posée sur la page du contenu signalé (le Retour du
-          navigateur la ferme, la page d'où l'on vient reste dessinée dessous). */}
-      <Stack.Screen name="report" options={sheetRoute} />
-      {/* R9 : « Suspendre » aussi, posée sur la page du membre ou sur la file de la modération. */}
-      <Stack.Screen name="suspend" options={sheetRoute} />
-      {/* R10 : « Créer une ruche » et « Inviter » sont des feuilles posées sur l'onglet Ruches et sur
-          la page de la ruche : le Retour du navigateur les ferme. (Les réglages sont une page.) */}
-      <Stack.Screen name="hives/new" options={sheetRoute} />
-      <Stack.Screen name="hives/[id]/invite" options={sheetRoute} />
+      {/* R17 : sur iOS et Android, les quatre onglets se fondent l'un dans l'autre (des pages
+          sœurs) ; les autres pages glissent comme le veut le système. */}
+      {tabRoutes.map((name) => (
+        <Stack.Screen key={name} name={name} options={tabOptions} />
+      ))}
+      {/* Les feuilles (R6a à R10) : publier, modifier, une mise à jour, un appel ou un retour de
+          testeur, signaler, suspendre, créer une ruche, inviter. Chacune est posée sur la page d'où
+          l'on vient : une fenêtre transparente (`transparentModal`) garde cette page dessinée
+          dessous, et la feuille anime elle-même son entrée (`animation: 'none'`) ; son adresse à elle
+          donne au Retour du navigateur de quoi la fermer. Ouverte sans page d'avant, la feuille pose
+          le fil dessous (ProjectFormScreen) : pas d'`initialRouteName` ici, qui ferait croire à toutes
+          les pages qu'elles ont une page d'avant (relecture du plan R6a, ui-I1). La liste vit dans
+          navigation/sheetRoutes.ts : les passages de page (R17) la lisent aussi. */}
+      {sheetRoutes.map((name) => (
+        <Stack.Screen key={name} name={name} options={sheetRoute} />
+      ))}
     </Stack>
   )
   return (

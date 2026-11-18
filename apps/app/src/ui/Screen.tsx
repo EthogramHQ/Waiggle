@@ -68,6 +68,7 @@ import { type ScreenScroll, ScreenScrollContext, useScreenScrollChannel } from '
 import { Text } from './Text'
 import { useHasTabBarHost, useTabBarSpace } from './tabBarSpace'
 import { ScreenAmbient, useAmbient, useHasAmbientHost } from './theme/ambient'
+import { passageBarMark, passagePageMark } from './theme/document'
 import { markHydrated } from './theme/hydration'
 import { ContentWidthContext, useLayout, wideContentWidth } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
@@ -607,6 +608,9 @@ export function Screen({
                 {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
           horizontal). */}
                 <View
+                  // R17 : le contenu de la page, photographié à part pendant un passage (`wg-page`,
+                  // ui/theme/document.ts) ; la lumière d'ambiance, dessous, ne bouge pas.
+                  {...passagePageMark}
                   style={{
                     flex: 1,
                     // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
@@ -650,6 +654,8 @@ export function Screen({
                     // passe dessous : opaque de jour (la crème de la page, décision du 7/11/2026), presque
                     // opaque de nuit, où il laisse transparaître la lumière d'ambiance.
                     <View
+                      // R17 : la barre reste en place pendant un passage (`wg-bar`).
+                      {...passageBarMark}
                       style={{
                         paddingTop: insets.top + space.sm,
                         paddingBottom: space.sm,

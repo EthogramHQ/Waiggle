@@ -6,6 +6,7 @@
 // Aucune n'a de rôle ni de nom : c'est le `Loading` de la page qui dit « Chargement… », une fois.
 import { layout } from '@ruche/brand'
 import type { ReactNode } from 'react'
+import { DelayedShapes } from './DelayedShapes'
 import { ListRowSkeleton, TextLineShape } from './ListGroup'
 import { Shape } from './Skeleton'
 import { Stack } from './Stack'
@@ -28,6 +29,24 @@ export function ActionsShapes({ wide }: { wide: boolean }): ReactNode {
         <Shape height={layout.controlHeight.small} width={wide ? '45%' : '65%'} round />
       </Stack>
     </Stack>
+  )
+}
+
+/**
+ * R17 : une ligne de l'en-tête que la carte touchée ne savait pas, posée à sa place jusqu'à
+ * l'arrivée du projet : la ligne des dates (« Publié le … »), ou l'accroche (une carte de la
+ * modération ne la porte pas). Elle attend 160 ms avant de se montrer, comme le squelette du bas de
+ * la page (`DelayedShapes`) : une page qui arrive plus vite n'a rien montré de vide.
+ */
+export function HeaderLineShape({ line }: { line: 'dates' | 'pitch' }): ReactNode {
+  return (
+    <DelayedShapes>
+      {line === 'dates' ? (
+        <TextLineShape variant="caption" width="45%" />
+      ) : (
+        <TextLineShape variant="headline" width="85%" />
+      )}
+    </DelayedShapes>
   )
 }
 

@@ -97,6 +97,11 @@ const stopsGlow = (rule: CssRule) =>
   rule.selectors.length > 0 &&
   rule.selectors.every((selector) => glowAttributesIn(selector).length > 0)
 
+/** R17 : une règle d'un passage de page (tous ses sélecteurs visent un `::view-transition-…`). */
+const playsPassage = (rule: CssRule) =>
+  rule.selectors.length > 0 &&
+  rule.selectors.every((selector) => selector.includes('::view-transition'))
+
 describe('the web page before the app starts', () => {
   it('hides the pre-rendered page above 700 px before hydration, by day too', () => {
     // Témoin : la règle de nuit, déjà là, cache la page sur tout appareil en mode sombre.
@@ -139,7 +144,13 @@ describe('the web page before the app starts', () => {
     // sortie de l'abeille (un `animation: none` trop large garderait la page cachée pour toujours).
     // R16 : la règle qui arrête la lueur des squelettes est sous ce même réglage ; elle a son test à
     // part (plus bas) et ne vise ni la page ni l'abeille.
-    const calm = sheet.rules.filter((rule) => underMedia(rule, REDUCED) && !stopsGlow(rule))
+    // R17 (scénario « Réduire les animations ») : les passages de page gardent sous ce réglage un
+    // fondu croisé de 180 ms, voulu, sur les pseudo-éléments `::view-transition-…` ; leurs règles
+    // ont leur test à part (document.passages.test.ts) et ne visent ni la page pré-rendue ni
+    // l'abeille : elles sont dispensées ici, comme la lueur des squelettes.
+    const calm = sheet.rules.filter(
+      (rule) => underMedia(rule, REDUCED) && !stopsGlow(rule) && !playsPassage(rule),
+    )
     expect(calm).not.toEqual([]) // témoin : l'abeille vole, et s'arrête sous ce réglage
     for (const rule of calm) {
       expect(rule.selectors.every((selector) => selector.includes('[data-wait]'))).toBe(true)

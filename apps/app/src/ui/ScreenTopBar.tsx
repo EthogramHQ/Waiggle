@@ -40,6 +40,7 @@ import {
 import { type LayoutChangeEvent, Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenScrollContext } from './scrollLight'
+import { passageBarMark } from './theme/document'
 import { useHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -318,6 +319,8 @@ export function ScreenTopBar({
     // et la zone qui défile, venue après, se dessinerait dessus). Elle laisse passer les touchers à
     // côté de la capsule vers le contenu et la barre de défilement (`box-none`, ui-4).
     <View
+      // R17 : la barre reste en place pendant un passage de page (`wg-bar`, ui/theme/document.ts).
+      {...passageBarMark}
       pointerEvents="box-none"
       onFocus={reveal}
       style={{

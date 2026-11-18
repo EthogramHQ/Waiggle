@@ -74,6 +74,7 @@ import { type LayoutChangeEvent, Platform, Pressable, View, type ViewStyle } fro
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Avatar } from './Avatar'
 import { describedBy } from './aria'
+import { coverPanelMark } from './coverTransition'
 import { ExampleBadge } from './ExampleBadge'
 import { HighlightedText } from './HighlightedText'
 import { Icon, type IconName } from './Icon'
@@ -738,7 +739,10 @@ export function ProjectCard({
     // en route remonterait la carte, et le lien perdrait son focus).
     <Animated.View style={[{ alignSelf: 'stretch' }, grow, bounceStyle]}>
       <Animated.View {...tilt.handlers} style={[{ alignSelf: 'stretch' }, grow, tilt.cardStyle]}>
-        <Animated.View style={[{ alignSelf: 'stretch' }, grow, pressStyle]}>
+        {/* R17 (relecture du design C2) : la vue qui contient la photo et tout le texte de la
+            carte porte `data-cover-panel` ; pendant un passage, elle reste au-dessus de la photo
+            qui vole (ui/coverTransition.tsx). */}
+        <Animated.View {...coverPanelMark()} style={[{ alignSelf: 'stretch' }, grow, pressStyle]}>
           {/* La rangée de l'auteur vient avant le lien dans l'arbre, mais se dessine au-dessus de
             lui (zIndex). box-none : le calque laisse passer le doigt hors de la rangée. */}
           {authorRow ? (

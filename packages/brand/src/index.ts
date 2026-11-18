@@ -20,6 +20,7 @@ export {
   type DurationName,
   durations,
   easings,
+  parallax,
   pressScale,
   pressScaleFab,
   type SpringName,

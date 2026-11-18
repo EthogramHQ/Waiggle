@@ -1,7 +1,8 @@
 // Les hooks des projets : brancher un écran sur un projet gardé en cache par React Query
 // (même principe que profile/hooks.ts, un tiroir par projet : ['project', id]).
 // R14 : `useProjectPreview`, ce qu'une liste déjà lue sait d'un projet, pour la page qui s'ouvre.
-import type { Project, ProjectSummary } from '@ruche/contracts'
+// R17 : `useShowcasePreview`, le peu qu'en sait la vitrine (sa photo, son titre, son auteur).
+import type { ModerationShowcase, Project, ProjectSummary, ShowcaseItem } from '@ruche/contracts'
 import { type Query, type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
 import { getProject } from './api'
@@ -85,6 +86,84 @@ export const findProjectInLists = (client: QueryClient, id: string): ProjectSumm
 export const useProjectPreview = (id: string): ProjectSummary | null => {
   const client = useQueryClient()
   return useMemo(() => findProjectInLists(client, id), [client, id])
+}
+
+/**
+ * R17 : ce qu'une carte de la vitrine sait d'un projet, et rien de plus. La photo (la première de la
+ * galerie), le titre, le statut, l'auteur par son nom et sa photo ; l'accroche, si la carte la porte
+ * (la vitrine d'un membre oui, l'onglet de la modération non : `null`). Ni l'identifiant de l'auteur,
+ * ni la visibilité, ni les dates, ni les réactions : la vitrine ne les donne pas (`ShowcaseItem`,
+ * packages/contracts), et la page ne doit pas les inventer.
+ */
+export type ShowcasePreview = Pick<ShowcaseItem, 'id' | 'title' | 'status' | 'cover'> & {
+  pitch: string | null
+  author: Pick<ShowcaseItem['author'], 'name' | 'avatarUrl' | 'example'>
+}
+
+/**
+ * Les vitrines en cache qu'un membre a pu lire, par le début de leur clé : la sienne (`['showcase']`,
+ * « À la une » d'Explorer et son accueil, showcase/api.ts) et l'onglet de la modération
+ * (`['moderation', 'showcase']`, moderation/showcase-api.ts). Jamais celle d'un visiteur
+ * (`['public', 'showcase']`) : ce qu'un visiteur a lu ne se mêle pas à ce que lit un membre. En
+ * toutes lettres, comme `LIST_KEYS`, pour ne pas dépendre de ces modules.
+ */
+const SHOWCASE_KEYS = [['showcase'], ['moderation', 'showcase']] as const
+
+/** Un projet de l'onglet de la modération (le contrat ne nomme pas ce type à part). */
+type ModerationShowcaseProject = ModerationShowcase['items'][number]['project']
+
+/**
+ * Les projets que connaît une vitrine du cache, ramenés à ce qu'elle sait (`ShowcasePreview`) :
+ * - celle d'un membre (`ShowcasePage`) : `items`, chacun une carte entière ;
+ * - celle de la modération (`ModerationShowcase`) : `items` et `candidates`, chacun avec son projet
+ *   dans `project`, sans accroche ; de son auteur, on ne garde que le nom (pas de photo).
+ * Comme `summariesIn` : le cache ne garde que des réponses déjà vérifiées par leur schéma.
+ */
+const showcasedIn = (data: unknown): readonly ShowcasePreview[] => {
+  if (!isRecord(data)) return []
+  return [...arrayOf(data.items), ...arrayOf(data.candidates)].flatMap(
+    (entry): ShowcasePreview[] => {
+      if (!isRecord(entry)) return []
+      if (isRecord(entry.project)) {
+        const { id, title, status, cover, author } = entry.project as ModerationShowcaseProject
+        return [
+          { id, title, status, cover, pitch: null, author: { name: author.name, avatarUrl: null } },
+        ]
+      }
+      const { id, title, status, cover, pitch, author } = entry as ShowcaseItem
+      return [{ id, title, status, cover, pitch, author }]
+    },
+  )
+}
+
+/**
+ * Le projet `id` tel qu'une vitrine du cache le connaît, ou `null`. La plus fraîche gagne, comme
+ * pour `findProjectInLists`.
+ */
+export const findProjectInShowcase = (client: QueryClient, id: string): ShowcasePreview | null => {
+  let found: { preview: ShowcasePreview; at: number } | null = null
+  const queries: Query[] = SHOWCASE_KEYS.flatMap((queryKey) =>
+    client.getQueryCache().findAll({ queryKey: [...queryKey] }),
+  )
+  for (const query of queries) {
+    const preview = showcasedIn(query.state.data).find((item) => item.id === id)
+    if (preview && (!found || query.state.dataUpdatedAt > found.at)) {
+      found = { preview, at: query.state.dataUpdatedAt }
+    }
+  }
+  return found?.preview ?? null
+}
+
+/**
+ * Hook (R17) : ce que la vitrine déjà lue sait du projet, pour la page ouverte depuis une de ses
+ * cartes, quand aucune liste ne le connaît en version courte (`useProjectPreview`). Moins qu'un
+ * aperçu : la page n'en montre que la photo (la cible de la photo qui vole), le titre, l'auteur et le
+ * statut, et le reste en squelette. Mêmes règles que `useProjectPreview` : jamais rangé sous
+ * `['project', id]`, lu une fois par projet.
+ */
+export const useShowcasePreview = (id: string): ShowcasePreview | null => {
+  const client = useQueryClient()
+  return useMemo(() => findProjectInShowcase(client, id), [client, id])
 }
 
 /**

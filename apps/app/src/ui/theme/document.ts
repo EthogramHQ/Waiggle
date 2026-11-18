@@ -10,9 +10,13 @@ import {
   layout,
   type Palette,
   palettes,
+  radii,
+  space,
+  springs,
 } from '@ruche/brand'
 import { Platform } from 'react-native'
 import { bee, beeViewBox } from '../logo.generated'
+import { springEasing } from './springEasing'
 
 /**
  * L'attribut posé sur <html> pendant le fondu entre le jour et la nuit (voir ThemeProvider). Un
@@ -118,6 +122,107 @@ const SKELETON_GLOW = 'data-skeleton-glow'
 export const skeletonGlowMark: object = { dataSet: { skeletonGlow: 'on' } }
 
 /**
+ * Les calques d'un passage de page (R17), marqués par un attribut data- que lisent les règles plus
+ * bas : le contenu de la page (`Screen`), la barre du haut (`ScreenTopBar`, la barre fixe), la barre
+ * d'onglets du téléphone (`TabBarHost`) et l'hôte des toasts. À étaler sur la vue (`{...passagePage}`) ;
+ * rien hors du web. Les noms de passage (`view-transition-name`) ne sont posés que pendant un passage
+ * (`html[data-passage]`) : hors de lui, le navigateur n'a rien à photographier à part.
+ */
+const passageMark = (key: string): object =>
+  Platform.OS === 'web' ? { dataSet: { [key]: 'on' } } : {}
+export const passagePageMark = passageMark('passagePage')
+export const passageBarMark = passageMark('passageBar')
+export const passageTabBarMark = passageMark('passageTabbar')
+export const passageToastMark = passageMark('passageToast')
+
+const exitCurve = `cubic-bezier(${easings.exit.join(', ')})`
+// Les calques qui restent par-dessus la page pendant un passage : ils ne bougent pas.
+const STILL_LAYERS = ['wg-bar', 'wg-tabbar', 'wg-toast']
+// Leurs marques, posées sur les vues (le verre de ces vues prend un fond plein pendant le passage).
+const STILL_MARKS = ['[data-passage-bar]', '[data-passage-tabbar]', '[data-passage-toast]']
+const group = (name: string) => `::view-transition-group(${name})`
+const oldImage = (name: string) => `::view-transition-old(${name})`
+const newImage = (name: string) => `::view-transition-new(${name})`
+
+/** Une animation de passage, en propriétés séparées (son nom reste lisible seul). */
+const passageAnimation = (name: string, duration: number) =>
+  `animation-name: ${name}; animation-duration: ${duration}ms; animation-timing-function: ${exitCurve}; animation-fill-mode: both;`
+
+/**
+ * Les passages de page (R17, View Transitions ; le moteur : ui/pageTransition.web.ts). Pendant un
+ * passage, `<html>` porte `data-passage="deeper|back|sibling"` :
+ * - la racine (la lumière d'ambiance, le fond) n'est pas animée : la nouvelle image couvre l'ancienne ;
+ * - le contenu de la page (`wg-page`) : l'ancien s'efface en `quick` (160 ms) en montant de la moitié
+ *   de `space.md`, le nouveau apparaît en `base` (320 ms) en montant de `space.md` (12 points), sur
+ *   la courbe `exit` (le prototype B validé) ; au retour, l'inverse (l'ancien descend, le nouveau
+ *   descend depuis −12) ; entre deux onglets, un fondu de `page` (180 ms), sans direction ;
+ * - la barre du haut, la barre d'onglets et les toasts restent par-dessus (`z-index: 2`), sans
+ *   animation : leur ancienne image est cachée, la nouvelle est là tout de suite ;
+ * - la photo partagée (`wg-cover`) vole en `medium` (420 ms) sur la courbe du ressort `open`
+ *   (`springEasing`), au-dessus de tout (`z-index: 3`), rognée comme la tuile (`radii.tile`) ;
+ * - seule (rien ne l'accueille : la carte d'arrivée se voit trop peu), l'ancienne photo s'efface
+ *   en `quick`, comme la page, au lieu de rester 420 ms au-dessus de tout (relecture du design,
+ *   N1, 18/11/2026) ;
+ * - la carte autour de la photo, sans elle (`wg-card-panel`, nommée par le moteur) : son auteur,
+ *   son titre et « Tester » restent au-dessus de la photo qui vole (`z-index: 4`), comme sur la
+ *   carte au repos ; l'ancienne s'efface en `quick`, la nouvelle (au retour) apparaît en `base`,
+ *   sans bouger (relecture du design, C2, 18/11/2026 : la carte revenait vide pendant le vol) ;
+ * - le verre des barres et des toasts : une vue nommée est photographiée seule, son verre n'a donc
+ *   plus rien à flouter, et on lisait la page à travers la barre pendant tout le passage (relecture
+ *   du design, C1, 18/11/2026). Pendant le passage, la couche de flou de leurs surfaces
+ *   (`[data-surface-blur]`, ui/Surface.tsx) prend la couleur du fond de la page (`--passage-fill`,
+ *   le rôle `background`, posé par le thème) : la couleur du verre se pose sur un fond plein, comme
+ *   s'il était posé sur la page (couples « verre sur le fond » de `contrastPairs`) ;
+ * - sous « Réduire les animations », chaque passage est un fondu de 180 ms, sans déplacement.
+ * Jamais `pointer-events: none` sur ces calques (relecture de sécurité S3).
+ */
+const passagesCss = `
+html[data-passage] [data-passage-page] { view-transition-name: wg-page; }
+html[data-passage] [data-passage-bar] { view-transition-name: wg-bar; }
+html[data-passage] [data-passage-tabbar] { view-transition-name: wg-tabbar; }
+html[data-passage] [data-passage-toast] { view-transition-name: wg-toast; }
+${STILL_MARKS.map((mark) => `html[data-passage] ${mark} [data-surface-blur]`).join(', ')} {
+  background-color: var(--passage-fill, ${palettes.day.background});
+}
+${oldImage('root')}, ${newImage('root')} { animation: none; }
+${STILL_LAYERS.map(group).join(', ')} { z-index: 2; animation: none; }
+${STILL_LAYERS.map(oldImage).join(', ')} { display: none; }
+${STILL_LAYERS.map(newImage).join(', ')} { animation: none; }
+${group('wg-page')} { animation: none; }
+${oldImage('wg-page')} { ${passageAnimation('wg-out', durations.quick)} }
+${newImage('wg-page')} { ${passageAnimation('wg-in', durations.base)} }
+html[data-passage="back"]${oldImage('wg-page')} { ${passageAnimation('wg-out-back', durations.quick)} }
+html[data-passage="back"]${newImage('wg-page')} { ${passageAnimation('wg-in-back', durations.base)} }
+html[data-passage="sibling"]${oldImage('wg-page')} { ${passageAnimation('wg-fade-out', durations.page)} }
+html[data-passage="sibling"]${newImage('wg-page')} { ${passageAnimation('wg-fade-in', durations.page)} }
+${group('wg-cover')} {
+  animation-duration: ${durations.medium}ms;
+  animation-timing-function: ${springEasing(springs.open, durations.medium)};
+  z-index: 3;
+}
+::view-transition-image-pair(wg-cover) { overflow: clip; border-radius: ${radii.tile}px; }
+${oldImage('wg-cover')}, ${newImage('wg-cover')} {
+  animation-duration: ${durations.medium}ms;
+  height: 100%;
+  object-fit: cover;
+}
+${oldImage('wg-cover')}:only-child { ${passageAnimation('wg-fade-out', durations.quick)} }
+${group('wg-card-panel')} { z-index: 4; animation: none; }
+${oldImage('wg-card-panel')} { ${passageAnimation('wg-fade-out', durations.quick)} }
+${newImage('wg-card-panel')} { ${passageAnimation('wg-fade-in', durations.base)} }
+@keyframes wg-out { to { opacity: 0; transform: translateY(-${space.md / 2}px); } }
+@keyframes wg-in { from { opacity: 0; transform: translateY(${space.md}px); } }
+@keyframes wg-out-back { to { opacity: 0; transform: translateY(${space.md / 2}px); } }
+@keyframes wg-in-back { from { opacity: 0; transform: translateY(-${space.md}px); } }
+@keyframes wg-fade-out { to { opacity: 0; } }
+@keyframes wg-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-passage]${oldImage('wg-page')} { ${passageAnimation('wg-fade-out', durations.page)} }
+  html[data-passage]${newImage('wg-page')} { ${passageAnimation('wg-fade-in', durations.page)} }
+}
+`
+
+/**
  * La feuille de style fixe de la page (n'y mettre que des jetons de @ruche/brand, jamais une donnée
  * venue d'ailleurs : elle est écrite telle quelle dans le HTML).
  *
@@ -216,7 +321,7 @@ html :focus-visible:not(input, textarea, [data-focus="inset"]) {
 :focus:not(:focus-visible), input:focus-visible, textarea:focus-visible { outline: none; }
 @media (forced-colors: active) { [data-wordmark="copy"] { display: none; } }
 @media (forced-colors: active) { [data-placeholder="copy"] { display: none; } }
-`
+${passagesCss}`
 
 /**
  * Le mot-symbole (`Wordmark`) en contraste élevé de Windows (`forced-colors: active`) : le

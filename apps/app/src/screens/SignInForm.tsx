@@ -14,6 +14,7 @@ import { safeNext } from '../navigation/next'
 import { firstParam } from '../navigation/params'
 import { focusWithoutScroll } from '../ui/focus'
 import { HeldSpace } from '../ui/HeldSpace'
+import { useHoneyWave, type WaveButton } from '../ui/HoneyWaveHost'
 import { Notice } from '../ui/Notice'
 import { useRetryAt } from '../ui/RetryAt'
 import { RetryButton } from '../ui/RetryButton'
@@ -69,6 +70,9 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
   const busy = useRef(false)
   // Une poignée vers le champ de l'adresse, pour y poser le focus quand elle manque.
   const emailInput = useRef<TextFieldInput>(null)
+  // Le bouton « Me connecter » : la vague de miel part de son centre (R17).
+  const submitButton = useRef<WaveButton>(null)
+  const wave = useHoneyWave()
 
   const submit = async () => {
     if (busy.current || retry.blocked) return
@@ -90,15 +94,22 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
     busy.current = true
     setLoading(true)
     const result = await signIn(parsed.data)
-    busy.current = false
-    setLoading(false)
-    // replace (et non push) : le bouton « retour » ne ramènera pas sur l'écran de connexion.
-    // Sans page à suivre, le Fil (`/feed`, plan R12, décision 9) : un membre qui vient de se
-    // connecter arrive sur le Fil, pas sur l'accueil des visiteurs.
     if (result.ok) {
-      router.replace(next ?? '/feed')
+      // R17 : la vague de miel monte depuis le bouton, couvre l'écran, et c'est alors seulement
+      // (`then`, environ 600 ms plus tard) que la page change ; aussi vers la page demandée par
+      // `next`, déjà filtrée par `safeNext`. Le formulaire reste occupé jusque-là (relecture U2) :
+      // `busy` et le chargement ne retombent pas, une seconde Entrée n'envoie rien.
+      // replace (et non push) : le bouton « retour » ne ramènera pas sur l'écran de connexion.
+      // Sans page à suivre, le Fil (`/feed`, plan R12, décision 9) : un membre qui vient de se
+      // connecter arrive sur le Fil, pas sur l'accueil des visiteurs.
+      // `then` en raccourci : Biome refuse une propriété nommée `then` écrite en clair
+      // (noThenProperty, qui la confondrait avec une promesse).
+      const then = () => router.replace(next ?? '/feed')
+      wave.play({ from: submitButton.current, then })
       return
     }
+    busy.current = false
+    setLoading(false)
     setError(result.error)
     if (result.error === 'tooManyAttempts') setRetryAfter(result.retryAfterSeconds)
   }
@@ -165,6 +176,7 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
       <Stack gap="sm">
         {/* Inactif, le bouton dit pourquoi : la phrase de l'heure (web), un indice (téléphone). */}
         <RetryButton
+          ref={submitButton}
           label={t(($) => $.auth.signIn.submit)}
           onPress={submit}
           loading={loading}

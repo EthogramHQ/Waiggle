@@ -29,10 +29,21 @@ import {
   useCoverSource,
   useCoverTarget,
 } from './coverTransition'
+import { arrivalStyle } from './pageTransition'
 import { ScreenFade } from './ScreenFade'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+
+// R17 : ScreenFade demande au moteur des passages comment la page arrive (`arrivalStyle`). Jest
+// charge la version du téléphone, qui répond toujours `none` (la pile native anime) ; ces tests du
+// fondu sur le web simulent donc un navigateur sans l'API View Transitions, où une page ouverte
+// dans l'appli fond sur place (`fade`, 180 ms). Les autres sortes ont leurs tests dans
+// ScreenFade.passage.test.tsx.
+jest.mock('./pageTransition', () => ({
+  ...jest.requireActual('./pageTransition'),
+  arrivalStyle: jest.fn(() => 'fade'),
+}))
 
 // La route du composant : affichée ou non (`focused`), et combien de fois elle l'est devenue
 // (`shown`). `require` dans la fabrique : Jest la remonte en tête du fichier, avant les imports.
@@ -111,6 +122,7 @@ beforeEach(() => {
   jest.replaceProperty(Platform, 'OS', 'web')
   jest.mocked(useReducedMotion).mockReturnValue(false)
   jest.mocked(withTiming).mockImplementation(actualWithTiming)
+  jest.mocked(arrivalStyle).mockReturnValue('fade')
 })
 
 afterEach(() => {
@@ -149,18 +161,23 @@ describe('ScreenFade, a page opened in the app (web)', () => {
     expect(seenOpacity(content())).toBe(1)
   })
 
-  // ui-11 : au retour sur une page restée montée (cachée dans la pile), l'opacité 0 est posée dès
-  // le rendu qui la montre, avant toute image : la page pleine ne se voit pas un instant.
-  it('fades a page in again when the member comes back to it, from the first frame', async () => {
+  // R17 (scénario « Avancer et revenir, sur le web ») : au retour sur une page restée montée, la
+  // page d'avant est là tout de suite, à son défilement, sans fondu depuis le vide. Ce test disait
+  // l'inverse (ui-11, RF : la page refondait à chaque retour) ; R17 l'a inversé, sur décision de la
+  // session du 18/11/2026 (le scénario R17 contredisait l'ancien). Le moteur des passages dit
+  // `none` pour un retour (ui/pageTransition.web.ts) ; le fondu à l'aller reste (plus haut).
+  it('shows a page at once when the member comes back to it, without a fade', async () => {
     const view = await renderWithProviders(page({ focused: true, shown: 1 }))
     expect(seenOpacity(content())).toBe(1) // témoin : une page déjà là, sans fondu
     await view.rerender(page({ focused: false, shown: 1 }))
+    jest.mocked(arrivalStyle).mockReturnValue('none')
 
     await view.rerender(page({ focused: true, shown: 2 }))
 
-    expect(seenOpacity(content())).toBe(0)
-    await wait(durations.page + 50)
     expect(seenOpacity(content())).toBe(1)
+    await wait(durations.page / 2)
+    expect(seenOpacity(content())).toBe(1)
+    expect(screen.queryByTestId('fade-shield', { includeHiddenElements: true })).toBeNull()
   })
 
   // ui-1 : le fondu suit la route, pas le montage du composant. Un écran monté pendant une visite
@@ -279,8 +296,8 @@ describe('ScreenFade, its guards (web)', () => {
 // entre les deux : elle ne rejoue pas son fondu (la photo, elle, se replie dans sa carte). Le
 // fondu ne se saute que si le projet a été ouvert par une carte de cette page ; ScreenFade le lit
 // dans le magasin de « la carte qui devient la page » (`ui/coverTransition`), posé au-dessus des
-// pages. Sinon (une adresse, un lien), le retour garde son fondu : le test ui-11 plus haut
-// (« fades a page in again when the member comes back to it ») en est le témoin.
+// pages. Sinon, une arrivée que le moteur des passages fait fondre garde son fondu : le dernier test
+// de ce groupe en est le témoin (depuis R17, un vrai retour arrive sans fondu, voir plus haut).
 describe('ScreenFade, back from a project opened by a card (R14, web)', () => {
   // Le lien de la carte, tel que le navigateur le donne.
   const link = { focus: jest.fn() }

@@ -22,6 +22,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
+import { passageArrived } from './pageTransition'
 
 /**
  * Ce que le module retient d'une route : combien de fois elle est devenue affichée, si elle l'est
@@ -159,6 +160,9 @@ export const useScreenShownCount = (): number => {
     record.shown = true
     record.count += 1
     for (const listener of [...record.listeners]) listener()
+    // R17 : la page est arrivée, posée avant la prochaine image (un effet de mise en page) ; le
+    // passage en cours peut la photographier (ui/pageTransition.web.ts).
+    passageArrived()
   }, [focused, record])
   return count
 }

@@ -9,10 +9,12 @@
 //
 // Même idée que TabBarHost (ui/TabBar.tsx) : un cadre posé une fois, qui rend un service aux écrans
 // par un contexte, et un hook pour savoir s'il est là (useHasAmbientHost).
+import { durations } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { type ColorValue, Platform, View } from 'react-native'
 import { AmbientLight } from './AmbientLight'
 import { AmbientHostProvider, useAmbientSource } from './theme/ambient'
+import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
@@ -30,11 +32,26 @@ export const hostedStackStyle = { backgroundColor: 'transparent' } as const
  */
 export const usePageStackOptions = () => {
   const { colors } = useTheme()
+  const calm = useCalmMotion()
   return {
     headerShown: false,
     contentStyle: Platform.OS === 'web' ? hostedStackStyle : { backgroundColor: colors.background },
+    // R17, « Réduire les animations » sur iOS et Android : toutes les pages se fondent au lieu de
+    // glisser (un grand déplacement). Sur le web, les passages ont leur propre moteur
+    // (ui/pageTransition) ; la pile n'y anime rien.
+    ...(calm && Platform.OS !== 'web' ? { animation: 'fade' as const } : null),
   } as const
 }
+
+/**
+ * R17 : les options des quatre onglets (Fil, Explorer, Ruches, Moi) sur iOS et Android. Ce sont
+ * des pages sœurs : elles se fondent l'une dans l'autre en 180 ms (`durations.page`, la durée du
+ * fondu d'une page sur le web), au lieu de glisser comme une page plus profonde. Android garde la
+ * durée de son système (la pile n'y lit pas `animationDuration`). Sur le web, rien : les passages
+ * ont leur propre moteur.
+ */
+export const useTabScreenOptions = () =>
+  Platform.OS === 'web' ? {} : ({ animation: 'fade', animationDuration: durations.page } as const)
 
 /**
  * Le thème de la navigation autour de l'hôte (RF, U4) : celui reçu (`DefaultTheme` d'expo-router),

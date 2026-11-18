@@ -10,12 +10,13 @@
 // écran garde son propre fournisseur (AmbientProvider) et sa propre lumière, comme avant.
 // Dans les deux cas, un composant de l'écran parle à la lumière par useAmbient() ; la lumière
 // elle-même (AmbientLight) lit la source par useAmbientSource().
-import { palettes } from '@ruche/brand'
+import { durations, palettes } from '@ruche/brand'
 import {
   createContext,
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -520,10 +521,71 @@ export function ScreenAmbient({
   ...options
 }: ScreenAmbientOptions & { children: ReactNode }) {
   const actions = useAmbientRegistration(options)
+  // Après le contenu : sur téléphone, la lumière de l'écran est dans le contenu, et ses effets (son
+  // abonnement aux impulsions) passent avant celui-ci, qui suit dans l'arbre.
+  const entrance = <EntrancePulse wanted={options.light && options.focused} />
   if (actions === null) {
-    return <AmbientProvider initialSource={options.initialSource}>{children}</AmbientProvider>
+    return (
+      <AmbientProvider initialSource={options.initialSource}>
+        {children}
+        {entrance}
+      </AmbientProvider>
+    )
   }
-  return <AmbientActions.Provider value={actions}>{children}</AmbientActions.Provider>
+  return (
+    <AmbientActions.Provider value={actions}>
+      {children}
+      {entrance}
+    </AmbientActions.Provider>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// L'impulsion d'entrée (R17, scénario « La vague de miel à l'entrée »)
+
+/**
+ * Le délai pendant lequel l'impulsion levée attend sa page : la vague entière, deux fois. Au-delà
+ * (la page demandée n'a pas de lumière, la navigation a échoué), elle se perd, plutôt que de
+ * raviver plus tard une page arrivée sans rapport avec l'entrée.
+ */
+const ENTRANCE_WAIT_MS = durations.wave * 2
+
+// Un « drapeau de module » : une variable du fichier, commune à toute l'appli, hors de React.
+// L'hôte de la vague (ui/HoneyWaveHost.tsx) la lève juste avant la navigation, depuis la page de
+// connexion ; l'écran qui arrive la lit. Aucun contexte ne relie ces deux écrans (l'un remplace
+// l'autre), d'où une valeur partagée plutôt qu'un état React.
+let entranceRaisedAt: number | null = null
+
+/**
+ * L'impulsion d'entrée dans l'appli : `raise()` la lève (l'hôte de la vague, juste avant la
+ * navigation) ; `take()` la consomme, vrai une seule fois, et seulement dans le délai. La première
+ * page à lumière qui s'affiche ensuite la prend (`pulse(1)`) : le Fil, ou la page demandée par
+ * `next`. Jamais à l'ouverture de l'appli ni en revenant sur le Fil : rien ne l'a levée.
+ */
+export const entrancePulse = {
+  raise: (): void => {
+    entranceRaisedAt = Date.now()
+  },
+  take: (): boolean => {
+    if (entranceRaisedAt === null) return false
+    const fresh = Date.now() - entranceRaisedAt <= ENTRANCE_WAIT_MS
+    entranceRaisedAt = null
+    return fresh
+  },
+}
+
+/**
+ * Composant invisible de ScreenAmbient : quand l'écran devient affiché avec une lumière, il prend
+ * l'impulsion d'entrée si elle attend, et ravive la lumière de l'écran. Un effet après le rendu
+ * (`useEffect`) : sur le web, l'inscription de l'écran auprès de l'hôte (ses effets de mise en page)
+ * a déjà eu lieu, et l'hôte sait que la lumière dessinée est la sienne.
+ */
+function EntrancePulse({ wanted }: { wanted: boolean }) {
+  const { pulse } = useAmbient()
+  useEffect(() => {
+    if (wanted && entrancePulse.take()) pulse(1)
+  }, [wanted, pulse])
+  return null
 }
 
 /** Ce qu'on peut donner directement à une lumière, au lieu de la source de l'écran. */

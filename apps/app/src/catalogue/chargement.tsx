@@ -29,6 +29,7 @@ import {
   ActionsShapes,
   CommentsShapes,
   DescriptionShapes,
+  HeaderLineShape,
   PromptShapes,
   RecipeShapes,
 } from '../ui/ProjectPageShapes'
@@ -99,7 +100,7 @@ const fr = {
     'Le haut vide d’une ruche (HiveHeaderSkeleton) : l’alvéole à la taille de la vraie, le nom, le nombre ; puis les titres vides des colonnes (HiveColumnTitleSkeleton : members, testers)',
   cover: 'La galerie vide d’un projet (ProjectCoverSkeleton) : band (téléphone), medium (tablette)',
   projectParts:
-    'Le bas vide de la page d’un projet (ProjectPageShapes) : les actions, la description, le prompt, la recette, les commentaires',
+    'Le bas vide de la page d’un projet (ProjectPageShapes) : les actions, la description, le prompt, la recette, les commentaires ; puis les lignes de l’en-tête qu’une carte de la vitrine ne sait pas (HeaderLineShape : dates, accroche)',
   showcase:
     'Les cartes vides de la vitrine (ShowcaseCardSkeleton) : en bande (carousel), puis en part égale de la rangée (fill)',
   testers: 'Les cartes vides d’« Ils cherchent des testeurs » (TesterCardSkeleton)',
@@ -157,7 +158,7 @@ const en: typeof fr = {
     'A hive’s empty top (HiveHeaderSkeleton): the badge at the real one’s size, the name, the count; then the empty column titles (HiveColumnTitleSkeleton: members, testers)',
   cover: 'A project’s empty gallery (ProjectCoverSkeleton): band (phone), medium (tablet)',
   projectParts:
-    'The empty bottom of a project page (ProjectPageShapes): the actions, the description, the prompt, the recipe, the comments',
+    'The empty bottom of a project page (ProjectPageShapes): the actions, the description, the prompt, the recipe, the comments; then the header lines a showcase card does not know (HeaderLineShape: dates, pitch)',
   showcase:
     'The showcase’s empty cards (ShowcaseCardSkeleton): in a band (carousel), then an equal share of the row (fill)',
   testers: 'The empty cards of “Looking for testers” (TesterCardSkeleton)',
@@ -387,6 +388,8 @@ function Pieces({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] }) 
             <PromptShapes />
             <RecipeShapes />
             <CommentsShapes />
+            <HeaderLineShape line="dates" />
+            <HeaderLineShape line="pitch" />
           </Stack>
         </Loading>
       </Example>

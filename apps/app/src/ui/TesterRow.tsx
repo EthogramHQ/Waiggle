@@ -22,6 +22,7 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View } from 'react-native'
 import { describedBy } from './aria'
+import { useCoverSource } from './coverTransition'
 import { ExampleBadge } from './ExampleBadge'
 import { enterActivates } from './keyboard'
 import { ListRow } from './ListGroup'
@@ -52,6 +53,12 @@ type Props = {
    * décrit : `aria-describedby` sur le web, son indice sur téléphone. Absent ou faux : rien.
    */
   example?: boolean
+  /**
+   * R17 (« La carte qui devient la page ») : l'identifiant du projet. Avec lui, la vignette vole
+   * jusqu'à la couverture de la page du projet (`useCoverSource`), sur le web qui sait animer un
+   * passage de page. Absent : la ligne ouvre simplement.
+   */
+  coverId?: string
 }
 
 // La vignette : un peu plus grande que la pastille d'icône d'une ligne (40), pour qu'on reconnaisse
@@ -62,15 +69,26 @@ const THUMB = 48
 // de droite (320 points), « Tester » tient sur la ligne du titre à la taille de texte ordinaire.
 const LINK_BASIS = 180
 
-export function TesterRow({ title, author, image, onTest, onOpen, example = false }: Props) {
+export function TesterRow({
+  title,
+  author,
+  image,
+  onTest,
+  onOpen,
+  example = false,
+  coverId,
+}: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   // L'identifiant du texte « Exemple », que le lien de la ligne désigne comme sa description.
   const exampleId = `tester-row-example-${useId()}`
+  // La vignette qui devient la page (R17). Un hook s'appelle toujours (règle des hooks de React) :
+  // sans `coverId`, sous un identifiant vide qu'aucune page ne porte, et rien ne s'en sert.
+  const cover = useCoverSource(coverId ?? '')
   // Une seule garde pour les deux liens de la ligne (voir tapGuard.ts).
   const guard = useTapGuard()
   const test = guard(onTest)
-  const open = onOpen ? guard(onOpen) : undefined
+  const open = onOpen ? guard(coverId ? () => cover.capture(onOpen) : onOpen) : undefined
 
   const body = (
     <ListRow
@@ -89,8 +107,9 @@ export function TesterRow({ title, author, image, onTest, onOpen, example = fals
         )
       }
       leading={
-        // La vignette ne s'étire ni ne rétrécit : la photo garde son cadre carré.
-        <View style={{ width: THUMB, flexShrink: 0 }}>
+        // La vignette ne s'étire ni ne rétrécit : la photo garde son cadre carré. R17 : c'est elle
+        // qui vole jusqu'à la page du projet.
+        <View ref={coverId ? cover.ref : undefined} style={{ width: THUMB, flexShrink: 0 }}>
           <ProjectCover height={THUMB} radius="code" image={image} />
         </View>
       }

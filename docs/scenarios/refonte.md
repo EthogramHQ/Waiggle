@@ -4311,3 +4311,103 @@ Outils en grand (« on fait tout maintenant dans R16 »).
 
 Les transitions entre pages, la photo qui défile moins vite et la vague de miel sont R17. Le
 préchargement des pages avant le clic n'est pas dans cette tranche.
+
+## R17 — Les passages de page
+
+Sur le web, changer de page ne se voit presque pas, ou se voit mal. L'ancienne page est coupée net,
+la nouvelle fond en 180 ms depuis le vide, le retour rejoue ce fondu sur une page déjà prête (on
+croit à un rechargement), et la photo d'une carte grandit sur une page vide (audit de design du
+17/11, section 3, film image par image). Louis a choisi la variante B du prototype des transitions,
+« fondu et glissement » (décision 12 du 17/11), et décidé de faire la photo qui défile moins vite
+que la page et la vague de miel des maquettes validées le 28/10 (décision 13). Il a placé ici aussi
+la feuille vide d'environ 340 ms au Retour d'un projet, sur téléphone (relecture de R14, 17/11 au
+matin). Les squelettes à la forme de la page (R16) donnent la matière : un passage ne mène plus à
+trois bandes grises.
+
+### Avancer et revenir, sur le web
+
+- Étant donné un membre sur une page
+  Quand il ouvre une page plus profonde (un lien, une ligne, une tuile, une carte)
+  Alors l'ancien contenu s'efface en 160 ms pendant que le nouveau apparaît en 320 ms en montant
+  de 12 points, sur la courbe « sortie » des jetons (le prototype B validé) ;
+  Et la barre du haut et la lumière d'ambiance ne bougent pas.
+- Quand il revient par le « Retour » de la page
+  Alors c'est l'inverse : le contenu de la page d'avant descend de 12 points en apparaissant ;
+  Et il la retrouve à l'endroit où il l'avait laissée (défilement gardé), jamais en fondu depuis
+  une page vide.
+- Quand il revient par le bouton ou le geste « retour » du navigateur
+  Alors l'appli n'ajoute pas d'animation à celle du navigateur ;
+  Mais la page d'avant est là tout de suite, à son défilement, sans page vide ni fondu depuis le
+  vide.
+- Quand il passe d'un onglet à l'autre (Fil, Explorer, Ruches, Moi)
+  Alors les deux pages se fondent l'une dans l'autre en 180 ms, sans direction : ce sont des pages
+  sœurs.
+- La première page de la visite n'a pas de passage : elle est pré-rendue, elle s'affiche telle
+  quelle.
+- Pendant un passage (400 ms au plus), un second appui ne lance pas une seconde page.
+- Un navigateur qui ne sait pas animer un passage de page (View Transitions) montre la page plus
+  profonde en fondu, en montant de 12 points, et l'ancienne disparaît d'un coup ; au retour, la
+  page d'avant est là tout de suite, sans fondu.
+
+### La carte qui devient la page
+
+- Étant donné une carte de projet avec sa photo, où qu'elle soit (le Fil, Récents, une ruche, les
+  projets d'un membre, un carrousel d'Explorer, la vitrine de l'accueil). Les pages publiques
+  viendront avec R22.
+  Quand le membre l'ouvre
+  Alors, sur le web, la photo de la carte grandit jusqu'à la couverture de la page du projet, en environ 420 ms ;
+  Et le reste de la page fond en 180 ms autour d'elle ;
+  Et on ne voit jamais la page d'arrivée vide derrière la photo.
+- Quand il revient par le « Retour » de la page
+  Alors la photo se replie dans sa carte, à sa place dans la page d'avant.
+- Sur téléphone, au « Retour », la page d'avant est là pendant le repli : plus de feuille vide
+  d'environ 340 ms (là depuis R4, sur le Fil aussi). La photo vole au-dessus des deux pages.
+- Sur iOS et Android, la carte qui devient la page reste celle d'aujourd'hui ; avancer glisse
+  comme le veut le système, et les onglets se fondent.
+
+### La photo d'un projet qui défile moins vite
+
+- Étant donné la page d'un projet avec sa photo de couverture
+  Quand le membre fait défiler la page
+  Alors la photo descend moins vite que la page (45 % de sa vitesse), et la page la recouvre ;
+  Quand il tire vers le bas, plus haut que le haut de la page
+  Alors la photo s'agrandit doucement (1 % tous les 6 points), puis revient à sa taille.
+- Le texte de la page ne bouge jamais à une autre vitesse que le doigt : seule la photo est
+  décalée.
+
+### La vague de miel à l'entrée
+
+- Étant donné une personne qui se connecte (« Me connecter » de la page de connexion) ou qui
+  entre après avoir vérifié son adresse (« Continuer » de la page « Adresse vérifiée »)
+  Quand elle entre dans l'appli
+  Alors une vague de miel monte depuis ce bouton, couvre l'écran, puis se retire
+  par le bas et découvre le Fil, en 1,2 s environ ;
+  Et la lumière d'ambiance reçoit une impulsion.
+- La vague ne passe qu'à cette entrée : jamais à l'ouverture de l'appli par un membre déjà
+  connecté, ni en revenant sur le Fil.
+- Pendant la vague, rien ne se touche ; le Fil reçoit le focus à son arrivée, comme aujourd'hui.
+
+### Réduire les animations
+
+- Si la personne a activé « Réduire les animations » :
+  - chaque passage de page est un fondu croisé de 180 ms, sans déplacement ;
+  - la carte qui devient la page est un fondu croisé ;
+  - la photo d'un projet ne défile plus à part et ne s'étire pas ;
+  - la vague de miel devient un fondu vers le Fil.
+- La lumière d'ambiance garde sa couleur et reste immobile (WCAG 2.2.2).
+
+### Les cibles (mesurées avant et après par le même passage)
+
+- Entre le Fil et un projet : images où l'on voit un squelette générique, 2 à 4 → 0 ; une image
+  entièrement vide, oui → non.
+- Du clic à la page posée, sur ordinateur : 890 ms → 400 ms au plus (hors vol de la photo).
+- Défilement gardé au retour, par le bouton de la page comme par le navigateur.
+- Sous « Réduire les animations » : un fondu de 10 à 12 images, sans déplacement.
+- Au Retour d'un projet sur téléphone : 0 image de feuille vide (aujourd'hui ~340 ms).
+- Écart maximal entre deux images pendant un passage, sur un téléphone : 34 ms au plus.
+
+### Le reste ne change pas
+
+Le focus et ce que lit un lecteur d'écran suivent les règles d'aujourd'hui (le titre à l'arrivée,
+la carte au retour). Les feuilles (Publier, Signaler…) gardent leur mouvement. Le préchargement des
+pages avant le clic n'est pas dans cette tranche.

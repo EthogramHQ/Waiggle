@@ -13,10 +13,20 @@ import { Platform, StyleSheet, View } from 'react-native'
 import { getAnimatedStyle, useReducedMotion } from 'react-native-reanimated'
 import { renderWithProviders } from '../testing/render'
 import { CoverArrival, CoverTransitionProvider, useCoverSource } from './coverTransition'
+import { arrivalStyle } from './pageTransition'
 import { Screen } from './Screen'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+
+// R17 : ScreenFade demande au moteur des passages comment la page arrive (`arrivalStyle`). Jest
+// charge la version du téléphone, qui répond toujours `none` ; ces tests du web simulent un
+// navigateur sans l'API View Transitions, où la page fond sur place (`fade`), comme
+// ScreenFade.test.tsx.
+jest.mock('./pageTransition', () => ({
+  ...jest.requireActual('./pageTransition'),
+  arrivalStyle: jest.fn(() => 'fade'),
+}))
 
 // La route de l'écran (voir l'en-tête). `require` dans la fabrique : Jest la remonte en tête.
 jest.mock('./screenFocus', () => {
@@ -120,6 +130,7 @@ beforeEach(() => {
   jest.useFakeTimers()
   jest.replaceProperty(Platform, 'OS', 'web')
   jest.mocked(useReducedMotion).mockReturnValue(false)
+  jest.mocked(arrivalStyle).mockReturnValue('fade')
 })
 
 afterEach(() => {

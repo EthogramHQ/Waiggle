@@ -5726,7 +5726,37 @@ const shoot = async (page, options, label) => {
   }
 }
 
-const settle = async (page) => {
+/**
+ * Attend la fin du passage de page en cours (R17) : jamais de capture en plein passage (View
+ * Transitions). Le moteur retire `data-passage` de <html> à la fin du passage, 2 s au plus (son
+ * filet, ui/pageTransition.web.ts).
+ *
+ * L'attribut se lit par `page.evaluate`, toutes les 100 ms, et non par `page.waitForFunction` : ce
+ * dernier attend par défaut une image d'animation (`requestAnimationFrame`) pour regarder, et une
+ * page très lourde n'en dessine parfois aucune pendant plus de 5 s. Le catalogue sur ordinateur
+ * échouait ainsi à chaque passage (CI de R17, 18/11/2026), sans aucun passage en cours : l'attribut
+ * était absent, mais personne ne l'avait regardé. `evaluate` attend que la page soit libre, sans
+ * limite : une page lente retarde la capture sans la faire échouer. Le délai de 5 s court depuis la
+ * première fois qu'on voit l'attribut ; seul un attribut vu là après ce délai, et à dix lectures au
+ * moins (le filet a eu le temps de jouer), est un passage sans fin. L'erreur nomme la capture.
+ */
+const waitForPassageEnd = async (page, label) => {
+  let seenSince = 0
+  let reads = 0
+  for (;;) {
+    const kind = await page.evaluate(() => document.documentElement.getAttribute('data-passage'))
+    if (kind === null) return
+    reads += 1
+    seenSince ||= Date.now()
+    if (reads >= 10 && Date.now() - seenSince > 5000) {
+      throw new Error(`passage sans fin : ${label} (data-passage="${kind}", ${page.url()})`)
+    }
+    await page.waitForTimeout(100)
+  }
+}
+
+const settle = async (page, label) => {
+  await waitForPassageEnd(page, label)
   let last = await scrollHeight(page)
   let steady = 0
   for (let i = 0; i < 40 && steady < 2; i++) {
@@ -5932,7 +5962,7 @@ async function layoutReport() {
         }
         if (shot.textScale) await scaleText(page, shot.textScale)
         await settleLoading(page, shot)
-        await settle(page) // la page entière, pas seulement son haut (voir settle)
+        await settle(page, `${shot.name}-${width}px`) // la page entière (voir settle)
         // Une page restée en chargement ne se mesure pas : noté dans le rapport, et le script
         // échoue à la fin (voir intendedUnfinished).
         const unloaded = await unfinishedProblem(page, shot, `${shot.name}-${width}`)
@@ -6133,7 +6163,7 @@ const capture = async ({ shot, device, scheme }) => {
     }
     if (shot.textScale) await scaleText(page, shot.textScale)
     await settleLoading(page, shot)
-    const height = await settle(page)
+    const height = await settle(page, `${shot.name}-${device.name}-${scheme.name}`)
     // La page s'est-elle chargée ? (voir intendedUnfinished) Le problème est signalé à la fin,
     // avec les erreurs des pages ; la capture est prise quand même, pour qu'on la regarde.
     const unloaded = await unfinishedProblem(
