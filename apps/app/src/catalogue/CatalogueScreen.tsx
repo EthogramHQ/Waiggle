@@ -92,6 +92,7 @@ import { FeedEndCatalogue } from './fin-de-fil'
 import { FluidTopBarCatalogue } from './fluidite-barre'
 import { ScreenFadeCatalogue } from './fluidite-fondu'
 import { AmbientHostCatalogue } from './fluidite-lumiere'
+import { HoneyWaveCatalogue } from './fluidite-vague'
 import { FormSamples } from './formulaire'
 import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
@@ -944,6 +945,8 @@ export function CatalogueScreen() {
       <FluidTopBarCatalogue />
       <ScreenFadeCatalogue />
       <AmbientHostCatalogue />
+      {/* Tranche R17, la vague de miel à l'entrée dans l'appli (fluidite-vague.tsx). */}
+      <HoneyWaveCatalogue />
 
       <Section title={l.icons}>
         <Icons />

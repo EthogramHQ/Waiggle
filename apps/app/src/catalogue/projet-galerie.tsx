@@ -12,6 +12,7 @@ import { type ColorName, palettes } from '@ruche/brand'
 import { REACTION_KINDS } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ScrollView, View } from 'react-native'
 import { IconButton } from '../ui/IconButton'
 import type { ImageSource } from '../ui/image'
 import { type GalleryPhoto, PhotoGallery } from '../ui/PhotoGallery'
@@ -19,6 +20,7 @@ import { CoverControls, CoverSheet, CoverStraddle } from '../ui/ProjectCover'
 import { ReactionCapsule } from '../ui/ReactionCapsule'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
+import { ScreenScrollContext, useScreenScrollChannel } from '../ui/scrollLight'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
@@ -51,6 +53,10 @@ const fr = {
   marked:
     'Une photo marquée (R9, mark) : retirée par la modération, que son auteur voit encore ; la marque suit la place dans le nom lu',
   mark: 'Retiré par la modération',
+  parallax:
+    'La photo qui défile moins vite que la page (R17, parallax) : faites défiler le cadre, la photo descend de 45 % du défilement et la feuille passe par-dessus ; rien avec « Réduire les animations »',
+  parallaxText:
+    'Le pitch du projet, puis ses mises à jour : de quoi faire défiler le cadre assez loin pour voir la photo glisser sous la feuille.',
 }
 
 const en: typeof fr = {
@@ -80,6 +86,10 @@ const en: typeof fr = {
   marked:
     'A marked photo (R9, mark): removed by moderation, still seen by its author; the mark follows the place in the spoken name',
   mark: 'Removed by moderation',
+  parallax:
+    'The photo that scrolls slower than the page (R17, parallax): scroll the frame, the photo moves down by 45 % of the scroll and the sheet passes over it; nothing with “Reduce motion”',
+  parallaxText:
+    'The project pitch, then its updates: enough to scroll the frame far enough to see the photo glide under the sheet.',
 }
 
 /**
@@ -204,7 +214,39 @@ export function GalleryCatalogue() {
         <Text variant="title1">{l.sampleTitle}</Text>
         <Text tone="secondary">{l.sheet}</Text>
       </CoverSheet>
+
+      {/* R17 : la parallaxe, dans un cadre qui défile, branché sur le canal de défilement de
+          Screen (ui/scrollLight.ts), comme la barre fixe (fluidite-barre.tsx). */}
+      {schemes.map((scheme) => (
+        <ThemeProvider key={`parallax-${scheme}`} appearance={scheme}>
+          <Example caption={`${l.parallax} — ${l[scheme]}`}>
+            <ParallaxFrame l={l} />
+          </Example>
+        </ThemeProvider>
+      ))}
     </Stack>
+  )
+}
+
+/** Une page de projet en réduction qui défile : la galerie avec `parallax`, puis la feuille. */
+function ParallaxFrame({ l }: { l: typeof fr }) {
+  const scroll = useScreenScrollChannel()
+  return (
+    <ScreenScrollContext.Provider value={scroll.channel}>
+      <View style={{ height: 420, overflow: 'hidden' }}>
+        <ScrollView onScroll={scroll.handleScroll} scrollEventThrottle={16}>
+          <PhotoGallery photos={PHOTOS} parallax />
+          <CoverSheet>
+            <Text variant="title1">{l.sampleTitle}</Text>
+            {[1, 2, 3, 4].map((line) => (
+              <Text key={line} tone="secondary">
+                {l.parallaxText}
+              </Text>
+            ))}
+          </CoverSheet>
+        </ScrollView>
+      </View>
+    </ScreenScrollContext.Provider>
   )
 }
 

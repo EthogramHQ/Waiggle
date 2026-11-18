@@ -15,6 +15,7 @@
 // passe en arrière-plan, la lumière s'arrête déjà d'elle-même (AppState, AmbientLightSoft).
 import { createContext, type RefObject, useCallback, useContext, useEffect, useRef } from 'react'
 import { Dimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { type SharedValue, useSharedValue } from 'react-native-reanimated'
 import { useAmbient } from './theme/ambient'
 
 /** Un défilement de la zone qui défile de l'écran. */
@@ -54,6 +55,14 @@ export type ScreenScroll = {
    * « milieu de l'écran » dans la place qui reste dessous (ui-15).
    */
   coveredTop: RefObject<number>
+  /**
+   * R17 (« La photo d'un projet qui défile moins vite ») : de combien la zone qui défile a défilé,
+   * en points (négatif quand on tire plus haut que le haut, sur iOS). Une « valeur partagée » de
+   * Reanimated : une case que le fil des animations lit aussi, sans redessiner React. La photo
+   * (ui/CoverParallax.tsx) en tire son décalage à chaque image. Facultatif : un canal fait à la
+   * main (un test) peut ne pas l'offrir, et la photo reste alors à sa place.
+   */
+  offset?: SharedValue<number>
 }
 
 // Hors d'un Screen (catalogue, test d'un composant seul) : rien ne défile, personne n'écoute.
@@ -83,6 +92,8 @@ export function useScreenScrollChannel(
   latestJumpTo.current = jumpTo
   const latestToEnd = useRef(toEnd)
   latestToEnd.current = toEnd
+  // La position du défilement, écrite à chaque défilement (voir `ScreenScroll.offset`).
+  const offset = useSharedValue(0)
 
   const subscribe = useCallback((listener: ScrollListener) => {
     listeners.current.add(listener)
@@ -100,12 +111,20 @@ export function useScreenScrollChannel(
     toTop: () => latestToTop.current?.(),
     jumpTo: (y) => latestJumpTo.current?.(y),
     toEnd: () => latestToEnd.current?.(),
+    offset,
   }).current
 
-  const handleScroll = useCallback((event: ScrollEvent) => {
-    latestOnScroll.current?.(event)
-    for (const listener of listeners.current) listener(event)
-  }, [])
+  const handleScroll = useCallback(
+    (event: ScrollEvent) => {
+      // `contentOffset` peut manquer dans un défilement fait à la main (un test) : la case garde
+      // alors sa dernière valeur.
+      const y = event.nativeEvent?.contentOffset?.y
+      if (typeof y === 'number') offset.value = y
+      latestOnScroll.current?.(event)
+      for (const listener of listeners.current) listener(event)
+    },
+    [offset],
+  )
 
   return { channel, handleScroll }
 }
