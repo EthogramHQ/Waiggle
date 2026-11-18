@@ -19,16 +19,20 @@
 // - `ProjectRecipe`, « La recette » : le mois de début, la difficulté et les outils ;
 // - `ProjectDescription`, « Description » et son texte en Markdown.
 // Ce fichier n'écrit aucun style (règle Biome de `src/projects/**`) : il assemble des composants.
+import { layout } from '@ruche/brand'
 import type { Project } from '@ruche/contracts'
-import type { ReactNode } from 'react'
+import { type ReactNode, useContext, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useOpenOutside } from '../navigation/links'
 import { Columns } from '../ui/Columns'
 import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
+import { ListRowSkeleton, TextLineShape } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { CoverSheet } from '../ui/ProjectCover'
 import { RecipeFact } from '../ui/RecipeFact'
+import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
+import { Loading, LoadingShownContext, Shape } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
@@ -114,6 +118,20 @@ type LayoutProps = ProjectPageSlots & {
    * Absent : les morceaux tels quels. Reçoit `null` pour une place vide et doit alors rendre `null`.
    */
   wrap?: (node: ReactNode) => ReactNode
+  /**
+   * R16 (plan, choix 9 et 10) : la page d'un membre dit ici si elle attend encore le projet complet
+   * (vrai pendant l'aperçu tiré d'une carte, R14). Tout ce qui suit l'en-tête a alors la forme de la
+   * page (`ProjectPageSkeleton`, sous un seul « Chargement… »), puis arrive en fondu, dans le même
+   * arbre (`Reveal`) : la galerie et l'en-tête, déjà montrés, ne bougent pas. Absent (la page d'un
+   * visiteur, qui n'a pas d'aperçu) : les morceaux tels quels, comme avant.
+   */
+  pending?: boolean
+  /**
+   * La partie vide posée à chaque endroit pendant l'attente : `ProjectPageSkeleton` par défaut.
+   * L'écran peut la donner lui-même (la page d'un membre passe la pièce exportée : c'est elle que ses
+   * tests comptent).
+   */
+  skeleton?: (part: ProjectPageSkeletonPart) => ReactNode
 }
 
 const asIs = (node: ReactNode) => node ?? null
@@ -143,6 +161,8 @@ export function ProjectPageLayout({
   bleed,
   layers,
   wrap = asIs,
+  pending,
+  skeleton: emptyPart = (part) => <ProjectPageSkeleton part={part} />,
 }: LayoutProps) {
   const { t } = useTranslation()
   const { sizeClass, columns } = useLayout()
@@ -152,6 +172,57 @@ export function ProjectPageLayout({
   const w = (node: ReactNode) => wrap(node ?? null)
   // La recette à côté de la photo seulement si les réactions comblent la place sous celle-ci.
   const recipeFirst = reactions != null
+
+  /**
+   * R16 : une zone que la page attend, ou ses morceaux tels quels (la page d'un visiteur). `loading` :
+   * la zone porte le seul « Chargement… » de la page. Sur ordinateur, la page attend trois zones
+   * (à côté de la galerie, puis les deux colonnes de la seconde rangée), séparées par la galerie et
+   * les colonnes : un seul `Loading` ne peut pas les envelopper toutes, et un lecteur d'écran
+   * n'entend « Chargement… » qu'une fois. Les deux autres n'ont donc que leurs formes, sans rôle ni
+   * nom, qui ne se lisent pas.
+   *
+   * Montré tout de suite (`shown`, plan R16, choix 8) : la page est déjà là (la photo, le titre,
+   * l'auteur, venus de la carte), et sa partie vide en est la forme ; elle ne surgit pas 160 ms plus
+   * tard sous un en-tête déjà posé. Toutes les parties paraissent donc ensemble, et chacune fond vers
+   * son contenu (`MarkShown` le dit à sa zone).
+   */
+  const awaited = (
+    part: ProjectPageSkeletonPart,
+    gap: 'xl' | 'xxl',
+    nodes: ReactNode,
+    loading = false,
+  ) => {
+    if (pending === undefined) return nodes
+    const skeleton = loading ? (
+      <Loading shown>{emptyPart(part)}</Loading>
+    ) : (
+      <>
+        <MarkShown />
+        {emptyPart(part)}
+      </>
+    )
+    return (
+      <Awaited pending={pending} skeleton={skeleton} gap={gap}>
+        {nodes}
+      </Awaited>
+    )
+  }
+  // Une seule colonne (téléphone, tablette) : tout ce qui suit l'en-tête, dans l'ordre de lecture. La
+  // conversation vient après le projet ; « Signaler » ferme la page.
+  const afterHeader = (
+    <>
+      {w(actions)}
+      {w(actionNotes)}
+      {w(reactions)}
+      {w(recipe)}
+      {w(recipeNotes)}
+      {w(description)}
+      {w(prompt)}
+      {w(journal)}
+      {w(conversation)}
+      {w(report)}
+    </>
+  )
 
   if (large) {
     return (
@@ -194,30 +265,44 @@ export function ProjectPageLayout({
                     {w(reactions)}
                   </>
                 ),
+                // R16 : sous l'en-tête, la zone qui porte le seul « Chargement… » de la page (lu
+                // juste après l'en-tête, comme sur téléphone) ; les deux zones de la seconde rangée
+                // paraissent avec elle.
                 side: (
                   <>
                     {w(header)}
-                    {w(actions)}
-                    {w(actionNotes)}
-                    {recipeFirst ? w(recipe) : null}
-                    {recipeFirst ? w(recipeNotes) : null}
+                    {awaited(
+                      'actions',
+                      'xxl',
+                      <>
+                        {w(actions)}
+                        {w(actionNotes)}
+                        {recipeFirst ? w(recipe) : null}
+                        {recipeFirst ? w(recipeNotes) : null}
+                      </>,
+                      true,
+                    )}
                   </>
                 ),
               },
               {
-                main: (
+                main: awaited(
+                  'reading',
+                  'xxl',
                   <>
                     {w(description)}
                     {w(prompt)}
                     {w(journal)}
-                  </>
+                  </>,
                 ),
-                side: (
+                side: awaited(
+                  'conversation',
+                  'xxl',
                   <>
                     {recipeFirst ? null : w(recipe)}
                     {recipeFirst ? null : w(recipeNotes)}
                     {w(conversation)}
-                  </>
+                  </>,
                 ),
               },
               ...(report ? [{ main: w(report), side: null, continues: true }] : []),
@@ -229,16 +314,7 @@ export function ProjectPageLayout({
             {gallery}
             {w(galleryNotes)}
             {w(header)}
-            {w(actions)}
-            {w(actionNotes)}
-            {w(reactions)}
-            {w(recipe)}
-            {w(recipeNotes)}
-            {w(description)}
-            {w(prompt)}
-            {w(journal)}
-            {w(conversation)}
-            {w(report)}
+            {awaited('all', 'xl', afterHeader, true)}
           </>
         )}
         {layers}
@@ -252,17 +328,7 @@ export function ProjectPageLayout({
       {/* R9 : la photo retirée est juste au-dessus, dans la galerie : son encadré ouvre la page. */}
       {w(galleryNotes)}
       {w(header)}
-      {w(actions)}
-      {w(actionNotes)}
-      {w(reactions)}
-      {w(recipe)}
-      {w(recipeNotes)}
-      {w(description)}
-      {w(prompt)}
-      {w(journal)}
-      {/* La conversation vient après le projet ; « Signaler » ferme la page. */}
-      {w(conversation)}
-      {w(report)}
+      {awaited('all', 'xl', afterHeader, true)}
     </>
   )
   return (
@@ -387,8 +453,178 @@ export function ProjectDescription({ text, removed }: { text: string; removed?: 
   )
 }
 
-// R16, socle : pièce vide, écrite par la tranche (plan R16).
-/** Le bas vide de la page d'un projet (description, recette, commentaires). Sans rôle ni nom à elle. */
-export function ProjectPageSkeleton(_props: Record<string, never>): ReactNode {
+// ---------------------------------------------------------------------------------------------
+// R16 (« Les squelettes », planches R16-Projet-1440 et 390) : ce que la page attend encore
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * La partie vide que la page pose à un endroit :
+ * - `all` (téléphone, tablette : une seule colonne) : tout ce qui suit l'en-tête, dans l'ordre de la
+ *   page (les actions, la recette, la description et le prompt, les commentaires) ;
+ * - `actions` (ordinateur, à côté de la galerie) : « Tester la démo », l'adresse de la démo, puis
+ *   « Suivre ce projet » et « Rejoindre les testeurs » ;
+ * - `reading` (ordinateur, seconde rangée à gauche) : la description et le bloc du prompt ;
+ * - `conversation` (ordinateur, seconde rangée à droite) : la recette et les commentaires.
+ */
+export type ProjectPageSkeletonPart = 'all' | 'actions' | 'reading' | 'conversation'
+
+/**
+ * Le bas vide de la page d'un projet (plan R16, choix 10 et 11) : ce que l'aperçu tiré d'une carte
+ * ne sait pas (les actions, la recette, la description, le prompt, les commentaires), à la forme de
+ * ce qui arrive. Le bloc du prompt est posé vide même si le projet n'en a pas : on ne le sait pas
+ * encore. Sans rôle ni nom à elle : c'est le `Loading` de la page qui dit « Chargement… », une seule
+ * fois. Faite des pièces vides de `src/ui` (lignes à la hauteur d'un texte écrit, lignes vides d'une
+ * liste) dans les vraies surfaces de la recette et des commentaires : ce fichier n'écrit aucun style.
+ */
+export function ProjectPageSkeleton({ part = 'all' }: { part?: ProjectPageSkeletonPart }) {
+  // Sur ordinateur, « Tester la démo » ne prend pas toute la colonne (planche R16-Projet-1440).
+  const { columns } = useLayout()
+  const actions = <ActionsShapes wide={columns} />
+  const reading = (
+    <>
+      <DescriptionShapes />
+      <PromptShapes />
+    </>
+  )
+  const conversation = (
+    <>
+      <RecipeShapes />
+      <CommentsShapes />
+    </>
+  )
+  if (part === 'actions') return actions
+  // Les écarts sont ceux des morceaux qu'elles imitent : `xxl` entre deux morceaux d'une colonne de
+  // `Columns`, `xl` entre deux morceaux de la colonne unique de `Screen`.
+  if (part === 'reading') return <Stack gap="xxl">{reading}</Stack>
+  if (part === 'conversation') return <Stack gap="xxl">{conversation}</Stack>
+  return (
+    <Stack gap="xl">
+      {actions}
+      <RecipeShapes />
+      {reading}
+      <CommentsShapes />
+    </Stack>
+  )
+}
+
+/** « Tester la démo » (le grand bouton), l'adresse de la démo, puis les deux actions plus discrètes. */
+function ActionsShapes({ wide }: { wide: boolean }) {
+  return (
+    <Stack gap="lg">
+      <Stack gap="sm">
+        <Shape height={layout.controlHeight.regular} width={wide ? '80%' : '100%'} round />
+        <TextLineShape variant="caption" width="55%" />
+      </Stack>
+      <Stack gap="sm">
+        <Shape height={layout.controlHeight.small} width={wide ? '40%' : '60%'} round />
+        <Shape height={layout.controlHeight.small} width={wide ? '45%' : '65%'} round />
+      </Stack>
+    </Stack>
+  )
+}
+
+/** « Description » (son titre) et trois lignes de texte, comme `ProjectDescription`. */
+function DescriptionShapes() {
+  return (
+    <Stack gap="md">
+      <TextLineShape variant="heading" width="35%" />
+      <Stack gap="none">
+        <TextLineShape variant="body" width="95%" />
+        <TextLineShape variant="body" width="90%" />
+        <TextLineShape variant="body" width="60%" />
+      </Stack>
+    </Stack>
+  )
+}
+
+/** Le bloc du prompt de départ : son titre, puis quelques lignes dans un bloc. */
+function PromptShapes() {
+  return (
+    <Surface variant="grouped" padding="lg" gap="sm">
+      <TextLineShape variant="callout" width="40%" />
+      <Stack gap="none">
+        <TextLineShape variant="code" width="90%" />
+        <TextLineShape variant="code" width="85%" />
+        <TextLineShape variant="code" width="50%" />
+      </Stack>
+    </Surface>
+  )
+}
+
+/** « La recette », dans sa surface : son titre et trois lignes (outils, difficulté, début). */
+function RecipeShapes() {
+  return (
+    <Surface variant="grouped" padding="xl" gap="lg">
+      <TextLineShape variant="heading" width="45%" />
+      <Stack gap="sm">
+        <TextLineShape variant="callout" width="75%" />
+        <TextLineShape variant="callout" width="85%" />
+        <TextLineShape variant="callout" width="60%" />
+      </Stack>
+    </Surface>
+  )
+}
+
+/** Les commentaires, dans leur surface : le titre de la section et trois lignes vides. */
+function CommentsShapes() {
+  return (
+    <Surface variant="grouped" padding="xl" gap="lg">
+      <TextLineShape variant="heading" width="50%" />
+      <CommentRowsSkeleton />
+    </Surface>
+  )
+}
+
+/** Les lignes vides des commentaires (la photo, le nom, le texte), le nombre de l'aperçu. */
+const COMMENT_ROWS = 3
+
+/**
+ * Les lignes vides d'une liste de commentaires qui charge, sans `Loading` autour : la page les pose
+ * dans son squelette, et la section des commentaires (screens/ProjectComments.tsx) dans le sien.
+ */
+export function CommentRowsSkeleton() {
+  return (
+    <Stack gap="xs">
+      {Array.from({ length: COMMENT_ROWS }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+        <ListRowSkeleton key={index} />
+      ))}
+    </Stack>
+  )
+}
+
+/**
+ * Une zone que la page attend (R16, choix 9) : son squelette, puis son contenu en fondu, toujours
+ * dans le même arbre (`Reveal`). Les morceaux du contenu gardent leur écart (`gap`) : celui de la
+ * colonne où la zone est posée.
+ */
+function Awaited({
+  pending,
+  skeleton,
+  gap,
+  children,
+}: {
+  pending: boolean
+  skeleton: ReactNode
+  gap: 'xl' | 'xxl'
+  children: ReactNode
+}) {
+  return (
+    <Reveal loading={pending} skeleton={skeleton}>
+      <Stack gap={gap}>{children}</Stack>
+    </Reveal>
+  )
+}
+
+/**
+ * Dit à la zone qui l'entoure (`Reveal`) que son squelette s'est montré, comme `Loading` le dit pour
+ * la sienne : elle fondra vers le contenu. Pour une partie vide sans `Loading` à elle (voir
+ * `awaited`, dans `ProjectPageLayout`).
+ */
+function MarkShown(): null {
+  const shown = useContext(LoadingShownContext)
+  useEffect(() => {
+    shown?.()
+  }, [shown])
   return null
 }

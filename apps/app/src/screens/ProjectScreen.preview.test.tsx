@@ -190,8 +190,9 @@ describe('the page of a project opened from a card, before the API answers (R14)
     expect(screen.queryByRole('header', { name: descriptionTitle })).toBeNull()
     expect(screen.queryByText(containing(descriptionTitle))).toBeNull()
     expect(screen.queryByRole('button', { name: /^Waggle/ })).toBeNull()
-    // Le reste de la page est un squelette, nommé « Chargement… ».
-    expect(screen.getByRole('progressbar', { name: T.loading })).toBeTruthy()
+    // Le reste de la page est un squelette, nommé « Chargement… ». R16 (plan, choix 8) : `Loading`
+    // reste caché aux lecteurs d'écran 160 ms avant de se montrer : on l'attend (`findBy…`).
+    expect(await screen.findByRole('progressbar', { name: T.loading })).toBeTruthy()
   })
 
   it('shows no action of the page that depends on who is reading (edit, menu, follow, reactions) before the API answers', async () => {
