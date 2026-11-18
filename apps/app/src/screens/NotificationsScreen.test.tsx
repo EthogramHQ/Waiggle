@@ -1326,7 +1326,9 @@ describe('the activity while it loads (R16)', () => {
     await renderWithProviders(<NotificationsScreen />)
 
     const loading = fr.t(($) => $.common.loading)
-    expect(screen.getAllByTestId('ListRowSkeleton')).toHaveLength(5)
+    // `findAll…` : l'attente garde sa place cachée, aux yeux comme aux lecteurs d'écran, pendant
+    // ses 160 premières millisecondes (plan R16, choix 8), puis se montre.
+    expect(await screen.findAllByTestId('ListRowSkeleton')).toHaveLength(5)
     expect(screen.getAllByRole('progressbar', { name: loading })).toHaveLength(1)
     expect(screen.queryByText(loading)).toBeNull()
   })

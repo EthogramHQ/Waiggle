@@ -24,7 +24,7 @@ import { type Project, ProjectStatus, UPDATE_LINE_MAX, UPDATE_PHOTOS_MAX } from 
 import { usePathname, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { nextAfterSignIn, useSignInAgain } from '../navigation/signInAgain'
@@ -62,10 +62,25 @@ export function UpdateSheet({ id, announce }: ScreenProps) {
   return (
     <>
       {alone ? <ProjectScreen id={id} /> : null}
-      <UpdateSheetStates id={id} announce={announce} />
+      {/* R16 : la garde commune. En attente, la feuille et ses lignes vides ; pour un visiteur, la
+          feuille « Réservé aux membres » (une feuille reste une feuille) ; si la session ne se lit
+          pas, la page « Réessayer » de la garde. Les trois issues dessinent le même composant
+          (`UpdateSheetStates`, que la garde place au même endroit) : la feuille déjà ouverte
+          pendant l'attente reste la même quand la session arrive, au lieu de se refermer et de se
+          rouvrir (elle est une couche, un Modal). Ce composant ne lit rien tant que la garde ne lui
+          dit pas qu'un membre est là (`reading`). */}
+      <SessionGate
+        loading={<UpdateSheetStates id={id} announce={announce} reading="pending" />}
+        signedOut={<UpdateSheetStates id={id} announce={announce} reading="signedOut" />}
+      >
+        {() => <UpdateSheetStates id={id} announce={announce} reading="signedIn" />}
+      </SessionGate>
     </>
   )
 }
+
+/** Ce que la garde a lu de la session, quand elle dessine la feuille (jamais une erreur : sa page). */
+type Reading = 'pending' | 'signedOut' | 'signedIn'
 
 /** Un état qui remplace le formulaire, dans la même feuille : titre, phrase et issues. */
 type SheetState = {
@@ -75,17 +90,28 @@ type SheetState = {
   actions?: { label: string; onPress: () => void }[]
 }
 
-/** Choisit ce que montre la feuille : un état (chargement, suspendu, introuvable…) ou le formulaire. */
-function UpdateSheetStates({ id, announce }: { id: string; announce: string | undefined }) {
+/**
+ * Choisit ce que montre la feuille : un état (chargement, suspendu, introuvable…) ou le formulaire.
+ * `reading` vient de la garde : rien n'est demandé à l'API avant `signedIn`.
+ */
+function UpdateSheetStates({
+  id,
+  announce,
+  reading,
+}: {
+  id: string
+  announce: string | undefined
+  reading: Reading
+}) {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
   // Fermer revient à la page d'avant, sinon à la page du projet (arrivée par un lien direct).
   const sheet = useRouteSheet({ pathname: '/projects/[id]', params: { id } })
-  const { state, session, retry } = useMemberSession()
+  const signedIn = reading === 'signedIn'
   // Le profil (sa suspension) d'abord : rien à taper tant qu'on ne sait pas si l'on peut publier.
-  const me = useMe(Boolean(session))
-  const project = useProject(id, Boolean(session && me.data))
+  const me = useMe(signedIn)
+  const project = useProject(id, signedIn && Boolean(me.data))
   const title = t(($) => $.project.updates.sheetTitle)
 
   const shown = (content: ReactNode) => (
@@ -124,17 +150,8 @@ function UpdateSheetStates({ id, announce }: { id: string; announce: string | un
           actions: [{ label: t(($) => $.common.retry), onPress: onRetry }],
         })
 
-  if (state === 'pending') return loading
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') {
-    return stateSheet({
-      kind: 'error',
-      title: t(($) => $.states.errorTitle),
-      message: t(($) => $.account.loadError),
-      actions: [{ label: t(($) => $.common.retry), onPress: retry }],
-    })
-  }
-  if (!session) return signedOut(false)
+  if (reading === 'pending') return loading
+  if (reading === 'signedOut') return signedOut(false)
   if (!me.data) return me.error ? failed(me.error, () => void me.refetch()) : loading
   if (me.data.suspension) {
     // Comme la feuille de publication : le bandeau replié (la date de fin, « Détails » vers le

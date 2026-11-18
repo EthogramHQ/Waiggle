@@ -10,7 +10,8 @@ import { Redirect, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
+import type { SessionData } from '../accounts/session'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -24,7 +25,7 @@ import { SettingsColumns, settingsColumnsWidth } from '../ui/SettingsColumns'
 import { SettingsNav, type SettingsNavItem } from '../ui/SettingsNav'
 import { useLayout } from '../ui/theme/layout'
 import { type ContentSection, SettingsSection } from './settings/sections'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen } from './states'
 
 /** Les rubriques des réglages, dans l'ordre du scénario. */
 export type SettingsSectionKey = 'profile' | ContentSection | 'moderation'
@@ -55,12 +56,33 @@ type Props = {
 }
 
 export function SettingsScreen({ section }: Props) {
+  // Mon profil et Modération ont leur propre page : une adresse qui les nomme y mène, avant même de
+  // savoir qui est là (la page d'arrivée a sa propre garde).
+  if (section === 'profile' || section === 'moderation')
+    return <Redirect href={ownPages[section]} />
+  // R16 : la garde commune (attente, erreur, visiteur). Son attente a la forme de la liste des
+  // rubriques, à la largeur d'avant (un formulaire) ; les pages d'état aussi (`form` par défaut).
+  // Le profil ne se lit qu'avec une session : sa lecture vit dans `Settings`.
+  return (
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
+      {(session) => <Settings section={section} session={session} />}
+    </SessionGate>
+  )
+}
+
+type SettingsProps = {
+  /** La rubrique ouverte : une de celles dont le contenu est ici (les autres ont redirigé). */
+  section: ContentSection | undefined
+  /** La session lue par la garde : l'adresse e-mail, et le nom quand le profil ne se lit pas. */
+  session: SessionData
+}
+
+function Settings({ section, session: data }: SettingsProps) {
   const { t } = useTranslation()
   const router = useRouter()
   const { sizeClass } = useLayout()
   const wide = sizeClass === 'wide'
-  const { state, session: data, retry: retrySession } = useMemberSession()
-  const me = useMe(Boolean(data))
+  const me = useMe()
   const toSource = useMediaSources()
   // Une relecture du profil demandée par « Réessayer » est en cours : pendant ce temps, React Query
   // efface l'erreur ; le message reste, sinon il disparaîtrait avec le bouton qui a le focus.
@@ -73,15 +95,6 @@ export function SettingsScreen({ section }: Props) {
   }
   // Le retour : de la liste vers le Fil (`/feed`) ; d'une rubrique (téléphone) vers la liste.
   const back = useGoBack(section && !wide ? '/settings' : '/feed')
-
-  // Mon profil et Modération ont leur propre page : une adresse qui les nomme y mène.
-  if (section === 'profile' || section === 'moderation')
-    return <Redirect href={ownPages[section]} />
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
-  // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
-  if (!data) return <SignedOutScreen />
 
   const label = (key: SettingsSectionKey) => t(($) => $.settings.sections[key])
   // La modération, pour un administrateur seulement : elle apparaît quand le profil est arrivé. Ce

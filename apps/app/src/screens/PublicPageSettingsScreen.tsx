@@ -17,7 +17,7 @@
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style (règle des étages).
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { useGoBack } from '../navigation/useGoBack'
 import { usePublicPageChange, usePublicPageSettings } from '../profile/api'
 import { useMe } from '../profile/hooks'
@@ -31,14 +31,26 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { Switch } from '../ui/Switch'
 import { PublicMemberScreen } from './PublicMemberScreen'
-import { LoadErrorScreen, LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadErrorScreen, LoadingScreen } from './states'
+
+/**
+ * L'attente de la page : la forme d'une liste (l'interrupteur, puis les cases), à la largeur d'un
+ * formulaire, comme avant. La même pendant la lecture de la session et celle des réglages, pour que
+ * rien ne saute de l'une à l'autre.
+ */
+const waiting = <LoadingScreen shape="list" width="form" />
 
 export function PublicPageSettingsScreen() {
+  // R16 : la garde commune (attente, erreur, visiteur), avec ses pages d'état de la largeur d'un
+  // formulaire, comme avant. Les lectures ne partent qu'avec une session : elles vivent dans
+  // `PublicPageSettings`.
+  return <SessionGate loading={waiting}>{() => <PublicPageSettings />}</SessionGate>
+}
+
+function PublicPageSettings() {
   const { t } = useTranslation()
-  const { state, session, retry: retrySession } = useMemberSession()
-  const signedIn = Boolean(session)
-  const me = useMe(signedIn)
-  const page = usePublicPageSettings(signedIn)
+  const me = useMe()
+  const page = usePublicPageSettings()
   const { change, error } = usePublicPageChange()
   const back = useGoBack('/settings/profile')
   // L'aperçu est posé dans l'écran : « Retour » le referme et rend le focus à son bouton.
@@ -53,9 +65,6 @@ export function PublicPageSettingsScreen() {
     wasPreviewing.current = previewing
   }, [previewing])
 
-  if (state === 'pending') return <LoadingScreen />
-  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
-  if (!session) return <SignedOutScreen />
   if (page.error && !page.data) {
     return (
       <LoadErrorScreen
@@ -65,7 +74,7 @@ export function PublicPageSettingsScreen() {
       />
     )
   }
-  if (!page.data || !me.data) return <LoadingScreen />
+  if (!page.data || !me.data) return waiting
 
   const { settings, webProjectCount, projectCount } = page.data
   // Un membre suspendu ne peut que fermer sa page (Q6) : l'API refuse le reste en 403.
