@@ -638,13 +638,24 @@ function MemberSearch() {
 
   // --- R16 : les résultats en grand (dès 1 280 points).
   // Les projets en cartes compactes, chacune un lien vers le projet (`SummaryCard`, comme « Récents »
-  // d'Explorer), dans une grille qui compte ses colonnes selon sa place.
+  // d'Explorer), dans une grille qui compte ses colonnes selon sa place. Chaque carte dit pourquoi
+  // elle est trouvée (planches R16-Recherche-1440 et -1920) : les mots cherchés surlignés dans son
+  // titre, et l'extrait de la description quand c'est elle qui a correspondu, comme les lignes.
   const projectCards =
     data && shows('projects') ? (
       <ProjectsSection>
         <ProjectGrid>
           {data.projects.items.map((project) => (
-            <SummaryCard key={project.id} project={project} />
+            <SummaryCard
+              key={project.id}
+              project={project}
+              match={{
+                words,
+                excerpt: project.excerpt
+                  ? t(($) => $.search.excerpt, { excerpt: project.excerpt })
+                  : null,
+              }}
+            />
           ))}
         </ProjectGrid>
       </ProjectsSection>

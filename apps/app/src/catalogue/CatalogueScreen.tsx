@@ -66,6 +66,7 @@ import { AmbiancesCatalogue } from './ambiances'
 import { BeforeAfterCatalogue } from './avant-apres'
 import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
+import { SearchCardsCatalogue } from './cartes-recherche'
 import { InvalidChoicesCatalogue } from './champs-invalides'
 import { LoadingCatalogue } from './chargement'
 import { TestersCornerHeadsCatalogue } from './coin-entetes'
@@ -860,6 +861,8 @@ export function CatalogueScreen() {
       <NavigationCatalogue />
       <TopBarCatalogue />
       <CardsCatalogue />
+      {/* R16 : la carte d'un résultat de recherche, en grand (cartes-recherche.tsx). */}
+      <SearchCardsCatalogue />
       <FeedCatalogue />
       <ExploreCatalogue />
       <ToolsCatalogue />
