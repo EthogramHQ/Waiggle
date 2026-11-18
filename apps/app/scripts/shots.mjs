@@ -6158,7 +6158,17 @@ const capture = async ({ shot, device, scheme }) => {
     await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
     // Un geste avant la capture (ouvrir un champ), puis le temps de son fondu.
     if (shot.prepare) {
-      await shot.prepare(page)
+      try {
+        await shot.prepare(page)
+      } catch (error) {
+        // L'image de la page au moment de l'échec, envoyée avec les autres par la CI : sans elle, on
+        // ne savait pas ce que `recherche-attente` montrait à la place du chargement, qui n'est
+        // jamais apparu de deux CI sur trois (18/11/2026).
+        await page
+          .screenshot({ path: join(out, `echec-${shot.name}-${device.name}-${scheme.name}.png`) })
+          .catch(() => {})
+        throw error
+      }
       await page.waitForTimeout(300)
     }
     if (shot.textScale) await scaleText(page, shot.textScale)
