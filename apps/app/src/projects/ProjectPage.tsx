@@ -19,26 +19,36 @@
 // - `ProjectRecipe`, « La recette » : le mois de début, la difficulté et les outils ;
 // - `ProjectDescription`, « Description » et son texte en Markdown.
 // Ce fichier n'écrit aucun style (règle Biome de `src/projects/**`) : il assemble des composants.
-import { layout } from '@ruche/brand'
 import type { Project } from '@ruche/contracts'
-import { type ReactNode, useContext, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useOpenOutside } from '../navigation/links'
 import { Columns } from '../ui/Columns'
+import { DelayedShapes } from '../ui/DelayedShapes'
 import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
-import { ListRowSkeleton, TextLineShape } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { CoverSheet } from '../ui/ProjectCover'
+import {
+  ActionsShapes,
+  CommentsShapes,
+  DescriptionShapes,
+  PromptShapes,
+  RecipeShapes,
+} from '../ui/ProjectPageShapes'
 import { RecipeFact } from '../ui/RecipeFact'
 import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
-import { Loading, LoadingShownContext, Shape } from '../ui/Skeleton'
+import { Loading } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
 import { startedMonth } from './month'
+
+// Les lignes vides des commentaires vivent avec les autres formes de la page (`ui/ProjectPageShapes`) ;
+// la section des commentaires (screens/ProjectComments.tsx) les prend ici, comme avant (R16).
+export { CommentRowsSkeleton } from '../ui/ProjectPageShapes'
 
 /**
  * Les morceaux de la page, déjà fabriqués par l'écran ; `null` ou absent : rien à cette place, pas
@@ -181,10 +191,10 @@ export function ProjectPageLayout({
    * n'entend « Chargement… » qu'une fois. Les deux autres n'ont donc que leurs formes, sans rôle ni
    * nom, qui ne se lisent pas.
    *
-   * Montré tout de suite (`shown`, plan R16, choix 8) : la page est déjà là (la photo, le titre,
-   * l'auteur, venus de la carte), et sa partie vide en est la forme ; elle ne surgit pas 160 ms plus
-   * tard sous un en-tête déjà posé. Toutes les parties paraissent donc ensemble, et chacune fond vers
-   * son contenu (`MarkShown` le dit à sa zone).
+   * Le délai de 160 ms de toute la page (plan R16, choix 8 ; scénario : « si la page arrive en moins
+   * de 160 ms, aucun squelette ne s'affiche ») : le `Loading` attend, et les formes sans `Loading`
+   * attendent avec lui (`DelayedShapes`, montées au même instant). Toutes les parties paraissent
+   * donc ensemble, et chacune le dit à sa zone, qui fond alors vers son contenu.
    */
   const awaited = (
     part: ProjectPageSkeletonPart,
@@ -194,12 +204,9 @@ export function ProjectPageLayout({
   ) => {
     if (pending === undefined) return nodes
     const skeleton = loading ? (
-      <Loading shown>{emptyPart(part)}</Loading>
+      <Loading>{emptyPart(part)}</Loading>
     ) : (
-      <>
-        <MarkShown />
-        {emptyPart(part)}
-      </>
+      <DelayedShapes>{emptyPart(part)}</DelayedShapes>
     )
     return (
       <Awaited pending={pending} skeleton={skeleton} gap={gap}>
@@ -473,8 +480,8 @@ export type ProjectPageSkeletonPart = 'all' | 'actions' | 'reading' | 'conversat
  * ne sait pas (les actions, la recette, la description, le prompt, les commentaires), à la forme de
  * ce qui arrive. Le bloc du prompt est posé vide même si le projet n'en a pas : on ne le sait pas
  * encore. Sans rôle ni nom à elle : c'est le `Loading` de la page qui dit « Chargement… », une seule
- * fois. Faite des pièces vides de `src/ui` (lignes à la hauteur d'un texte écrit, lignes vides d'une
- * liste) dans les vraies surfaces de la recette et des commentaires : ce fichier n'écrit aucun style.
+ * fois. Ses formes (les actions, la description, le prompt, la recette, les commentaires) vivent
+ * dans `ui/ProjectPageShapes`, qui lit les jetons ; ici, seulement leur ordre selon la largeur.
  */
 export function ProjectPageSkeleton({ part = 'all' }: { part?: ProjectPageSkeletonPart }) {
   // Sur ordinateur, « Tester la démo » ne prend pas toute la colonne (planche R16-Projet-1440).
@@ -507,92 +514,6 @@ export function ProjectPageSkeleton({ part = 'all' }: { part?: ProjectPageSkelet
   )
 }
 
-/** « Tester la démo » (le grand bouton), l'adresse de la démo, puis les deux actions plus discrètes. */
-function ActionsShapes({ wide }: { wide: boolean }) {
-  return (
-    <Stack gap="lg">
-      <Stack gap="sm">
-        <Shape height={layout.controlHeight.regular} width={wide ? '80%' : '100%'} round />
-        <TextLineShape variant="caption" width="55%" />
-      </Stack>
-      <Stack gap="sm">
-        <Shape height={layout.controlHeight.small} width={wide ? '40%' : '60%'} round />
-        <Shape height={layout.controlHeight.small} width={wide ? '45%' : '65%'} round />
-      </Stack>
-    </Stack>
-  )
-}
-
-/** « Description » (son titre) et trois lignes de texte, comme `ProjectDescription`. */
-function DescriptionShapes() {
-  return (
-    <Stack gap="md">
-      <TextLineShape variant="heading" width="35%" />
-      <Stack gap="none">
-        <TextLineShape variant="body" width="95%" />
-        <TextLineShape variant="body" width="90%" />
-        <TextLineShape variant="body" width="60%" />
-      </Stack>
-    </Stack>
-  )
-}
-
-/** Le bloc du prompt de départ : son titre, puis quelques lignes dans un bloc. */
-function PromptShapes() {
-  return (
-    <Surface variant="grouped" padding="lg" gap="sm">
-      <TextLineShape variant="callout" width="40%" />
-      <Stack gap="none">
-        <TextLineShape variant="code" width="90%" />
-        <TextLineShape variant="code" width="85%" />
-        <TextLineShape variant="code" width="50%" />
-      </Stack>
-    </Surface>
-  )
-}
-
-/** « La recette », dans sa surface : son titre et trois lignes (outils, difficulté, début). */
-function RecipeShapes() {
-  return (
-    <Surface variant="grouped" padding="xl" gap="lg">
-      <TextLineShape variant="heading" width="45%" />
-      <Stack gap="sm">
-        <TextLineShape variant="callout" width="75%" />
-        <TextLineShape variant="callout" width="85%" />
-        <TextLineShape variant="callout" width="60%" />
-      </Stack>
-    </Surface>
-  )
-}
-
-/** Les commentaires, dans leur surface : le titre de la section et trois lignes vides. */
-function CommentsShapes() {
-  return (
-    <Surface variant="grouped" padding="xl" gap="lg">
-      <TextLineShape variant="heading" width="50%" />
-      <CommentRowsSkeleton />
-    </Surface>
-  )
-}
-
-/** Les lignes vides des commentaires (la photo, le nom, le texte), le nombre de l'aperçu. */
-const COMMENT_ROWS = 3
-
-/**
- * Les lignes vides d'une liste de commentaires qui charge, sans `Loading` autour : la page les pose
- * dans son squelette, et la section des commentaires (screens/ProjectComments.tsx) dans le sien.
- */
-export function CommentRowsSkeleton() {
-  return (
-    <Stack gap="xs">
-      {Array.from({ length: COMMENT_ROWS }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
-        <ListRowSkeleton key={index} />
-      ))}
-    </Stack>
-  )
-}
-
 /**
  * Une zone que la page attend (R16, choix 9) : son squelette, puis son contenu en fondu, toujours
  * dans le même arbre (`Reveal`). Les morceaux du contenu gardent leur écart (`gap`) : celui de la
@@ -614,17 +535,4 @@ function Awaited({
       <Stack gap={gap}>{children}</Stack>
     </Reveal>
   )
-}
-
-/**
- * Dit à la zone qui l'entoure (`Reveal`) que son squelette s'est montré, comme `Loading` le dit pour
- * la sienne : elle fondra vers le contenu. Pour une partie vide sans `Loading` à elle (voir
- * `awaited`, dans `ProjectPageLayout`).
- */
-function MarkShown(): null {
-  const shown = useContext(LoadingShownContext)
-  useEffect(() => {
-    shown?.()
-  }, [shown])
-  return null
 }
