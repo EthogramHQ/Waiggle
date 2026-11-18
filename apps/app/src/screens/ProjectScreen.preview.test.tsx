@@ -333,8 +333,10 @@ describe('the preview of a project while the rest of its page loads (R16)', () =
       screen.getAllByText(T.status)[0],
       screen.getByText(project.pitch),
     ]
-    // Témoin : le reste de la page attend bien, sous un seul nom.
-    expect(screen.getByRole('progressbar', { name: T.loading })).toBeTruthy()
+    // Témoin : le reste de la page attend bien, sous un seul nom. `findBy` : le squelette du bas de
+    // la page attend 160 ms avant de se montrer, caché aux lecteurs d'écran jusque-là (plan R16,
+    // choix 8 : une page qui arrive plus vite ne montre aucun squelette).
+    expect(await screen.findByRole('progressbar', { name: T.loading })).toBeTruthy()
     for (const element of known) {
       expect(element).toBeTruthy()
       expect(insideProgressbar(element as never)).toBe(false)
@@ -346,7 +348,8 @@ describe('the preview of a project while the rest of its page loads (R16)', () =
     await screen.findByRole('header', { name: containing(project.title) })
 
     // La pièce vide de la page d'un projet (projects/ProjectPage.tsx), sans rôle ni nom à elle :
-    // son faux module l'entoure d'une vue marquée de son nom.
-    expect(screen.getByTestId('ProjectPageSkeleton')).toBeTruthy()
+    // son faux module l'entoure d'une vue marquée de son nom. `findBy` : elle reste cachée 160 ms
+    // (plan R16, choix 8), et `getByTestId` ignore un arbre caché aux lecteurs d'écran.
+    expect(await screen.findByTestId('ProjectPageSkeleton')).toBeTruthy()
   })
 })

@@ -13,6 +13,7 @@ import { borders, layout as layoutTokens, radii, readableWidth, space } from '@r
 import type { ReactNode, Ref } from 'react'
 import { Image, View } from 'react-native'
 import { Avatar } from './Avatar'
+import { DelayedShapes } from './DelayedShapes'
 import { ExampleBadge } from './ExampleBadge'
 import type { Focusable } from './focus'
 import type { ImageSource } from './image'
@@ -20,7 +21,7 @@ import { TextLineShape } from './ListGroup'
 import { ProjectCover } from './ProjectCover'
 import { Shape, SkeletonSurface } from './Skeleton'
 import { Stack } from './Stack'
-import { Tag } from './Tag'
+import { Tag, TagSkeleton } from './Tag'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -252,10 +253,12 @@ function ColumnPhoto({ name, source }: { name: string; source: ImageSource | nul
   )
 }
 
-/** Les étiquettes d'outils vides : trois, à la hauteur dessinée d'une étiquette (`Tag`). */
-const SKELETON_TOOLS = [72, 88, 64] as const
+/** Les étiquettes d'outils vides : trois (`TagSkeleton`, leur rang choisit leur largeur). */
+const SKELETON_TOOLS = [0, 1, 2] as const
 /** La largeur du bouton vide sous l'en-tête (« Suivre Léa »), quand il ne prend pas toute la ligne. */
 const SKELETON_ACTION = 152
+/** La largeur de la ligne vide des abonnés, celle de « 12 abonnés » écrit en `callout`. */
+const SKELETON_FOLLOWERS = 88
 
 /**
  * R16 (plan, choix 4 et 10 ; planches R16-Membre-1440 et 390) : l'en-tête d'un membre pendant que
@@ -268,6 +271,12 @@ const SKELETON_ACTION = 152
  * donnés (`name`, `avatar`), ils s'affichent pour de vrai, le nom en titre de la page. L'écran pose
  * alors cet en-tête **hors** de son `Loading` (le nom se lit, il n'attend rien). Sans eux, tout est
  * formes, sans rôle ni nom à elles : le `Loading` de l'écran les nomme.
+ *
+ * Hors du `Loading`, les formes vides attendraient moins que lui : elles se montreraient tout de
+ * suite, et une page arrivée en moins de 160 ms ferait clignoter un en-tête à moitié vide (scénario
+ * R16, « Quand on le voit »). `delayShapes` les fait donc attendre avec lui (`DelayedShapes`), le
+ * nom et la photo restant montrés d'emblée. Par défaut, dès que le nom est connu : c'est justement
+ * le cas où l'écran pose l'en-tête hors de son `Loading`.
  */
 export function MemberHeaderSkeleton({
   layout,
@@ -275,6 +284,7 @@ export function MemberHeaderSkeleton({
   avatar = null,
   heading = 1,
   action = true,
+  delayShapes = name !== undefined,
 }: {
   layout?: 'column' | undefined
   /** Le nom déjà connu (l'aperçu) ; absent, une forme vide. */
@@ -283,11 +293,20 @@ export function MemberHeaderSkeleton({
   avatar?: ImageSource | null | undefined
   /** Le niveau du nom, quand il est connu (comme `MemberHeader`). */
   heading?: 1 | 2 | 3
-  /** Le bouton vide sous l'en-tête : `false` quand la vraie page n'en a pas. */
+  /**
+   * Le nombre d'abonnés et le bouton vides sous l'en-tête : `false` quand la vraie page n'en a pas.
+   */
   action?: boolean
+  /**
+   * Les formes vides (pseudo, bio, outils, abonnés et bouton) attendent 160 ms avant de se montrer,
+   * comme le `Loading` de la page ; vrai par défaut quand `name` est donné (voir plus haut).
+   */
+  delayShapes?: boolean
 }): ReactNode {
   const column = layout === 'column'
   const center = !column
+  // Les formes qui attendent, ou telles quelles (l'en-tête tout vide, déjà sous le `Loading`).
+  const shapes = (node: ReactNode) => (delayShapes ? <DelayedShapes>{node}</DelayedShapes> : node)
   const photo =
     name === undefined ? (
       column ? (
@@ -317,31 +336,51 @@ export function MemberHeaderSkeleton({
               {name}
             </Text>
           )}
-          <TextLineShape variant="callout" width="35%" center={center} />
+          {shapes(<TextLineShape variant="callout" width="35%" center={center} />)}
         </Stack>
         {/* La bio : deux lignes, à la largeur de lecture de la vraie bio. */}
-        <View
-          style={center ? { width: '100%', maxWidth: readableWidth, alignSelf: 'center' } : null}
-        >
-          <TextLineShape variant="body" width="95%" center={center} />
-          <TextLineShape variant="body" width="75%" center={center} />
-        </View>
+        {shapes(
+          <View
+            style={center ? { width: '100%', maxWidth: readableWidth, alignSelf: 'center' } : null}
+          >
+            <TextLineShape variant="body" width="95%" center={center} />
+            <TextLineShape variant="body" width="75%" center={center} />
+          </View>,
+        )}
       </Stack>
-      <Stack gap="sm" align={column ? 'stretch' : 'center'}>
-        <TextLineShape variant="caption" width={96} center={center} />
-        <Stack direction="row" gap="sm" wrap justify={column ? 'start' : 'center'}>
-          {SKELETON_TOOLS.map((width) => (
-            <Shape key={width} height={layoutTokens.chipHeight} width={width} round />
-          ))}
-        </Stack>
-      </Stack>
-      {action ? (
-        <Shape
-          height={layoutTokens.controlHeight.regular}
-          width={column ? SKELETON_ACTION : '100%'}
-          round
-        />
-      ) : null}
+      {shapes(
+        <Stack gap="sm" align={column ? 'stretch' : 'center'}>
+          <TextLineShape variant="caption" width={96} center={center} />
+          <Stack direction="row" gap="sm" wrap justify={column ? 'start' : 'center'}>
+            {/* Les étiquettes vides d'« Outils populaires », dans la zone de 44 points d'une vraie
+                étiquette (36 dessinés) : la rangée garde la hauteur de celle qui arrive. */}
+            {SKELETON_TOOLS.map((index) => (
+              <TagSkeleton key={index} index={index} />
+            ))}
+          </Stack>
+        </Stack>,
+      )}
+      {action
+        ? shapes(
+            // Le nombre d'abonnés (« 12 abonnés », une ligne de `callout`) au-dessus du bouton,
+            // comme sur la vraie page : sans lui, tout ce qui suit l'en-tête (« Projets » sur
+            // téléphone) descendait à l'arrivée. L'écart `xs` garde la hauteur de ce qui arrive sur
+            // la page d'un autre membre : la ligne (21), `md` (12) puis « Suivre » en taille
+            // `compact` (44), soit 77 points, comme la ligne, 4 et le bouton vide (52). Sur sa
+            // propre page (`sm`, puis « Modifier mon profil » en taille `regular`), 4 points de
+            // plus.
+            // Étirée sur toute la ligne (`alignSelf`), même dans l'en-tête centré : le bouton vide
+            // y prend toute la largeur, et la ligne des abonnés se centre elle-même (`center`).
+            <View style={{ alignSelf: 'stretch', gap: space.xs }}>
+              <TextLineShape variant="callout" width={SKELETON_FOLLOWERS} center={center} />
+              <Shape
+                height={layoutTokens.controlHeight.regular}
+                width={column ? SKELETON_ACTION : '100%'}
+                round
+              />
+            </View>,
+          )
+        : null}
     </Stack>
   )
 }
