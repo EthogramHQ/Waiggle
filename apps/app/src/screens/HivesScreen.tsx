@@ -394,9 +394,12 @@ function HivesView({ mine }: { mine: MyHives }) {
   }
 
   // Les invitations, une carte chacune (et son échec dessous) : en colonne, ou dans la grille.
+  // En grand, chaque carte prend la hauteur de sa case (`grow`, puis `fill`) : les invitations d'une
+  // rangée ont la même hauteur, même quand un nom de ruche passe sur deux lignes.
   const invitationCards = invitations.map((invitation, index) => (
-    <Stack key={invitation.id} gap="sm" align="stretch">
+    <Stack key={invitation.id} gap="sm" align="stretch" grow={wide}>
       <HiveInvitation
+        fill={wide}
         invitation={invitation}
         onAccept={() => onAccept(invitation, index)}
         onRefuse={() => onRefuse(invitation, index)}

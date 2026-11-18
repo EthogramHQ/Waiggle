@@ -145,7 +145,8 @@ function FeedWaiting() {
   const compact = sizeClass === 'compact'
   const panelId = useId()
   const idleNews = <FeedNews news={NO_NEWS} onPress={noop} />
-  // Le filtre, réduit à « Tout » tant qu'on ne connaît pas ses ruches (voir MemberHome).
+  // Le filtre : « Tout », puis les pastilles vides des ruches, tant qu'on ne les connaît pas (voir
+  // MemberHome).
   const main = (
     <TabPanel id={panelId} label={t(($) => $.hives.pills.all)}>
       <FeedSkeleton news={compact ? idleNews : null} />
@@ -163,7 +164,7 @@ function FeedWaiting() {
       sticky={
         <>
           {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
-          <HivePills hives={[]} value={ALL_HIVES} onChange={noop} panelId={panelId} />
+          <HivePills hives={[]} value={ALL_HIVES} onChange={noop} panelId={panelId} waiting />
         </>
       }
     >
@@ -258,8 +259,11 @@ function MemberHome({
 
   // R10 : les pastilles, seulement pour un membre d'au moins une ruche. Elles commandent le
   // panneau du Fil (`panelId`), posé autour de la colonne principale. R16 (planches R16-Fil) : le
-  // filtre est déjà là pendant la lecture de ses ruches, réduit à « Tout » : les cartes ne
-  // descendent plus quand ses ruches arrivent (69 points sur téléphone). Sans ruche, il part.
+  // filtre est déjà là pendant la lecture de ses ruches : le vrai onglet « Tout », qui commande
+  // déjà le Fil, puis les pastilles vides des ruches à venir (`waiting`). Les cartes ne descendent
+  // plus quand ses ruches arrivent (69 points sur téléphone), et la rangée garde sa largeur (seul,
+  // « Tout » laissait la bande trop étroite pour les noms, qui passaient un instant à la ligne :
+  // le Fil descendait de 27 points puis remontait, à 1 440 comme à 2 560). Sans ruche, il part.
   const panelId = useId()
   const pills =
     hiveChoice.hives.length > 0 || hiveChoice.waiting ? (
@@ -268,6 +272,7 @@ function MemberHome({
         value={chosen?.id ?? ALL_HIVES}
         onChange={hiveChoice.choose}
         panelId={panelId}
+        waiting={hiveChoice.waiting}
       />
     ) : null
   // Sur téléphone, le titre « Fil » reste pourtant lu, caché à l'œil (relecture R3) : un lecteur

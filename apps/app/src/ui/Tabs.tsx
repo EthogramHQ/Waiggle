@@ -91,6 +91,13 @@ type Props<K extends string> = {
    * l'onglet choisi en entier. La capsule prend la largeur de ses onglets, jusqu'à toute la place.
    */
   scroll?: boolean
+  /**
+   * R16 (« Les squelettes », planche R16-Fil-1440) : des pièces posées après les onglets, dans la
+   * même capsule et, avec `scroll`, dans la même bande : les pastilles vides des ruches à venir,
+   * après « Tout », pendant la lecture des ruches. Hors de la liste d'onglets : ce ne sont pas des
+   * onglets, elles ne se lisent pas (au composant qui les donne de les cacher) ni ne se touchent.
+   */
+  trailing?: ReactNode
 }
 
 type KeyEvent = { key: string; preventDefault: () => void }
@@ -123,6 +130,7 @@ export function Tabs<K extends string>({
   focusOnMount = false,
   panelId: externalPanel,
   scroll = false,
+  trailing,
 }: Props<K>) {
   const { colors, shadows } = useTheme()
   // fontScale : la taille de texte choisie sur l'appareil. Très agrandis, les onglets vont à la
@@ -198,6 +206,14 @@ export function Tabs<K extends string>({
   // La largeur visible de la bande, aussi en état : un onglet n'est jamais plus large qu'elle (un
   // nom long, à 200 %, passe à la ligne dans sa pastille au lieu de sortir de la bande).
   const [bandWidth, setBandWidth] = useState(0)
+  // R16 (les sauts du Fil) : les onglets dont la bande a été mesurée avec eux. La bande prend la
+  // largeur de ses onglets : quand les ruches arrivent après « Tout », la largeur connue est encore
+  // celle de « Tout » seul. Bornés à elle, « Famille » et « Amis du jeudi » passaient à la ligne,
+  // la rangée grandissait de 27 points le temps d'une mesure, puis rétrécissait, et le Fil dessous
+  // descendait puis remontait. Un onglet neuf n'est donc borné qu'après la mesure suivante de la
+  // rangée (qui change de largeur dès qu'un onglet s'ajoute) ; la largeur de la bande lue alors
+  // est la bonne.
+  const [measuredTabs, setMeasuredTabs] = useState<ReadonlySet<string>>(() => new Set())
 
   // Choisir l'onglet de rang `index` et lui donner le focus (flèches, Début, Fin).
   const go = (index: number) => {
@@ -271,6 +287,12 @@ export function Tabs<K extends string>({
               const { x } = event.nativeEvent.layout
               const resized = x !== rowX.current
               rowX.current = x
+              // La rangée vient d'être posée avec ces onglets : chacun peut être borné à la bande.
+              setMeasuredTabs((known) =>
+                tabs.every((tab) => known.has(tab.key))
+                  ? known
+                  : new Set(tabs.map((tab) => tab.key)),
+              )
               measured(resized)
             }
           : undefined
@@ -322,7 +344,9 @@ export function Tabs<K extends string>({
               // sa ligne entière. Dans la bande, chacun garde la taille de son texte.
               flexGrow: scroll ? 0 : 1,
               flexShrink: 0,
-              ...(scroll && bandWidth > 0 ? { maxWidth: bandWidth } : null),
+              ...(scroll && bandWidth > 0 && measuredTabs.has(tab.key)
+                ? { maxWidth: bandWidth }
+                : null),
               flexBasis: large ? '100%' : 'auto',
               alignItems: 'center',
               justifyContent: 'center',
@@ -358,6 +382,18 @@ export function Tabs<K extends string>({
     </View>
   )
 
+  // Les pièces d'après (`trailing`), à côté de la rangée, à l'écart des onglets entre eux ; la
+  // rangée garde sa place en tête (son début mesuré dans la bande ne change pas).
+  const band =
+    trailing === undefined ? (
+      row
+    ) : (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
+        {row}
+        {trailing}
+      </View>
+    )
+
   // La capsule de verre. Dans la bande, elle prend la largeur de ses onglets, jusqu'à toute la
   // place (`maxWidth`), et ses onglets défilent dedans au-delà.
   const capsule = scroll ? (
@@ -381,13 +417,13 @@ export function Tabs<K extends string>({
           scrollEventThrottle={16}
           style={{ flexGrow: 0 }}
         >
-          {row}
+          {band}
         </ScrollView>
       </Surface>
     </View>
   ) : (
     <Surface variant={variant} radius={large ? 'group' : 'pill'} padding="xxs">
-      {row}
+      {band}
     </Surface>
   )
 
