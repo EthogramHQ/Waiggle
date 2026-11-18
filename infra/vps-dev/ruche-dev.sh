@@ -102,7 +102,7 @@ apercu() {
   local target=${1:-}
   [ -n "$target" ] || die "apercu <branche> | stop"
   if [ "$target" = stop ]; then
-    sudo systemctl stop ruche-dev-app ruche-dev-api
+    sudo systemctl disable --now ruche-dev-app ruche-dev-api
     rm -f "$APERCU/branche"
     echo "aperçu arrêté"
     return
@@ -114,6 +114,8 @@ apercu() {
   with_lock "$target" prepare "$target" "$sha" >/dev/null
   printf '%s\n' "$target" >"$APERCU/branche"
   write_env "$target"
+  # Activés, pas seulement démarrés : l'aperçu revient seul après un redémarrage du serveur.
+  sudo systemctl enable --quiet ruche-dev-api ruche-dev-app
   sudo systemctl restart ruche-dev-api ruche-dev-app
   echo "aperçu : $target ($(git --git-dir="$REPO" log -1 --format='%h %s' "$sha"))"
   echo "adresse : https://$(tailscale_name)/"
