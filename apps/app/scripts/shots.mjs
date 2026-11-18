@@ -292,6 +292,23 @@ const update = (
 })
 const line = (family, text) => ({ family, text })
 /** Le champ de la n-ième ligne (depuis 1) de la feuille « Nouvelle mise à jour » : « Changement 2 sur 3, … ». */
+/**
+ * Appuie sur `button` jusqu'à voir `effect` (six essais au plus). Une feuille ignore les tapes de ses
+ * 600 premières ms (`guardTaps`), comptées depuis l'arrivée de son contenu ; depuis R16, la garde de
+ * session commune l'a retardée, et sur une CI lente un seul clic tombait encore dans ces 600 ms
+ * (18/11/2026).
+ */
+const pressUntil = async (button, effect) => {
+  for (let attempt = 1; ; attempt++) {
+    await button.click()
+    try {
+      await effect.waitFor({ timeout: 1500 })
+      return
+    } catch (error) {
+      if (attempt >= 6) throw error
+    }
+  }
+}
 const updateLine = (page, n) => page.getByLabel(new RegExp(`^Changement ${n} sur `))
 /**
  * Une image PNG d'une seule couleur, fabriquée ici même (sans fichier ni dépendance) : une signature
@@ -4165,11 +4182,10 @@ const pages = [
     // La feuille ignore les tapes des 600 premières ms (`guardTaps`) : on attend plus que d'habitude.
     wait: 1500,
     prepare: async (page) => {
-      await page
-        .getByRole('button', { name: fr.project.updates.publish, exact: true })
-        .last()
-        .click()
-      await page.getByText(fr.project.updates.required).first().waitFor()
+      await pressUntil(
+        page.getByRole('button', { name: fr.project.updates.publish, exact: true }).last(),
+        page.getByText(fr.project.updates.required).first(),
+      )
     },
   },
   {
@@ -4179,11 +4195,10 @@ const pages = [
     wait: 1500, // « Annuler » ignore les tapes des 600 premières ms de la feuille
     prepare: async (page) => {
       await updateLine(page, 1).fill('Un compte à rebours de dix secondes')
-      await page
-        .getByRole('button', { name: fr.project.updates.cancel, exact: true })
-        .first()
-        .click()
-      await page.getByText(fr.project.updates.discardTitle).waitFor()
+      await pressUntil(
+        page.getByRole('button', { name: fr.project.updates.cancel, exact: true }).first(),
+        page.getByText(fr.project.updates.discardTitle),
+      )
     },
   },
   // R7a : les testeurs. La feuille d'inscription (page de Décollage !, d'Inès, « Testable » avec sa
