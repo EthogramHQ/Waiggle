@@ -159,11 +159,16 @@ export function ToolCardGrid({
   /** Une liste pour les lecteurs d'écran (vrai par défaut) ; faux pour les cartes vides. */
   list?: boolean
 }) {
-  const { columns } = useCardColumns(toolCardGrid.minWidth, toolCardGrid.gap)
+  const { columns, probe } = useCardColumns(toolCardGrid.minWidth, toolCardGrid.gap)
   return (
-    <CardGrid {...toolCardGrid} columns={Math.min(MOST_USED_COLUMNS, columns)} list={list}>
-      {children}
-    </CardGrid>
+    <>
+      <CardGrid {...toolCardGrid} columns={Math.min(MOST_USED_COLUMNS, columns)} list={list}>
+        {children}
+      </CardGrid>
+      {/* La ligne cachée qui mesure le texte agrandi sur le web (posée hors du flux) : sans elle,
+          la grille ne saurait pas que le texte est à 200 % et garderait cinq cartes serrées. */}
+      {probe}
+    </>
   )
 }
 
