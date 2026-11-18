@@ -81,6 +81,9 @@ const day = {
   skeletonGlow: 'rgba(255,194,26,0.38)',
   // La carte vide : la matière d'une carte sans photo, la crème du jour, pas une dalle grise.
   skeletonCard: '#FFF0C2',
+  // Le panneau en bas de la carte vide, à la place du verre : la feuille crème, plein (rien derrière
+  // à flouter). Il a son rôle à lui parce que la nuit le veut différent de la feuille (ci-dessous).
+  skeletonPanel: '#FFFCF5',
 
   // Messages
   danger: '#D92D20', // fond du bouton de suppression définitive
@@ -231,6 +234,10 @@ const night = {
   skeletonGlow: 'rgba(255,201,51,0.16)',
   // La carte vide de nuit : la surface des cartes (la crème de nuit tirait au kaki sur la lumière).
   skeletonCard: '#1A1712',
+  // Le panneau de la carte vide de nuit : un peu plus clair que la carte (planche
+  // R16-Fil-1440-Nuit), le ton du fond groupé. La feuille de nuit (`sheet`) a la couleur exacte de
+  // la carte vide : le panneau s'y confondait.
+  skeletonPanel: '#221E17',
 
   danger: '#D92D20',
   dangerPressed: '#B42318',
@@ -519,6 +526,8 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'skeleton', on: 'background', min: 1.5 },
   { text: 'skeleton', on: 'surface', min: 1.5 },
   { text: 'skeleton', on: 'skeletonCard', min: 1.5 },
+  // Et sur le panneau en bas de la carte vide, où se posent le titre, l'auteur et « Tester » vides.
+  { text: 'skeleton', on: 'skeletonPanel', min: 1.5 },
 ]
 
 /**
