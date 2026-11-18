@@ -94,6 +94,7 @@ import { AmbientHostCatalogue } from './fluidite-lumiere'
 import { FormSamples } from './formulaire'
 import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
+import { CardGridCatalogue } from './grille-cartes'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
 import { LightCatalogue } from './lumiere'
@@ -951,6 +952,9 @@ export function CatalogueScreen() {
       <LightCatalogue />
       <AmbiancesCatalogue />
       <LoadingCatalogue />
+      {/* Tranche R16 : la grille de cartes commune, la carte d'une ruche et sa pièce vide
+          (grille-cartes.tsx). */}
+      <CardGridCatalogue />
       <FeedEndCatalogue />
       <MascotCatalogue />
     </Screen>
