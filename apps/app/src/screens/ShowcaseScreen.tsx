@@ -120,6 +120,10 @@ function ShowcaseHome({ items, loading, member }: ShowcaseHomeProps) {
         strong: item.status === 'testable',
       }}
       onPress={() => open(item.id)}
+      // R17 : pour un membre, sur le web, la photo de la carte grandit jusqu'à celle de la page du
+      // projet (`ui/ShowcaseCard` s'en charge). Pas pour un visiteur : sa page publique n'a pas
+      // encore de photo d'arrivée (scénario : « Les pages publiques viendront avec R22 »).
+      {...(member ? { coverId: item.id } : null)}
       size={compact ? 'carousel' : 'fill'}
       // R12b : « Exemple » sur un projet fictif du compte d'exemples de l'équipe.
       example={item.author.example === true}

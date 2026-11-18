@@ -676,6 +676,9 @@ function Featured({ shown }: { shown: boolean }) {
                 strong: item.status === 'testable',
               }}
               onPress={() => router.push({ pathname: '/projects/[id]', params: { id: item.id } })}
+              // R17 : sur le web, la photo de la carte grandit jusqu'à celle de la page du projet
+              // (`ui/ShowcaseCard` s'en charge ; l'écran ne donne que l'identifiant).
+              coverId={item.id}
               size="carousel"
               // R12b : « Exemple » sur le projet d'un compte d'exemples, mis à la une comme un autre.
               example={item.author.example === true}
@@ -784,6 +787,8 @@ function TestersLoaded({ items, rows }: { items: ReadonlyArray<FeedItem>; rows: 
               // La démo passe par la page d'avertissement des liens externes, comme sur la carte.
               onTest={() => openDemo(demoUrl, project.id)}
               onOpen={() => openProject(project.id)}
+              // R17 : la vignette grandit jusqu'à la photo de la page du projet, comme au Fil.
+              coverId={project.id}
             />
           ))}
         </ListGroup>

@@ -302,6 +302,9 @@ function Testers({ exclude, shown }: { exclude: ReadonlySet<string>; shown: bool
               onTest={() => openDemo(demoUrl, project.id)}
               // La vignette, le titre et l'auteur ouvrent la page du projet, comme dans Explorer.
               onOpen={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
+              // R17 : sur le web, la vignette grandit jusqu'à la photo de la page du projet. La
+              // ligne s'en charge (`ui/TesterRow`) ; l'écran ne lui donne que l'identifiant.
+              coverId={project.id}
             />
           ))}
         </ListGroup>
