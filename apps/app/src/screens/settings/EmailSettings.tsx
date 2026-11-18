@@ -21,9 +21,11 @@ import { useSignInAgain } from '../../navigation/signInAgain'
 import { Button } from '../../ui/Button'
 import { ChoiceRow, type ChoiceRowChoice } from '../../ui/ChoiceRow'
 import { type Focusable, focusWithoutScroll } from '../../ui/focus'
-import { ListGroup, ListRow } from '../../ui/ListGroup'
+import { ListGroup, ListRow, ListRowSkeleton } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { NotificationExample } from '../../ui/NotificationExample'
+import { Reveal } from '../../ui/Reveal'
+import { Loading } from '../../ui/Skeleton'
 import { Stack } from '../../ui/Stack'
 import { StatusPill } from '../../ui/StatusPill'
 import { Switch } from '../../ui/Switch'
@@ -46,6 +48,19 @@ const TYPES: readonly Setting[] = [
   'hives',
   'discoveries',
 ]
+
+/**
+ * R16 : les lignes vides du groupe pendant la lecture (`ListRowSkeleton`, sans photo, une pastille
+ * à droite pour le choix actuel, comme sur la planche R16-Explorer-Listes). Une ligne vide a deux
+ * lignes de texte, plus haute qu'une ligne de choix (une seule) : sept lignes vides prennent à peu
+ * près la hauteur des huit choix et de l'interrupteur du récap (505 points contre 513, mesurés à 390
+ * et 1 440 le 18/11/2026), pour que la rubrique ne grandisse pas à leur arrivée.
+ */
+const EMPTY_ROWS = 7
+const emptyRows = Array.from({ length: EMPTY_ROWS }, (_, index) => (
+  // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+  <ListRowSkeleton key={index} leading="none" trailing="pill" />
+))
 
 /** Les types où « Tout de suite » se propose ; les autres n'ont que le récap ou rien. */
 const offersNow = (type: Setting) => (INSTANT_EMAIL_TYPES as readonly Setting[]).includes(type)
@@ -73,8 +88,8 @@ export function EmailSettings() {
     focusWithoutScroll(firstRow.current)
   })
   // Une nouvelle lecture en cours, demandée par « Réessayer ». React Query remet alors la requête
-  // « en attente » et oublie l'erreur : sans cet état, la ligne d'erreur ferait place à
-  // « Chargement… », et le bouton qui avait le focus disparaîtrait.
+  // « en attente » et oublie l'erreur : sans cet état, la ligne d'erreur ferait place aux lignes
+  // vides de la lecture, et le bouton qui avait le focus disparaîtrait.
   const [retrying, setRetrying] = useState(false)
   // Combien de « Réessayer » ont échoué : pose à neuf l'alerte qui dit pourquoi (`detailAlert`).
   // Une alerte neuve est lue par le lecteur d'écran ; la même alerte restée en place ne serait pas
@@ -142,6 +157,10 @@ export function EmailSettings() {
     { value: 'never', label: t(($) => $.notificationSettings.choices.never) },
   ]
 
+  // R16 : la première lecture, sans rien à montrer ni échec à dire. Le groupe « Par e-mail » est
+  // alors dessiné vide (`emptyRows`), sous un seul « Chargement… », puis fond vers les vraies lignes.
+  const waiting = !data && !loadFailure
+
   const rows = data
     ? emailRows(data)
     : loadFailure
@@ -167,7 +186,7 @@ export function EmailSettings() {
             }
           />,
         ]
-      : [<ListRow key="loading" label={t(($) => $.common.loading)} busy />]
+      : []
 
   // Les lignes des réglages lus : une par type, puis l'interrupteur du récap.
   function emailRows(current: EmailPreferences) {
@@ -232,12 +251,26 @@ export function EmailSettings() {
         />
       </ListGroup>
       {notice}
-      <ListGroup
-        title={t(($) => $.notificationSettings.byEmail)}
-        footer={t(($) => $.notificationSettings.security)}
-      >
-        {rows}
-      </ListGroup>
+      {/* R16 : le titre du groupe reste lisible pendant la lecture, hors du « Chargement… »
+          (plan R16, choix 4 : seules les pièces vides sont sous `Loading`). Il est donc posé ici
+          plutôt que par `ListGroup title`, avec la même allure et le même écart (`ListGroup`). */}
+      <Stack gap="sm">
+        <Stack paddingX="lg">
+          <Text variant="caption" weight={600} tone="muted" heading={2}>
+            {t(($) => $.notificationSettings.byEmail)}
+          </Text>
+        </Stack>
+        <Reveal
+          loading={waiting}
+          skeleton={
+            <Loading>
+              <ListGroup>{emptyRows}</ListGroup>
+            </Loading>
+          }
+        >
+          <ListGroup footer={t(($) => $.notificationSettings.security)}>{rows}</ListGroup>
+        </Reveal>
+      </Stack>
     </Stack>
   )
 }

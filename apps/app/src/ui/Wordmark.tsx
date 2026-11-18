@@ -13,8 +13,11 @@
 //   en miel dépassait d'un point de l'encre (vu sur les captures). La copie perd ces deux
 //   approches, imperceptibles à l'œil.
 // Si le nom ne contient pas de « i », le mot s'écrit simplement, sans copie.
-import { appName, textStyles } from '@ruche/brand'
-import { Text as NativeText, View } from 'react-native'
+//
+// R16 (« Les polices ne déplacent plus rien ») : sur le web, le mot réserve sa largeur finale avant
+// l'arrivée de Funnel Display (voir `reservedWidth`) ; les liens de la barre ne glissent plus.
+import { appName, type TextVariant, textStyles } from '@ruche/brand'
+import { Text as NativeText, Platform, type TextStyle, View } from 'react-native'
 import { Logo } from './Logo'
 import { Pressed } from './Pressed'
 import { Stack } from './Stack'
@@ -36,6 +39,34 @@ const variants = { small: 'heading', large: 'display', huge: 'hero' } as const
 // Un logo déjà très grand n'a pas besoin de doubler avec le réglage de taille de l'appareil.
 const maxScale = 1.2
 
+/**
+ * La largeur du mot écrit en Funnel Display 700, sans interlettrage, en fraction de sa taille (em) :
+ * « waiggle » à 100 px mesure 383,84 px dans Chromium, crénage compris (mesuré le 18/11/2026 sur le
+ * fichier de `@expo-google-fonts/funnel-display` 0.4.1, par `getBoundingClientRect` d'un texte
+ * seul). Elle ne vaut que pour ce mot : un autre nom d'appli ne réserve rien, plutôt qu'une largeur
+ * fausse.
+ */
+const MEASURED = { word: 'waiggle', em: 3.8384 } as const
+
+/**
+ * La largeur que le mot réserve sur le web, avant que sa police arrive. La page s'affiche d'abord
+ * dans la police de secours (`font-display: swap`, R13), un peu plus étroite pour ce mot : quand
+ * Funnel Display arrive, le mot s'élargissait de 3 points et poussait les liens de la barre
+ * (mesure de R16). Le vrai mot (transparent) reçoit donc dès le départ une largeur minimale, celle
+ * qu'il aura : la mesure ci-dessus, plus l'interlettrage de la variante, ajouté après chaque lettre.
+ * En `em`, la réserve suit la taille réelle du texte, même quand une formule CSS la fait varier
+ * avec la largeur de l'écran (le logo d'accueil, `Text`). `inline-block` : une largeur ne s'applique
+ * pas à un morceau de texte en ligne. Sur téléphone, les polices sont chargées avant le premier
+ * dessin : rien à réserver.
+ */
+const reservedWidth = (word: string, variant: TextVariant): TextStyle | null => {
+  if (Platform.OS !== 'web' || word !== MEASURED.word) return null
+  const em = MEASURED.em + Array.from(word).length * textStyles[variant].tracking
+  // `display` et une largeur en `em` manquent aux types de React Native ; react-native-web les
+  // passe tels quels au navigateur.
+  return { display: 'inline-block', minWidth: `${em.toFixed(4)}em` } as unknown as TextStyle
+}
+
 export function Wordmark({ size = 'small', onPress, header, logo = false }: Props) {
   const { colors } = useTheme()
   const variant = variants[size]
@@ -44,7 +75,7 @@ export function Wordmark({ size = 'small', onPress, header, logo = false }: Prop
   const before = word.slice(0, dot)
   const after = word.slice(dot + 1)
   const honey = { color: colors.honey }
-  const hidden = { color: 'transparent' }
+  const hidden = { color: 'transparent', ...reservedWidth(word, variant) }
 
   const text = (
     // Les lecteurs d'écran lisent le nom tel qu'il s'écrit (« Waiggle »), pas en minuscules.
