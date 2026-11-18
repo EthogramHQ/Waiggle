@@ -3994,6 +3994,22 @@ const pages = [
   { name: 'explorer-attente', path: '/explore', signedIn: true, prepare: holdApi() },
   // Une ruche (plan R16, choix 17) : les trois colonnes posées dès le squelette.
   { name: 'ruche-attente', path: `/hives/${familleId}`, signedIn: true, prepare: holdApi() },
+  // R16 (planches R16-Ruches-Squelette-1920 et R16-Recherche-Squelette-1920) : l'onglet Ruches et
+  // la recherche « carn » pendant que leurs lectures se taisent, aussi à 1 920.
+  {
+    name: 'ruches-attente',
+    path: '/hives',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
+  {
+    name: 'recherche-attente',
+    path: '/search?q=carn',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
   // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
