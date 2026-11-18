@@ -15,12 +15,12 @@
 //   (`flexGrow` de sa vue la plus extérieure) ;
 // - chaque case dit son rang (`GridColumnContext`) : la lueur d'une carte vide passe 150 ms plus
 //   tard d'une colonne à la suivante.
-import { layout, type Space, space } from '@ruche/brand'
+import { type Space, space } from '@ruche/brand'
 import { Children, type ReactNode } from 'react'
 import { View } from 'react-native'
 import { GridColumnContext } from './ProjectGrid'
 import { useLargeText } from './textScale'
-import { columnsFor, useContentWidth, useLayout } from './theme/layout'
+import { columnsFor, useContentWidth } from './theme/layout'
 
 type Props = {
   /** Les cartes, dans l'ordre de lecture (de gauche à droite, puis rangée après rangée). */
@@ -62,16 +62,11 @@ export function useCardColumns(minWidth: number, gap: Space = 'lg', imposed?: nu
 }
 
 /**
- * Hook : vrai quand la page peut prendre le gabarit large de R15 (`Screen width="wide"`) : une
- * fenêtre d'au moins 1 280 points (`layout.maxContentWidth`, la largeur d'une page ordinaire). En
- * dessous, Ruches, Recherche et Outils restent comme avant R16 (« sous 1 280, rien ne change »).
- * Faux avant l'hydratation (la page pré-rendue ne connaît pas la fenêtre). Le seuil vit ici, pas
- * dans les écrans.
+ * Le seuil du gabarit large (vrai dès 1 280 points de fenêtre) n'est écrit qu'à un endroit,
+ * `theme/wideTemplate.ts` : Ruches, Recherche et Outils le lisent tous là. Il reste exporté d'ici
+ * pour les écrans qui prennent la grille et le seuil au même endroit (l'onglet Ruches).
  */
-export function useWideTemplate() {
-  const { width } = useLayout()
-  return width >= layout.maxContentWidth
-}
+export { useWideTemplate } from './theme/wideTemplate'
 
 export function CardGrid({ children, minWidth, gap = 'lg', columns: imposed, list = true }: Props) {
   const { columns, probe } = useCardColumns(minWidth, gap, imposed)
