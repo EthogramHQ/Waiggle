@@ -35,7 +35,7 @@ import {
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { categoryOf, useCategories } from '../categories/api'
 import {
@@ -68,13 +68,7 @@ import { Text } from '../ui/Text'
 import { TextField, type TextFieldInput } from '../ui/TextField'
 import { UncategorizedCard } from '../ui/UncategorizedCard'
 import { CatalogueRecentChanges, listState } from './CatalogueRecentChanges'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 type Tab = 'uncategorized' | 'categories'
 
@@ -113,18 +107,27 @@ const keepDecided = (
   return shown
 }
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx), comme `/moderation`. En attente,
+ * des lignes vides à la largeur d'aujourd'hui (`form`). La vérification de l'administrateur reste
+ * ici, dans `ModerationCategories`, après la garde.
+ */
 export function ModerationCategoriesScreen() {
+  return (
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
+      {() => <ModerationCategories />}
+    </SessionGate>
+  )
+}
+
+function ModerationCategories() {
   const { t } = useTranslation()
-  const { state, session, retry } = useMemberSession()
-  // Le profil dit si le membre est administrateur ; personne de connecté : on ne demande rien.
-  const me = useMe(Boolean(session))
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (!session) return <SignedOutScreen />
+  // Le profil dit si le membre est administrateur ; dessiné seulement avec une session.
+  const me = useMe()
   if (!me.data) {
     if (me.isError) return <LoadErrorScreen error={me.error} onRetry={() => void me.refetch()} />
-    return <LoadingScreen />
+    // La même forme que l'attente de la garde : le squelette continue.
+    return <LoadingScreen shape="list" width="form" />
   }
   // Un membre qui n'est pas administrateur : la page n'existe pas pour lui, rien n'est demandé.
   if (!me.data.isAdmin) return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
