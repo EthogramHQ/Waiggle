@@ -311,7 +311,7 @@ page « Confidentialité ».
 | Clé | Contenu | Durée |
 | --- | --- | --- |
 | Cookie `ruche.session_token` (web) ; SecureStore (iOS, Android) | le jeton de session, strictement nécessaire | 7 jours glissants |
-| Cookie `waiggle_member=1` (web, domaine de l'appli) | un repère sans identifiant : une session existe ; il sert seulement à ouvrir le Fil (`/` → `/feed`) et à garder la place de la barre pendant le chargement ; il ne donne aucun droit | 7 jours, reposé à chaque visite d'un membre connecté ; effacé à la déconnexion et sur un refus de session (`apps/app/src/account/memberMarker.ts`) |
+| Cookie `waiggle_member=1` (web, domaine de l'appli) | un repère sans identifiant : une session existe ; il sert seulement à ouvrir le Fil (`/` → `/feed`) et à garder la place de la barre pendant le chargement ; il ne donne aucun droit | 7 jours, reposé à chaque visite d'un membre connecté ; effacé à la déconnexion et sur un refus de session (`apps/app/src/accounts/memberMarker.ts`) |
 | `appearance` | le thème choisi | jusqu'au changement |
 | `once:reaction-fan-help` | une aide vue | sans fin |
 | `suspension-seen` | les dates de la dernière suspension vue | sans fin, gardée à la déconnexion ; rien qui identifie |
