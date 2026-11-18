@@ -34,9 +34,16 @@ type Props = {
   onChange: (value: string) => void
   /** L'identifiant du panneau qu'elles commandent : la liste du Fil, posée par l'écran. */
   panelId: string
+  /**
+   * R16 (planche R16-Fil-1440) : ses ruches ne sont pas encore lues. Le vrai onglet « Tout »,
+   * choisi, qui commande déjà le Fil (aucun panneau sans onglet), puis, dans la même capsule, les
+   * pastilles vides des ruches à venir (`EmptyHivePills`). Quand les ruches arrivent, les noms
+   * prennent la place des pastilles vides : la rangée garde sa hauteur, et presque sa largeur.
+   */
+  waiting?: boolean
 }
 
-export function HivePills({ hives, value, onChange, panelId }: Props) {
+export function HivePills({ hives, value, onChange, panelId, waiting = false }: Props) {
   const { t } = useTranslation()
   // « Tout » en tête, puis chaque ruche ; une ruche dont le nom a été retiré se lit « Ruche sans
   // nom ». Les clés sont les identifiants (stables : une ruche renommée garde sa pastille).
@@ -52,6 +59,7 @@ export function HivePills({ hives, value, onChange, panelId }: Props) {
       onSelect={onChange}
       panelId={panelId}
       scroll
+      {...(waiting ? { trailing: <EmptyHivePills /> } : null)}
     />
   )
 }
@@ -72,33 +80,53 @@ const ALL_WIDTH = 32
  */
 export function HivePillsSkeleton({ count = 2 }: { count?: number }) {
   const { colors, shadows } = useTheme()
-  // Une pastille de `Tabs` (scroll) : sa hauteur à toucher et ses marges, sans texte.
-  const pill: ViewStyle = {
-    minHeight: layout.touchTarget,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.xs,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  }
   return (
     <View {...hiddenFromReaders} style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
       <Surface variant="glass" radius="pill" padding="xxs">
         <View style={{ flexDirection: 'row', gap: space.xxs, overflow: 'hidden' }}>
-          <View style={[pill, { backgroundColor: colors.surfaceRaised, boxShadow: shadows.soft }]}>
+          <View
+            style={[EMPTY_PILL, { backgroundColor: colors.surfaceRaised, boxShadow: shadows.soft }]}
+          >
             <TextLineShape variant="callout" width={ALL_WIDTH} />
           </View>
-          {Array.from({ length: count }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: des pastilles identiques, jamais réordonnées.
-            <View key={index} style={pill}>
-              <TextLineShape
-                variant="callout"
-                width={EMPTY_WIDTHS[index % EMPTY_WIDTHS.length] ?? EMPTY_WIDTHS[0]}
-              />
-            </View>
-          ))}
+          <EmptyPills count={count} />
         </View>
       </Surface>
+    </View>
+  )
+}
+
+/** Une pastille de `Tabs` (scroll) : sa hauteur à toucher et ses marges, sans texte. */
+const EMPTY_PILL: ViewStyle = {
+  minHeight: layout.touchTarget,
+  paddingHorizontal: space.lg,
+  paddingVertical: space.xs,
+  borderRadius: radii.pill,
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+/** `count` pastilles vides, côte à côte (sans cadre : la rangée qui les reçoit les espace). */
+function EmptyPills({ count }: { count: number }) {
+  return Array.from({ length: count }, (_, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: des pastilles identiques, jamais réordonnées.
+    <View key={index} style={EMPTY_PILL}>
+      <TextLineShape
+        variant="callout"
+        width={EMPTY_WIDTHS[index % EMPTY_WIDTHS.length] ?? EMPTY_WIDTHS[0]}
+      />
+    </View>
+  ))
+}
+
+/**
+ * Les pastilles vides des ruches à venir, posées après le vrai « Tout » (`HivePills waiting`) :
+ * cachées aux lecteurs d'écran, hors de la liste d'onglets, rien ne s'y touche.
+ */
+function EmptyHivePills({ count = 2 }: { count?: number }) {
+  return (
+    <View {...hiddenFromReaders} style={{ flexDirection: 'row', gap: space.xxs }}>
+      <EmptyPills count={count} />
     </View>
   )
 }

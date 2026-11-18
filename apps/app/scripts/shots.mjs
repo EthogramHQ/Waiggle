@@ -3762,6 +3762,7 @@ const waitingPages = [
   'ruche-attente',
   'ruches-attente',
   'recherche-attente',
+  'outils-attente',
 ]
 const pages = [
   // `layoutWidths` : le relevé de mise en page (--layout) ne mesure le catalogue qu'aux largeurs d'un
@@ -4008,6 +4009,15 @@ const pages = [
   {
     name: 'recherche-attente',
     path: '/search?q=carn',
+    signedIn: true,
+    bigScreens: true,
+    prepare: holdApi(),
+  },
+  // R16 (planche R16-Outils-Squelette-1920) : « Tous les outils » pendant que ses lectures se
+  // taisent : les cartes vides des plus utilisés, puis la liste de A à Z, aussi à 1 920.
+  {
+    name: 'outils-attente',
+    path: '/tools',
     signedIn: true,
     bigScreens: true,
     prepare: holdApi(),

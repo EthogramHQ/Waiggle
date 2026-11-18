@@ -14,7 +14,7 @@ import { useMyHives } from '../hives/api'
 import { useOpenDemo } from '../navigation/links'
 import { useSuggestions } from '../suggestions/api'
 import { PeopleToFollow } from '../suggestions/PeopleToFollow'
-import { HiveRow } from '../ui/HiveRow'
+import { HiveRow, HiveRowSkeleton } from '../ui/HiveRow'
 import { ListGroup, ListRowSkeleton } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Reveal } from '../ui/Reveal'
@@ -140,6 +140,12 @@ function SideSkeleton({
             section === 'suggestions' ? (
               // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
               <SuggestionRowSkeleton key={index} stacked />
+            ) : section === 'hives' ? (
+              // « Tes ruches » aussi : la ligne courte vide d'une ruche (44 points, comme une vraie
+              // `HiveRow compact`), et non une ligne de liste de 72 : la section remontait de près
+              // de 30 points par ruche à l'arrivée, et les sections dessous avec elle.
+              // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
+              <HiveRowSkeleton key={index} compact />
             ) : (
               // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
               <ListRowSkeleton key={index} leading={leading} trailing="pill" />

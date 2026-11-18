@@ -13,12 +13,13 @@
 // de l'appli publiée) sont écrits ici, en français et en anglais ; les textes des composants
 // viennent de l'appli.
 import { radii, space } from '@ruche/brand'
-import type { HiveSummary } from '@ruche/contracts'
+import type { HiveSummary, HiveInvitation as Invitation } from '@ruche/contracts'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { CardGrid } from '../ui/CardGrid'
 import { HiveCard, HiveCardSkeleton, hiveCardGrid } from '../ui/HiveCard'
+import { HiveInvitation } from '../ui/HiveInvitation'
 import { HivePillsSkeleton } from '../ui/HivePills'
 import { HiveRowSkeleton } from '../ui/HiveRow'
 import { ListGroup } from '../ui/ListGroup'
@@ -37,6 +38,8 @@ const fr = {
   skeleton: 'Cartes vides (HiveCardSkeleton), la lueur de colonne en colonne',
   rows: 'Lignes vides d’une ruche (HiveRowSkeleton), pleine puis courte',
   pills: 'Pastilles vides du filtre du Fil (HivePillsSkeleton)',
+  invitations:
+    'Invitations dans la grille (HiveInvitation fill) : un nom sur deux lignes, et les deux cartes gardent la même hauteur, boutons alignés',
   longName: 'Les cousins de la côte atlantique, amis',
   day: 'jour',
   night: 'nuit',
@@ -50,6 +53,8 @@ const en: typeof fr = {
   skeleton: 'Empty cards (HiveCardSkeleton), the glow from column to column',
   rows: 'Empty hive rows (HiveRowSkeleton), full then short',
   pills: 'Empty pills of the Feed filter (HivePillsSkeleton)',
+  invitations:
+    'Invitations in the grid (HiveInvitation fill): a name on two lines, and both cards keep the same height, buttons aligned',
   longName: 'The cousins from the Atlantic coast, pals',
   day: 'day',
   night: 'night',
@@ -87,6 +92,32 @@ const hivesOf = (l: Labels): HiveSummary[] => [
   { ...family, id: 'unnamed', name: null, icon: 'leaf', news: 12 },
   { ...family, id: 'long', name: l.longName, icon: 'music-notes', news: 3, animator: null },
 ]
+
+/** Une écriture finie aussitôt : l'exemple ne montre que la mise en page. */
+const settled = () => Promise.resolve()
+
+/**
+ * Deux invitations côte à côte (R16) : la seconde a un nom de ruche long, sur deux lignes. Sans
+ * `fill`, elle était plus haute que sa voisine.
+ */
+const invitationsOf = (l: Labels): Invitation[] => {
+  const first: Invitation = {
+    id: 'invitation-short',
+    hive: {
+      id: 'hive-short',
+      name: 'Atelier IA',
+      icon: 'code',
+      memberCount: 6,
+      animatorName: 'Nora Benali',
+    },
+    inviter: { id: 'u-nora', name: 'Nora Benali', avatarUrl: null },
+    createdAt: '2026-11-14T09:00:00.000Z',
+  }
+  return [
+    first,
+    { ...first, id: 'invitation-long', hive: { ...first.hive, id: 'hive-long', name: l.longName } },
+  ]
+}
 
 /** Un exemple légendé, sur le fond de la page (jour ou nuit). */
 function Example({ caption, children }: { caption: string; children: ReactNode }) {
@@ -150,6 +181,21 @@ export function CardGridCatalogue() {
               </Example>
               <Example caption={`${l.pills} — ${l[scheme]}`}>
                 <HivePillsSkeleton />
+              </Example>
+              <Example caption={`${l.invitations} — ${l[scheme]}`}>
+                <CardGrid {...hiveCardGrid}>
+                  {invitationsOf(l).map((invitation, index) => (
+                    <Stack key={invitation.id} grow align="stretch">
+                      <HiveInvitation
+                        invitation={invitation}
+                        onAccept={settled}
+                        onRefuse={settled}
+                        primary={index === 0}
+                        fill
+                      />
+                    </Stack>
+                  ))}
+                </CardGrid>
               </Example>
             </Stack>
           </ContentWidthContext.Provider>
