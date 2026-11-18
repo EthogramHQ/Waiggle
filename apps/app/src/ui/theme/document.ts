@@ -138,6 +138,8 @@ export const passageToastMark = passageMark('passageToast')
 const exitCurve = `cubic-bezier(${easings.exit.join(', ')})`
 // Les calques qui restent par-dessus la page pendant un passage : ils ne bougent pas.
 const STILL_LAYERS = ['wg-bar', 'wg-tabbar', 'wg-toast']
+// Leurs marques, posées sur les vues (le verre de ces vues prend un fond plein pendant le passage).
+const STILL_MARKS = ['[data-passage-bar]', '[data-passage-tabbar]', '[data-passage-toast]']
 const group = (name: string) => `::view-transition-group(${name})`
 const oldImage = (name: string) => `::view-transition-old(${name})`
 const newImage = (name: string) => `::view-transition-new(${name})`
@@ -158,6 +160,19 @@ const passageAnimation = (name: string, duration: number) =>
  *   animation : leur ancienne image est cachée, la nouvelle est là tout de suite ;
  * - la photo partagée (`wg-cover`) vole en `medium` (420 ms) sur la courbe du ressort `open`
  *   (`springEasing`), au-dessus de tout (`z-index: 3`), rognée comme la tuile (`radii.tile`) ;
+ * - seule (rien ne l'accueille : la carte d'arrivée se voit trop peu), l'ancienne photo s'efface
+ *   en `quick`, comme la page, au lieu de rester 420 ms au-dessus de tout (relecture du design,
+ *   N1, 18/11/2026) ;
+ * - la carte autour de la photo, sans elle (`wg-card-panel`, nommée par le moteur) : son auteur,
+ *   son titre et « Tester » restent au-dessus de la photo qui vole (`z-index: 4`), comme sur la
+ *   carte au repos ; l'ancienne s'efface en `quick`, la nouvelle (au retour) apparaît en `base`,
+ *   sans bouger (relecture du design, C2, 18/11/2026 : la carte revenait vide pendant le vol) ;
+ * - le verre des barres et des toasts : une vue nommée est photographiée seule, son verre n'a donc
+ *   plus rien à flouter, et on lisait la page à travers la barre pendant tout le passage (relecture
+ *   du design, C1, 18/11/2026). Pendant le passage, la couche de flou de leurs surfaces
+ *   (`[data-surface-blur]`, ui/Surface.tsx) prend la couleur du fond de la page (`--passage-fill`,
+ *   le rôle `background`, posé par le thème) : la couleur du verre se pose sur un fond plein, comme
+ *   s'il était posé sur la page (couples « verre sur le fond » de `contrastPairs`) ;
  * - sous « Réduire les animations », chaque passage est un fondu de 180 ms, sans déplacement.
  * Jamais `pointer-events: none` sur ces calques (relecture de sécurité S3).
  */
@@ -166,6 +181,9 @@ html[data-passage] [data-passage-page] { view-transition-name: wg-page; }
 html[data-passage] [data-passage-bar] { view-transition-name: wg-bar; }
 html[data-passage] [data-passage-tabbar] { view-transition-name: wg-tabbar; }
 html[data-passage] [data-passage-toast] { view-transition-name: wg-toast; }
+${STILL_MARKS.map((mark) => `html[data-passage] ${mark} [data-surface-blur]`).join(', ')} {
+  background-color: var(--passage-fill, ${palettes.day.background});
+}
 ${oldImage('root')}, ${newImage('root')} { animation: none; }
 ${STILL_LAYERS.map(group).join(', ')} { z-index: 2; animation: none; }
 ${STILL_LAYERS.map(oldImage).join(', ')} { display: none; }
@@ -188,6 +206,10 @@ ${oldImage('wg-cover')}, ${newImage('wg-cover')} {
   height: 100%;
   object-fit: cover;
 }
+${oldImage('wg-cover')}:only-child { ${passageAnimation('wg-fade-out', durations.quick)} }
+${group('wg-card-panel')} { z-index: 4; animation: none; }
+${oldImage('wg-card-panel')} { ${passageAnimation('wg-fade-out', durations.quick)} }
+${newImage('wg-card-panel')} { ${passageAnimation('wg-fade-in', durations.base)} }
 @keyframes wg-out { to { opacity: 0; transform: translateY(-${space.md / 2}px); } }
 @keyframes wg-in { from { opacity: 0; transform: translateY(${space.md}px); } }
 @keyframes wg-out-back { to { opacity: 0; transform: translateY(${space.md / 2}px); } }

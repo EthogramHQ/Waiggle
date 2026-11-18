@@ -30,7 +30,7 @@ import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { Avatar } from './Avatar'
-import { useCoverSource } from './coverTransition'
+import { coverPanelMark, useCoverSource } from './coverTransition'
 import { ExampleBadge } from './ExampleBadge'
 import type { ImageSource } from './image'
 import { Pressed } from './Pressed'
@@ -142,7 +142,10 @@ export function ShowcaseCard({
         {/* La carte, à sa hauteur minimale, grandit avec son texte. R17 : la photo est sur une
             couche à elle, posée sous le statut et le panneau (comme dans ProjectCard) : c'est elle
             seule qui vole jusqu'à la page du projet, sans le verre ni le statut. */}
-        <View style={{ minHeight: height, flexGrow: 1 }}>
+        {/* R17 (relecture du design C2) : la vue de la photo, du statut et du panneau porte
+            `data-cover-panel` : pendant un passage, le statut et le panneau restent au-dessus de
+            la photo qui vole. */}
+        <View {...coverPanelMark()} style={{ minHeight: height, flexGrow: 1 }}>
           {/* La photo garde son nom lu, comme avant (le test « named for screen readers »). */}
           <View ref={coverId ? cover.ref : undefined} style={{ position: 'absolute', inset: 0 }}>
             <ProjectCover

@@ -116,3 +116,20 @@ describe('the page stylesheet', () => {
     expect(documentCss).toMatch(/box-shadow: 0 0 0 \d+px var\(--focus-halo/)
   })
 })
+
+// Relecture du design de R17 (C1, 18/11/2026) : pendant un passage, le verre des barres se pose sur
+// la couleur du fond de la page du thème choisi (`--passage-fill`, lue par documentCss).
+describe('the full background of the glass during a passage (web)', () => {
+  it('writes the page background of the scheme shown, by day then by night', async () => {
+    await render(
+      <ThemeProvider>
+        <Switcher />
+      </ThemeProvider>,
+    )
+    expect(root.style.setProperty).toHaveBeenCalledWith('--passage-fill', palettes.day.background)
+
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'to night' })))
+    expect(root.style.setProperty).toHaveBeenCalledWith('--passage-fill', palettes.night.background)
+    expect(documentCss).toContain('var(--passage-fill')
+  })
+})

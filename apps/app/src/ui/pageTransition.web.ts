@@ -46,6 +46,8 @@ type PassageStyle = {
 type PassageElement = {
   style: PassageStyle
   getBoundingClientRect: () => { top: number; bottom: number; height: number }
+  /** Le premier ancêtre (lui compris) qui répond au sélecteur : la carte autour d'une photo. */
+  closest?: (selector: string) => unknown
 }
 
 /** Ce que rend `startViewTransition` : les trois promesses du passage, et de quoi l'abréger. */
@@ -81,6 +83,19 @@ export const PASSAGE_ATTRIBUTE = 'data-passage'
 
 /** Le nom partagé par la photo de la carte et la couverture du projet pendant leur vol. */
 const COVER_NAME = 'wg-cover'
+
+/**
+ * Le nom de la carte autour de la photo qui vole, sans cette photo (relecture du design de R17, C2,
+ * 18/11/2026). La photo nommée est la couche qui remplit toute la carte, sous son texte (auteur,
+ * titre, « Tester ») ; or elle vole au-dessus de tout : au retour, elle se repliait par-dessus le
+ * texte de sa propre carte, qui revenait vide jusqu'à la fin du vol. La carte (la vue marquée
+ * `data-cover-panel`, ui/coverTransition.tsx) est donc nommée aussi : un élément nommé à l'intérieur
+ * d'un autre est photographié à part, et l'image de la carte n'a plus que son texte et son verre.
+ * Les règles de document.ts la posent au-dessus de la photo : la photo se replie sous le texte,
+ * comme sur la carte au repos. Une vignette sans texte (« Récents ») n'a pas de marque : rien.
+ */
+const CARD_PANEL_NAME = 'wg-card-panel'
+const CARD_PANEL_SELECTOR = '[data-cover-panel]'
 
 /**
  * Le temps que le navigateur attend la page qui arrive avant de la photographier (le plan : 250 ms
@@ -187,6 +202,12 @@ const visibleShare = (doc: PassageDocument, element: PassageElement, underBar: b
   return Math.max(0, seen) / rect.height
 }
 
+/** La carte autour de cette photo, si elle est dans une carte marquée ; sinon aucune. */
+const cardOf = (photo: PassageElement): PassageElement | null => {
+  const card = photo.closest?.(CARD_PANEL_SELECTOR)
+  return isElement(card) && card !== photo ? card : null
+}
+
 /** L'élément à l'arrivée de la photo : la carte d'origine (au retour), ou la couverture du projet. */
 const coverTarget = (doc: PassageDocument, cover: SharedCover): PassageElement | null => {
   if (cover.to !== undefined) {
@@ -262,7 +283,12 @@ export const runPassage = (kind: PassageKind, mutate: () => void): void => {
       ? cover.from
       : null
   let landing: PassageElement | null = null
+  // La carte de la photo de départ (à l'aller), puis celle d'arrivée (au retour) : voir
+  // CARD_PANEL_NAME.
+  const fromCard = from ? cardOf(from) : null
+  let landingCard: PassageElement | null = null
   if (from) nameElement(from, COVER_NAME)
+  if (fromCard) nameElement(fromCard, CARD_PANEL_NAME)
   doc.documentElement.setAttribute(PASSAGE_ATTRIBUTE, kind)
 
   let net: ReturnType<typeof setTimeout> | undefined
@@ -283,7 +309,7 @@ export const runPassage = (kind: PassageKind, mutate: () => void): void => {
     clearTimeout(net)
     doc.documentElement.removeAttribute(PASSAGE_ATTRIBUTE)
     if (current === passage) current = null
-    const named = [from, landing]
+    const named = [from, fromCard, landing, landingCard]
     for (const element of named) if (element) runSafely(() => unnameElement(element))
     try {
       send()
@@ -304,8 +330,11 @@ export const runPassage = (kind: PassageKind, mutate: () => void): void => {
         // la couverture à la carte), si elle se voit.
         if (!from || !cover) return
         unnameElement(from)
+        if (fromCard) unnameElement(fromCard)
         landing = coverTarget(doc, cover)
         if (landing) nameElement(landing, COVER_NAME)
+        landingCard = landing ? cardOf(landing) : null
+        if (landingCard) nameElement(landingCard, CARD_PANEL_NAME)
       })
     })
   } catch {

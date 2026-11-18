@@ -43,6 +43,8 @@ const keyframesOf = (rules: CssRule[]) =>
       .join(''),
   )
 
+const group = (name: string) => `::view-transition-group(${name})`
+
 const exitCurve = compactValue(`cubic-bezier(${easings.exit.join(', ')})`)
 
 describe('documentCss, the layers of a passage', () => {
@@ -128,6 +130,49 @@ describe('documentCss, the shared cover', () => {
     expect(declared(rulesFor('::view-transition-image-pair(wg-cover)'))).toContain('overflow:clip')
     expect(declared(rulesFor('::view-transition-old(wg-cover)'))).toContain('object-fit:cover')
     expect(declared(rulesFor('::view-transition-new(wg-cover)'))).toContain('object-fit:cover')
+  })
+})
+
+// Relecture du design de R17 (18/11/2026). C1 : une barre nommée est photographiée seule, et son
+// verre n'a plus rien à flouter (on lisait la page à travers) ; pendant un passage, il se pose sur
+// un fond plein, la couleur du fond de la page (`--passage-fill`, posée par le thème). C2 : la photo
+// qui vole passait par-dessus le texte de sa carte ; la carte sans sa photo (`wg-card-panel`) vole
+// au-dessus d'elle. N1 : l'ancienne photo, seule (rien ne l'accueille), restait 420 ms au-dessus de
+// tout ; elle s'efface en 160 ms, comme la page.
+describe('documentCss, the review of the design (C1, C2, N1)', () => {
+  it('lays the glass of the bars and of the toasts on a full background during a passage (C1)', () => {
+    for (const mark of ['[data-passage-bar]', '[data-passage-tabbar]', '[data-passage-toast]']) {
+      const rules = rulesFor(mark).filter((rule) =>
+        rule.selectors.some(
+          (selector) =>
+            selector.includes('html[data-passage]') &&
+            selector.includes(mark) &&
+            selector.includes('[data-surface-blur]'),
+        ),
+      )
+      expect(declared(rules)).toContain('background-color:var(--passage-fill')
+    }
+  })
+
+  it('keeps the text of the card above its flying photo, then fades it like the page (C2)', () => {
+    const coverLayer = Number(/z-index:(\d+)/.exec(declared(rulesFor(group('wg-cover'))))?.[1])
+    const panelLayer = Number(/z-index:(\d+)/.exec(declared(rulesFor(group('wg-card-panel'))))?.[1])
+    expect(panelLayer).toBeGreaterThan(coverLayer)
+
+    const old = rulesFor('::view-transition-old(wg-card-panel)')
+    const fresh = rulesFor('::view-transition-new(wg-card-panel)')
+    expect(declared(old)).toContain(`${durations.quick}ms`)
+    expect(keyframesOf(old)).toContain('opacity:0')
+    expect(declared(fresh)).toContain(`${durations.base}ms`)
+    expect(keyframesOf(fresh)).toContain('opacity:0')
+    expect(keyframesOf([...old, ...fresh])).not.toContain('translate')
+  })
+
+  it('fades a lone old cover out in 160 ms, like the page, when nothing receives it (N1)', () => {
+    const lone = rulesFor('::view-transition-old(wg-cover):only-child')
+
+    expect(declared(lone)).toContain(`${durations.quick}ms`)
+    expect(keyframesOf(lone)).toContain('opacity:0')
   })
 })
 

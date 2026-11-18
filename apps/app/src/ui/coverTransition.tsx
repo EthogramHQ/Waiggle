@@ -491,6 +491,16 @@ type ArrivalProps = {
 const coverTargetMark = (id: string): object =>
   Platform.OS === 'web' ? { dataSet: { coverTarget: id } } : {}
 
+/**
+ * L'attribut `data-cover-panel` d'une carte à photo pleine (relecture du design de R17, C2,
+ * 18/11/2026), à étaler sur la vue qui contient sa photo et tout son texte (auteur, titre,
+ * « Tester »). Pendant un passage, le moteur (ui/pageTransition.web.ts) la trouve depuis la photo
+ * qui vole et la nomme à part, au-dessus d'elle : la photo se replie sous le texte de la carte,
+ * comme au repos, au lieu de le cacher. Rien hors du web ; une vignette sans texte n'en a pas.
+ */
+export const coverPanelMark = (): object =>
+  Platform.OS === 'web' ? { dataSet: { coverPanel: 'on' } } : {}
+
 /** Ce que rend le style animé quand rien ne bouge : aucune transformation. */
 const still = [{ translateX: 0 }, { translateY: 0 }, { scaleX: 1 }, { scaleY: 1 }]
 

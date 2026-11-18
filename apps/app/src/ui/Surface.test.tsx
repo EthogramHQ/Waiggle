@@ -7,6 +7,7 @@ import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Surface } from './Surface'
 import { Text } from './Text'
+import { documentCss } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -50,6 +51,28 @@ const sheet = () =>
       <Text>Commentaires</Text>
     </Surface>,
   )
+
+// Relecture du design de R17 (C1, 18/11/2026) : pendant un passage de page, une barre nommée est
+// photographiée seule, et son verre n'a plus rien à flouter. La feuille de la page (documentCss)
+// donne alors un fond plein à la couche de flou marquée `data-surface-blur` : la marque doit y être.
+describe('Surface glass, during a passage of page (R17, C1)', () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it('marks its blur layer on the web, the layer that the passage lays on a full background', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    useScheme('day')
+    await renderWithProviders(
+      <Surface variant="glass">
+        <Text>Fil</Text>
+      </Surface>,
+    )
+
+    expect(documentCss).toContain('[data-surface-blur]')
+    const [layer, ...others] = blurLayers()
+    expect(others).toEqual([])
+    expect((layer?.props.dataSet as Record<string, unknown> | undefined)?.surfaceBlur).toBeDefined()
+  })
+})
 
 describe('Surface sheet', () => {
   afterEach(() => jest.restoreAllMocks())

@@ -454,6 +454,76 @@ describe('pageTransition.web, the cover of a card that becomes the page', () => 
   })
 })
 
+// Relecture du design de R17 (C2, 18/11/2026) : la photo qui vole passait par-dessus le texte de sa
+// propre carte (auteur, titre, « Tester »), et la carte revenait vide. La carte sans sa photo (la vue
+// marquée `data-cover-panel`, qui contient la photo) est nommée à part, au-dessus d'elle : à l'aller
+// avec la photo de départ, au retour avec la carte d'arrivée.
+describe('pageTransition.web, the text of the card around its flying photo', () => {
+  /** Une photo posée dans une carte : `closest('[data-cover-panel]')` rend la carte. */
+  const inCard = (fake: Fake, photo: FakeElement) => {
+    const card = fake.track(element(photo.getBoundingClientRect().top))
+    return {
+      card,
+      photo: Object.assign(photo, {
+        closest: (selector: string) => (selector === '[data-cover-panel]' ? card : null),
+      }),
+    }
+  }
+
+  it('names the card around the photo with the photo on the way in, then neither', async () => {
+    const fake = fakeDocument()
+    const engine = load(fake)
+    const { card, photo } = inCard(fake, fake.track(element(300)))
+    const target = fake.track(element(0, 300))
+
+    engine.shareCover({ from: photo, id: 'p1' })
+    engine.runPassage('deeper', () => fake.targets.set('p1', target))
+    expect(nameOf(card)).toBe('wg-card-panel')
+    expect(nameOf(photo)).toBe('wg-cover')
+    await flush()
+    engine.passageArrived()
+    await flush()
+
+    // La page du projet n'a plus la carte : seule la couverture porte un nom dans la nouvelle image.
+    expect(nameOf(card)).toBe('')
+    expect(nameOf(target)).toBe('wg-cover')
+    fake.calls[0]?.finish()
+    await flush()
+    expect(fake.named()).toEqual([])
+  })
+
+  it('names the card that receives the photo on the way back, then neither', async () => {
+    const fake = fakeDocument()
+    const engine = load(fake)
+    const box = fake.track(element(0, 300))
+    const { card, photo } = inCard(fake, fake.track(element(300)))
+
+    engine.shareCover({ from: box, id: 'p1', to: photo })
+    engine.runPassage('back', () => {})
+    expect(fake.calls[0]?.named).toEqual([box])
+    await flush()
+    engine.passageArrived()
+    await flush()
+
+    expect(nameOf(photo)).toBe('wg-cover')
+    expect(nameOf(card)).toBe('wg-card-panel')
+    fake.calls[0]?.finish()
+    await flush()
+    expect(fake.named()).toEqual([])
+  })
+
+  it('names no card when the visitor reduces motion', async () => {
+    const fake = fakeDocument({ reduced: true })
+    const engine = load(fake)
+    const { photo } = inCard(fake, fake.track(element(300)))
+
+    engine.shareCover({ from: photo, id: 'p1' })
+    engine.runPassage('deeper', () => {})
+
+    expect(fake.named()).toEqual([])
+  })
+})
+
 // La fin d'un passage ne dépend pas de la navigation (relecture de sécurité S2) : si la navigation
 // elle-même lève une erreur au moment où le passage la joue, la marque `data-passage` est quand
 // même retirée de <html> et le moteur est libre. Sinon, la marque restait pour toujours (les

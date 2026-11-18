@@ -80,6 +80,10 @@ const webBlur = (intensity: number): WebStyle => ({
   backdropFilter: `blur(${intensity / 5}px) saturate(1.2)`,
 })
 
+// L'attribut `data-surface-blur` (react-native-web écrit `dataSet` en attributs data- ; `dataSet`
+// n'existe pas dans les types de React Native, d'où l'objet). Posé seulement sur la couche du web.
+const surfaceBlurMark: object = { dataSet: { surfaceBlur: 'on' } }
+
 export function Surface({
   children,
   variant = 'plain',
@@ -184,8 +188,16 @@ export function Surface({
           {/* Les couches reprennent les coins arrondis : sur le web, une couche floutée n'est pas
               rognée par l'arrondi de son parent, et ses coins carrés dépasseraient.
               La feuille de jour est opaque : aucun flou, il coûterait sans se voir. */}
+          {/* R17 (relecture du design C1, 18/11/2026) : la couche de flou du web porte la marque
+              `data-surface-blur`. Pendant un passage de page, une barre est photographiée seule et
+              son flou n'a plus rien derrière lui (on lisait la page à travers) : la feuille de la
+              page (ui/theme/document.ts) donne alors à cette couche la couleur du fond de la page,
+              sous la couleur du verre. Aucune couleur ici : la marque seule. */}
           {variant === 'sheet' && scheme === 'day' ? null : Platform.OS === 'web' ? (
-            <View style={[StyleSheet.absoluteFill, layerCorners, webBlur(blur)]} />
+            <View
+              {...surfaceBlurMark}
+              style={[StyleSheet.absoluteFill, layerCorners, webBlur(blur)]}
+            />
           ) : (
             <BlurView
               intensity={blur}
