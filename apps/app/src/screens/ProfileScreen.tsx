@@ -23,7 +23,7 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
 import { useSession } from '../accounts/api'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useRouteSheet } from '../navigation/useRouteSheet'
@@ -56,22 +56,31 @@ import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { ToolField } from '../ui/ToolField'
 import { TAP_GUARD_MS } from '../ui/tapGuard'
 import { useCalmMotion } from '../ui/theme/motion'
-import { LoadErrorScreen, LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadErrorScreen, LoadingScreen } from './states'
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, un formulaire aux champs
+ * vides ; la session ne se lit pas (trop de demandes, serveur en panne) : « Réessayer », pas « Me
+ * connecter » ; personne de connecté : « Réservé aux membres » (et retour ici ensuite).
+ */
 export function ProfileScreen() {
-  const { state, session, retry } = useMemberSession()
-  const me = useMe(Boolean(session))
+  return <SessionGate loading={<LoadingScreen shape="form" />}>{() => <Profile />}</SessionGate>
+}
 
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  if (!session) return <SignedOutScreen />
+/**
+ * Le profil, une fois la session lue : ses hooks vivent ici, jamais dans la garde. `useMe()` part
+ * donc au même moment qu'avant (quand la session existe), sans drapeau à lui passer.
+ */
+function Profile() {
+  const me = useMe()
+
   if (me.error) {
     return (
       <LoadErrorScreen error={me.error} onRetry={() => void me.refetch()} fallback="/account" />
     )
   }
-  if (!me.data) return <LoadingScreen />
+  // Le même formulaire vide que pendant la lecture de la session : rien ne saute de l'un à l'autre.
+  if (!me.data) return <LoadingScreen shape="form" />
   // Un compte suspendu (tranche 7c) ne modifie plus son profil : il le lit tel que les autres le
   // voient. Ses réglages d'e-mail restent permis, dans la rubrique « Notifications ».
   if (me.data.suspension) return <LockedProfile me={me.data} />

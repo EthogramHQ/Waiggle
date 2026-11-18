@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useMemberSession } from '../accounts/session'
+import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useDeleteMyComment, useMyComments } from '../comments/api'
 import { DeleteCommentDialog } from '../comments/DeleteCommentDialog'
@@ -33,16 +33,20 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { useCommentFailure } from './ProjectCommentThreads'
-import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SignedOutScreen } from './states'
 
+/**
+ * R16 : la garde de session commune (accounts/SessionGate.tsx). En attente, des rangées vides, à la
+ * largeur de la page d'aujourd'hui (`form` : `shape="list"` seul choisirait `page`, plus large) ;
+ * la session ne se lit pas : « Réessayer », pas « Me connecter » ; un visiteur : « Réservé aux
+ * membres », puis retour ici une fois connecté.
+ */
 export function MyCommentsScreen() {
-  const { state, retry } = useMemberSession()
-  if (state === 'pending') return <LoadingScreen />
-  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
-  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
-  // Un visiteur : se connecter d'abord (et revenir ici ensuite).
-  if (state === 'signedOut') return <SignedOutScreen />
-  return <MyComments />
+  return (
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />}>
+      {() => <MyComments />}
+    </SessionGate>
+  )
 }
 
 /** L'adresse d'un commentaire à sa place dans le fil de son projet. */
