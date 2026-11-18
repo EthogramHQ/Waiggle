@@ -5,18 +5,26 @@
 // (`ProjectMosaic`) à 1, 2, 3, 4 et 5 projets. La mosaïque suit la largeur de la fenêtre : la
 // capture de téléphone montre la mise en page du téléphone, celle d'ordinateur le bloc d'en tête.
 // Aucune carte ne porte d'auteur : on est sur la page du membre. De jour et de nuit.
+// R16 (« Les squelettes ») : les pièces vides de la page d'un membre, chacune sous un `Loading`
+// montré tout de suite (c'est lui qui dit « Chargement… », les pièces n'ont ni rôle ni nom) : la
+// compacte vide, la grande carte vide sans auteur, l'en-tête vide (centré, comme sur téléphone, puis
+// en colonne, comme sur ordinateur ; avec le nom et la photo déjà connus d'une carte ; sans bouton),
+// la carte « Moi » vide (`MemberCardSkeleton`) et les tuiles vides (`TileSkeleton`).
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { ProjectCard, type ProjectCardSize } from '../ui/ProjectCard'
+import { MemberCardSkeleton } from '../ui/MemberCard'
+import { MemberHeaderSkeleton } from '../ui/MemberHeader'
+import { ProjectCard, type ProjectCardSize, ProjectCardSkeleton } from '../ui/ProjectCard'
 import { ProjectMosaic } from '../ui/ProjectMosaic'
-import { SkeletonCard } from '../ui/Skeleton'
+import { Loading } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
+import { TileSkeleton } from '../ui/Tile'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
 
 const fr = {
@@ -27,7 +35,17 @@ const fr = {
     'Carte compacte, à 171 points (390) : avec photo, sans photo (l’accroche sur deux lignes), sans réactions',
   pills:
     'Toutes les pastilles (privé, exemple, mis à jour, 128 réactions) : à 171 points, puis à 136 (320) ; la carte grandit',
-  skeleton: 'Une carte compacte qui charge (SkeletonCard shape="compact")',
+  skeleton: 'La compacte vide (ProjectCardSkeleton size="compact"), à 171 points',
+  skeletonFull:
+    'La grande carte vide d’un membre, sans auteur (ProjectCardSkeleton author={false})',
+  header: 'L’en-tête vide (MemberHeaderSkeleton), centré comme sur téléphone',
+  headerKnown:
+    'Ouvert depuis une carte : le nom et la photo déjà connus se lisent ; le reste attend 160 ms',
+  headerColumn: 'En colonne (layout="column"), comme sur ordinateur, à 360 points',
+  headerColumnKnown: 'En colonne, le nom déjà connu',
+  headerNoAction: 'Sans abonnés ni bouton (action={false})',
+  memberCard: 'La carte « Moi » vide (MemberCardSkeleton)',
+  tiles: 'Les tuiles vides (TileSkeleton) : la lueur passe de l’une à la suivante',
   mosaic: (count: number) =>
     count === 1 ? 'La mosaïque, 1 projet' : `La mosaïque, ${count} projets`,
   photo: 'Photo du projet',
@@ -59,7 +77,17 @@ const en: typeof fr = {
     'Compact card, 171 points wide (390): with a photo, without (the pitch on two lines), without reactions',
   pills:
     'Every pill (private, example, updated, 128 reactions): 171 points wide, then 136 (320); the card grows',
-  skeleton: 'A compact card loading (SkeletonCard shape="compact")',
+  skeleton: 'The empty compact card (ProjectCardSkeleton size="compact"), 171 points wide',
+  skeletonFull:
+    'A member’s empty big card, without the author (ProjectCardSkeleton author={false})',
+  header: 'The empty header (MemberHeaderSkeleton), centred as on a phone',
+  headerKnown:
+    'Opened from a card: the name and photo already known are read; the rest waits 160 ms',
+  headerColumn: 'As a column (layout="column"), as on a computer, 360 points wide',
+  headerColumnKnown: 'As a column, the name already known',
+  headerNoAction: 'Without followers or button (action={false})',
+  memberCard: 'The empty “Me” card (MemberCardSkeleton)',
+  tiles: 'The empty tiles (TileSkeleton): the glow passes from one to the next',
   mosaic: (count: number) =>
     count === 1 ? 'The mosaic, 1 project' : `The mosaic, ${count} projects`,
   photo: 'Project photo',
@@ -107,6 +135,77 @@ function Example({ caption, children }: { caption: string; children: ReactNode }
 /** Une carte compacte posée à une largeur donnée (celle d'une case de la mosaïque). */
 function Sized({ width, children }: { width: number; children: ReactNode }) {
   return <View style={{ width, maxWidth: '100%' }}>{children}</View>
+}
+
+/** La largeur de la colonne du profil sur ordinateur (`Columns sideWidth="profile"`). */
+const PROFILE_COLUMN = 360
+/** Le membre déjà connu d'une carte : son nom, sans photo (ses initiales). */
+const KNOWN_NAME = 'Max Durand'
+const TILE_COUNT = 3
+
+/**
+ * Les pièces vides de la page d'un membre, chacune sous un `Loading` montré tout de suite (`shown`),
+ * pour que la capture les voie sans attendre ses 160 ms. L'en-tête au nom connu se pose hors du
+ * `Loading`, comme dans la page : son nom se lit, ses formes attendent seules (`DelayedShapes`).
+ */
+function EmptyPieces({ l, scheme }: { l: Labels; scheme: (typeof schemes)[number] }) {
+  const of = (caption: string) => `${caption} — ${l[scheme]}`
+  return (
+    <>
+      <Example caption={of(l.skeleton)}>
+        <Sized width={PHONE_HALF}>
+          <Loading shown>
+            <ProjectCardSkeleton size="compact" />
+          </Loading>
+        </Sized>
+      </Example>
+      <Example caption={of(l.skeletonFull)}>
+        <Loading shown>
+          <ProjectCardSkeleton size="full" author={false} />
+        </Loading>
+      </Example>
+      <Example caption={of(l.header)}>
+        <Loading shown>
+          <MemberHeaderSkeleton />
+        </Loading>
+      </Example>
+      <Example caption={of(l.headerKnown)}>
+        <MemberHeaderSkeleton name={KNOWN_NAME} heading={3} />
+      </Example>
+      <Example caption={of(l.headerColumn)}>
+        <Sized width={PROFILE_COLUMN}>
+          <Loading shown>
+            <MemberHeaderSkeleton layout="column" />
+          </Loading>
+        </Sized>
+      </Example>
+      <Example caption={of(l.headerColumnKnown)}>
+        <Sized width={PROFILE_COLUMN}>
+          <MemberHeaderSkeleton layout="column" name={KNOWN_NAME} heading={3} />
+        </Sized>
+      </Example>
+      <Example caption={of(l.headerNoAction)}>
+        <Loading shown>
+          <MemberHeaderSkeleton action={false} />
+        </Loading>
+      </Example>
+      <Example caption={of(l.memberCard)}>
+        <Loading shown>
+          <MemberCardSkeleton />
+        </Loading>
+      </Example>
+      <Example caption={of(l.tiles)}>
+        <Loading shown>
+          <Row gap="md" wrap>
+            {Array.from({ length: TILE_COUNT }, (_, column) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: des tuiles identiques, jamais réordonnées.
+              <TileSkeleton key={column} column={column} />
+            ))}
+          </Row>
+        </Loading>
+      </Example>
+    </>
+  )
 }
 
 /** Les compactes ordinaires : avec photo, sans photo, sans réactions. */
@@ -229,11 +328,7 @@ export function MemberMosaicCatalogue() {
             <Example caption={`${l.pills} — ${l[scheme]}`}>
               <AllPills l={l} />
             </Example>
-            <Example caption={`${l.skeleton} — ${l[scheme]}`}>
-              <Sized width={PHONE_HALF}>
-                <SkeletonCard shape="compact" />
-              </Sized>
-            </Example>
+            <EmptyPieces l={l} scheme={scheme} />
             {[1, 2, 3, 4, 5].map((count) => (
               <Example key={count} caption={`${l.mosaic(count)} — ${l[scheme]}`}>
                 <Mosaic l={l} count={count} />

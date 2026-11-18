@@ -3633,6 +3633,65 @@ const withLeaPhoto = async (page) => {
   )
   await page.reload({ waitUntil: 'networkidle' })
 }
+// R16 (« Les squelettes ») : les pages d'attente. Une lecture de l'API ne répond jamais (`() => {}`),
+// pour photographier le squelette de la page au lieu de son contenu. Les routes de la page passent
+// avant l'API simulée du contexte.
+// - `holdApi(keep)` : toute l'API se tait, sauf ce que `keep` garde (la session, le profil de Léa et
+//   son accord des règles : la barre du haut et la garde de session se lisent, la page attend ses
+//   données). La page est relue, comme un membre qui recharge : le squelette pré-rendu, puis celui
+//   de l'appli ;
+// - `openFromFeed(link, held)` : depuis le Fil chargé, on touche une carte (son titre ou le nom de
+//   son auteur) pendant que la lecture de la page ouverte se tait : la page montre tout de suite ce
+//   que la carte connaissait (plan R16, choix 10), et des pièces vides pour le reste.
+// Un membre qui recharge porte le repère `waiggle_member=1` (R12) : la barre du haut garde alors sa
+// place pendant le chargement (plan R16, choix 3). Les contextes des captures ne l'ont pas : on le
+// pose ici, pour photographier l'attente que voit vraiment un membre.
+const memberMarker = async (page) => {
+  await page
+    .context()
+    .addCookies([{ name: 'waiggle_member', value: '1', url: new URL(page.url()).origin }])
+}
+/** Ce qu'une page d'attente laisse répondre : la session (hors de /v1), le profil, les règles. */
+const sessionReads = (pathname) => pathname === '/v1/me' || pathname === '/v1/me/rules'
+const holdApi =
+  (keep = sessionReads, { member = true, slow = false } = {}) =>
+  async (page) => {
+    if (member) await memberMarker(page)
+    await page.route(
+      (url) => url.pathname.startsWith('/v1/') && !keep(url.pathname),
+      () => {},
+    )
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.locator('[aria-busy="true"]').first().waitFor()
+    // Le temps que le squelette se montre (160 ms) et finisse son fondu ; `slow` : au-delà des 4 s
+    // après lesquelles « Revenir » apparaît sous le squelette d'une page entière.
+    await page.waitForTimeout(slow ? 4600 : 900)
+  }
+const openFromFeed = (link, held) => async (page) => {
+  await memberMarker(page)
+  await page.route(
+    (url) => held.test(url.pathname),
+    (route) => (route.request().method() === 'GET' ? undefined : route.fallback()),
+  )
+  await page.getByRole('link', { name: link, exact: true }).first().click()
+  await page.locator('[aria-busy="true"]').first().waitFor()
+  await page.waitForTimeout(900)
+}
+/** La lecture d'un projet seul (pas ses commentaires, ses mises à jour…). */
+const oneProjectRead = /^\/v1\/projects\/[^/]+$/
+/** Les lectures d'un membre : son profil et ses projets. */
+const memberReads = /^\/v1\/members\/[^/]+(\/projects)?$/
+// Les pages d'attente montrent « Chargement… » exprès (voir intendedUnfinished plus bas).
+const waitingPages = [
+  'fil-attente',
+  'fil-attente-calme',
+  'projet-attente-carte',
+  'projet-attente-lent',
+  'membre-attente-carte',
+  'accueil-attente',
+  'explorer-attente',
+  'ruche-attente',
+]
 const pages = [
   // `layoutWidths` : le relevé de mise en page (--layout) ne mesure le catalogue qu'aux largeurs d'un
   // téléphone, où il trouve les composants trop serrés. Depuis R12, il est si long qu'à 768 px sa
@@ -3816,6 +3875,56 @@ const pages = [
       await page.getByRole('button', { name: 'Réessayer' }).first().waitFor()
     },
   },
+  // R16 (« Les squelettes », planches R16-Fil-390, R16-Fil-1440 et R16-Fil-1440-Nuit) : le Fil
+  // rechargé pendant que ses lectures se taisent (voir holdApi) : un seul squelette, les 4 cartes
+  // vides dans les colonnes du Fil, avec leur lueur, et les sections de côté qui gardent leur
+  // place. « fil-attente-calme » : le même sous « Réduire les animations », la lueur immobile.
+  { name: 'fil-attente', path: '/feed', signedIn: true, prepare: holdApi() },
+  {
+    name: 'fil-attente-calme',
+    path: '/feed',
+    signedIn: true,
+    reducedMotion: 'reduce',
+    prepare: holdApi(),
+  },
+  // La page d'un projet ouverte depuis une carte du Fil (planches R16-Projet-1440, -1440-Nuit et
+  // -390) : le titre, l'auteur, la photo, le statut et l'accroche de la carte, tout de suite ; des
+  // pièces vides pour la description, la recette et les commentaires.
+  {
+    name: 'projet-attente-carte',
+    path: '/feed',
+    signedIn: true,
+    prepare: openFromFeed('Mon agent de recettes', oneProjectRead),
+  },
+  // Le même projet ouvert par son adresse (rien de connu) : le squelette de la page entière, puis,
+  // au bout de 4 s, « Revenir » sous lui (scénario R16 : « Revenir » apparaît toujours après 4 s).
+  {
+    name: 'projet-attente-lent',
+    path: project,
+    signedIn: true,
+    prepare: holdApi(sessionReads, { slow: true }),
+  },
+  // La page d'un membre ouverte depuis une carte (planches R16-Membre-1440 et -390) : son nom tout
+  // de suite, l'en-tête vide et la mosaïque vide.
+  {
+    name: 'membre-attente-carte',
+    path: '/feed',
+    signedIn: true,
+    prepare: openFromFeed('Max Durand', memberReads),
+  },
+  // L'accueil d'un visiteur (planches R16-Visiteur-390 et -1440) : la vitrine garde sa place avec
+  // ses cartes vides, rien ne pousse le bas de la page. Un visiteur n'a pas de repère.
+  {
+    name: 'accueil-attente',
+    path: '/fr/',
+    signedIn: false,
+    prepare: holdApi(() => false, { member: false }),
+  },
+  // Explorer (planche R16-Explorer-Listes) : les vrais titres des sections, leurs pièces vides aux
+  // mesures des vraies (« À la une », les testeurs, les outils, « Récents »).
+  { name: 'explorer-attente', path: '/explore', signedIn: true, prepare: holdApi() },
+  // Une ruche (plan R16, choix 17) : les trois colonnes posées dès le squelette.
+  { name: 'ruche-attente', path: `/hives/${familleId}`, signedIn: true, prepare: holdApi() },
   // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
@@ -5314,7 +5423,8 @@ const pages = [
 const unfinished = unfinishedTexts(fr)
 // Les pages qui montrent l'un de ces textes exprès : le catalogue (les états « chargement » et
 // « erreur » de StateMessage) et « erreur » (une lecture qui échoue, LoadErrorScreen).
-const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur']
+// R16 : les pages d'attente des squelettes (waitingPages, plus haut).
+const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur', ...waitingPages]
 // Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
 // (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
 // Depuis Miel 2 (R1), un squelette ou le logo du lancement n'affichent plus « Chargement… » :
@@ -5855,6 +5965,9 @@ const capture = async ({ shot, device, scheme }) => {
   const context = await browser.newContext({
     viewport: device.viewport,
     colorScheme: scheme.colorScheme,
+    // R16 : une page peut se photographier sous « Réduire les animations » (`reducedMotion:
+    // 'reduce'`), le réglage du système que lisent la feuille de la page et useCalmMotion.
+    reducedMotion: shot.reducedMotion ?? 'no-preference',
     locale: 'fr-FR',
     timezoneId: SHOT_TIMEZONE,
     deviceScaleFactor: device.scale ?? scale,
