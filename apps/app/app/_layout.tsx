@@ -14,6 +14,7 @@ import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { EditorPreload } from '../src/navigation/chunks/preload'
+import { sheetRoutes } from '../src/navigation/sheetRoutes'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
@@ -126,28 +127,17 @@ function ThemedChrome() {
   const screenOptions = usePageStackOptions()
   const stack = (
     <Stack screenOptions={screenOptions}>
-      {/* R6a : publier et modifier sont des feuilles posées sur la page d'où l'on vient. Une
-          fenêtre transparente (`transparentModal`) garde cette page dessinée dessous ; la feuille
-          anime elle-même son entrée (`animation: 'none'`). Ouverte sans page d'avant, la feuille
-          pose le fil dessous (ProjectFormScreen) : pas d'`initialRouteName` ici, qui ferait
-          croire à toutes les pages qu'elles ont une page d'avant (relecture du plan, ui-I1). */}
-      <Stack.Screen name="projects/new" options={sheetRoute} />
-      <Stack.Screen name="projects/[id]/edit" options={sheetRoute} />
-      {/* R7a : la feuille « Nouvelle mise à jour », posée de même sur la page du projet. */}
-      <Stack.Screen name="projects/[id]/update" options={sheetRoute} />
-      {/* R7b : les feuilles « Nouvel appel » et « Ton retour », posées de même sur le coin des
-          testeurs : leur adresse à elles, et donc le Retour du navigateur pour les fermer. */}
-      <Stack.Screen name="projects/[id]/testers/new-call" options={sheetRoute} />
-      <Stack.Screen name="projects/[id]/testers/new-feedback" options={sheetRoute} />
-      {/* R9 : « Signaler » est une feuille posée sur la page du contenu signalé (le Retour du
-          navigateur la ferme, la page d'où l'on vient reste dessinée dessous). */}
-      <Stack.Screen name="report" options={sheetRoute} />
-      {/* R9 : « Suspendre » aussi, posée sur la page du membre ou sur la file de la modération. */}
-      <Stack.Screen name="suspend" options={sheetRoute} />
-      {/* R10 : « Créer une ruche » et « Inviter » sont des feuilles posées sur l'onglet Ruches et sur
-          la page de la ruche : le Retour du navigateur les ferme. (Les réglages sont une page.) */}
-      <Stack.Screen name="hives/new" options={sheetRoute} />
-      <Stack.Screen name="hives/[id]/invite" options={sheetRoute} />
+      {/* Les feuilles (R6a à R10) : publier, modifier, une mise à jour, un appel ou un retour de
+          testeur, signaler, suspendre, créer une ruche, inviter. Chacune est posée sur la page d'où
+          l'on vient : une fenêtre transparente (`transparentModal`) garde cette page dessinée
+          dessous, et la feuille anime elle-même son entrée (`animation: 'none'`) ; son adresse à elle
+          donne au Retour du navigateur de quoi la fermer. Ouverte sans page d'avant, la feuille pose
+          le fil dessous (ProjectFormScreen) : pas d'`initialRouteName` ici, qui ferait croire à toutes
+          les pages qu'elles ont une page d'avant (relecture du plan R6a, ui-I1). La liste vit dans
+          navigation/sheetRoutes.ts : les passages de page (R17) la lisent aussi. */}
+      {sheetRoutes.map((name) => (
+        <Stack.Screen key={name} name={name} options={sheetRoute} />
+      ))}
     </Stack>
   )
   return (

@@ -46,6 +46,7 @@ export const durations = {
   portal: 4200, // le passage par le portail (un lien qui sort de l'appli)
   loadingLoop: 4600, // un vol complet de l'abeille au lancement
   breath: 20_000, // une « respiration » de la lumière d'ambiance
+  wave: 1200, // la vague de miel à l'entrée dans l'appli (R17) : elle monte, puis découvre le Fil
 } as const
 export type DurationName = keyof typeof durations
 
@@ -60,3 +61,11 @@ export const pressScaleFab = 0.92
  * elle est courte, plus le bord qui s'éloigne rapetisse.
  */
 export const tilt = { maxDegrees: 4, perspective: 900 } as const
+
+/**
+ * La photo d'un projet qui défile moins vite que la page (R17, maquettes du 28/10) : `rate`, la part
+ * de la vitesse du défilement qu'elle suit (0,45 : elle descend moins vite, la page la recouvre) ;
+ * quand on tire plus haut que le haut de la page, elle grandit de `stretchStep` (1 %) tous les
+ * `stretchPer` points.
+ */
+export const parallax = { rate: 0.45, stretchPer: 6, stretchStep: 0.01 } as const

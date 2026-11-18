@@ -21,6 +21,9 @@ export const markHydrated = () => {
   for (const listener of listeners) listener()
 }
 
+/** Vrai une fois la page hydratée, lu hors de React (les passages de page, R17). */
+export const isHydrated = (): boolean => hydrated
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
   return () => {
