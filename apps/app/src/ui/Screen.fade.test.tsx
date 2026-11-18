@@ -15,10 +15,20 @@ import { Platform, StyleSheet } from 'react-native'
 import { getAnimatedStyle, useReducedMotion } from 'react-native-reanimated'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
+import { arrivalStyle } from './pageTransition'
 import { Screen } from './Screen'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+
+// R17 : ScreenFade demande au moteur des passages comment la page arrive (`arrivalStyle`). Jest
+// charge la version du téléphone, qui répond toujours `none` (la pile native anime) ; ces tests du
+// fondu sur le web simulent donc un navigateur sans l'API View Transitions, où une page ouverte
+// dans l'appli fond sur place (`fade`), comme ScreenFade.test.tsx.
+jest.mock('./pageTransition', () => ({
+  ...jest.requireActual('./pageTransition'),
+  arrivalStyle: jest.fn(() => 'fade'),
+}))
 
 // La route de l'écran (voir l'en-tête). `require` dans la fabrique : Jest la remonte en tête.
 jest.mock('./screenFocus', () => {
@@ -93,6 +103,7 @@ beforeEach(() => {
   jest.useFakeTimers()
   jest.replaceProperty(Platform, 'OS', 'web')
   jest.mocked(useReducedMotion).mockReturnValue(false)
+  jest.mocked(arrivalStyle).mockReturnValue('fade')
 })
 
 afterEach(() => {
@@ -143,14 +154,20 @@ describe('Screen, a page opened in the app (web)', () => {
     expect(isHiddenFromAccessibility(button)).toBe(false)
   })
 
-  it('fades its content in again when the member comes back', async () => {
+  // R17 (scénario « Avancer et revenir, sur le web ») : au retour sur une page restée montée, la
+  // page d'avant est là tout de suite, sans fondu depuis le vide. Ce test disait l'inverse (« fades
+  // its content in again when the member comes back », RF) ; il est inversé comme celui de
+  // ScreenFade.test.tsx, sur décision du 18/11/2026 (le scénario R17 contredisait l'ancien). Le
+  // moteur des passages dit `none` pour un retour (ui/pageTransition.web.ts).
+  it('shows its content at once when the member comes back, without a fade', async () => {
     const view = await renderWithProviders(page({ focused: true, shown: 1 }))
     await view.rerender(page({ focused: false, shown: 1 }))
+    jest.mocked(arrivalStyle).mockReturnValue('none')
 
     await view.rerender(page({ focused: true, shown: 2 }))
 
-    expect(seenOpacity(content())).toBe(0)
-    await wait(durations.page + 50)
+    expect(seenOpacity(content())).toBe(1)
+    await wait(durations.page / 2)
     expect(seenOpacity(content())).toBe(1)
   })
 
