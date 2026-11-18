@@ -272,4 +272,23 @@ describe('ToolsScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.retry) }))
     expect(failed.refetch).toHaveBeenCalledTimes(1)
   })
+
+  // Relecture de design R16, point 4 : sur téléphone, le groupe vide n'avait pas son titre, et la
+  // liste descendait de 25 points à l'arrivée. Le scénario veut les titres de section vrais pendant
+  // l'attente.
+  it('shows « Les plus utilisés » for real on a phone while the catalogue loads', async () => {
+    jest.mocked(useTools).mockReturnValue(query({}))
+    await renderWithProviders(<ToolsScreen />)
+
+    const heading = screen.getByRole('header', { name: fr.t(($) => $.tools.mostUsed) })
+    expect(heading).toBeTruthy()
+    // Lu tout de suite : hors de la zone « Chargement… », qui garde les lignes vides.
+    const loading = screen.getByRole('progressbar', {
+      name: fr.t(($) => $.common.loading),
+      includeHiddenElements: true,
+    })
+    let parent = (heading as unknown as { parent: unknown }).parent
+    while (parent && parent !== loading) parent = (parent as { parent: unknown }).parent
+    expect(parent).toBeFalsy()
+  })
 })

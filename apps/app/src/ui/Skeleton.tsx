@@ -236,7 +236,11 @@ export function Shape({
   width,
   round = false,
 }: {
-  height: number
+  /**
+   * En points ; ou, sur le web seulement, en `em` (une part de la taille des lettres posée autour) :
+   * la ligne de texte vide (`TextLineShape`) grandit ainsi avec le texte agrandi.
+   */
+  height: number | `${number}em`
   width: `${number}%` | number
   /** Un rond (la photo de l'auteur) ou une pastille, plutôt qu'un bloc aux coins doux. */
   round?: boolean
@@ -245,7 +249,9 @@ export function Shape({
   return (
     <View
       style={{
-        height,
+        // Une hauteur en `em` manque aux types de React Native ; react-native-web la passe telle
+        // quelle au navigateur.
+        height: height as number,
         width,
         borderRadius: round ? radii.pill : radii.small,
         backgroundColor: colors.skeleton,
