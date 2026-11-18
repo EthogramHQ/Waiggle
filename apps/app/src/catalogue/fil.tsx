@@ -4,6 +4,10 @@
 // l'arrivée des nouvelles cartes, la date relative seule, la grille imposée à deux colonnes, le
 // salut du premier lancement, les proches à suivre (une ligne dans ses états, puis la liste),
 // l'encart « Publier », la sphère de miel et la ligne d'un projet qui cherche des testeurs.
+// R16 (« Les squelettes ») : la carte du fil vide (`ProjectCardSkeleton`), seule puis deux côte à
+// côte (la lueur de la seconde part 150 ms plus tard), la carte dont la catégorie arrive
+// (`category="pending"`, avec et sans photo), et « Proches à suivre » qui charge
+// (`SuggestionListSkeleton`, en rangée puis empilée comme dans la colonne du Fil).
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais.
@@ -15,14 +19,18 @@ import { Greeting } from '../ui/Greeting'
 import { HoneySphere } from '../ui/HoneySphere'
 import { ListGroup } from '../ui/ListGroup'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
-import { ProjectCard } from '../ui/ProjectCard'
+import { ProjectCard, ProjectCardSkeleton } from '../ui/ProjectCard'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { PublishPrompt } from '../ui/PublishPrompt'
 import { RelativeTime } from '../ui/RelativeTime'
 import { PageHeading } from '../ui/Screen'
-import { SkeletonCard } from '../ui/Skeleton'
+import { Loading } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
-import { type SuggestedMemberRow, SuggestionList } from '../ui/SuggestionList'
+import {
+  type SuggestedMemberRow,
+  SuggestionList,
+  SuggestionListSkeleton,
+} from '../ui/SuggestionList'
 import { SuggestionRow } from '../ui/SuggestionRow'
 import { Surface } from '../ui/Surface'
 import { TesterRow } from '../ui/TesterRow'
@@ -46,7 +54,16 @@ const fr = {
     'L’arrivée des nouvelles cartes (Arrival) et la grille qui étire la note à côté d’un projet : « Faire arriver » pose une carte en haut, qui tombe en place (en fondu avec « Réduire les animations ») ; les autres ne bougent pas',
   arrive: 'Faire arriver une carte',
   arrived: (n: number) => `Nouveau projet ${n}`,
-  skeleton: 'Une carte du fil qui charge (SkeletonCard shape="feed")',
+  skeleton:
+    'La carte du fil vide (ProjectCardSkeleton) : la hauteur de la vraie, son panneau, sa lueur',
+  skeletonPair:
+    'Deux cartes vides côte à côte (ProjectGrid columns={2}) : la lueur de la seconde passe 150 ms plus tard',
+  pending:
+    'La catégorie qui n’est pas encore arrivée (category="pending") : sa place gardée au-dessus du titre, rien à lire',
+  pendingPhoto: 'La même, avec photo : sa place dans le haut de la photo',
+  suggestionsLoading:
+    '« Proches à suivre » qui charge (SuggestionListSkeleton) : le vrai titre, puis les lignes vides à la hauteur des vraies',
+  suggestionsLoadingStacked: 'Empilée (stacked), comme dans la colonne du Fil sur ordinateur',
   dates: 'Dates relatives (RelativeTime) : à l’instant, il y a 3 h, hier, au-delà de 7 jours',
   datePhrase: 'Avec une phrase (prop phrase) : « bloqué le 12 oct. »',
   blockedOn: (when: string) => `bloqué ${when}`,
@@ -97,7 +114,15 @@ const en: typeof fr = {
     'The arrival of new cards (Arrival) and the grid stretching the note beside a project: “Make one arrive” puts a card at the top, which drops into place (a fade with “Reduce motion”); the others stay still',
   arrive: 'Make a card arrive',
   arrived: (n: number) => `New project ${n}`,
-  skeleton: 'A feed card loading (SkeletonCard shape="feed")',
+  skeleton: 'The empty feed card (ProjectCardSkeleton): the real one’s height, its panel, its glow',
+  skeletonPair:
+    'Two empty cards side by side (ProjectGrid columns={2}): the second one’s glow passes 150 ms later',
+  pending:
+    'The category not arrived yet (category="pending"): its place kept above the title, nothing to read',
+  pendingPhoto: 'The same, with a photo: its place at the top of the photo',
+  suggestionsLoading:
+    '“People to follow” loading (SuggestionListSkeleton): the real heading, then empty rows as tall as the real ones',
+  suggestionsLoadingStacked: 'Stacked, as in the Feed’s column on a computer',
   dates: 'Relative dates (RelativeTime): just now, 3 h ago, yesterday, beyond 7 days',
   datePhrase: 'With a phrase (phrase prop): “blocked on Oct 12”',
   blockedOn: (when: string) => `blocked ${when}`,
@@ -200,10 +225,48 @@ function Pieces({ l }: { l: typeof fr }) {
             onPress={noop}
           />
         </Captioned>
+        <Captioned caption={l.pending}>
+          <ProjectCard
+            title={quiz}
+            pitch={quizPitch}
+            author={{ name: 'Sam Morel', avatar: null, onPress: noop }}
+            when={<RelativeTime date={hoursAgo(72)} now={now} />}
+            status={{ label: l.building, strong: false }}
+            category="pending"
+            onPress={noop}
+          />
+        </Captioned>
+        <Captioned caption={l.pendingPhoto}>
+          <ProjectCard
+            title={cafes}
+            pitch={cafesPitch}
+            author={{ name: 'Nora Benali', avatar: null, onPress: noop }}
+            when={<RelativeTime date={hoursAgo(3)} now={now} />}
+            status={{ label: l.testable, strong: true }}
+            tryIt={{ label: l.test, onPress: noop }}
+            reactionTotal={49}
+            image={{ source: null, thumbhash: cafe, label: l.photo }}
+            category="pending"
+            onPress={noop}
+          />
+        </Captioned>
         <Captioned caption={l.skeleton}>
-          <SkeletonCard shape="feed" />
+          {/* Sous un `Loading` montré tout de suite, comme dans une page : la pièce n'a ni rôle ni
+              nom, c'est lui qui dit « Chargement… ». */}
+          <Loading shown>
+            <ProjectCardSkeleton />
+          </Loading>
         </Captioned>
       </ProjectGrid>
+
+      <Captioned caption={l.skeletonPair}>
+        <Loading shown>
+          <ProjectGrid empty="" columns={2}>
+            <ProjectCardSkeleton />
+            <ProjectCardSkeleton />
+          </ProjectGrid>
+        </Loading>
+      </Captioned>
 
       <Captioned caption={l.heading}>
         <Stack gap="xl">
@@ -304,6 +367,12 @@ function Pieces({ l }: { l: typeof fr }) {
       </Captioned>
       <Captioned caption={l.list}>
         <Suggestions l={l} />
+      </Captioned>
+      <Captioned caption={l.suggestionsLoading}>
+        <SuggestionListSkeleton count={3} shown />
+      </Captioned>
+      <Captioned caption={l.suggestionsLoadingStacked}>
+        <SuggestionListSkeleton count={2} stacked shown />
       </Captioned>
 
       <Captioned caption={l.publish}>

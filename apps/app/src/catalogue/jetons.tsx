@@ -1,7 +1,9 @@
 // La rubrique « Jetons » du catalogue (tranche R1) : les valeurs de packages/brand telles qu'on les
 // voit (les couleurs avec leurs noms de marque, les lettres, les formes, les ombres, le mouvement),
 // puis les composants de Miel 2 posés sur ces jetons : la pile d'avatars, les tuiles, les
-// squelettes et les messages (Notice). Le jour et la nuit se voient en changeant l'apparence en haut
+// squelettes et les messages (Notice). R16 : les jetons de la lueur des squelettes (durées, retard,
+// courbe, attente et fondu) et leurs rôles de couleur (skeleton, skeletonGlow, skeletonCard,
+// skeletonPanel), de jour et de nuit. Le jour et la nuit se voient en changeant l'apparence en haut
 // du catalogue. Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs
 // personnes y travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais.
@@ -24,7 +26,7 @@ import {
 } from '@ruche/brand'
 import { type ReactNode, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { AvatarStack } from '../ui/AvatarStack'
 import { Button } from '../ui/Button'
@@ -35,7 +37,7 @@ import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { AddTile, ProjectTile } from '../ui/Tile'
 import { spring, useCalmMotion } from '../ui/theme/motion'
-import { useTheme } from '../ui/theme/ThemeProvider'
+import { ThemeProvider, useTheme } from '../ui/theme/ThemeProvider'
 
 const fr = {
   title: 'Jetons',
@@ -76,6 +78,17 @@ const fr = {
   authors: ['Léa Moreau', 'Max Durand', 'Inès Haddad'],
   add: 'Ajouter un projet',
   skeletons: 'Squelettes : une carte, puis une liste de deux',
+  skeletonTokens:
+    'Squelettes (R16) : la lueur et les rôles skeleton, skeletonGlow, skeletonCard, skeletonPanel',
+  glowTimings: (pass: number, pause: number) =>
+    `skeletonGlow ${pass} : le passage de la lueur ; skeletonPause ${pause} : son repos`,
+  glowStagger: (stagger: number) =>
+    `skeletonStagger ${stagger} : le retard d’une colonne à la suivante`,
+  glowCurve: 'Courbe du passage : cubic-bezier(0.45, 0, 0.55, 1) ; bande de 60 % de la carte',
+  glowWait: (quick: number, page: number) =>
+    `quick ${quick} : l’attente avant de montrer un squelette ; page ${page} : le fondu vers le contenu`,
+  day: 'jour',
+  night: 'nuit',
   notices: 'Messages (Notice)',
   error: 'Mot de passe incorrect.',
   expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
@@ -121,6 +134,17 @@ const en: typeof fr = {
   authors: ['Léa Moreau', 'Max Durand', 'Inès Haddad'],
   add: 'Add a project',
   skeletons: 'Skeletons: one card, then a list of two',
+  skeletonTokens:
+    'Skeletons (R16): the glow and the skeleton, skeletonGlow, skeletonCard, skeletonPanel roles',
+  glowTimings: (pass: number, pause: number) =>
+    `skeletonGlow ${pass}: the glow’s pass; skeletonPause ${pause}: its rest`,
+  glowStagger: (stagger: number) =>
+    `skeletonStagger ${stagger}: the delay from one column to the next`,
+  glowCurve: 'Pass curve: cubic-bezier(0.45, 0, 0.55, 1); a band 60% of the card wide',
+  glowWait: (quick: number, page: number) =>
+    `quick ${quick}: the wait before showing a skeleton; page ${page}: the fade into the content`,
+  day: 'day',
+  night: 'night',
   notices: 'Messages (Notice)',
   error: 'Wrong password.',
   expired: 'Your session has expired. Sign in again to continue.',
@@ -504,6 +528,96 @@ function Tiles({ l }: { l: Labels }) {
   )
 }
 
+/**
+ * R16 (« Les squelettes ») : les rôles de couleur d'une page qui charge, de jour puis de nuit. Les
+ * formes (`skeleton`, le brun miel transparent) sont posées sur chacun de leurs fonds : la carte vide
+ * (`skeletonCard`), son panneau (`skeletonPanel`), la page ; la lueur (`skeletonGlow`) est montrée
+ * seule, sur la carte vide, comme dans son dégradé (transparente aux bords, ce miel au cœur).
+ */
+const skeletonRoles: readonly ColorName[] = [
+  'skeleton',
+  'skeletonGlow',
+  'skeletonCard',
+  'skeletonPanel',
+]
+
+function SkeletonSwatches() {
+  const { colors } = useTheme()
+  return (
+    <Stack direction="row" gap="md" wrap>
+      {skeletonRoles.map((role) => (
+        <Stack key={role} gap="xs">
+          <View
+            style={{
+              width: 120,
+              height: 72,
+              borderRadius: radii.small,
+              // Une forme et la lueur se voient sur ce qu'elles couvrent : la carte vide.
+              backgroundColor:
+                role === 'skeleton' || role === 'skeletonGlow' ? colors.skeletonCard : colors[role],
+              borderWidth: borders.hairline,
+              borderColor: colors.line,
+              padding: space.md,
+              justifyContent: 'center',
+            }}
+          >
+            {role === 'skeletonGlow' ? (
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  { borderRadius: radii.small, backgroundColor: colors.skeletonGlow },
+                ]}
+              />
+            ) : (
+              <View
+                style={{
+                  height: space.md,
+                  width: '70%',
+                  borderRadius: radii.small,
+                  backgroundColor: colors.skeleton,
+                }}
+              />
+            )}
+          </View>
+          <Mono text={role} />
+          <Mono text={colors[role]} />
+        </Stack>
+      ))}
+    </Stack>
+  )
+}
+
+/** Les jetons de mouvement de la lueur et de l'attente (plan R16, choix 6 à 9). */
+function SkeletonTimings({ l }: { l: Labels }) {
+  return (
+    <Stack gap="xs">
+      <Mono text={l.glowTimings(durations.skeletonGlow, durations.skeletonPause)} />
+      <Mono text={l.glowStagger(durations.skeletonStagger)} />
+      <Mono text={l.glowCurve} />
+      <Mono text={l.glowWait(durations.quick, durations.page)} />
+    </Stack>
+  )
+}
+
+function SkeletonTokens({ l }: { l: Labels }) {
+  return (
+    <Stack gap="md">
+      <SkeletonTimings l={l} />
+      {(['day', 'night'] as const).map((scheme) => (
+        // Le jour et la nuit l'un sous l'autre, quel que soit le thème du catalogue.
+        <ThemeProvider key={scheme} appearance={scheme}>
+          <Surface variant="plain" padding="lg" gap="sm">
+            <Text variant="caption" tone="muted">
+              {l[scheme]}
+            </Text>
+            <SkeletonSwatches />
+          </Surface>
+        </ThemeProvider>
+      ))}
+    </Stack>
+  )
+}
+
 function Skeletons() {
   return (
     <Stack direction="row" gap="xl" wrap>
@@ -557,6 +671,9 @@ export function TokensCatalogue() {
       </Block>
       <Block title={l.tiles}>
         <Tiles l={l} />
+      </Block>
+      <Block title={l.skeletonTokens}>
+        <SkeletonTokens l={l} />
       </Block>
       <Block title={l.skeletons} variant="plain">
         <Skeletons />
