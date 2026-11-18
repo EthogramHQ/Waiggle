@@ -5647,6 +5647,12 @@ const runQueue = async (jobs, work) => {
       try {
         await work(job)
       } catch (error) {
+        // Le nom de la capture en échec : la pile de l'erreur ne dit que la ligne du script, pas
+        // la page (deux pannes de la CI sans nom, le 18/11/2026).
+        const { shot, device, scheme } = job ?? {}
+        console.error(
+          `Capture en échec : ${shot?.name ?? '?'} ${device?.name ?? device ?? ''} ${scheme ?? ''}`,
+        )
         failure ??= { error }
       }
     }
