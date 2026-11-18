@@ -1026,10 +1026,14 @@ describe('ExploreScreen, while its sections load (R16)', () => {
         const title = await screen.findByRole('header', { name })
         expect(insideProgressbar(title as never)).toBe(false)
       }
-      // Une zone « Chargement » par section qui attend (choix 4), soit trois au moins.
-      expect(
-        (await screen.findAllByRole('progressbar', { name: fr.t(($) => $.common.loading) })).length,
-      ).toBeGreaterThanOrEqual(3)
+      // Une zone « Chargement » par section qui attend (choix 4), soit trois au moins. On attend
+      // qu'elles soient toutes là : chacune se montre après ses 160 ms (choix 8), pas toutes à la même
+      // image ; lire le nombre à la première trouvée rougissait la CI au hasard (18/11).
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+        ).toBeGreaterThanOrEqual(3),
+      )
       // Témoin : « Récents » est là, sous elles.
       expect(screen.getByRole('header', { name: fr.t(($) => $.explore.recent) })).toBeTruthy()
     } finally {
