@@ -2,7 +2,7 @@
 # installer.sh <commit>: installs the night deployment scripts on vps-dev (infra/vps-dev/contrat.md, A8).
 #
 # Run by root (Louis, as admin). The script itself is read from root's bare repository, never
-# from a working copy of louis, which louis could change (see infra/vps-dev/README.md):
+# from a working copy of louis, which louis could change (see infra/vps-dev/installation.md):
 #   sudo bash -c 'git -C /srv/waiggle-deploy/depot.git show "$1:infra/vps-dev/installer.sh" > /root/waiggle-installer.sh && bash /root/waiggle-installer.sh "$1"' _ <commit>
 #
 # It installs only the three files below, read by `git show <commit>:<path>` from that same
@@ -111,12 +111,12 @@ for dossier in "$ETAT" "$CONFIG"; do
   fi
 done
 
-# 5. What stays for Louis, in this order (infra/vps-dev/README.md).
+# 5. What stays for Louis, in this order (infra/vps-dev/installation.md).
 printf '%s\n' \
-  "Installé au commit $commit. Restent tes gestes, dans l'ordre (infra/vps-dev/README.md) :" \
+  "Installé au commit $commit. Restent tes gestes, dans l'ordre (infra/vps-dev/installation.md) :" \
   "  1. sudoers (visudo) : ajouter /usr/local/sbin/waiggle-deployer à l'alias de l'aperçu de louis ; jamais waiggle-retour ;" \
   "  2. les clés : /root/.ssh/waiggle-prod (sans phrase de passe) et /root/.ssh/waiggle-retour (avec la tienne), et leurs lignes sur la production ;" \
   "  3. le jeton fin de lecture, par gh auth login, collé au terminal, dans $CONFIG/gh ;" \
   "  4. le sujet ntfy de root, dans $CONFIG/ntfy.curl (0600) ;" \
   "  5. known_hosts : la production seule, empreinte vérifiée à la main ;" \
-  "  puis les vérifications du README (A11)."
+  "  puis les vérifications de infra/vps-dev/installation.md (A11)."

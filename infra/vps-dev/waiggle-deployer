@@ -63,7 +63,7 @@ CLE=/root/.ssh/waiggle-prod
 # shellcheck disable=SC2034 # the block is the same on vps-dev for both scripts: waiggle-retour uses it
 CLE_RETOUR=/root/.ssh/waiggle-retour
 HOTES_CONNUS=/root/.ssh/known_hosts
-PRODUCTION=louis@192.0.2.10
+PRODUCTION=louis@31.97.158.205
 VERROU=/run/waiggle-deploy.lock
 ETAT=/var/lib/waiggle-deploy
 JOURNAL=/var/log/waiggle-deploy.log
@@ -218,7 +218,7 @@ finir() {
 
 # TERM, INT or HUP: one `fin` line, code 4. Bash runs this trap once the program in progress
 # returns; during step 10, production goes on with the deployment on its side (A6).
-# shellcheck disable=SC2329 # called by the trap set in verifier_root
+# shellcheck disable=SC2317,SC2329 # called by the trap set in verifier_root
 interrompre() {
   if ((fini == 0)); then
     finir 4 interrompu

@@ -78,7 +78,8 @@ restrict,from="<IPv4 de vps-dev>",command="/usr/local/sbin/waiggle-deploy-force 
    ```
    Il porte chaque programme appelé, par son chemin absolu, et chaque fichier ou adresse. La copie de test ne
    remplace que ce bloc ; un test prouve qu'elle ne diffère du script qu'entre ces deux lignes. Hors du bloc, aucun
-   programme n'est appelé par son seul nom, sauf les commandes internes de bash.
+   programme n'est appelé par son seul nom, sauf les commandes internes de bash. Un programme de base appelé hors
+   du bloc l'est par son chemin absolu (`/usr/bin/mkdir`, `/usr/bin/rm`, comme `/usr/bin/env` et `/usr/bin/node`).
 6. **Aucun secret sur une ligne de commande** (M1), puisque `ps` la montre à `louis`. Le jeton reste dans
    `GH_CONFIG_DIR`, le sujet ntfy dans le fichier passé par `curl -K`, et aucune adresse n'est de la forme
    `https://x:jeton@`.
@@ -129,7 +130,8 @@ fichier partagé à l'exécution. Un test prouve que les deux blocs sont identiq
   `/usr/bin/env GH_CONFIG_DIR=$GH_DIR $GH attestation verify oci://<préfixe>-<part>:<commit> --repo EthogramHQ/Waiggle --signer-workflow EthogramHQ/Waiggle/.github/workflows/ci.yml --source-ref refs/heads/main --source-digest <commit> --deny-self-hosted-runners --format json --jq .[0].verificationResult.statement.subject[0].digest.sha256`.
 - `ssh` avec la clé de déploiement : `$TIMEOUT <délai> $SSH -F /dev/null -4 -i $CLE -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOTES_CONNUS -o BatchMode=yes -o ConnectTimeout=20 $PRODUCTION <commande>`.
   Le délai vaut `60` pour `version`, `900` pour `deploy`. Aucune option ne vient de l'appelant.
-- `ssh` avec la clé de retour : la même ligne, avec `-i $CLE_RETOUR` et `-o BatchMode=no`. La phrase de passe est
+- `ssh` avec la clé de retour : la même ligne, avec `-i $CLE_RETOUR`, `-o BatchMode=no` et `$TIMEOUT --foreground`
+  (sans quoi `timeout` met `ssh` en arrière-plan et la lecture de la phrase de passe se bloque). La phrase de passe est
   demandée sur le terminal d'`admin`, et rien ne la fournit à sa place.
 - La notification (I1) : `$CURL -fsS --max-time 10 -K $NTFY -H "Title: waiggle-deployer" --data-binary @-`, le
   texte sur l'entrée standard.
@@ -229,6 +231,8 @@ DOCKER=/usr/bin/docker
 LOGGER=/usr/bin/logger
 SETSID=/usr/bin/setsid
 TAIL=/usr/bin/tail
+NOHUP=/usr/bin/nohup
+DATE=/usr/bin/date
 DEPLOYE=/srv/ruche/deployed.env
 DEPOT=/srv/ruche/repo
 JOURNAUX=/srv/ruche/waiggle-deploy-force
@@ -253,7 +257,7 @@ Les commandes acceptées, comme chaînes entières :
      `$DOCKER buildx imagetools inspect <préfixe>-<part>:<commit> --format '{{json .Manifest.Digest}}'` doit rendre
      exactement `"sha256:<l'empreinte reçue>"`. Sinon, refus ;
   5. **le lancement détaché** (I2) : une ligne `avant <en service ou ->` sur la sortie. Puis `deploy.sh` est lancé
-     par `$SETSID nohup /bin/bash -c '"$0" "$1" "$2" "$3"; printf "fin %s\n" "$?"'`, avec
+     par `$SETSID $NOHUP /bin/bash -c '"$0" "$1" "$2" "$3"; printf "fin %s\n" "$?"'`, avec
      `$DEPOT/infra/deploy.sh <commit> <image api> <image web>` en arguments. Les valeurs passent en arguments,
      jamais dans le texte du `-c`. L'entrée vient de `/dev/null`, et la sortie **et l'erreur** vont dans
      `$JOURNAUX/<AAAAMMJJTHHMMSSZ>-<commit 7>.log` ;
@@ -264,7 +268,8 @@ Les commandes acceptées, comme chaînes entières :
 
 **Chaque commande** donne une ligne `$LOGGER -t waiggle-deploy`, au format
 `<normal|retour> <accepte|refuse> <raison> commit=<40 hex|-> client=<adresse>`. L'adresse est le premier mot de
-`SSH_CLIENT`, gardée seulement si elle est faite de chiffres, de points et de deux-points, sinon `-`. Une
+`SSH_CLIENT`, gardée seulement si elle est faite de chiffres hexadécimaux en minuscules, de points et de deux-points (IPv6
+comprise), sinon `-`. Une
 commande refusée n'est jamais recopiée.
 
 ## A7. Le journal et les notifications
@@ -335,7 +340,7 @@ Dans l'ordre :
 5. il ne touche ni au `sudoers`, ni aux clés, ni au jeton, ni au sujet ntfy, ni à `known_hosts` : ce sont des gestes
    de Louis, que le script rappelle à la fin, dans l'ordre.
 
-Le premier `fetch` du dépôt nu, avant la première installation, se fait à la main (`infra/vps-dev/README.md`) :
+Le premier `fetch` du dépôt nu, avant la première installation, se fait à la main (`infra/vps-dev/installation.md`) :
 créer le dépôt nu, poser le jeton (`gh auth login --with-token`, collé au terminal, jamais dans un tube ni un
 argument), puis faire le `fetch` de A3.
 

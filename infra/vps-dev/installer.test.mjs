@@ -30,7 +30,7 @@ const version = (v) => ({
   'infra/vps-dev/waiggle-retour': `#!/bin/bash -p\n# retour ${v}\n`,
   'infra/vps-dev/waiggle-deploy.logrotate': `/var/log/waiggle-deploy.log { weekly } # ${v}\n`,
   'infra/vps-dev/installer.sh': `# installer ${v}\n`,
-  'infra/vps-dev/README.md': `not installed ${v}\n`,
+  'infra/vps-dev/installation.md': `not installed ${v}\n`,
   'infra/production/waiggle-deploy-force': `# not for vps-dev ${v}\n`,
 })
 
