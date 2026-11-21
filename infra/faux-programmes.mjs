@@ -1,4 +1,4 @@
-// Shared test helper for the night deployment scripts (infra/vps-dev/CONTRAT.md, A10).
+// Shared test helper for the night deployment scripts (infra/vps-dev/contrat.md, A10).
 //
 // It builds a "bench" in a temporary directory:
 //   - the test copy of a script, where only the block between `# --- chemins : début ---` and
@@ -31,7 +31,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export const linux = process.platform === 'linux'
 export const raisonDuSaut =
-  !linux && 'Linux only (bash, flock, setsid): infra/vps-dev/CONTRAT.md A9'
+  !linux && 'Linux only (bash, flock, setsid): infra/vps-dev/contrat.md A9'
 
 /** Louis's numeric GitHub account id (A1, `ID_LOUIS`), and another account for the refusals. */
 export const ID_LOUIS = 128143287

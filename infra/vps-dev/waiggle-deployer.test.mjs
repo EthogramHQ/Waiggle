@@ -1,4 +1,4 @@
-// Tests of waiggle-deployer and waiggle-retour (infra/vps-dev/CONTRAT.md, A4, A5, A7, A10), run by
+// Tests of waiggle-deployer and waiggle-retour (infra/vps-dev/contrat.md, A4, A5, A7, A10), run by
 // `node --test infra/vps-dev/*.test.mjs infra/production/*.test.mjs` in the CI (A9).
 // Each test builds its own bench (infra/faux-programmes.mjs): the test copy of the script, the fake
 // gh, ssh, curl, systemd-run and id, and a bare repository standing for GitHub, checked by the real

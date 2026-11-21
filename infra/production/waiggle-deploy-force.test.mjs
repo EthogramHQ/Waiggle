@@ -1,4 +1,4 @@
-// Tests of waiggle-deploy-force, the guard of production (infra/vps-dev/CONTRAT.md, A6, A10), run by
+// Tests of waiggle-deploy-force, the guard of production (infra/vps-dev/contrat.md, A6, A10), run by
 // `node --test infra/vps-dev/*.test.mjs infra/production/*.test.mjs` in the CI (A9).
 // The bench (infra/faux-programmes.mjs) gives the test copy fake docker and logger; git, setsid and
 // tail are the real ones, and `$DEPOT` is a clone of a bare repository standing for GitHub, whose

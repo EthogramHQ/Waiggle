@@ -1,4 +1,4 @@
-// Test of infra/vps-dev/installer.sh (infra/vps-dev/CONTRAT.md, A8, A10), run by
+// Test of infra/vps-dev/installer.sh (infra/vps-dev/contrat.md, A8, A10), run by
 // `node --test infra/vps-dev/*.test.mjs infra/production/*.test.mjs` in the CI (A9).
 // The bench (infra/faux-programmes.mjs) relocates every path of the script's block of paths under
 // a temporary root (`/usr/local/sbin` becomes `<racine>/usr/local/sbin`), fakes id and chown (the

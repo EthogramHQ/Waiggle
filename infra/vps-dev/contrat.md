@@ -153,7 +153,8 @@ de début impossible (rien n'a été examiné).
    - **plafond** : refus s'il y a déjà 6 essais comptés dans le jour UTC.
 
    Un refus donne une ligne `fin` (raison `ecart` ou `plafond`) et le code 3. Il donne aussi une notification,
-   **au plus une toutes les 600 secondes** (m3), comptée dans `$ETAT/derniere-alerte`. Sinon, la ligne de l'essai
+   **au plus une toutes les 600 secondes** (m3), comptée dans `$ETAT/derniere-alerte` (une seule ligne : les
+   secondes depuis 1970 de la dernière de ces notifications ; illisible ou absent, l'envoi est permis). Sinon, la ligne de l'essai
    s'ajoute à `essais` avant l'étape suivante : un essai refusé plus loin compte quand même.
 3. **Le début** : une ligne `debut` au journal, puis la notification de début. Si elle ne part pas (code de `curl`
    non nul), une ligne `fin` (raison `notification`) et le code 5 (m3).
@@ -254,7 +255,7 @@ Les commandes acceptées, comme chaînes entières :
   5. **le lancement détaché** (I2) : une ligne `avant <en service ou ->` sur la sortie. Puis `deploy.sh` est lancé
      par `$SETSID nohup /bin/bash -c '"$0" "$1" "$2" "$3"; printf "fin %s\n" "$?"'`, avec
      `$DEPOT/infra/deploy.sh <commit> <image api> <image web>` en arguments. Les valeurs passent en arguments,
-     jamais dans le texte du `-c`. L'entrée vient de `/dev/null`, et la sortie va dans
+     jamais dans le texte du `-c`. L'entrée vient de `/dev/null`, et la sortie **et l'erreur** vont dans
      `$JOURNAUX/<AAAAMMJJTHHMMSSZ>-<commit 7>.log` ;
   6. **le suivi** : `$TAIL -n +1 -f --pid=<pid> <journal>` jusqu'à la fin de `deploy.sh`, puis le code lu sur la
      ligne `fin <code>`. Une connexion fermée n'arrête que le suivi, pas `deploy.sh`.
@@ -281,13 +282,16 @@ commande refusée n'est jamais recopiée.
   `pas-louis`, `site-env`, `mentions`, `attestation`, `empreinte`, `production`, `delai`, `interrompu`.
 - Le journal ne contient jamais le jeton, une clé, le sujet ntfy, ni le contenu d'un fichier de `/root`.
 
-**Les notifications** se font en une ligne de texte, par exemple :
+**Les notifications** se font en une ligne de texte, **exactement** sous ces formes (commit en 7 caractères,
+`<raison>` de la liste fermée ; les tests les comparent mot pour mot) :
 
 ```
-déployé : 1a2b3c4 (avant 9f8e7d6), demandé par louis, 212 s
-refusé (pas-louis) : 1a2b3c4, demandé par louis, étape 6
-début : 1a2b3c4, demandé par louis
+début : <commit>, demandé par <appelant>
+déployé : <commit> (avant <en service>), demandé par <appelant>, <durée> s
+refusé (<raison>) : <commit ou ->, demandé par <appelant>, étape <n>
 ```
+
+Par exemple : `déployé : 1a2b3c4 (avant 9f8e7d6), demandé par louis, 212 s`.
 
 Chaque essai envoie le début et la fin. Les refus de cadence et d'argument envoient au plus une notification toutes
 les 600 s. Le refus du verrou n'en envoie pas.
@@ -300,6 +304,25 @@ dépôt nu de root**, jamais dans une copie de `louis` (M4) :
 ```
 sudo bash -c 'git -C /srv/waiggle-deploy/depot.git show "$1:infra/vps-dev/installer.sh" > /root/waiggle-installer.sh && bash /root/waiggle-installer.sh "$1"' _ <commit>
 ```
+
+Il suit A3 (en-tête, un seul bloc de chemins, chaque programme par son chemin absolu), avec ce bloc au moins :
+
+```
+# --- chemins : début ---
+GIT=/usr/bin/git
+ID=/usr/bin/id
+CHOWN=/usr/bin/chown
+DEPOT=/srv/waiggle-deploy/depot.git
+SBIN=/usr/local/sbin
+LOGROTATE=/etc/logrotate.d
+ETAT=/var/lib/waiggle-deploy
+CONFIG=/root/.config/waiggle-deploy
+# --- chemins : fin ---
+```
+
+Chaque autre programme qu'il appelle (`chmod`, `mkdir`, `rm`…) y entre aussi, par son chemin absolu. L'uid se lit par
+`$ID -u` (jamais `$EUID`), et le propriétaire se pose par `$CHOWN root:root` (jamais `install -o`), pour que la copie
+de test tourne hors de root.
 
 Dans l'ordre :
 1. il vérifie l'uid 0, un seul argument de 40 hex, et que le commit est sur `refs/remotes/origin/main` du dépôt nu ;
@@ -436,6 +459,9 @@ Sur vps-dev, sous `admin` :
 - `sudo ssh-keygen -y -f /root/.ssh/waiggle-retour` → demande la phrase de passe.
 
 Depuis une autre machine : la clé de déploiement → refusée par `from=`.
+
+Au premier essai : le vrai `gh api … --jq` rend du JSON compact (`[12]`) pour la liste des PR, comme le faux `gh`
+des tests.
 
 Sur GitHub (B-2, D1 (a), D2) :
 - `gh api repos/EthogramHQ/Waiggle/collaborators/<compte machine>/permission --jq .permission` → `read` ;
