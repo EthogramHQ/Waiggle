@@ -97,9 +97,9 @@ function preparer(
     `github.com:\n  oauth_token: ${SECRETS.jeton}\n  user: lecteur\n`,
   )
   ecrire(c.NTFY, `url = "https://ntfy.example.invalid/${SECRETS.sujet}"\n`)
-  if (c.CLE) ecrire(c.CLE, `-----BEGIN OPENSSH PRIVATE KEY-----\n${SECRETS.cle}\n`)
+  if (c.CLE) ecrire(c.CLE, `-----BEGIN OPENSSH PRIVATE KEY-----\n${SECRETS.cle}\n`) // gitleaks:allow (fausse clé, faux-programmes.mjs)
   if (c.CLE_RETOUR)
-    ecrire(c.CLE_RETOUR, `-----BEGIN OPENSSH PRIVATE KEY-----\n${SECRETS.cleRetour}\n`)
+    ecrire(c.CLE_RETOUR, `-----BEGIN OPENSSH PRIVATE KEY-----\n${SECRETS.cleRetour}\n`) // gitleaks:allow
   ecrire(c.HOTES_CONNUS, '203.0.113.7 ssh-ed25519 AAAAC3NzaHOTECONNU\n', 0o644)
   mkdirSync(c.ETAT, { recursive: true, mode: 0o700 })
   const origine = creerOrigine(banc, ARBRE)
