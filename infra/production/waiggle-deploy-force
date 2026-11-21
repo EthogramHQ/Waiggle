@@ -1,0 +1,210 @@
+#!/bin/bash -p
+# waiggle-deploy-force: the guard of production (infra/vps-dev/contrat.md, A6).
+#
+# sshd runs it as the forced command of the two keys of vps-dev, under louis
+# (~louis/.ssh/authorized_keys, docs/ops/serveur.md):
+#   - the deploy key: no argument. Only a commit of main newer than the one in service;
+#   - the return key: exactly --retour. A commit of main older than the one in service, or the
+#     same one, is allowed too, to repair.
+# It is installed by hand, outside the repository, as /usr/local/sbin/waiggle-deploy-force
+# (root:root 0755): a copy of the repository that louis can write must not be able to change it.
+#
+# The command the client asked for arrives in SSH_ORIGINAL_COMMAND. It is never handed to a shell:
+# it is compared whole with a regular expression, and only the captured parts (BASH_REMATCH) are
+# used. Two commands exist:
+#   version
+#       prints RUCHE_VERSION of deployed.env, and nothing else;
+#   deploy <commit> <prefix>-api@sha256:<64 hex> <prefix>-web@sha256:<64 hex>
+#       checks the commit and the digests, then runs infra/deploy.sh detached from the connection
+#       and follows its log.
+# Exit codes: 0 done; 2 refused (nothing was launched); otherwise the code of deploy.sh.
+#
+# -p (on the first line) keeps bash from reading BASH_ENV, SHELLOPTS and BASHOPTS, and from
+# importing functions from the environment.
+set -euo pipefail
+IFS=$' \t\n'
+umask 077
+cd /
+
+# The only two values read from the environment, kept in variables that are not exported. The
+# command is copied as one quoted value; an unset variable means an interactive session.
+if [[ -v SSH_ORIGINAL_COMMAND ]]; then
+  commande="${SSH_ORIGINAL_COMMAND}"
+  interactif=non
+else
+  commande=''
+  interactif=oui
+fi
+client_brut="${SSH_CLIENT-}"
+
+# Everything the caller exported goes away; only a fixed PATH and LANG remain, inherited by
+# deploy.sh. lib.sh then takes its own defaults (/srv/ruche), never a value of the caller.
+for nom in $(compgen -e); do
+  unset -v "$nom" || true
+done
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LANG=C.UTF-8
+
+# --- chemins : début ---
+GIT=/usr/bin/git
+DOCKER=/usr/bin/docker
+LOGGER=/usr/bin/logger
+SETSID=/usr/bin/setsid
+NOHUP=/usr/bin/nohup
+TAIL=/usr/bin/tail
+DATE=/usr/bin/date
+DEPLOYE=/srv/ruche/deployed.env
+DEPOT=/srv/ruche/repo
+JOURNAUX=/srv/ruche/waiggle-deploy-force
+# --- chemins : fin ---
+
+# The client address for the log: the first word of SSH_CLIENT, kept only when it is made of
+# hexadecimal digits, dots and colons (IPv4 or IPv6), otherwise "-".
+client=-
+motif_client='^([0-9a-f.:]+)( |$)'
+if [[ $client_brut =~ $motif_client ]]; then
+  client=${BASH_REMATCH[1]}
+fi
+
+mode=normal
+
+# One syslog line per command: <mode> <accepte|refuse> <reason> commit=<40 hex|-> client=<address>.
+# Only validated values go in it, never the text of a refused command.
+journaliser() {
+  "$LOGGER" -t waiggle-deploy "$mode $1 $2 commit=$3 client=$client" || true
+}
+
+# A refusal: the log line, one sentence on stderr, code 2. Nothing is written on stdout.
+refuser() {
+  journaliser refuse "$1" "$2"
+  printf 'waiggle-deploy-force : %s\n' "$3" >&2
+  exit 2
+}
+
+# The version in service: the single RUCHE_VERSION line of deployed.env, 40 hexadecimal
+# characters, read without any program. Missing or malformed, it is "-".
+lire_version() {
+  service=-
+  local ligne valeur='' nombre=0
+  [[ -f $DEPLOYE ]] || return 0
+  while IFS= read -r ligne || [[ -n $ligne ]]; do
+    if [[ $ligne == RUCHE_VERSION=* ]]; then
+      valeur=${ligne#RUCHE_VERSION=}
+      nombre=$((nombre + 1))
+    fi
+  done <"$DEPLOYE"
+  if [[ $nombre -eq 1 && $valeur =~ ^[0-9a-f]{40}$ ]]; then
+    service=$valeur
+  fi
+  return 0
+}
+
+# The arguments come from the forced command of authorized_keys: none, or exactly --retour.
+if [[ $# -eq 1 && $1 == --retour ]]; then
+  mode=retour
+elif [[ $# -ne 0 ]]; then
+  refuser argument - "argument inattendu dans la commande forcée"
+fi
+
+if [[ $interactif == oui ]]; then
+  refuser interactif - "pas de session interactive"
+fi
+
+# --- version
+if [[ $commande == version ]]; then
+  lire_version
+  if [[ $service == - ]]; then
+    refuser version-illisible - "RUCHE_VERSION absente ou illisible dans deployed.env"
+  fi
+  journaliser accepte version -
+  printf '%s\n' "$service"
+  exit 0
+fi
+
+# --- deploy: the whole command, or nothing.
+motif_deploy='^deploy ([0-9a-f]{40}) (ghcr\.io/[a-z0-9._/-]+)-api@sha256:([0-9a-f]{64}) (ghcr\.io/[a-z0-9._/-]+)-web@sha256:([0-9a-f]{64})$'
+if ! [[ $commande =~ $motif_deploy ]]; then
+  refuser commande - "commande refusée"
+fi
+commit=${BASH_REMATCH[1]}
+prefixe=${BASH_REMATCH[2]}
+empreinte_api=${BASH_REMATCH[3]}
+prefixe_web=${BASH_REMATCH[4]}
+empreinte_web=${BASH_REMATCH[5]}
+if [[ $prefixe != "$prefixe_web" ]]; then
+  refuser prefixes "$commit" "les deux images n'ont pas le même préfixe"
+fi
+image_api="${prefixe}-api@sha256:${empreinte_api}"
+image_web="${prefixe}-web@sha256:${empreinte_web}"
+
+# 1. The version in service. The normal mode needs it; the return mode repairs without it.
+lire_version
+if [[ $service == - && $mode == normal ]]; then
+  refuser version-illisible "$commit" "RUCHE_VERSION absente ou illisible dans deployed.env"
+fi
+
+# 2. The commit is on main of GitHub, as fetched now into the server's copy of the repository.
+# The fetch writes nothing on stdout, which carries only "avant …" and the deploy log.
+if ! "$GIT" -C "$DEPOT" fetch --quiet --no-tags origin main >&2; then
+  refuser fetch "$commit" "la lecture de main a échoué"
+fi
+if ! "$GIT" -C "$DEPOT" rev-parse --verify --quiet "${commit}^{commit}" >/dev/null; then
+  refuser pas-sur-main "$commit" "commit inconnu de main"
+fi
+if ! "$GIT" -C "$DEPOT" merge-base --is-ancestor "$commit" origin/main 2>/dev/null; then
+  refuser pas-sur-main "$commit" "ce commit n'est pas sur main"
+fi
+
+# 3. The direction, in normal mode only: strictly newer than the version in service.
+if [[ $mode == normal ]]; then
+  if [[ $commit == "$service" ]]; then
+    refuser deja-en-service "$commit" "ce commit est déjà en service"
+  fi
+  if ! "$GIT" -C "$DEPOT" merge-base --is-ancestor "$service" "$commit" 2>/dev/null; then
+    refuser plus-ancien "$commit" "ce commit ne descend pas de la version en service"
+  fi
+fi
+
+# 4. Each digest is the one the registry gives for the tag <prefix>-<part>:<commit>, which the CI
+# of main pushes: a digest of another build of the same prefix is refused.
+for part in api web; do
+  if [[ $part == api ]]; then
+    attendue=$empreinte_api
+  else
+    attendue=$empreinte_web
+  fi
+  if ! rendue=$("$DOCKER" buildx imagetools inspect "${prefixe}-${part}:${commit}" --format '{{json .Manifest.Digest}}' 2>/dev/null); then
+    refuser empreinte "$commit" "aucune image ${part} étiquetée par ce commit"
+  fi
+  if [[ $rendue != "\"sha256:${attendue}\"" ]]; then
+    refuser empreinte "$commit" "l'empreinte ${part} n'est pas celle de l'image étiquetée par ce commit"
+  fi
+done
+
+# 5. Accepted: the log line, then the version it replaces, first line of the output.
+journaliser accepte deploy "$commit"
+printf 'avant %s\n' "$service"
+
+# deploy.sh runs in its own session (setsid) and ignores SIGHUP (nohup): when the connection
+# closes, sshd's signals reach this script and tail, not deploy.sh. Its input is /dev/null, its
+# output and errors go to the log of this deployment, which ends with "fin <code>". The values
+# are arguments of the fixed -c text, never part of it. The log exists before tail opens it.
+journal="${JOURNAUX}/$("$DATE" -u +%Y%m%dT%H%M%SZ)-${commit:0:7}.log"
+: >>"$journal"
+# shellcheck disable=SC2016 # the text is for the inner bash, which expands $0 to $3 itself
+"$SETSID" "$NOHUP" /bin/bash -c '"$0" "$1" "$2" "$3"; printf "fin %s\n" "$?"' "${DEPOT}/infra/deploy.sh" "$commit" "$image_api" "$image_web" </dev/null >>"$journal" 2>&1 &
+pid=$!
+
+# 6. Follow the log until deploy.sh is over; a closed connection stops only this follow.
+"$TAIL" -n +1 -f --pid="$pid" "$journal" || true
+
+# The code of deploy.sh, from the last line of the log.
+derniere=''
+while IFS= read -r ligne || [[ -n $ligne ]]; do
+  derniere=$ligne
+done <"$journal"
+motif_fin='^fin ([0-9]{1,3})$'
+if [[ $derniere =~ $motif_fin ]]; then
+  exit "${BASH_REMATCH[1]}"
+fi
+exit 1

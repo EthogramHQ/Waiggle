@@ -19,7 +19,7 @@ Internet ──443──▶ web (Caddy + appli construite) ─┬─ waiggle.com
 | Système | Debian 13, compte d'administration `louis` (root fermé) |
 | Domaines | waiggle.com (appli), api.waiggle.com (API), www.waiggle.com (renvoie vers waiggle.com) ; anciens : waiggle.io, www.waiggle.io et api.waiggle.io redirigent (ADR 0006) ; waiggle.fr redirigé par Hostinger |
 | Images | `ghcr.io/ethogramhq/waiggle-api` et `waiggle-web`, publiées par la CI après chaque fusion sur main |
-| Dossier de l'appli | `/srv/ruche` : `repo/` (copie du dépôt), `secrets.env`, `deployed.env`, `backups/` |
+| Dossier de l'appli | `/srv/ruche` : `repo/` (copie du dépôt), `secrets.env`, `deployed.env`, `backups/`, `waiggle-deploy-force/` (journaux du déploiement de nuit) |
 | E-mails | Scaleway Transactional Email (compte), expéditeur `no-reply@waiggle.com` ; Brevo réservé au marketing (ADR 0005) |
 
 Ce qui se fait tout seul :
@@ -473,6 +473,58 @@ infra/deploy-from-pc.sh
 Le déploiement fait une sauvegarde juste avant (étiquette `avant-deploi`) et affiche la commande
 pour revenir à la version précédente. Si la vérification de provenance échoue, **on ne déploie
 pas** : on prévient Louis.
+
+### Le déploiement de nuit depuis vps-dev : le gardien
+
+vps-dev peut aussi déployer seul, la nuit (`infra/vps-dev/contrat.md`, partie A). Il se connecte
+avec deux clés à lui, et chacune ne peut lancer qu'une seule commande sur la production : le
+**gardien**, `infra/production/waiggle-deploy-force`. Le gardien n'accepte que deux demandes,
+`version` (la version en service) et `deploy <commit> <image api> <image web>`, comparées en
+entier ; tout le reste est refusé sans rien lancer, et chaque demande laisse une ligne dans les
+journaux du système (`journalctl -t waiggle-deploy`).
+
+Avec le gardien, la clé de déploiement, même volée, ne déploie qu'**un commit de `main` plus
+récent que celui en service, avec les images étiquetées par ce commit** : il relit `main` sur
+GitHub, vérifie que le commit descend de la version en service, et compare chaque empreinte reçue
+à celle de l'image `<préfixe>-api:<commit>` (et `-web`) dans le dépôt d'images. La clé de retour,
+protégée par une phrase de passe que seul Louis connaît, permet en plus un commit plus ancien, ou
+le même, pour réparer.
+
+**L'installation, par Louis, hors du dépôt** : le gardien n'est jamais lancé depuis
+`/srv/ruche/repo`, que le compte `louis` peut modifier. Une fois le script relu, au commit voulu :
+
+```bash
+git -C /srv/ruche/repo fetch --quiet origin main
+git -C /srv/ruche/repo show <commit>:infra/production/waiggle-deploy-force > /tmp/waiggle-deploy-force
+sudo install -o root -g root -m 0755 /tmp/waiggle-deploy-force /usr/local/sbin/waiggle-deploy-force
+rm /tmp/waiggle-deploy-force
+ls -l /usr/local/sbin/waiggle-deploy-force
+```
+
+La dernière ligne doit montrer `-rwxr-xr-x 1 root root`. Le gardien ne change ensuite qu'en
+refaisant ces gestes : un déploiement ne le met jamais à jour.
+
+**Le dossier des journaux de déploiement**, `/srv/ruche/waiggle-deploy-force/`, à `louis`, mode
+0700 : un fichier par déploiement lancé par le gardien, `<date>T<heure>Z-<commit en 7>.log`, avec
+toute la sortie de `deploy.sh`, erreurs comprises, et en dernière ligne `fin <code>`.
+
+```bash
+mkdir -p /srv/ruche/waiggle-deploy-force
+chmod 0700 /srv/ruche/waiggle-deploy-force
+```
+
+**Les deux clés**, dans `~louis/.ssh/authorized_keys` (mode 0600), une ligne chacune. L'adresse
+est l'IPv4 de vps-dev (vps-dev se connecte toujours en IPv4) ; les valeurs ci-dessous sont des
+exemples, à remplacer par la vraie adresse et les vraies clés publiques :
+
+```text
+restrict,from="192.0.2.10",command="/usr/local/sbin/waiggle-deploy-force" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExempleCleDeDeploiement waiggle-prod@vps-dev
+restrict,from="192.0.2.10",command="/usr/local/sbin/waiggle-deploy-force --retour" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExempleCleDeRetour waiggle-retour@vps-dev
+```
+
+`restrict` coupe le terminal, les redirections de ports et l'agent SSH ; `from=` refuse la clé
+depuis toute autre machine ; `command=` remplace la commande demandée par le gardien, qui ne la
+lit que pour la comparer.
 
 ### Revenir en arrière
 
