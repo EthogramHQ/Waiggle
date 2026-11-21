@@ -296,7 +296,7 @@ describe('waiggle-deployer', { skip: !linux && raisonDuSaut }, () => {
   })
 
   it('refuses when production answers a version that is not 40 hexadecimal characters', async () => {
-    for (const reponse of ['abc\n', 'S', '', 'deux lignes']) {
+    for (const reponse of ['abc', 'S', '', 'deux lignes']) {
       const { banc, S, C } = preparer()
       const version = {
         abc: 'abc\n',

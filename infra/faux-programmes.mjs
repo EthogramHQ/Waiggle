@@ -217,8 +217,10 @@ export function copieDeTest(texte, { bin, racine, remplacements = {} }) {
     if (nom in remplacements) n = remplacements[nom]
     else if (v.startsWith('/')) {
       const base = basename(v)
-      if (existsSync(join(bin, base))) n = join(bin, base)
-      else if (REELS.includes(base)) n = reel(base)
+      // Only a program path becomes a fake or a real program: GH_DIR ends in /gh too.
+      const programme = /^\/(usr\/)?s?bin\/[^/]+$/.test(v)
+      if (programme && existsSync(join(bin, base))) n = join(bin, base)
+      else if (programme && REELS.includes(base)) n = reel(base)
       else if (!executable(v)) n = join(racine, v)
     }
     valeurs[nom] = n
