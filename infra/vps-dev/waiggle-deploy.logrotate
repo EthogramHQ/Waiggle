@@ -1,0 +1,12 @@
+# Rotation of the night deployment log on vps-dev (infra/vps-dev/contrat.md, A2).
+# Installed by infra/vps-dev/installer.sh as /etc/logrotate.d/waiggle-deploy (root:root 0644).
+# One line per attempt: a year of monthly files is kept, readable by root only.
+/var/log/waiggle-deploy.log {
+	monthly
+	rotate 12
+	compress
+	delaycompress
+	missingok
+	notifempty
+	create 0600 root root
+}
