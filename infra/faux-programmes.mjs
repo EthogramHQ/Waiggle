@@ -4,7 +4,8 @@
 //   - the test copy of a script, where only the block between `# --- chemins : début ---` and
 //     `# --- chemins : fin ---` changes (A3.5);
 //   - fake gh, ssh, curl, systemd-run, docker, id and logger, which succeed only with the exact
-//     arguments of the contract (A3, A6) and record each call in `appels.jsonl`;
+//     arguments of the contract (A3, A6) and record each call in `appels.jsonl`; no script calls
+//     docker any more (A6 step 4 reads attestations, never a tag), its fake stays to prove it;
 //   - a bare repository standing for GitHub (`ORIGINE`), checked by the real git (I-3).
 // flock, timeout, setsid, tail, env and git stay the real programs.
 //
@@ -72,6 +73,29 @@ export const argumentsAttestation = (prefixe, part, commit) => [
   'attestation',
   'verify',
   `oci://${prefixe}-${part}:${commit}`,
+  '--repo',
+  DEPOT_GITHUB,
+  '--signer-workflow',
+  `${DEPOT_GITHUB}/.github/workflows/ci.yml`,
+  '--source-ref',
+  'refs/heads/main',
+  '--source-digest',
+  commit,
+  '--deny-self-hosted-runners',
+  '--format',
+  'json',
+  '--jq',
+  FILTRE_ATTESTATION,
+]
+
+/**
+ * The arguments of `gh attestation verify` for one image on production (A6 step 4): the image is
+ * named by the digest received, never by a tag, and the attestation must be for `commit`.
+ */
+export const argumentsAttestationEmpreinte = (prefixe, part, empreinte, commit) => [
+  'attestation',
+  'verify',
+  `oci://${prefixe}-${part}@sha256:${empreinte}`,
   '--repo',
   DEPOT_GITHUB,
   '--signer-workflow',
@@ -564,6 +588,23 @@ const reponses = {
         }
       }
       return null
+    }
+    // Production (A6 step 4): the image by its digest. `config.attestationsProduction` lists the
+    // attestations of main's CI as { image: '<prefix>-<part>@sha256:<64 hex>', commit, sujet? };
+    // gh fails when none is for this image and this commit, and prints the subject's digest
+    // (the image's own one, unless `sujet` says otherwise) when one is.
+    const production = /^oci:\/\/(.+)-(api|web)@sha256:([0-9a-f]{64})$/.exec(args[2] ?? '')
+    if (args[0] === 'attestation' && production) {
+      const [, prefixe, part, empreinte] = production
+      const commit = /^[0-9a-f]{40}$/.test(args[10] ?? '') ? args[10] : ''
+      if (!egal(args, argumentsAttestationEmpreinte(prefixe, part, empreinte, commit))) return null
+      const trouvee = (config.attestationsProduction ?? []).find(
+        (a) => a.image === `${prefixe}-${part}@sha256:${empreinte}` && a.commit === commit,
+      )
+      if (!trouvee) {
+        return { code: 1, erreur: 'Error: no attestations found texte-recu-de-github\n' }
+      }
+      return { sortie: `${trouvee.sujet ?? empreinte}\n` }
     }
     if (args[0] === 'attestation') {
       const m = /^oci:\/\/(.+)-(api|web):([0-9a-f]{40})$/.exec(args[2] ?? '')

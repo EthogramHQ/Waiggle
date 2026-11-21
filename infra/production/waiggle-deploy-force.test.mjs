@@ -1,6 +1,6 @@
 // Tests of waiggle-deploy-force, the guard of production (infra/vps-dev/contrat.md, A6, A10), run by
 // `node --test infra/vps-dev/*.test.mjs infra/production/*.test.mjs` in the CI (A9).
-// The bench (infra/faux-programmes.mjs) gives the test copy fake docker and logger; git, setsid and
+// The bench (infra/faux-programmes.mjs) gives the test copy fake gh, docker and logger; git, setsid and
 // tail are the real ones, and `$DEPOT` is a clone of a bare repository standing for GitHub, whose
 // infra/deploy.sh is a fake that records its arguments and leaves a witness file.
 // Linux only: elsewhere the whole file is skipped.
@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path'
 import { afterEach, describe, it } from 'node:test'
 import {
+  argumentsAttestationEmpreinte,
   creerBanc,
   creerOrigine,
   lignes,
@@ -40,9 +41,16 @@ echo "deploy.sh: done"
 exit "$(cat '${dossier}/deploy-code' 2>/dev/null || echo 0)"
 `
 
+/** The attestations of main's CI for the images API and WEB of `prefixe`, one per commit. */
+const attestationsDe = (prefixe, commits) =>
+  commits.flatMap((commit) => [
+    { image: `${prefixe}-api@sha256:${API}`, commit },
+    { image: `${prefixe}-web@sha256:${WEB}`, commit },
+  ])
+
 /**
- * A production running S, on a main that reads P, S, N (P older, N newer), with the digests of
- * the tags of all three in the registry.
+ * A production running S, on a main that reads P, S, N (P older, N newer), with the attestations
+ * of main's CI for the images API and WEB of all three.
  */
 function preparer() {
   const banc = creerBanc(FORCE)
@@ -59,15 +67,11 @@ function preparer() {
     `RUCHE_VERSION=${S}\nAPI_IMAGE=${PREFIXE}-api@sha256:${'0'.repeat(64)}\nWEB_IMAGE=x\n`,
   )
   mkdirSync(c.JOURNAUX, { recursive: true, mode: 0o700 })
-  const docker = {}
-  for (const sha of [P, S, N, cote]) {
-    docker[`${PREFIXE}-api:${sha}`] = API
-    docker[`${PREFIXE}-web:${sha}`] = WEB
-  }
-  banc.configurer({ docker })
+  const attestations = attestationsDe(PREFIXE, [P, S, N])
+  banc.configurer({ attestationsProduction: attestations })
   const temoin = join(banc.dossier, 'temoin-deploy')
   const injecte = join(banc.dossier, 'injecte')
-  return { banc, c, P, S, N, cote, docker, temoin, injecte }
+  return { banc, c, P, S, N, cote, attestations, temoin, injecte }
 }
 
 const deploy = (
@@ -172,6 +176,7 @@ describe('waiggle-deploy-force', { skip: !linux && raisonDuSaut }, () => {
     ]
     for (const texte of cas)
       refuse(p, await lancer(p.banc, texte), JSON.stringify(texte ?? 'interactive'))
+    assert.deepEqual(p.banc.appels('gh'), [], 'nothing was even verified')
     assert.deepEqual(p.banc.appels('docker'), [], 'nothing was even inspected')
   })
 
@@ -214,21 +219,57 @@ describe('waiggle-deploy-force', { skip: !linux && raisonDuSaut }, () => {
 
   // --- From the security review v1
 
-  it('refuses an image digest that is not the one of the tags <prefix>-api:<commit> and <prefix>-web:<commit>', async () => {
+  it("refuses an image digest that has no provenance attestation from main's CI for this commit, and never reads a tag", async () => {
     const p = preparer()
     const autre = '5e'.repeat(32)
-    refuse(p, await lancer(p.banc, deploy(p.N, { api: autre })), 'api digest')
-    refuse(p, await lancer(p.banc, deploy(p.N, { web: autre })), 'web digest')
+    // Tags that a workflow of another branch moved onto the other digest: the guard never reads them.
+    p.banc.configurer({
+      docker: { [`${PREFIXE}-api:${p.N}`]: autre, [`${PREFIXE}-web:${p.N}`]: autre },
+    })
+    refuse(p, await lancer(p.banc, deploy(p.N, { api: autre })), 'api digest without attestation')
+    refuse(p, await lancer(p.banc, deploy(p.N, { web: autre })), 'web digest without attestation')
     refuse(p, await lancer(p.banc, deploy(p.N, { api: WEB, web: API })), 'swapped digests')
-    delete p.docker[`${PREFIXE}-web:${p.N}`]
-    p.banc.configurer({ docker: p.docker })
-    refuse(p, await lancer(p.banc, deploy(p.N)), 'no web tag for the commit')
-    const inspections = p.banc.appels('docker').map((a) => a.args.join(' '))
-    assert.ok(
-      inspections.includes(
-        `buildx imagetools inspect ${PREFIXE}-api:${p.N} --format {{json .Manifest.Digest}}`,
+    // An attestation of main's CI, but for another commit (P), is not one for N.
+    const pourP = attestationsDe(PREFIXE, [p.P])
+    p.banc.configurer({ attestationsProduction: pourP })
+    refuse(p, await lancer(p.banc, deploy(p.N)), 'attestations for another commit')
+    // The web image of N has no attestation.
+    p.banc.configurer({
+      attestationsProduction: p.attestations.filter(
+        (a) => !(a.commit === p.N && a.image.includes('-web@')),
       ),
+    })
+    refuse(p, await lancer(p.banc, deploy(p.N)), 'no attestation for the web image')
+    // gh succeeds but prints another subject: refused too.
+    p.banc.configurer({
+      attestationsProduction: p.attestations.map((a) =>
+        a.commit === p.N && a.image.includes('-api@') ? { ...a, sujet: autre } : a,
+      ),
+    })
+    refuse(p, await lancer(p.banc, deploy(p.N)), 'another subject digest')
+    // The text gh printed never reaches the log.
+    const journal = messages(p.banc).join('\n')
+    assert.equal(journal.includes('texte-recu-de-github'), false)
+    assert.equal(journal.includes(autre), false)
+
+    // With the attestations of N, the deployment goes: api then web, by the exact call of A6.
+    p.banc.configurer({ attestationsProduction: p.attestations })
+    const avant = p.banc.appels('gh').length
+    const r = await lancer(p.banc, deploy(p.N))
+    assert.equal(r.code, 0, r.stderr)
+    assert.deepEqual(
+      p.banc
+        .appels('gh')
+        .slice(avant)
+        .map((a) => a.args),
+      [
+        argumentsAttestationEmpreinte(PREFIXE, 'api', API, p.N),
+        argumentsAttestationEmpreinte(PREFIXE, 'web', WEB, p.N),
+      ],
     )
+    for (const a of p.banc.appels('gh')) assert.equal(a.env.GH_CONFIG_DIR, p.c.GH_DIR)
+    assert.deepEqual(p.banc.appels('docker'), [], 'docker is never called')
+    assert.deepEqual(p.banc.refuses(), [])
   })
 
   it("accepts a commit older than the version in production only under the return key's forced command", async () => {
@@ -282,7 +323,7 @@ describe('waiggle-deploy-force', { skip: !linux && raisonDuSaut }, () => {
     const p = preparer()
     const autre = 'ghcr.io/ethogramhq/autre'
     p.banc.configurer({
-      docker: { ...p.docker, [`${autre}-web:${p.N}`]: WEB, [`${autre}-api:${p.N}`]: API },
+      attestationsProduction: [...p.attestations, ...attestationsDe(autre, [p.N])],
     })
     refuse(p, await lancer(p.banc, deploy(p.N, { prefixeWeb: autre })), 'web prefix differs')
     refuse(p, await lancer(p.banc, deploy(p.N, { prefixeApi: autre })), 'api prefix differs')
