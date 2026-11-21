@@ -17,7 +17,7 @@
     "journey": "node scripts/journey-local.mjs"
   },
   "dependencies": {
-    "@better-auth/expo": "1.7.18",
+    "@better-auth/expo": "1.7.25",
     "@better-auth/utils": "0.5.1",
     "@expo-google-fonts/funnel-display": "0.4.1",
     "@expo-google-fonts/funnel-sans": "0.4.2",
@@ -27,7 +27,7 @@
     "@ruche/contracts": "workspace:*",
     "@ruche/i18n": "workspace:*",
     "@tanstack/react-query": "5.107.1",
-    "better-auth": "1.7.18",
+    "better-auth": "1.7.25",
     "expo": "~57.0.27",
     "expo-blur": "~57.0.3",
     "expo-clipboard": "57.0.2",
@@ -43,7 +43,7 @@
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.3",
-    "i18next": "27.1.0",
+    "i18next": "27.1.1",
     "marked": "18.1.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
