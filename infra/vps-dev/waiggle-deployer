@@ -1,0 +1,478 @@
+#!/bin/bash -p
+# waiggle-deployer <commit>: deploys a commit of main to production, from vps-dev.
+#
+# Louis runs it through sudo without a password (it is the only deploy command in his sudoers
+# alias), typically at night from a phone. Everything it checks is listed in
+# infra/vps-dev/contrat.md (A3, A4, A7); in short, in this order:
+#   0. root, then the lock (one run at a time);
+#   1. exactly one argument, a full commit (40 lowercase hexadecimal characters);
+#   2. the pace: 10 minutes between two attempts, 6 attempts per UTC day;
+#   3. a log line and a start notification (no notification, no deployment);
+#   4. the commit is on main of GitHub (root's own bare repository, fetched now);
+#   5. it descends from the version in production, and differs from it;
+#   6. each first-parent commit since that version was merged by Louis through a pull request;
+#   7. the image prefix, read from infra/site.env in the commit tree;
+#   8. the legal check, run from the commit tree in a sandbox without network, /root or homes;
+#   9. both images carry a provenance attestation from main's CI for this very commit;
+#  10. the guard of production (waiggle-deploy-force) deploys the images, by digest;
+#  11. a log line and an end notification.
+#
+# `-p` (privileged mode) stops bash from reading BASH_ENV, SHELLOPTS and BASHOPTS, and from
+# importing functions: nothing of the caller's environment runs before the first line.
+# Exit codes: 0 deployed, 2 refused, 3 too early (lock or pace), 4 production failed or
+# interrupted, 5 start notification impossible.
+set -euo pipefail
+IFS=$' \t\n'
+umask 077
+cd /
+
+# The only value read from the caller's environment (A3.2): the user sudo names. It is validated
+# below, after the environment is cleared, and only ever written as `appelant=`.
+sudo_user=${SUDO_USER-}
+
+# Every exported variable goes, in this very process (A3.3): PATH, HOME, GIT_*, GH_*, SSH_* of
+# the caller can steer none of the programs called below. A program that needs a variable gets it
+# on its own command line (`/usr/bin/env GH_CONFIG_DIR=… gh …`).
+for nom in $(compgen -e); do
+  unset -v "$nom" 2>/dev/null || true
+done
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root LANG=C.UTF-8
+
+appelant=inconnu
+if [[ $sudo_user =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+  appelant=$sudo_user
+fi
+
+# Every program and every file, by its absolute path (A3.5). The tests rewrite this block only.
+# PRODUCTION: the IPv4 address of the production server (ssh always goes over IPv4, `-4`, so that
+# the `from=` of its authorized_keys names one address).
+# --- chemins : début ---
+GIT=/usr/bin/git
+GH=/usr/bin/gh
+SSH=/usr/bin/ssh
+CURL=/usr/bin/curl
+SYSTEMD_RUN=/usr/bin/systemd-run
+FLOCK=/usr/bin/flock
+TIMEOUT=/usr/bin/timeout
+ID=/usr/bin/id
+ORIGINE=https://github.com/EthogramHQ/Waiggle.git
+DEPOT=/srv/waiggle-deploy/depot.git
+GH_DIR=/root/.config/waiggle-deploy/gh
+NTFY=/root/.config/waiggle-deploy/ntfy.curl
+CLE=/root/.ssh/waiggle-prod
+# shellcheck disable=SC2034 # the block is the same on vps-dev for both scripts: waiggle-retour uses it
+CLE_RETOUR=/root/.ssh/waiggle-retour
+HOTES_CONNUS=/root/.ssh/known_hosts
+PRODUCTION=louis@31.97.158.205
+VERROU=/run/waiggle-deploy.lock
+ETAT=/var/lib/waiggle-deploy
+JOURNAL=/var/log/waiggle-deploy.log
+TRAVAIL=/run/waiggle-deploy
+# --- chemins : fin ---
+
+SCRIPT=waiggle-deployer
+
+# Louis's GitHub account, by its numeric id: a login can be renamed, an id cannot (A1).
+ID_LOUIS=128143287
+
+# The code shared with waiggle-retour, copied as is in both files (a test checks that the two
+# copies are identical): log, notifications and the checks both scripts make. No `source`: each
+# script is one file, installed and checked on its own.
+# --- commun : début ---
+DEPOT_GITHUB=EthogramHQ/Waiggle
+FICHIERS_MENTIONS=(scripts/legal-placeholders.mjs packages/brand/src/legal.ts apps/api/src/env.ts packages/i18n/src/locales/fr.ts packages/i18n/src/locales/en.ts)
+
+# What the final log line says. Each value is validated before it lands here (A3.7): nothing
+# received from GitHub, from production or from the caller is ever copied as is.
+commit=-
+service=-
+api=-
+web=-
+prefixe=
+etape=0
+depart=0
+now=0
+horo=
+fini=0
+mentions=
+
+# The current time, in seconds since 1970. `printf %(…)T` is a bash builtin: no `date` program.
+maintenant() {
+  printf -v now '%(%s)T' -1
+}
+
+# Each step, on the standard output (A3.8); the step number also goes in the `fin` line.
+annoncer() {
+  etape=$1
+  printf 'étape %s : %s\n' "$1" "$2" || true
+}
+
+# The UTC date and time of a number of seconds since 1970, as 2026-11-21T02:13:05Z, computed
+# here rather than by `date` (one program less) and independent of the server's time zone.
+# The days-to-date conversion is the classic one of Howard Hinnant ("civil_from_days").
+horodatage() {
+  local -i t=$1 jours secondes z ere jde ade jda mp j m a
+  jours=$((t / 86400))
+  secondes=$((t % 86400))
+  z=$((jours + 719468))
+  ere=$((z / 146097))
+  jde=$((z - ere * 146097))
+  ade=$(((jde - jde / 1460 + jde / 36524 - jde / 146096) / 365))
+  a=$((ade + ere * 400))
+  jda=$((jde - (365 * ade + ade / 4 - ade / 100)))
+  mp=$(((5 * jda + 2) / 153))
+  j=$((jda - (153 * mp + 2) / 5 + 1))
+  if ((mp < 10)); then
+    m=$((mp + 3))
+  else
+    m=$((mp - 9))
+  fi
+  if ((m <= 2)); then
+    a=$((a + 1))
+  fi
+  printf -v horo '%04d-%02d-%02dT%02d:%02d:%02dZ' "$a" "$m" "$j" $((secondes / 3600)) $((secondes % 3600 / 60)) $((secondes % 60))
+}
+
+# Sends one line of text to Louis's phone (ntfy). The address, with root's topic, stays in the
+# file given by `-K`: never on a command line, which `ps` shows to every user (A3.6). The answer
+# of the server is thrown away, since it repeats the topic.
+notifier() {
+  printf '%s\n' "$1" | "$CURL" -fsS --max-time 10 -K "$NTFY" -H "Title: $SCRIPT" --data-binary @- >/dev/null 2>&1
+}
+
+# The refusals that come before any check (argument, interval, daily cap) notify at most once
+# every 10 minutes: a loop of refused runs does not flood the phone (A4 step 2).
+alerte_permise() {
+  local derniere=
+  if [[ -r $ETAT/derniere-alerte ]]; then
+    IFS= read -r derniere <"$ETAT/derniere-alerte" || true
+  fi
+  if [[ $derniere =~ ^[0-9]{1,12}$ ]] && ((now >= 10#$derniere && now - 10#$derniere < 600)); then
+    return 1
+  fi
+  return 0
+}
+
+# The end of every attempt: exactly one `fin` line in the log (A7), the end notification, a
+# sentence in French for the caller, and the exit code.
+finir() {
+  local code=$1 raison=$2 resultat duree texte message
+  trap '' TERM INT HUP
+  fini=1
+  case $code in
+    0) resultat=ok ;;
+    2) resultat=refus ;;
+    3) resultat=tard ;;
+    *) resultat=echec ;;
+  esac
+  if [[ $raison == interrompu ]]; then
+    resultat=interrompu
+  fi
+  maintenant
+  duree=$((now - depart))
+  horodatage "$now"
+  printf '%s fin script=%s appelant=%s commit=%s service=%s api=%s web=%s etape=%s resultat=%s raison=%s duree=%s\n' "$horo" "$SCRIPT" "$appelant" "$commit" "$service" "$api" "$web" "$etape" "$resultat" "$raison" "$duree" >>"$JOURNAL"
+  case $raison in
+    ok) message="déployé." ;;
+    argument) message="il faut un seul argument : le commit complet, 40 caractères hexadécimaux en minuscules." ;;
+    verrou) message="un déploiement est déjà en cours ; rien n'est fait." ;;
+    ecart) message="le dernier essai date de moins de 10 minutes ; réessaie plus tard." ;;
+    plafond) message="six essais aujourd'hui (jour UTC) ; réessaie demain." ;;
+    notification) message="la notification de début n'est pas partie ; rien n'est déployé." ;;
+    pas-sur-main) message="ce commit n'est pas sur main du dépôt GitHub." ;;
+    version-illisible) message="la production n'a pas rendu une version lisible ; rien n'est déployé." ;;
+    deja-en-service) message="ce commit est déjà en service." ;;
+    plus-ancien) message="ce commit ne descend pas de la version en service ; revenir en arrière, c'est waiggle-retour." ;;
+    intervalle-trop-long) message="plus de 50 commits depuis la version en service ; déploie par étapes." ;;
+    sans-pr) message="un commit de main n'a pas de pull request fusionnée ; si elle vient d'être fusionnée, réessaie dans quelques minutes." ;;
+    pas-louis) message="une pull request de l'intervalle n'a pas été fusionnée dans main par Louis." ;;
+    site-env) message="infra/site.env du commit n'a pas exactement une ligne IMAGE_PREFIX valable." ;;
+    mentions) message="la vérification des Mentions légales a échoué ; rien n'est déployé." ;;
+    attestation) message="une image n'a pas d'attestation de la CI de main pour ce commit ; la CI a-t-elle fini ?" ;;
+    empreinte) message="une empreinte d'image est illisible ; rien n'est déployé." ;;
+    production) message="la production a refusé ou échoué ; voir sa sortie ci-dessus." ;;
+    delai) message="la production n'a pas répondu dans le délai ; elle peut continuer de son côté." ;;
+    *) message="interrompu ; la production, si elle avait commencé, continue." ;;
+  esac
+  # A terminal already closed (the phone's ssh session dropped) must not cut the notification.
+  if ((code != 0)); then
+    printf '%s : %s\n' "$SCRIPT" "$message" >&2 || true
+  fi
+  if ((code == 0)); then
+    texte="déployé : ${commit:0:7} (avant ${service:0:7}), demandé par $appelant, $duree s"
+  else
+    texte="refusé ($raison) : ${commit:0:7}, demandé par $appelant, étape $etape"
+  fi
+  case $raison in
+    verrou | notification) ;;
+    argument | ecart | plafond)
+      if alerte_permise; then
+        printf '%s\n' "$now" >"$ETAT/derniere-alerte"
+        notifier "$texte" || true
+      fi
+      ;;
+    *) notifier "$texte" || true ;;
+  esac
+  exit "$code"
+}
+
+# TERM, INT or HUP: one `fin` line, code 4. Bash runs this trap once the program in progress
+# returns; during step 10, production goes on with the deployment on its side (A6).
+# shellcheck disable=SC2317,SC2329 # called by the trap set in verifier_root
+interrompre() {
+  if ((fini == 0)); then
+    finir 4 interrompu
+  fi
+  exit 4
+}
+
+# The temporary directory of the legal check goes at the end, whatever happens.
+effacer_mentions() {
+  if [[ -n $mentions ]]; then
+    /usr/bin/rm -rf -- "$mentions"
+    mentions=
+  fi
+}
+
+# Root only, before anything is written (A4 step 0). `id -u` rather than $EUID, so that the tests
+# can answer with a fake `id`.
+verifier_root() {
+  local uid
+  uid=$("$ID" -u) || uid=
+  if [[ $uid != 0 ]]; then
+    printf '%s : %s\n' "$SCRIPT" "il faut le lancer par sudo, en root ; rien n'est fait." >&2
+    exit 2
+  fi
+  maintenant
+  depart=$now
+  trap interrompre TERM INT HUP
+  trap effacer_mentions EXIT
+}
+
+# Once the lock is held: the directory of the legal checks, readable by the sandbox user, and the
+# leftovers of a run that was killed outright. Only root writes there, and only under the lock.
+# mkdir and rm are called by their absolute path: the block of paths is the contract's (A3).
+preparer_travail() {
+  if [[ ! -d $TRAVAIL ]]; then
+    /usr/bin/mkdir -m 0755 -- "$TRAVAIL"
+  fi
+  /usr/bin/rm -rf -- "$TRAVAIL"/mentions.*
+}
+
+# Exactly one argument, a full commit; anything else is neither counted nor copied (A4 step 1).
+lire_argument() {
+  annoncer 1 "l'argument"
+  if (($# != 1)) || [[ ! $1 =~ ^[0-9a-f]{40}$ ]]; then
+    finir 2 argument
+  fi
+  commit=$1
+}
+
+# The `debut` line, then the start notification: without it, nothing is examined (A4 step 3).
+commencer() {
+  annoncer 3 "le début, noté et notifié"
+  maintenant
+  horodatage "$now"
+  printf '%s debut script=%s appelant=%s commit=%s\n' "$horo" "$SCRIPT" "$appelant" "$commit" >>"$JOURNAL"
+  if ! notifier "début : ${commit:0:7}, demandé par $appelant"; then
+    finir 5 notification
+  fi
+}
+
+# The commit is on main of GitHub (A4 step 4), checked by the real git in root's bare repository.
+# The read token reaches git through gh's credential helper, never through an address.
+verifier_main() {
+  annoncer 4 "le commit est-il sur main ?"
+  local lu
+  if [[ ! -d $DEPOT ]] && ! "$GIT" init --quiet --bare "$DEPOT"; then
+    finir 2 pas-sur-main
+  fi
+  if ! "$GIT" -C "$DEPOT" -c credential.helper= -c "credential.helper=!/usr/bin/env GH_CONFIG_DIR=$GH_DIR $GH auth git-credential" fetch --quiet --no-tags --prune "$ORIGINE" +refs/heads/main:refs/remotes/origin/main; then
+    finir 2 pas-sur-main
+  fi
+  lu=$("$GIT" -C "$DEPOT" rev-parse --verify --quiet "$commit^{commit}") || lu=
+  if [[ $lu != "$commit" ]] || ! "$GIT" -C "$DEPOT" merge-base --is-ancestor "$commit" refs/remotes/origin/main; then
+    finir 2 pas-sur-main
+  fi
+}
+
+# The image prefix, from infra/site.env in the commit tree, never from a working copy (A4 step 7).
+lire_prefixe() {
+  annoncer 7 "le préfixe des images, dans infra/site.env du commit"
+  local texte ligne n=0
+  texte=$("$GIT" -C "$DEPOT" show "$commit:infra/site.env") || finir 2 site-env
+  while IFS= read -r ligne; do
+    if [[ $ligne == IMAGE_PREFIX=* ]]; then
+      n=$((n + 1))
+      prefixe=${ligne#IMAGE_PREFIX=}
+    fi
+  done <<<"$texte"
+  if ((n != 1)) || [[ ! $prefixe =~ ^ghcr\.io/[a-z0-9._/-]+$ ]]; then
+    finir 2 site-env
+  fi
+}
+
+# The legal check (A4 step 8): the five files it needs, taken from the commit tree into a new
+# directory (0755, files 0644, so that the sandbox user can read them), then the commit's own
+# script run without argument by systemd-run, as a transient user without network, homes or
+# /root, stopped after 60 seconds.
+verifier_mentions() {
+  annoncer 8 "les Mentions légales"
+  local f
+  umask 022
+  mentions=$TRAVAIL/mentions.$$
+  if ! /usr/bin/mkdir -m 0755 -- "$mentions"; then
+    mentions=
+    umask 077
+    finir 2 mentions
+  fi
+  for f in "${FICHIERS_MENTIONS[@]}"; do
+    if ! /usr/bin/mkdir -p -- "$mentions/${f%/*}" || ! "$GIT" -C "$DEPOT" show "$commit:$f" >"$mentions/$f"; then
+      umask 077
+      finir 2 mentions
+    fi
+  done
+  umask 077
+  if ! "$SYSTEMD_RUN" --wait --pipe --collect --quiet -p DynamicUser=yes -p PrivateNetwork=yes -p ProtectHome=yes -p ProtectSystem=strict -p PrivateTmp=yes -p NoNewPrivileges=yes -p RuntimeMaxSec=60 -p "WorkingDirectory=$mentions" /usr/bin/node scripts/legal-placeholders.mjs </dev/null; then
+    finir 2 mentions
+  fi
+  effacer_mentions
+}
+
+# Both images (A4 step 9): a provenance attestation from main's CI, on a GitHub machine, for this
+# very commit; its digest is what production receives, so a tag moved later changes nothing.
+verifier_images() {
+  annoncer 9 "les attestations des images"
+  local part empreinte
+  local -a empreintes=()
+  for part in api web; do
+    if ! empreinte=$(/usr/bin/env "GH_CONFIG_DIR=$GH_DIR" "$GH" attestation verify "oci://$prefixe-$part:$commit" --repo "$DEPOT_GITHUB" --signer-workflow "$DEPOT_GITHUB/.github/workflows/ci.yml" --source-ref refs/heads/main --source-digest "$commit" --deny-self-hosted-runners --format json --jq '.[0].verificationResult.statement.subject[0].digest.sha256'); then
+      finir 2 attestation
+    fi
+    if [[ ! $empreinte =~ ^[0-9a-f]{64}$ ]]; then
+      finir 2 empreinte
+    fi
+    empreintes+=("$empreinte")
+  done
+  api=${empreintes[0]}
+  web=${empreintes[1]}
+}
+# --- commun : fin ---
+
+# At most one attempt every 10 minutes and 6 per UTC day, checked before anything else (A4 step 2).
+# `essais` has one line `<seconds since 1970> <commit>` per attempt counted. An attempt that passes
+# is written down at once: refused further on, it still counts.
+verifier_cadence() {
+  annoncer 2 "la cadence (10 minutes entre deux essais, 6 par jour)"
+  local t dernier=0 jour=0 aujourdhui
+  maintenant
+  aujourdhui=$((now / 86400))
+  if [[ -f $ETAT/essais ]]; then
+    while read -r t _ || [[ -n $t ]]; do
+      if [[ ! $t =~ ^[0-9]{1,12}$ ]]; then
+        continue
+      fi
+      t=$((10#$t))
+      if ((t > dernier)); then
+        dernier=$t
+      fi
+      if ((t / 86400 == aujourdhui)); then
+        jour=$((jour + 1))
+      fi
+    done <"$ETAT/essais"
+  fi
+  if ((dernier > 0 && now - dernier < 600)); then
+    finir 3 ecart
+  fi
+  if ((jour >= 6)); then
+    finir 3 plafond
+  fi
+  printf '%s %s\n' "$now" "$commit" >>"$ETAT/essais"
+}
+
+# Production is asked over ssh, with root's deploy key and nothing from the caller: no ssh
+# configuration file (-F /dev/null), no agent, only the known host of production.
+# The version in production (A4 step 5): one line, a full commit, from which the commit descends.
+lire_version() {
+  annoncer 5 "la version en service"
+  local lu
+  if ! lu=$("$TIMEOUT" 60 "$SSH" -F /dev/null -4 -i "$CLE" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$HOTES_CONNUS" -o BatchMode=yes -o ConnectTimeout=20 "$PRODUCTION" version </dev/null); then
+    finir 2 version-illisible
+  fi
+  if [[ ! $lu =~ ^[0-9a-f]{40}$ ]]; then
+    finir 2 version-illisible
+  fi
+  service=$lu
+  if [[ $service == "$commit" ]]; then
+    finir 2 deja-en-service
+  fi
+  lu=$("$GIT" -C "$DEPOT" rev-parse --verify --quiet "$service^{commit}") || lu=
+  if [[ $lu != "$service" ]] || ! "$GIT" -C "$DEPOT" merge-base --is-ancestor "$service" "$commit"; then
+    finir 2 plus-ancien
+  fi
+}
+
+# Merged by Louis (A4 step 6, D2): each first-parent commit since the version in production is
+# the merge commit of a pull request into main, merged by Louis's account (numeric id). The
+# number comes from GitHub's list of the commit's pull requests, never from the commit message.
+verifier_fusions() {
+  annoncer 6 "les pull requests, fusionnées par Louis ?"
+  local liste c numeros n detail attendu
+  local motif='^\[([0-9]{1,9})\]$'
+  local -a commits=()
+  liste=$("$GIT" -C "$DEPOT" rev-list --first-parent "$service..$commit") || finir 2 intervalle-trop-long
+  mapfile -t commits <<<"$liste"
+  if ((${#commits[@]} > 50)); then
+    finir 2 intervalle-trop-long
+  fi
+  for c in "${commits[@]}"; do
+    if [[ ! $c =~ ^[0-9a-f]{40}$ ]]; then
+      finir 2 sans-pr
+    fi
+    numeros=$(/usr/bin/env "GH_CONFIG_DIR=$GH_DIR" "$GH" api "repos/$DEPOT_GITHUB/commits/$c/pulls" --jq "[.[] | select(.merged_at != null and .merge_commit_sha == \"$c\" and .base.ref == \"main\" and .base.repo.full_name == \"$DEPOT_GITHUB\") | .number]") || finir 2 sans-pr
+    if [[ ! $numeros =~ $motif ]]; then
+      finir 2 sans-pr
+    fi
+    n=${BASH_REMATCH[1]}
+    detail=$(/usr/bin/env "GH_CONFIG_DIR=$GH_DIR" "$GH" api "repos/$DEPOT_GITHUB/pulls/$n" --jq '[.merged, .merge_commit_sha, .base.ref, .base.repo.full_name, .merged_by.id] | @tsv') || finir 2 pas-louis
+    attendu="true"$'\t'"$c"$'\t'"main"$'\t'"$DEPOT_GITHUB"$'\t'"$ID_LOUIS"
+    if [[ $detail != "$attendu" ]]; then
+      finir 2 pas-louis
+    fi
+  done
+}
+
+# The deployment (A4 step 10): the guard of production checks everything again and runs
+# deploy.sh detached; its output goes through as is. 900 seconds at most.
+deployer() {
+  annoncer 10 "le déploiement, par le gardien de la production"
+  local code=0
+  "$TIMEOUT" 900 "$SSH" -F /dev/null -4 -i "$CLE" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$HOTES_CONNUS" -o BatchMode=yes -o ConnectTimeout=20 "$PRODUCTION" deploy "$commit" "$prefixe-api@sha256:$api" "$prefixe-web@sha256:$web" </dev/null || code=$?
+  if ((code == 124)); then
+    finir 4 delai
+  fi
+  if ((code != 0)); then
+    finir 4 production
+  fi
+}
+
+verifier_root
+# One run at a time, on vps-dev: a second one is refused at once, without notification (the
+# running one notifies). The lock lives as long as file descriptor 9.
+exec 9>>"$VERROU"
+if ! "$FLOCK" -n 9; then
+  finir 3 verrou
+fi
+preparer_travail
+lire_argument "$@"
+verifier_cadence
+commencer
+verifier_main
+lire_version
+verifier_fusions
+lire_prefixe
+verifier_mentions
+verifier_images
+deployer
+etape=11
+finir 0 ok

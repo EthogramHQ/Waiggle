@@ -25,3 +25,8 @@ e7c44434b3a6d135cad7b7c4287611b1dc1c9669:apps/api/src/email/preview.ts:generic-a
 # Un identifiant inventé (forme d'UUID) des fausses données des pages visiteur (tranche R12), pas
 # une clé. Les versions suivantes du fichier portent « gitleaks:allow » sur la ligne.
 a9b6377baa729b780f2911c834a1620204ee4326:apps/app/src/screens/Public.testkit.tsx:generic-api-key:34
+
+# Une fausse clé privée des tests du déploiement de nuit (P4 du Pilote, 21/11/2026) : le texte
+# « CLE-PRIVEE-SECRETE-DE-DEPLOIEMENT » de infra/faux-programmes.mjs, pas une clé. Les versions
+# suivantes du fichier portent « gitleaks:allow » sur la ligne.
+6d85fcfd3b53cdd976a60e2a977e32c48de3b173:infra/vps-dev/waiggle-deployer.test.mjs:private-key:100
