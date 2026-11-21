@@ -40,8 +40,10 @@ Sur vps-dev :
 | `/run/waiggle-deploy.lock` | root 0600 | le verrou |
 | ligne `sudoers` | `visudo`, par Louis | `waiggle-deployer` ajouté à l'alias de l'aperçu de `louis` ; `waiggle-retour` n'y est pas |
 
-**Le jeton fin** (M5 et I-2) : sur le seul `EthogramHQ/Waiggle`, en lecture seule, `contents:read`,
-`attestations:read`, `pull_requests:read`, rien d'autre. Son échéance va dans les échéances du Pilote.
+**Le jeton fin** (M5 et I-2) : créé sous le compte machine `ethogram-machine` (jamais sous celui de Louis), accès
+« Public repositories » en lecture seule, rien d'autre : il lit le contenu, les PR et les attestations de
+`EthogramHQ/Waiggle`, dépôt public. Le compte n'étant pas membre d'EthogramHQ, un jeton limité au seul dépôt ne peut
+pas se créer (relecture de l'assemblage, m3). Son échéance va dans les échéances du Pilote.
 
 Sur la production, compte `louis` (celui qui lance `deploy.sh` aujourd'hui) :
 
@@ -49,6 +51,7 @@ Sur la production, compte `louis` (celui qui lance `deploy.sh` aujourd'hui) :
 | --- | --- | --- |
 | `/usr/local/sbin/waiggle-deploy-force` | root:root 0755 | le gardien, **hors du dépôt** (I3) |
 | `/srv/ruche/waiggle-deploy-force/` | louis 0700 | un journal par déploiement lancé |
+| `/srv/ruche/waiggle-deploy-force/gh/hosts.yml` | louis 0600 | un second jeton fin, de la même sorte que celui de vps-dev (I2 (a) de Louis, 21/11) |
 | `~louis/.ssh/authorized_keys` | louis 0600 | les deux lignes ci-dessous |
 
 ```
@@ -227,7 +230,7 @@ Son bloc de chemins :
 ```
 # --- chemins : début ---
 GIT=/usr/bin/git
-DOCKER=/usr/bin/docker
+GH=/usr/bin/gh
 LOGGER=/usr/bin/logger
 SETSID=/usr/bin/setsid
 TAIL=/usr/bin/tail
@@ -236,6 +239,7 @@ DATE=/usr/bin/date
 DEPLOYE=/srv/ruche/deployed.env
 DEPOT=/srv/ruche/repo
 JOURNAUX=/srv/ruche/waiggle-deploy-force
+GH_DIR=/srv/ruche/waiggle-deploy-force/gh
 # --- chemins : fin ---
 ```
 
@@ -253,9 +257,11 @@ Les commandes acceptées, comme chaînes entières :
   3. **(D4) le sens**, en mode normal seulement : le commit diffère de la version en service, et
      `merge-base --is-ancestor <en service> <commit>`. Sinon, refus. Le mode `--retour` accepte un commit plus
      ancien, ou le même ;
-  4. **(D4, I-1) les empreintes liées au commit** : pour `api` et `web`,
-     `$DOCKER buildx imagetools inspect <préfixe>-<part>:<commit> --format '{{json .Manifest.Digest}}'` doit rendre
-     exactement `"sha256:<l'empreinte reçue>"`. Sinon, refus ;
+  4. **(D4, I-1, I2 (a) de Louis du 21/11) les empreintes attestées pour ce commit** : pour `api` puis `web`,
+     `/usr/bin/env GH_CONFIG_DIR=$GH_DIR $GH attestation verify oci://<préfixe>-<part>@sha256:<empreinte reçue> --repo EthogramHQ/Waiggle --signer-workflow EthogramHQ/Waiggle/.github/workflows/ci.yml --source-ref refs/heads/main --source-digest <commit> --deny-self-hosted-runners --format json --jq .[0].verificationResult.statement.subject[0].digest.sha256`
+     doit réussir et rendre exactement l'empreinte reçue. Sinon, refus. Le gardien ne lit **aucune étiquette** : une
+     étiquette `:<commit>`, un workflow de n'importe quelle branche peut la déplacer ; une attestation de la CI de
+     `main` pour ce commit, aucune branche ne peut la fabriquer. La sortie de `gh` ne va jamais au `logger` ;
   5. **le lancement détaché** (I2) : une ligne `avant <en service ou ->` sur la sortie. Puis `deploy.sh` est lancé
      par `$SETSID $NOHUP /bin/bash -c '"$0" "$1" "$2" "$3"; printf "fin %s\n" "$?"'`, avec
      `$DEPOT/infra/deploy.sh <commit> <image api> <image web>` en arguments. Les valeurs passent en arguments,
@@ -428,7 +434,7 @@ De la relecture v0 :
 - refuses a commit that does not descend from the version in production
 
 De la relecture v1 :
-- refuses an image digest that is not the one of the tags <prefix>-api:<commit> and <prefix>-web:<commit>
+- refuses an image digest that has no provenance attestation from main's CI for this commit, and never reads a tag (I2 (a) de Louis, 21/11)
 - accepts a commit older than the version in production only under the return key's forced command
 - never hands SSH_ORIGINAL_COMMAND to a shell
 
