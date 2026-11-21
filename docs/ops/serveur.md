@@ -217,13 +217,17 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
   enregistrements mail (SPF, DKIM, DMARC, MX) ; c'est arrivé à `waiggle.io` le 23/10/2026.
 
   Pour DMARC, commence par `p=none` : on observe d'abord, on durcit ensuite. L'enregistrement de
-  `waiggle.com` est aujourd'hui `v=DMARC1; p=none; sp=reject; rua=mailto:contact@waiggle.com` :
-  les rapports des messageries (adresse `rua`) arrivent dans la boîte `contact@` (depuis le
-  24/10/2026 ; audit de sécurité du 25/10, C10), et `sp=reject` refuse tout e-mail d'un
-  sous-domaine qui n'envoie rien (depuis le 25/10). Avant de passer à `p=quarantine` (prévu
-  mi-novembre 2026, décision du 7/11) : ces rapports montrent Scaleway (et Brevo, s'il envoie) en
-  SPF ou DKIM `pass`, et Louis lit `dkim=pass` et `dmarc=pass` dans les en-têtes d'un vrai e-mail
-  reçu de Waiggle. Le changement d'enregistrement est une action de Louis.
+  `waiggle.com` est aujourd'hui `v=DMARC1; p=quarantine; sp=reject; rua=mailto:contact@waiggle.com`
+  (depuis le 22/11/2026) :
+  - les rapports des messageries (adresse `rua`) arrivent dans la boîte `contact@` (depuis le
+    24/10/2026 ; audit de sécurité du 25/10, C10) ;
+  - `sp=reject` refuse tout e-mail d'un sous-domaine qui n'envoie rien (depuis le 25/10) ;
+  - `p=quarantine` envoie dans les spams un e-mail qui se dit de `waiggle.com` sans passer SPF ou
+    DKIM.
+
+  On n'est passé de `p=none` à `p=quarantine` qu'une fois que les en-têtes d'un vrai e-mail de
+  Waiggle montraient SPF, DKIM et DMARC à `pass`. Prochaine marche possible : `p=reject`, avec la
+  même vérification. Changer l'enregistrement est une action de Louis, dans hPanel.
 
 - **MTA-STS et TLS-RPT** (audit de sécurité du 7/11/2026) : les e-mails reçus à `contact@waiggle.com`
   voyagent d'un serveur de messagerie à l'autre. Sans règle, un intermédiaire peut retirer le
