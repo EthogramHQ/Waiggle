@@ -484,9 +484,12 @@ entier ; tout le reste est refusé sans rien lancer, et chaque demande laisse un
 journaux du système (`journalctl -t waiggle-deploy`).
 
 Avec le gardien, la clé de déploiement, même volée, ne déploie qu'**un commit de `main` plus
-récent que celui en service, avec les images étiquetées par ce commit** : il relit `main` sur
-GitHub, vérifie que le commit descend de la version en service, et compare chaque empreinte reçue
-à celle de l'image `<préfixe>-api:<commit>` (et `-web`) dans le dépôt d'images. La clé de retour,
+récent que celui en service, avec les images dont l'attestation de la CI de `main` porte ce
+commit** : il relit `main` sur GitHub, vérifie que le commit descend de la version en service, et
+demande à `gh` l'attestation de provenance de chaque image, nommée par l'empreinte reçue
+(`<préfixe>-api@sha256:…`, et `-web`) : elle doit venir de la CI de `main`, lancée sur une machine
+de GitHub, pour ce commit. Il ne lit aucune étiquette : une étiquette `:<commit>`, un workflow de
+n'importe quelle branche peut la déplacer. La clé de retour,
 protégée par une phrase de passe que seul Louis connaît, permet en plus un commit plus ancien, ou
 le même, pour réparer.
 
@@ -511,6 +514,41 @@ toute la sortie de `deploy.sh`, erreurs comprises, et en dernière ligne `fin <c
 ```bash
 mkdir -p /srv/ruche/waiggle-deploy-force
 chmod 0700 /srv/ruche/waiggle-deploy-force
+```
+
+**`gh` sur la production**, pour lire les attestations : le paquet de GitHub CLI, depuis le dépôt
+de paquets de GitHub (cli.github.com), qui pose `/usr/bin/gh`, à root, mode 0755.
+
+```bash
+sudo mkdir -p -m 0755 /etc/apt/keyrings
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+sudo chmod 0644 /etc/apt/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update && sudo apt install gh
+ls -l /usr/bin/gh
+```
+
+La dernière ligne doit montrer `-rwxr-xr-x 1 root root`.
+
+**Le second jeton fin**, celui du gardien, de la même sorte que celui de vps-dev
+(`infra/vps-dev/installation.md`) mais distinct : sur GitHub, connecté au compte machine
+`ethogram-machine` (jamais au compte de Louis), un jeton « fine-grained », accès « Public
+repositories », en lecture seule, rien d'autre. Son échéance va dans les échéances du Pilote.
+Louis le pose sous `louis`, dans le dossier que le gardien lit :
+
+```bash
+mkdir -m 0700 /srv/ruche/waiggle-deploy-force/gh
+/usr/bin/env GH_CONFIG_DIR=/srv/ruche/waiggle-deploy-force/gh gh auth login --hostname github.com --git-protocol https --with-token
+```
+
+Colle le jeton **au terminal**, Entrée, puis Ctrl-D ; jamais dans un tube ni dans un argument
+(`ps` montre les lignes de commande). Vérifie ensuite que `/srv/ruche/waiggle-deploy-force/gh/` et
+`hosts.yml` sont à `louis`, en 0700 et 0600. Puis l'essai du gardien, dans le même environnement
+vide que lui, sur l'image `api` en service (`API_IMAGE` et `RUCHE_VERSION` de
+`/srv/ruche/deployed.env`) : il doit afficher l'empreinte de l'image, sans le `sha256:`.
+
+```bash
+env -i /usr/bin/env GH_CONFIG_DIR=/srv/ruche/waiggle-deploy-force/gh /usr/bin/gh attestation verify oci://<API_IMAGE> --repo EthogramHQ/Waiggle --signer-workflow EthogramHQ/Waiggle/.github/workflows/ci.yml --source-ref refs/heads/main --source-digest <RUCHE_VERSION> --deny-self-hosted-runners --format json --jq '.[0].verificationResult.statement.subject[0].digest.sha256'
 ```
 
 **Les deux clés**, dans `~louis/.ssh/authorized_keys` (mode 0600), une ligne chacune. L'adresse

@@ -28,10 +28,12 @@ un argument ni dans un tube : `ps` montre les lignes de commande à tous les com
    sudo git init --quiet --bare /srv/waiggle-deploy/depot.git
    sudo mkdir -p -m 0700 /root/.config/waiggle-deploy
    ```
-3. **Le jeton fin de lecture** (M5, I-2). Sur GitHub, avec le compte machine : un jeton
-   « fine-grained » sur le seul dépôt `EthogramHQ/Waiggle`, en lecture seule, avec `Contents: read`,
-   `Attestations: read` et `Pull requests: read`, rien d'autre. Son échéance va dans les échéances
-   du Pilote. Puis, sur vps-dev :
+3. **Le jeton fin de lecture** (M5, I-2). Sur GitHub, connecté au compte machine
+   `ethogram-machine`, **jamais au compte de Louis** : un jeton « fine-grained », accès « Public
+   repositories », en lecture seule, rien d'autre. Il lit le contenu, les PR et les attestations de
+   `EthogramHQ/Waiggle`, dépôt public ; le compte n'étant pas membre d'EthogramHQ, un jeton limité
+   au seul dépôt ne peut pas se créer. Son échéance va dans les échéances du Pilote. Puis, sur
+   vps-dev :
    ```sh
    sudo /usr/bin/env GH_CONFIG_DIR=/root/.config/waiggle-deploy/gh gh auth login --hostname github.com --git-protocol https --with-token
    ```
@@ -89,13 +91,16 @@ ne touche ni au `sudoers`, ni aux clés, ni au jeton, ni au sujet ntfy, ni à `k
    dans une commande).
 5. **`known_hosts`** : la production seule, empreinte vérifiée à la main. Lire l'empreinte sur la
    production même (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, depuis la console de
-   l'hébergeur ou une session déjà sûre), puis sur vps-dev :
+   l'hébergeur ou une session déjà sûre), puis sur vps-dev, sous `admin`, dans un dossier neuf à
+   lui (mode 0700, nom tiré au hasard) : un fichier au nom fixe dans `/tmp` pourrait être posé à
+   l'avance par un autre compte.
    ```sh
-   ssh-keyscan -4 -t ed25519 <IPv4 de la production> > /tmp/production.hote
-   ssh-keygen -lf /tmp/production.hote
+   d=$(mktemp -d "$HOME/production.XXXXXX")
+   ssh-keyscan -4 -t ed25519 <IPv4 de la production> > "$d/hote"
+   ssh-keygen -lf "$d/hote"
    ```
-   Si les deux empreintes sont identiques : `sudo install -m 0644 -o root -g root
-   /tmp/production.hote /root/.ssh/known_hosts`, puis `rm /tmp/production.hote`.
+   Si les deux empreintes sont identiques : `sudo install -m 0644 -o root -g root "$d/hote"
+   /root/.ssh/known_hosts`. Dans tous les cas, pour finir : `rm -r "$d"`.
 
 ## Les vérifications de Louis (contrat, A11)
 

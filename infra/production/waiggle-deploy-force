@@ -47,7 +47,7 @@ export LANG=C.UTF-8
 
 # --- chemins : début ---
 GIT=/usr/bin/git
-DOCKER=/usr/bin/docker
+GH=/usr/bin/gh
 LOGGER=/usr/bin/logger
 SETSID=/usr/bin/setsid
 NOHUP=/usr/bin/nohup
@@ -56,6 +56,7 @@ DATE=/usr/bin/date
 DEPLOYE=/srv/ruche/deployed.env
 DEPOT=/srv/ruche/repo
 JOURNAUX=/srv/ruche/waiggle-deploy-force
+GH_DIR=/srv/ruche/waiggle-deploy-force/gh
 # --- chemins : fin ---
 
 # The client address for the log: the first word of SSH_CLIENT, kept only when it is made of
@@ -165,19 +166,22 @@ if [[ $mode == normal ]]; then
   fi
 fi
 
-# 4. Each digest is the one the registry gives for the tag <prefix>-<part>:<commit>, which the CI
-# of main pushes: a digest of another build of the same prefix is refused.
+# 4. Each image, named by the digest received, carries a provenance attestation from the CI of
+# main, run on a GitHub machine, for this very commit. No tag is ever read: a workflow of any
+# branch can move the tag <prefix>-<part>:<commit>, while no branch can make an attestation of
+# main's CI. gh reads its token in GH_DIR (the second fine-grained token, read-only). Its output
+# is kept in a variable and compared, its errors are dropped: neither ever reaches the logger.
 for part in api web; do
   if [[ $part == api ]]; then
     attendue=$empreinte_api
   else
     attendue=$empreinte_web
   fi
-  if ! rendue=$("$DOCKER" buildx imagetools inspect "${prefixe}-${part}:${commit}" --format '{{json .Manifest.Digest}}' 2>/dev/null); then
-    refuser empreinte "$commit" "aucune image ${part} étiquetée par ce commit"
+  if ! rendue=$(/usr/bin/env "GH_CONFIG_DIR=$GH_DIR" "$GH" attestation verify "oci://${prefixe}-${part}@sha256:${attendue}" --repo EthogramHQ/Waiggle --signer-workflow EthogramHQ/Waiggle/.github/workflows/ci.yml --source-ref refs/heads/main --source-digest "$commit" --deny-self-hosted-runners --format json --jq '.[0].verificationResult.statement.subject[0].digest.sha256' 2>/dev/null); then
+    refuser attestation "$commit" "l'image ${part} n'a pas d'attestation de la CI de main pour ce commit"
   fi
-  if [[ $rendue != "\"sha256:${attendue}\"" ]]; then
-    refuser empreinte "$commit" "l'empreinte ${part} n'est pas celle de l'image étiquetée par ce commit"
+  if [[ $rendue != "$attendue" ]]; then
+    refuser attestation "$commit" "l'attestation de l'image ${part} ne porte pas cette empreinte"
   fi
 done
 
