@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Met en ligne une version de l'appli sur le serveur, ou revient à une version précédente.
-# D'habitude, on ne le lance pas soi-même : infra/deploy-from-pc.sh vérifie d'abord, depuis le
-# PC, que les images ont bien été construites par la CI de main, puis l'appelle par SSH.
+# D'habitude, on ne le lance pas soi-même : il est appelé par SSH, après la vérification de la
+# provenance des images (construites par la CI de main), soit depuis le PC par
+# infra/deploy-from-pc.sh, soit depuis vps-dev par le gardien infra/production/waiggle-deploy-force
+# (le déploiement de nuit, infra/vps-dev/installation.md).
 #
 # Usage : infra/deploy.sh <commit> <image de l'API> <image web>
 #   <commit>        le numéro complet (40 caractères) d'un commit de main ;
@@ -22,6 +24,13 @@
 set -euo pipefail
 # shellcheck source=infra/lib.sh
 source "$(dirname "$0")/lib.sh"
+
+# Comment revenir à une version : Louis seul, depuis le PC ou depuis vps-dev (compte admin, le
+# script de retour décrit dans infra/vps-dev/installation.md). Une seule phrase, pour que les trois
+# messages qui la donnent ne divergent pas.
+rollback_hint() {
+  printf 'revenir à %s : infra/deploy-from-pc.sh depuis le PC, ou le script de retour sous admin sur vps-dev (Louis seul)' "${1:-<commit précédent>}"
+}
 
 main() {
   local sha=${1:-} api_image=${2:-} web_image=${3:-}
@@ -81,7 +90,7 @@ main() {
   # conteneurs d'un service qui n'existe plus dans docker-compose.yml.
   if ! compose up -d --no-build --remove-orphans --wait --wait-timeout 300; then
     compose ps
-    die "la version ${sha:0:7} ne démarre pas. Revenir en arrière : infra/deploy-from-pc.sh ${previous:-<commit précédent>}"
+    die "la version ${sha:0:7} ne démarre pas. Pour $(rollback_hint "${previous:-}")"
   fi
 
   step "6. L'API répond-elle avec la bonne version ?"
@@ -119,7 +128,7 @@ main() {
     status=$(curl -s --max-time 15 -o /dev/null -w '%{http_code}' "https://$API_DOMAIN/media/$key" || true)
     case $status in
       404) echo "ok : une image de membre est introuvable sans session" ;;
-      200) die "une image de membre est visible sans session : revenir en arrière avec infra/deploy-from-pc.sh ${previous:-<commit précédent>}" ;;
+      200) die "une image de membre est visible sans session. Pour $(rollback_hint "${previous:-}")" ;;
       *) echo "AVERTISSEMENT : image de membre sans session, réponse « $status » (DNS, certificats ?)" ;;
     esac
   fi
@@ -131,7 +140,7 @@ main() {
 
   printf '\nVersion %s en ligne.\n' "$sha"
   if [ -n "$previous" ] && [ "$previous" != "$sha" ]; then
-    printf 'Pour revenir à la version précédente, depuis le PC : infra/deploy-from-pc.sh %s\n' "$previous"
+    printf 'Pour %s\n' "$(rollback_hint "$previous")"
   fi
 }
 

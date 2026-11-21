@@ -34,10 +34,12 @@ Ce qui se fait tout seul :
 - **les certificats HTTPS** : Caddy les obtient et les renouvelle seul ;
 - **après un redémarrage** : les conteneurs repartent seuls.
 
-Ce qui ne se fait pas tout seul : **déployer une nouvelle version**. Louis fusionne une pull
-request, la CI publie les images, puis Louis demande à l'assistant de code de déployer. L'assistant de code lance
-alors `infra/deploy-from-pc.sh`, qui vérifie d'abord que les images ont bien été construites par
-la CI de main (leur « attestation de provenance »), puis les met en ligne par leur empreinte.
+Ce qui ne se fait pas tout seul : **déployer une nouvelle version**. Louis approuve et fusionne
+une pull request, la CI publie les images, puis l'assistant de code déploie le commit de fusion
+depuis vps-dev (`waiggle-deployer`, plus bas : « Le déploiement de nuit depuis vps-dev »), ou
+depuis le PC par `infra/deploy-from-pc.sh`. Les deux chemins vérifient d'abord que les images ont
+bien été construites par la CI de main (leur « attestation de provenance »), puis les mettent en
+ligne par leur empreinte.
 
 ## 2. Ce que Louis fait lui-même
 
@@ -464,7 +466,13 @@ instructions.
 ### Déployer une nouvelle version
 
 Après la fusion d'une pull request, attendre que la CI de main soit verte : le job « Publish
-images » doit être terminé. Puis, depuis le dossier du dépôt sur le PC :
+images » doit être terminé. Puis, depuis vps-dev, avec le commit de fusion en entier :
+
+```bash
+sudo -n /usr/local/sbin/waiggle-deployer <commit de fusion, 40 caractères>
+```
+
+Ou, depuis le dossier du dépôt sur le PC :
 
 ```bash
 infra/deploy-from-pc.sh
@@ -567,7 +575,8 @@ lit que pour la comparer.
 ### Revenir en arrière
 
 - **Sans changement de la base** (la plupart des cas) : redéployer le commit précédent, affiché à
-  la fin du déploiement raté.
+  la fin du déploiement raté. C'est Louis seul qui le fait : depuis vps-dev, sous `admin`, par le
+  script de retour (`infra/vps-dev/installation.md`, « L'usage »), ou depuis le PC :
 
   ```bash
   infra/deploy-from-pc.sh <commit précédent>

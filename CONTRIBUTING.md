@@ -157,11 +157,13 @@ L'interface doit rester facile à modifier : chaque décision de design vit à u
 ## Serveur (VPS)
 
 Procédure complète : `docs/ops/serveur.md`. Choix : `docs/adr/0003-hebergement.md`. L'assistant de
-code pilote le serveur depuis le PC de Louis, par `ssh waiggle`.
+code pilote le serveur depuis vps-dev (le déploiement seulement, par `waiggle-deployer`) ou depuis
+le PC de Louis, par `ssh waiggle`.
 
 - **Toujours par les scripts du dépôt** :
-  - déployer : `infra/deploy-from-pc.sh` (depuis le PC : il vérifie la provenance des images,
-    puis lance `infra/deploy.sh` sur le serveur) ;
+  - déployer : `waiggle-deployer` depuis vps-dev (`infra/vps-dev/installation.md`), ou
+    `infra/deploy-from-pc.sh` depuis le PC. Les deux vérifient la provenance des images, puis
+    lancent `infra/deploy.sh` sur le serveur ;
   - `infra/backup.sh`, `infra/restore.sh` ;
   - `infra/server/bootstrap.sh` ;
   - `infra/lib.sh`, pour `compose`.
@@ -179,7 +181,8 @@ code pilote le serveur depuis le PC de Louis, par `ssh waiggle`.
   - une sauvegarde avant de toucher aux données ;
   - un instantané Hostinger avant de toucher à SSH ou au pare-feu ;
   - on ne déploie qu'un commit de main dont la CI est verte, et dont la provenance des images est
-    vérifiée (`deploy-from-pc.sh` le fait). Si la vérification échoue, on ne déploie pas.
+    vérifiée (`waiggle-deployer` et `deploy-from-pc.sh` le font). Si la vérification échoue, on
+    ne déploie pas.
 - **Jamais sans l'accord explicite de Louis**, pour cette action précise :
   - `restore.sh` ;
   - `compose down -v`, `docker volume rm` ;
