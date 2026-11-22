@@ -2,7 +2,8 @@
 
 - Statut : accepté
 - Date : 2026-10-13
-- Mis à jour : le 23/10/2026, le domaine principal devient waiggle.com (ADR 0006)
+- Mis à jour : le 23/10/2026, le domaine principal devient waiggle.com (ADR 0006) ; le 21/11/2026,
+  le déploiement part aussi de vps-dev, dès la fusion par Louis (ADR 0007, point 6)
 
 ## Contexte
 
@@ -27,8 +28,9 @@ confort.
    - Chaque image est étiquetée avec le numéro de son commit et accompagnée d'une attestation de
      provenance.
    - Les domaines vivent dans `infra/site.env`, versionné et sans secret.
-4. **Le déploiement est lancé à la main**, depuis le PC de Louis (`infra/deploy-from-pc.sh`). Ce
-   n'est pas GitHub qui s'en charge. Le script :
+4. **Le déploiement est lancé à la main**, depuis le PC de Louis (`infra/deploy-from-pc.sh`) ou,
+   depuis le 21/11/2026, depuis vps-dev (`waiggle-deployer`, ADR 0007). Ce n'est pas GitHub qui
+   s'en charge. Le script du PC :
    - vérifie avec `gh attestation verify` que chaque image a été construite par la CI de main,
      depuis ce commit ;
    - lance `infra/deploy.sh` sur le serveur par SSH, avec l'**empreinte** exacte des images
@@ -84,8 +86,8 @@ confort.
 
 ## Conséquences
 
-- Il faut deux étapes pour mettre en ligne une version : fusionner (Louis), puis déployer (l'assistant
-  Code local, à la demande de Louis).
+- Il faut deux étapes pour mettre en ligne une version : approuver et fusionner (Louis), puis
+  déployer (l'assistant de code, dès la fusion, sans second accord depuis le 21/11/2026).
 - Le PC qui déploie a besoin de GitHub CLI, connecté au compte de Louis.
 - Les paquets ghcr.io doivent être publics. C'est cohérent avec un code public : les images ne
   contiennent aucun secret.
