@@ -200,7 +200,11 @@ describe('SkeletonCard, in the shape of a feed card', () => {
 // R14 : la forme d'une carte compacte (`shape="compact"`), celle de la mosaïque d'un membre, à la
 // hauteur exacte d'une `ProjectCard size="compact"` (lue sur la vraie carte, pas recopiée).
 describe('SkeletonCard, in the shape of a compact card (R14)', () => {
-  /** La hauteur minimale d'une vraie carte compacte, celle de la vue qui porte sa photo. */
+  /**
+   * La hauteur minimale d'une vraie carte compacte, celle de la vue qui porte sa photo. R18 : une
+   * carte à photo, celle qu'imite le squelette (sur téléphone, une compacte sans photo n'a plus de
+   * hauteur minimale, elle suit son contenu).
+   */
   const compactCardHeight = async () => {
     const view = await renderWithProviders(
       <ProjectCard
@@ -209,6 +213,7 @@ describe('SkeletonCard, in the shape of a compact card (R14)', () => {
         author={{ name: 'Tante Odile', avatar: null }}
         when="il y a 5 jours"
         status={{ label: 'En construction', strong: false }}
+        image={{ source: { uri: 'https://api.example/biscotte.webp' }, label: 'Biscotte au parc' }}
         size="compact"
         onPress={() => {}}
       />,
