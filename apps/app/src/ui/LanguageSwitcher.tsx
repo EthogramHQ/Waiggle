@@ -1,9 +1,21 @@
 // Le choix de la langue, en contrôle segmenté. Pour un membre connecté, le choix est aussi
 // enregistré sur son compte (voir profile/useChooseLanguage.ts).
+//
+// R18 : l'anglais arrive à la demande dans le navigateur. L'option touchée est occupée le temps que
+// ses textes arrivent, l'ancienne reste cochée ; s'ils n'arrivent pas, la langue reste, et un
+// message avec « Réessayer » paraît sous le contrôle.
+import { space } from '@ruche/brand'
 import { type Language, supportedLanguages } from '@ruche/i18n'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useChooseLanguage } from '../profile/useChooseLanguage'
-import { Segmented } from './Segmented'
+import { View } from 'react-native'
+import {
+  type LanguageChoice,
+  useChooseLanguage,
+  useSwitchLanguage,
+} from '../profile/useChooseLanguage'
+import { Notice } from './Notice'
+import { Segmented, type SegmentedHandle } from './Segmented'
 
 type Props = {
   /** compact : « FR / EN », pour un coin d'écran ; sinon les noms complets. */
@@ -21,45 +33,56 @@ export function LanguageSwitcher({ compact = false, visitor = false }: Props) {
 }
 
 function MemberChoice({ compact }: { compact: boolean }) {
-  const { current, choose } = useChooseLanguage()
-  return <Choice compact={compact} current={current} choose={choose} />
+  return <Choice compact={compact} choice={useChooseLanguage()} />
 }
 
 function VisitorChoice({ compact }: { compact: boolean }) {
-  const { i18n } = useTranslation()
-  return (
-    <Choice
-      compact={compact}
-      current={i18n.language as Language}
-      choose={(language) => void i18n.changeLanguage(language)}
-    />
-  )
+  return <Choice compact={compact} choice={useSwitchLanguage()} />
 }
 
-function Choice({
-  compact,
-  current,
-  choose,
-}: {
-  compact: boolean
-  current: Language
-  choose: (language: Language) => unknown
-}) {
+// En version compacte, le contrôle est posé seul au bout d'une rangée (`Row justify="end"`) : il en
+// prend la largeur, contrôle à droite comme avant, pour que le message d'un échec ait la place de
+// se lire dessous, au lieu de se tasser dans la largeur de « FR / EN ».
+const compactFrame = { flexGrow: 1, flexShrink: 1, alignItems: 'flex-end', gap: space.sm } as const
+const fullFrame = { gap: space.sm } as const
+const stretched = { alignSelf: 'stretch' } as const
+
+function Choice({ compact, choice }: { compact: boolean; choice: LanguageChoice }) {
   const { t } = useTranslation()
+  const { current, choose, loading, failed, retry } = choice
+  const control = useRef<SegmentedHandle>(null)
+  const onRetry = () => {
+    // « Réessayer » part avec le message : le focus du clavier revient d'abord au contrôle (sur la
+    // langue cochée, que Tab atteint), pour ne pas tomber sur la page entière.
+    control.current?.focusChecked()
+    void retry()
+  }
 
   return (
-    <Segmented
-      label={t(($) => $.common.language)}
-      // .map() transforme chaque langue en option du contrôle
-      options={supportedLanguages.map((language) => ({
-        value: language,
-        // En version compacte, on affiche le code (« FR ») mais on lit le nom (« Français »).
-        label: compact ? language.toUpperCase() : t(($) => $.common.languages[language]),
-        spokenLabel: t(($) => $.common.languages[language]),
-      }))}
-      value={current}
-      onChange={(language) => void choose(language)}
-      fill={!compact}
-    />
+    <View style={compact ? compactFrame : fullFrame}>
+      <Segmented<Language>
+        label={t(($) => $.common.language)}
+        // .map() transforme chaque langue en option du contrôle
+        options={supportedLanguages.map((language) => ({
+          value: language,
+          // En version compacte, on affiche le code (« FR ») mais on lit le nom (« Français »).
+          label: compact ? language.toUpperCase() : t(($) => $.common.languages[language]),
+          spokenLabel: t(($) => $.common.languages[language]),
+        }))}
+        value={current}
+        busy={loading}
+        onChange={(language) => void choose(language)}
+        fill={!compact}
+        handle={control}
+      />
+      {failed ? (
+        <View style={stretched}>
+          <Notice
+            message={t(($) => $.account.language.loadFailed)}
+            action={{ label: t(($) => $.common.retry), role: 'button', onPress: onRetry }}
+          />
+        </View>
+      ) : null}
+    </View>
   )
 }

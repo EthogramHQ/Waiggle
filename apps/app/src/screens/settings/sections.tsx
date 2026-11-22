@@ -4,7 +4,7 @@
 // de la colonne de droite sur ordinateur (SettingsScreen).
 import { contactEmail } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
-import { supportedLanguages } from '@ruche/i18n'
+import { type Language, supportedLanguages } from '@ruche/i18n'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,7 @@ import { useSetHideFromSuggestions } from '../../hives/api'
 import { firstParam } from '../../navigation/params'
 import { useMe } from '../../profile/hooks'
 import { useChooseLanguage } from '../../profile/useChooseLanguage'
-import { type Focusable, focusWithoutScroll } from '../../ui/focus'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../../ui/focus'
 import type { IconName } from '../../ui/Icon'
 import { LegalLinks } from '../../ui/LegalLinks'
 import { ListGroup, ListRow, type PressEvent } from '../../ui/ListGroup'
@@ -85,20 +85,45 @@ export function SettingsSection({
   }
 }
 
+// R18 : une langue autre que le français arrive à la demande. La ligne touchée est occupée le temps
+// que ses textes arrivent, l'ancienne reste cochée ; un échec pose le message sous le groupe, avec
+// « Réessayer ».
 function LanguageSection() {
   const { t } = useTranslation()
-  const { current, choose } = useChooseLanguage()
+  const { current, choose, loading, failed, retry } = useChooseLanguage()
+  // Les lignes, pour y ramener le focus du clavier quand « Réessayer » disparaît.
+  const rows = useRef<Partial<Record<Language, Focusable | null>>>({})
+  const onRetry = () => {
+    // Le bouton touché part avec le message : le focus va d'abord à la ligne qu'on recharge,
+    // occupée pendant l'essai, puis cochée s'il réussit (sur téléphone, le lecteur d'écran aussi).
+    const row = failed ? rows.current[failed] : null
+    focusWithoutScroll(row)
+    moveReaderTo(row)
+    void retry()
+  }
   return (
-    <ListGroup footer={t(($) => $.account.language.hint)} radio>
-      {supportedLanguages.map((language) => (
-        <ListRow
-          key={language}
-          label={t(($) => $.common.languages[language])}
-          selected={language === current}
-          onPress={() => void choose(language)}
+    <Stack gap="sm">
+      <ListGroup footer={t(($) => $.account.language.hint)} radio>
+        {supportedLanguages.map((language) => (
+          <ListRow
+            key={language}
+            ref={(node) => {
+              rows.current[language] = node
+            }}
+            label={t(($) => $.common.languages[language])}
+            selected={language === current}
+            busy={language === loading}
+            onPress={() => void choose(language)}
+          />
+        ))}
+      </ListGroup>
+      {failed ? (
+        <Notice
+          message={t(($) => $.account.language.loadFailed)}
+          action={{ label: t(($) => $.common.retry), role: 'button', onPress: onRetry }}
         />
-      ))}
-    </ListGroup>
+      ) : null}
+    </Stack>
   )
 }
 
