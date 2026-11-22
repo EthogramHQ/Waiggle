@@ -4,7 +4,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { createRequire } from 'node:module'
 import { dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -32,23 +31,20 @@ export const currentStamp = () => {
 export const stampFile = join(build, '.commit')
 
 // Construit l'appli web, catalogue compris, puis écrit le tampon.
-// On lance la commande d'Expo avec Node directement (process.execPath), au lieu de « pnpm exec
-// expo » : sous Windows, pnpm est un script (pnpm.cmd) que spawnSync ne sait pas lancer sans
-// passer par l'interpréteur de commandes, et il échouait sans un mot. createRequire permet de
-// trouver un fichier d'un paquet installé (expo/bin/cli) comme le ferait un require().
+// La construction passe par scripts/build-web.mjs, la commande de la production (R18) : les
+// captures photographient ainsi le même code que le site en ligne (élagage d'Expo, règles de
+// metro.config.js). On le lance avec Node directement (process.execPath), au lieu de « pnpm
+// build » : sous Windows, pnpm est un script (pnpm.cmd) que spawnSync ne sait pas lancer sans
+// passer par l'interpréteur de commandes, et il échouait sans un mot.
 // WAIGGLE_WORKERS, quand il est posé, limite le nombre de processus de Metro : sur un PC modeste, on
 // garde ainsi la construction sous un plafond de mémoire ; sans lui (la CI), Metro choisit seul.
 export const buildSite = () => {
   rmSync(build, { recursive: true, force: true })
-  const expo = createRequire(join(root, 'package.json')).resolve('expo/bin/cli')
   const workers = Number(process.env.WAIGGLE_WORKERS)
   const result = spawnSync(
     process.execPath,
     [
-      expo,
-      'export',
-      '--platform',
-      'web',
+      join(root, 'scripts', 'build-web.mjs'),
       '--output-dir',
       build,
       // Le cache de Metro ne tient pas compte des variables EXPO_PUBLIC_* : après une construction
