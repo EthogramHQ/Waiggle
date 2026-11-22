@@ -4414,10 +4414,11 @@ pages avant le clic n'est pas dans cette tranche.
 
 ## R18 — Les finitions
 
-Quatre restes des tranches passées, avant la gamification : le premier chargement encore lourd
+Des restes des tranches passées, avant la gamification : le premier chargement encore lourd
 (pistes mesurées en R13), le focus qui tombe sur toute la page à l'arrivée (relectures de R17), le
-catalogue des composants qui bloque l'ordinateur 45 s (D1 de R17), et l'ordre de Tab sur ordinateur
-(liste « À reprendre », 26/10). Les leçons à retoucher se font hors du dépôt.
+catalogue des composants qui bloque l'ordinateur 45 s (D1 de R17), et trois points de la liste
+« À reprendre » (26/10) : l'ordre de Tab sur ordinateur, la ponctuation des textes des membres,
+les cartes sans photo. Les leçons à retoucher se font hors du dépôt.
 
 ### Le premier chargement plus léger
 
@@ -4458,19 +4459,23 @@ compresse à la volée, au niveau le plus rapide (mesuré sur waiggle.com le 22/
 
 ### L'ordre de Tab sur ordinateur
 
+Déjà réglé depuis R5a : la page d'un projet se lit rangée par rangée (la galerie et les réactions,
+puis l'en-tête et « Suivre », puis la description et la conversation ; décision du 2/11), et la
+colonne latérale du Fil vient après son contenu. La tranche le vérifie au clavier, sans le changer.
+
 - Étant donné la page d'un projet, ou le Fil, à deux colonnes
   Quand on avance au clavier
-  Alors on parcourt d'abord la colonne principale, puis la colonne latérale (Suivre, réactions),
-  dans l'ordre où on les lit.
+  Alors on parcourt la page dans l'ordre où on la lit, rangée par rangée.
 
 ### Les textes des membres bien ponctués
 
 - Étant donné un membre qui écrit « Ça marche ? Oui ! » ou « Note : à tester » (titre, accroche,
   description, mise à jour, commentaire)
   Quand le texte s'affiche en français
-  Alors une espace fine insécable précède ? ! : ; et suit « (et précède ») : le signe ne part
-  jamais seul en début de ligne ;
-  Et le texte enregistré ne change pas (copier le texte rend ce que le membre a tapé).
+  Alors l'espace que le membre a tapée devant ? ! : ; (et après « , avant ») devient insécable : le
+  signe ne part jamais seul en début de ligne ;
+  Et le texte enregistré ne change pas ; sans espace tapée (« Oui! », « 10:30 », une adresse
+  https://…), rien n'est ajouté.
 - En anglais, rien ne change.
 
 ### Les cartes sans photo sur téléphone
