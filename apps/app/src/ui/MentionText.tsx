@@ -27,6 +27,7 @@
 // pseudo écrit. C'est voulu, et suffisant : le lien se trouve par le rotor des liens.
 import { radii, space } from '@ruche/brand'
 import { type Mention, splitMentions } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Text as NativeText, Platform, type TextStyle } from 'react-native'
@@ -117,12 +118,12 @@ export function MentionText({
     >
       {/* Sans mention, aucun découpage : le texte tel quel. */}
       {known.size === 0
-        ? text
+        ? keepPunctuation(text)
         : splitMentions(text).map((segment, index) => {
             const mention = segment.handle ? known.get(segment.handle) : undefined
             // La place du morceau dans le texte lui sert de clé : le texte ne se réordonne jamais.
             const key = `${index}`
-            if (!mention) return <Fragment key={key}>{segment.text}</Fragment>
+            if (!mention) return <Fragment key={key}>{keepPunctuation(segment.text)}</Fragment>
             const { memberId, name } = mention
             const open = () => onMemberPress(memberId)
             return (

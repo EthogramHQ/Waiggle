@@ -12,6 +12,7 @@
 
 import { radii, readableWidth, space, textStyles } from '@ruche/brand'
 import { publicHttpsUrl, removeForbiddenCharacters } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { lexer, type Token } from 'marked'
 import { Fragment, type ReactNode, useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
@@ -44,8 +45,12 @@ const decodeEntities = (text: string) =>
     return ENTITIES[code.toLowerCase()] ?? entity
   })
 
-/** Le texte à afficher : entités décodées, puis caractères invisibles retirés (voir text.ts). */
-const clean = (text: string) => removeForbiddenCharacters(decodeEntities(text))
+/**
+ * Le texte à afficher : entités décodées, caractères invisibles retirés (voir text.ts), puis l'espace
+ * tapée devant ? ! ; : rendue insécable (R18, `keepPunctuation`, même longueur). Seulement pour le
+ * texte : le code, les adresses des liens et le HTML brut passent ailleurs, tels qu'écrits.
+ */
+const clean = (text: string) => keepPunctuation(removeForbiddenCharacters(decodeEntities(text)))
 
 /** Découpe le texte ; si l'analyse échoue (texte piégé qui épuise la mémoire), null. */
 const parse = (text: string): Token[] | null => {
