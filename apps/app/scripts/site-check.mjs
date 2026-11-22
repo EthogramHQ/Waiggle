@@ -24,18 +24,35 @@ const paths = [
   '/projects/0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6',
   '/members/AbC123_xyz-9',
   '/tags/claude-code',
+  // R18 : les pages publiques par leur adresse de langue (précompressées ? non : lues comme
+  // gabarits par Caddy, infra/Caddyfile), qu'un visiteur atteint aussi par « / ».
+  '/fr/',
+  '/en/',
   '/nope',
+]
+
+// Les affichages visités : téléphone et ordinateur, de jour et de nuit, puis (R18) un navigateur
+// qui annonce le français (Accept-Language: fr-FR) : « / » l'envoie sur /fr/, la langue de la
+// page doit rester celle de l'adresse.
+const displays = [
+  { viewport: { width: 390, height: 844 }, colorScheme: 'light' },
+  { viewport: { width: 390, height: 844 }, colorScheme: 'dark' },
+  { viewport: { width: 1440, height: 900 }, colorScheme: 'light' },
+  { viewport: { width: 1440, height: 900 }, colorScheme: 'dark' },
+  { viewport: { width: 390, height: 844 }, colorScheme: 'light', locale: 'fr-FR' },
 ]
 
 const problems = []
 const browser = await chromium.launch()
-for (const viewport of [
-  { width: 390, height: 844 },
-  { width: 1440, height: 900 },
-]) {
-  for (const colorScheme of ['light', 'dark']) {
+for (const { viewport, colorScheme, locale } of displays) {
+  {
     // ignoreHTTPSErrors : la pile d'essai utilise les certificats locaux de Caddy.
-    const context = await browser.newContext({ viewport, colorScheme, ignoreHTTPSErrors: true })
+    const context = await browser.newContext({
+      viewport,
+      colorScheme,
+      ...(locale ? { locale } : {}),
+      ignoreHTTPSErrors: true,
+    })
     // Le navigateur annonce chaque blocage de la CSP par un évènement : on le fait remonter.
     await context.addInitScript(() => {
       document.addEventListener('securitypolicyviolation', (event) => {
@@ -92,4 +109,6 @@ if (problems.length > 0) {
   console.error(`Problèmes dans le navigateur :\n- ${[...new Set(problems)].join('\n- ')}`)
   process.exit(1)
 }
-console.log(`ok : ${paths.length} pages, 4 affichages, ni blocage de la CSP ni erreur dans la page`)
+console.log(
+  `ok : ${paths.length} pages, ${displays.length} affichages, ni blocage de la CSP ni erreur dans la page`,
+)

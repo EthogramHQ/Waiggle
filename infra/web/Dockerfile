@@ -39,6 +39,10 @@ ENV EXPO_PUBLIC_APP_URL=https://${APP_DOMAIN} \
 RUN pnpm --filter @ruche/app build
 # Le Caddyfile convient-il à cette appli ? (scripts autorisés, pages à paramètre)
 RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
+# R18 : les scripts, styles, polices et données sont compressés à l'avance (.br et .zst à côté de
+# chaque fichier), au niveau le plus fort ; Caddy les sert tels quels (« precompressed », Caddyfile).
+# Après check-web.mjs : la vérification lit les fichiers d'origine. Jamais le HTML.
+RUN node infra/web/precompress.mjs apps/app/dist
 
 # --- Étape 2 : Caddy et les fichiers de l'appli, rien d'autre ---
 FROM caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee

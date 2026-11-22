@@ -298,7 +298,13 @@
 		# /settings/profile a sa propre page, déjà trouvée à l'étape 1.
 		@settings_section path_regexp ^/settings/[^/.]+$
 		rewrite @settings_section /settings/[section].html
-		file_server
+		# R18 : « precompressed br zstd » sert la copie compressée à l'avance (fichier.js.br, .zst,
+		# écrites par infra/web/precompress.mjs à la construction de l'image) quand le navigateur
+		# l'accepte, sans recompresser. Sans copie (les pages HTML, les images), le fichier part tel
+		# quel, et « encode » plus haut le compresse à la volée comme avant.
+		file_server {
+			precompressed br zstd
+		}
 	}
 
 	# Une adresse inconnue : la page « introuvable » de l'appli, avec le code 404.
