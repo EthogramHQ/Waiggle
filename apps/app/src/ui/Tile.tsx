@@ -10,6 +10,7 @@
 // Toutes deux s'enfoncent sous le doigt (jeton `pressScale`), comme les boutons.
 // - TileSkeleton (R16) : la tuile vide qui tient la place d'une tuile pendant le chargement.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
+import { keepPunctuation } from '@ruche/i18n'
 import { Image } from 'expo-image'
 import { createContext, type ReactNode, type Ref, useContext, useId } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -254,7 +255,7 @@ export function ProjectTile({
             du 1/11). La tuile s'allonge (sa hauteur n'est qu'un minimum) ; dans une mosaïque, la
             rangée suit la plus haute, et la photo garde sa hauteur minimale. */}
         <Text variant={image ? 'callout' : 'headline'} weight={700} tone={look.title}>
-          {title}
+          {keepPunctuation(title)}
         </Text>
         <Text variant="caption" tone={look.author}>
           {author}
