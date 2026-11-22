@@ -98,6 +98,7 @@ import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
 import { TokensCatalogue } from './jetons'
+import { LazySection } from './LazySection'
 import { labels } from './labels'
 import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
@@ -807,180 +808,231 @@ export function CatalogueScreen() {
         </Stack>
       </Section>
       {/* Tranche R8, les lignes de la page Activité, jour et nuit (notifications.tsx). */}
-      <NotificationsCatalogue />
-      {/* Tranche R8, l'exemple et les lignes de choix des réglages (reglages-notifications.tsx). */}
-      <NotificationSettingsCatalogue />
-      {/* Tranche R10, l'actualité et les membres d'une ruche, jour et nuit (ruches-actualite.tsx). */}
-      <HiveNewsCatalogue />
+      <LazySection title={l.lazy.activity}>
+        <NotificationsCatalogue />
+        {/* Tranche R8, l'exemple et les lignes de choix des réglages (reglages-notifications.tsx). */}
+        <NotificationSettingsCatalogue />
+        {/* Tranche R10, l'actualité et les membres d'une ruche, jour et nuit (ruches-actualite.tsx). */}
+        <HiveNewsCatalogue />
+      </LazySection>
 
       {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions, le champ. */}
-      <CommentCardCatalogue />
-      <ReadMoreCatalogue />
-      <CommentThreadCatalogue />
-      <CommentMentionsCatalogue />
-      <CommentComposerCatalogue />
+      <LazySection title={l.lazy.comments}>
+        <CommentCardCatalogue />
+        <ReadMoreCatalogue />
+        <CommentThreadCatalogue />
+        <CommentMentionsCatalogue />
+        <CommentComposerCatalogue />
+      </LazySection>
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
-      <ReportSamples />
-      <ModerationCatalogue />
-      <ModerationR9Catalogue />
-      {/* R9 : les briques de la fenêtre « Retirer » (moderation-fenetres.tsx). */}
-      <ModerationSheetsCatalogue />
-      {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
-      <SuspensionCatalogue />
+      <LazySection title={l.lazy.moderation}>
+        <ReportSamples />
+        <ModerationCatalogue />
+        <ModerationR9Catalogue />
+        {/* R9 : les briques de la fenêtre « Retirer » (moderation-fenetres.tsx). */}
+        <ModerationSheetsCatalogue />
+        {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
+        <SuspensionCatalogue />
+      </LazySection>
       {/* Tranche R11 : le corps d'une page légale et les liens vers les quatre pages (pages-legales.tsx). */}
-      <LegalPagesCatalogue />
-      {/* Tranche R12 : la barre d'un visiteur, les réactions et les commentaires réservés (visiteur.tsx). */}
-      <VisitorCatalogue />
-      {/* Tranche R12 : la carte de la vitrine de l'accueil et de « À la une » (vitrine.tsx). */}
-      <ShowcaseCatalogue />
+      <LazySection title={l.lazy.visitors}>
+        <LegalPagesCatalogue />
+        {/* Tranche R12 : la barre d'un visiteur, les réactions et les commentaires réservés (visiteur.tsx). */}
+        <VisitorCatalogue />
+        {/* Tranche R12 : la carte de la vitrine de l'accueil et de « À la une » (vitrine.tsx). */}
+        <ShowcaseCatalogue />
+      </LazySection>
       {/* Tranche R11 : la ligne de « Mes commentaires » (mes-commentaires.tsx). */}
-      <MyCommentsCatalogue />
-      {/* Tranche R11 : « Mes retours envoyés », la carte d'un projet et ses messages (mes-retours.tsx). */}
-      <MyFeedbackCatalogue />
-      <RemovalR9Catalogue />
+      <LazySection title={l.lazy.myData}>
+        <MyCommentsCatalogue />
+        {/* Tranche R11 : « Mes retours envoyés », la carte d'un projet et ses messages (mes-retours.tsx). */}
+        <MyFeedbackCatalogue />
+        <RemovalR9Catalogue />
+      </LazySection>
       {/* Tranche R10 : l'alvéole d'une ruche et le choix de son icône (ruches-alveoles.tsx). */}
-      <HiveCellsCatalogue />
-      {/* Tranche R10, la ligne d'une ruche et la carte d'une invitation (ruches-lignes.tsx). */}
-      <HiveRowsCatalogue />
-      {/* Tranche R10, la pastille et le menu « … » d'une tuile de projet (ruches-tuiles.tsx). */}
-      <ProjectTilesCatalogue />
+      <LazySection title={l.lazy.hives}>
+        <HiveCellsCatalogue />
+        {/* Tranche R10, la ligne d'une ruche et la carte d'une invitation (ruches-lignes.tsx). */}
+        <HiveRowsCatalogue />
+        {/* Tranche R10, la pastille et le menu « … » d'une tuile de projet (ruches-tuiles.tsx). */}
+        <ProjectTilesCatalogue />
+      </LazySection>
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
-      <ActionMenuSamples />
-      {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
-      <AccountCatalogue />
-      <SheetsCatalogue />
-      <PublishSheetCatalogue />
+      <LazySection title={l.lazy.account}>
+        <ActionMenuSamples />
+        {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
+        <AccountCatalogue />
+        <SheetsCatalogue />
+        <PublishSheetCatalogue />
+      </LazySection>
       {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
-      <EntryCatalogue />
-      {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
-      <SettingsCatalogue />
-      {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
-      <SafeguardsCatalogue />
-      <PublishWindowsCatalogue />
+      <LazySection title={l.lazy.settings}>
+        <EntryCatalogue />
+        {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
+        <SettingsCatalogue />
+        {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
+        <SafeguardsCatalogue />
+        <PublishWindowsCatalogue />
+      </LazySection>
       {/* Tranche R3 : la barre d'onglets (navigation.tsx), la pastille « Suivre » sur une carte
           (cartes.tsx), le carrousel et la carte testeur (explorer.tsx), le surlignage (recherche.tsx). */}
-      <NavigationCatalogue />
-      <TopBarCatalogue />
-      <CardsCatalogue />
-      {/* R16 : la carte d'un résultat de recherche, en grand (cartes-recherche.tsx). */}
-      <SearchCardsCatalogue />
-      <FeedCatalogue />
-      <ExploreCatalogue />
-      <ToolsCatalogue />
-      <InvalidChoicesCatalogue />
-      <ToolTagsCatalogue />
-      <ToolFiltersCatalogue />
-      {/* Tranche R10 : le sélecteur de ruches du Fil (pastilles.tsx). */}
-      <HivePillsCatalogue />
-      <ToolFieldCatalogue />
-      <ToolHeaderCatalogue />
-      <AdminCardsCatalogue />
-      <AdminGesturesCatalogue />
-      <ToolPageSheetsCatalogue />
-      <SearchCatalogue />
+      <LazySection title={l.lazy.navigation}>
+        <NavigationCatalogue />
+        <TopBarCatalogue />
+        <CardsCatalogue />
+        {/* R16 : la carte d'un résultat de recherche, en grand (cartes-recherche.tsx). */}
+        <SearchCardsCatalogue />
+      </LazySection>
+      <LazySection title={l.lazy.feed}>
+        <FeedCatalogue />
+        <ExploreCatalogue />
+      </LazySection>
+      <LazySection title={l.lazy.tools}>
+        <ToolsCatalogue />
+        <InvalidChoicesCatalogue />
+        <ToolTagsCatalogue />
+        <ToolFiltersCatalogue />
+        {/* Tranche R10 : le sélecteur de ruches du Fil (pastilles.tsx). */}
+        <HivePillsCatalogue />
+      </LazySection>
+      <LazySection title={l.lazy.admin}>
+        <ToolFieldCatalogue />
+        <ToolHeaderCatalogue />
+        <AdminCardsCatalogue />
+        <AdminGesturesCatalogue />
+        <ToolPageSheetsCatalogue />
+        <SearchCatalogue />
+      </LazySection>
       {/* Tranche R5a, la page projet : le socle (prudence, dépliant, paire de boutons ; cadre de
           l'écran et place flottante), puis les pièces dans l'ordre de la page : galerie, en-tête et
           actions, capsule, éventail et vue de l'auteur, prompts, Partager, la page de sortie et son
           portail, l'introuvable (projet-*.tsx). */}
-      <ProjectGroundworkCatalogue />
-      <ProjectFrameCatalogue />
-      <GalleryCatalogue />
-      <ProjectPartsCatalogue />
+      <LazySection title={l.lazy.project}>
+        <ProjectGroundworkCatalogue />
+        <ProjectFrameCatalogue />
+        <GalleryCatalogue />
+        <ProjectPartsCatalogue />
+      </LazySection>
       {/* Tranche R12b : les en-têtes d'un projet d'exemple et du compte d'exemples
           (exemples-pages.tsx). */}
-      <ExamplePagesCatalogue />
-      {/* Tranche R12b : la pastille « Exemple » et les cartes d'un projet d'exemple
+      <LazySection title={l.lazy.examples}>
+        <ExamplePagesCatalogue />
+        {/* Tranche R12b : la pastille « Exemple » et les cartes d'un projet d'exemple
           (exemples-cartes.tsx). */}
-      <ExampleCardsCatalogue />
-      {/* Tranche R14 : la carte compacte et la mosaïque des projets d'un membre
+        <ExampleCardsCatalogue />
+        {/* Tranche R14 : la carte compacte et la mosaïque des projets d'un membre
           (mosaique-membre.tsx). */}
-      <MemberMosaicCatalogue />
-      <MemberColumnCatalogue />
-      {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
+        <MemberMosaicCatalogue />
+        <MemberColumnCatalogue />
+        {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
           son issue (projet-categorie.tsx). */}
-      <ProjectCategoryCatalogue />
+        <ProjectCategoryCatalogue />
+      </LazySection>
       {/* Tranche R6a, la feuille de publication (publier-*.tsx). */}
-      <PublishPhotosCatalogue />
-      <PublishToolsPreviewCatalogue />
-      <PublishPromptCatalogue />
-      <PublishPillsCatalogue />
-      <PublishDanceCatalogue />
-      <PublishDeleteCatalogue />
-      <PublishCategoriesCatalogue />
-      <RecipeCatalogue />
-      <CapsuleCatalogue />
-      <FanCatalogue />
-      <ProjectPromptsCatalogue />
-      <ShareCatalogue />
-      <LeavingCatalogue />
-      <NotFoundPortalCatalogue />
+      <LazySection title={l.lazy.publish}>
+        <PublishPhotosCatalogue />
+        <PublishToolsPreviewCatalogue />
+        <PublishPromptCatalogue />
+        <PublishPillsCatalogue />
+        <PublishDanceCatalogue />
+        <PublishDeleteCatalogue />
+        <PublishCategoriesCatalogue />
+      </LazySection>
+      <LazySection title={l.lazy.projectParts}>
+        <RecipeCatalogue />
+        <CapsuleCatalogue />
+        <FanCatalogue />
+        <ProjectPromptsCatalogue />
+        <ShareCatalogue />
+        <LeavingCatalogue />
+        <NotFoundPortalCatalogue />
+      </LazySection>
       {/* Tranche R7a, les mises à jour d'un projet (mises-a-jour*.tsx). */}
-      <UpdateFamiliesCatalogue />
-      {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
-      <TestersCatalogue />
-      {/* Tranche R7b, les briques du coin des testeurs (testeurs-briques.tsx). */}
-      <TesterBricksCatalogue />
-      {/* Tranche R7b, les en-têtes des feuilles et du fil du coin des testeurs (coin-entetes.tsx). */}
-      <TestersCornerHeadsCatalogue />
-      {/* Tranche R7b, le fil des retours : bulles et liste des fils (coin-testeurs-fil.tsx). */}
-      <TesterThreadCatalogue />
-      {/* Tranche R7b, la liste des testeurs du coin, que l'auteur déplie (coin-testeurs-liste.tsx). */}
-      <TestersListCatalogue />
-      {/* Tranche R7b, les onglets, les appels et les retours réglés du coin (coin-testeurs.tsx). */}
-      <TestersCornerCatalogue />
+      <LazySection title={l.lazy.testers}>
+        <UpdateFamiliesCatalogue />
+        {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
+        <TestersCatalogue />
+        {/* Tranche R7b, les briques du coin des testeurs (testeurs-briques.tsx). */}
+        <TesterBricksCatalogue />
+        {/* Tranche R7b, les en-têtes des feuilles et du fil du coin des testeurs (coin-entetes.tsx). */}
+        <TestersCornerHeadsCatalogue />
+        {/* Tranche R7b, le fil des retours : bulles et liste des fils (coin-testeurs-fil.tsx). */}
+        <TesterThreadCatalogue />
+        {/* Tranche R7b, la liste des testeurs du coin, que l'auteur déplie (coin-testeurs-liste.tsx). */}
+        <TestersListCatalogue />
+        {/* Tranche R7b, les onglets, les appels et les retours réglés du coin (coin-testeurs.tsx). */}
+        <TestersCornerCatalogue />
+      </LazySection>
       {/* Tranche R7a, l'avant / après d'une mise à jour (avant-apres.tsx). */}
-      <BeforeAfterCatalogue />
-      {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}
-      <UpdateLinesCatalogue />
-      {/* Tranche R7a, une mise à jour en entier, dans la frise du projet (mises-a-jour-frise.tsx). */}
-      <UpdateEntryCatalogue />
-      {/* Tranche R7a, la frise des mises à jour et la ligne des dates d'un projet (frise.tsx). */}
-      <UpdateTimelineCatalogue />
-      {/* Tranche R7a, la carte d'un projet mis à jour dans le fil (fil-mise-a-jour.tsx). */}
-      <FeedUpdateCatalogue />
-      {/* Tranche R7a, la feuille « Nouvelle mise à jour » (feuille-mise-a-jour.tsx). */}
-      <UpdateSheetCatalogue />
+      <LazySection title={l.lazy.updates}>
+        <BeforeAfterCatalogue />
+        {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}
+        <UpdateLinesCatalogue />
+        {/* Tranche R7a, une mise à jour en entier, dans la frise du projet (mises-a-jour-frise.tsx). */}
+        <UpdateEntryCatalogue />
+        {/* Tranche R7a, la frise des mises à jour et la ligne des dates d'un projet (frise.tsx). */}
+        <UpdateTimelineCatalogue />
+        {/* Tranche R7a, la carte d'un projet mis à jour dans le fil (fil-mise-a-jour.tsx). */}
+        <FeedUpdateCatalogue />
+        {/* Tranche R7a, la feuille « Nouvelle mise à jour » (feuille-mise-a-jour.tsx). */}
+        <UpdateSheetCatalogue />
+      </LazySection>
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
           pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
-      <FluidTopBarCatalogue />
-      <ScreenFadeCatalogue />
-      <AmbientHostCatalogue />
-      {/* Tranche R17, la vague de miel à l'entrée dans l'appli (fluidite-vague.tsx). */}
-      <HoneyWaveCatalogue />
+      <LazySection title={l.lazy.fluidity}>
+        <FluidTopBarCatalogue />
+        <ScreenFadeCatalogue />
+        <AmbientHostCatalogue />
+        {/* Tranche R17, la vague de miel à l'entrée dans l'appli (fluidite-vague.tsx). */}
+        <HoneyWaveCatalogue />
+      </LazySection>
 
       <Section title={l.icons}>
         <Icons />
       </Section>
-      <BrandCatalogue />
-      <ControlsCatalogue />
-      <MaterialsCatalogue />
-      <FormSamples />
-      <TokensCatalogue />
-      <LightCatalogue />
-      <AmbiancesCatalogue />
-      <LoadingCatalogue />
+      <LazySection title={l.lazy.brand}>
+        <BrandCatalogue />
+        <ControlsCatalogue />
+        <MaterialsCatalogue />
+        <FormSamples />
+      </LazySection>
+      <LazySection title={l.lazy.light}>
+        <TokensCatalogue />
+        <LightCatalogue />
+        <AmbiancesCatalogue />
+        <LoadingCatalogue />
+      </LazySection>
       {/* Tranche R16 : la grille de cartes commune, la carte d'une ruche et sa pièce vide
           (grille-cartes.tsx). */}
-      <CardGridCatalogue />
-      {/* Tranche R16 : la carte d'un outil, sa pièce vide et la liste en colonnes d'Outils en grand
+      <LazySection title={l.lazy.grids}>
+        <CardGridCatalogue />
+        {/* Tranche R16 : la carte d'un outil, sa pièce vide et la liste en colonnes d'Outils en grand
           (outils-grand.tsx). */}
-      <ToolsWideCatalogue />
-      <FeedEndCatalogue />
-      <MascotCatalogue />
+        <ToolsWideCatalogue />
+        <FeedEndCatalogue />
+        <MascotCatalogue />
+      </LazySection>
     </Screen>
   )
 }
 
 type Labels = (typeof labels)['fr']
 
+/**
+ * Une section écrite dans ce fichier : son titre, puis ses exemples. Elle n'est montée que près de
+ * la vue (`LazySection`, R18) : tout monter d'un coup figeait la page plus d'une minute. Les
+ * sections des autres fichiers sont groupées plus haut, chaque groupe dans sa `LazySection`.
+ */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Stack gap="md">
-      <Text variant="heading" heading={2}>
-        {title}
-      </Text>
-      {children}
-    </Stack>
+    <LazySection title={title}>
+      <Stack gap="md">
+        <Text variant="heading" heading={2}>
+          {title}
+        </Text>
+        {children}
+      </Stack>
+    </LazySection>
   )
 }
 
