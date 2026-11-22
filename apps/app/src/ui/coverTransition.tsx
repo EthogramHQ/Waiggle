@@ -23,7 +23,9 @@
 // la déformation, si bien que la photo grandit toujours dans ses proportions.
 //
 // Pendant le vol, la photo est cachée au lecteur d'écran et ne prend pas le doigt ; à l'arrivée, le
-// focus du clavier va au titre de la page (sur le web), pour que la lecture reparte du haut.
+// focus du clavier va au titre de la page (sur le web), pour que la lecture reparte du haut. Depuis
+// R18, c'est le module du focus à l'arrivée (ui/arrivalFocus.ts) qui le donne, à toute page : la
+// carte le lui cède, et le titre n'est focalisé qu'une fois.
 //
 // R17 (« La carte qui devient la page », web) : un navigateur qui sait animer un passage de page
 // (l'API View Transitions, ui/pageTransition.web.ts) fait voler la photo lui-même. Il photographie
@@ -65,7 +67,8 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated'
-import { type Focusable, focusWithoutScroll } from './focus'
+import { focusArrivalTitle, returnFocus } from './arrivalFocus'
+import type { Focusable } from './focus'
 import { afterPassage, passageBusy, passagesAnimated, shareCover } from './pageTransition'
 import { fade, spring, useCalmMotion } from './theme/motion'
 
@@ -104,54 +107,16 @@ const FADE_IN = durations.base
 const FADE_OUT = durations.quick
 /** Filet de sécurité : la photo n'est jamais mesurée (rendu sans mise en page) ; elle se pose. */
 const LAND_MAX = 1500
-/**
- * Au retour, le fil caché sous la page (la pile garde les pages quittées en `display: none`)
- * redevient visible un peu après la navigation : on essaie de focaliser la carte tous les
- * `REFOCUS_STEP`, pendant `REFOCUS_MAX` au plus.
- */
-const REFOCUS_STEP = 50
-const REFOCUS_MAX = 1000
 /** Le rebond de la carte au Retour du navigateur (R14) : elle part de cette échelle, revient à 1. */
 const BOUNCE_FROM = 0.96
 
 /** Sur le web, le lien autour de la photo d'une carte (son `Pressable` en `role="link"`). */
 const linkOf = (node: Measurable | null) => node?.closest?.('[role="link"], a') ?? null
 
-/**
- * Rend le focus au lien de la carte, sans défilement (`focusWithoutScroll`). Un élément caché ne
- * prend pas le focus : on réessaie jusqu'à ce qu'il l'ait (le navigateur le dit par
- * `document.activeElement`), ou que le délai passe. Hors du navigateur, un seul essai.
- *
- * `shown` (R14) est appelé une fois, quand la carte est de nouveau à l'écran : son lien a pris le
- * focus (un élément caché ne le prend pas), le membre a déjà mis le focus ailleurs, ou le délai
- * est passé. Le rebond attend ce moment : joué sous une page encore cachée, il ne se verrait pas.
- */
-const refocus = (link: unknown, shown?: () => void) => {
-  if (Platform.OS !== 'web') return
-  if (!link) {
-    shown?.()
-    return
-  }
-  const started = Date.now()
-  const web = typeof document !== 'undefined'
-  // Le focus au moment du retour (le bouton « Retour ») : s'il part ailleurs que sur la page entière
-  // pendant l'attente (le membre a déjà tapé Tab), on ne le lui reprend pas.
-  const before = web ? document.activeElement : null
-  const attempt = () => {
-    if (web) {
-      const now = document.activeElement
-      if (now !== before && now !== document.body && now !== null) {
-        shown?.()
-        return
-      }
-    }
-    focusWithoutScroll(link)
-    const done = !web || document.activeElement === link
-    if (!done && Date.now() - started < REFOCUS_MAX) setTimeout(attempt, REFOCUS_STEP)
-    else shown?.()
-  }
-  attempt()
-}
+// R18 : le focus, à l'arrivée comme au retour, appartient au module du focus à l'arrivée
+// (ui/arrivalFocus.ts), qui le donne à toute page. La carte garde son vol et lui cède le focus :
+// `focusArrivalTitle` ne refocalise pas un titre que le module a déjà focalisé (un seul focus), et
+// `returnFocus` est le nouvel essai borné qui rend le focus au lien d'une carte encore cachée.
 
 /**
  * Une carte affichée : son projet, la vue de sa photo (null quand elle n'est plus là), et son
@@ -270,7 +235,7 @@ const welcomeBack = (store: Store, id: string) => {
   if (Platform.OS !== 'web') return
   const origin = store.origins.get(id)
   if (!origin?.node || !store.entries.has(origin)) return
-  refocus(linkOf(origin.node), origin.bounce)
+  returnFocus(linkOf(origin.node), origin.bounce)
 }
 
 /**
@@ -449,7 +414,7 @@ export function useCoverTarget(id: string) {
       const origin = fromCard ? store?.origins.get(id) : undefined
       const quit = () => {
         then()
-        if (origin) refocus(linkOf(origin.node))
+        if (origin) returnFocus(linkOf(origin.node))
       }
       // R17 (web) : le navigateur anime le retour. La page part tout de suite ; sa photo est confiée
       // au moteur, avec la carte d'origine pour arrivée, si cette carte est encore affichée (le
@@ -547,9 +512,11 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
     // Seulement venue d'une carte : une page ouverte par son adresse garde le focus en haut, comme
     // toute page qui se charge. R17 : à la fin du passage du navigateur s'il y en a un
     // (`afterPassage`, tout de suite sinon) ; le focus pendant le vol se verrait sur l'image d'arrivée.
+    // R18 : le module du focus à l'arrivée l'a sans doute déjà donné au titre ; `focusArrivalTitle`
+    // ne le donne pas une seconde fois.
     if (fromCard && Platform.OS === 'web') {
       afterPassage(() => {
-        if (mounted.current) focusWithoutScroll(title.current?.current)
+        if (mounted.current) focusArrivalTitle(title.current?.current)
       })
     }
   }, [stage, progress, photo, rest, fromCard])

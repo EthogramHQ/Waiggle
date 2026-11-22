@@ -40,6 +40,15 @@ export const announcePassage = (_kind: PassageKind): void => {}
 /** Appelée quand une page arrive (ui/screenFocus.ts) : le passage peut se terminer. */
 export const passageArrived = (): void => {}
 
+/** Pour les tests du web : le faux document des passages. Hors du web, il n'y en a pas : rien. */
+export const setPassageDocument = (_doc: unknown): void => {}
+
+/**
+ * Vrai quand la première page de la visite est posée (lu par ui/arrivalFocus.ts). Hors du web, il
+ * n'y a pas de page pré-rendue : toujours vrai (et le focus à l'arrivée n'y fait rien).
+ */
+export const visitStarted = (): boolean => true
+
 /** Ce que doit faire la page qui arrive. Hors du web : rien, la pile native s'en charge. */
 export const arrivalStyle = (): ArrivalStyle => 'none'
 
