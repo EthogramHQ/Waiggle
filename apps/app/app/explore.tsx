@@ -1,11 +1,14 @@
 // Page : l'onglet Explorer (« /explore », tranche R3) : les projets de tous les membres. L'écran se
-// charge quand on ouvre la page, pas avec l'accueil (R18, navigation/lazyScreen.tsx) ; son squelette,
-// pendant l'attente, a la forme d'une grille de cartes.
+// charge quand on ouvre la page, pas avec l'accueil (R18, navigation/lazyScreen.tsx) ; pendant
+// l'attente, Explorer vide, aux places et à la largeur d'Explorer (`ExploreWaiting`, un module léger),
+// le même que pendant la lecture de la session : la barre du haut ne bouge plus (relecture de
+// design R18 ; la grille commune, plus étroite, la faisait rétrécir).
 import { lazyScreen } from '../src/navigation/lazyScreen'
+import { ExploreWaiting } from '../src/screens/ExploreWaiting'
 
 const ExploreScreen = lazyScreen(
   () => import('../src/navigation/chunks/explore').then((m) => m.ExploreScreen),
-  { shape: 'grid', width: 'page' },
+  { loading: ExploreWaiting },
 )
 
 export default function ExplorePage() {

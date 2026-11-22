@@ -53,7 +53,6 @@ import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useCategories } from '../categories/api'
 import { firstParam } from '../navigation/params'
-import { TopNav } from '../navigation/TopNav'
 import { SummaryCard } from '../projects/SummaryCard'
 import { useSearch } from '../search/api'
 import { Avatar } from '../ui/Avatar'
@@ -64,33 +63,22 @@ import { FilterButton } from '../ui/FilterButton'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HighlightedText } from '../ui/HighlightedText'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
-import { ListGroup, ListRow, ListRowSkeleton, type PressEvent } from '../ui/ListGroup'
+import { ListGroup, ListRow, type PressEvent } from '../ui/ListGroup'
 import { LiveStatus } from '../ui/LiveStatus'
-import { ProjectCardSkeleton } from '../ui/ProjectCard'
-import { GridCardsContext, ProjectGrid } from '../ui/ProjectGrid'
-import { Screen } from '../ui/Screen'
+import { ProjectGrid } from '../ui/ProjectGrid'
 import { SearchField } from '../ui/SearchField'
 import { Segmented } from '../ui/Segmented'
 import { SidePanel } from '../ui/SidePanel'
-import { Loading } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
-import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useWideTemplate } from '../ui/theme/wideTemplate'
 import { type CategoryFilterChoice, CategoryFilterSheet } from './CategoryFilterSheet'
-
-/**
- * R16 (choix 9 des planches) : pendant la recherche, huit cartes vides (deux rangées à 1 920), deux
- * membres et un outil vides, avant de connaître les nombres.
- */
-const SKELETON_PROJECTS = 8
-const SKELETON_MEMBERS = 2
-const SKELETON_TOOLS = 1
-/** Les lignes vides de la page qui attend la session, sous 1 280 points (une liste). */
-const SKELETON_ROWS = 5
+// Le cadre de la page et ses résultats vides, dans un module léger : la route montre aussi l'attente
+// pendant l'arrivée du morceau de cet écran (app/search.tsx, relecture de design R18).
+import { ProjectsSection, ResultsSkeleton, SearchPage, SearchWaiting } from './SearchWaiting'
 
 /** Le temps sans frappe après lequel la recherche part : une demande par mot, pas une par lettre. */
 const SEARCH_DELAY_MS = 250
@@ -105,124 +93,6 @@ export function SearchScreen() {
   // lecture ratée propose « Réessayer ». Les lectures de l'API (la recherche, les catégories) vivent
   // dans `MemberSearch`, qui n'est rendu qu'une fois la session d'un membre connue.
   return <SessionGate loading={<SearchWaiting />}>{() => <MemberSearch />}</SessionGate>
-}
-
-/** Le cadre de la page, le même pour l'attente de la session et pour les résultats. */
-function SearchPage({ wide, children }: { wide: boolean; children: ReactNode }) {
-  const { t } = useTranslation()
-  return (
-    <Screen
-      // R16 : le gabarit large dès 1 280 points ; en dessous, la colonne d'aujourd'hui.
-      {...(wide ? { width: 'wide' as const } : null)}
-      title={t(($) => $.search.title)}
-      // R16 (« Moins de mots », décision de Louis du 17/11) : le titre n'est affiché à aucune
-      // largeur ; il reste le titre de niveau 1 des lecteurs d'écran.
-      titleHidden
-      // Le titre de l'onglet du navigateur ne reprend jamais le texte cherché (sec-A8).
-      pageTitle={t(($) => $.search.title)}
-      header={<TopNav />}
-    >
-      {children}
-    </Screen>
-  )
-}
-
-/**
- * R16 : la page pendant la lecture de la session. Rien n'y lit l'API : on ne sait pas encore qui
- * regarde. Une seule zone « Chargement… » (comme toute page gardée) : en grand, la forme de la
- * planche (« Projets », huit cartes vides, le panneau) ; en dessous, une liste de lignes vides.
- */
-function SearchWaiting() {
-  const large = useWideTemplate()
-  return (
-    <SearchPage wide={large}>
-      <Loading>
-        {large ? (
-          <ResultsSkeleton whole />
-        ) : (
-          <ListGroup>
-            {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
-              <ListRowSkeleton key={index} />
-            ))}
-          </ListGroup>
-        )}
-      </Loading>
-    </SearchPage>
-  )
-}
-
-/**
- * R16 (planche R16-Recherche-Squelette-1920) : les résultats en grand, vides. Les titres sont vrais,
- * hors des zones « Chargement… » ; chaque zone (la grille, les membres, les outils) a la sienne.
- * `whole` : la page entière est déjà une seule zone qui charge (l'attente de la session) ; les
- * pièces se posent alors sans zone à elles.
- */
-function ResultsSkeleton({ whole = false }: { whole?: boolean }) {
-  const { t } = useTranslation()
-  const zone = (pieces: ReactNode) => (whole ? pieces : <Loading>{pieces}</Loading>)
-  // Les lignes vides d'un groupe du panneau, dans le groupe blanc qui porte son vrai titre : le
-  // titre reste hors de la zone « Chargement… », posée dans le groupe, autour des seules lignes.
-  const rows = (title: string, count: number, leading: 'round' | 'square') => (
-    <ListGroup title={title}>
-      {zone(
-        Array.from({ length: count }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: des lignes identiques, jamais réordonnées.
-          <ListRowSkeleton key={index} leading={leading} />
-        )),
-      )}
-    </ListGroup>
-  )
-  return (
-    <Columns
-      sideWidth="panel"
-      main={
-        <ProjectsSection>
-          {zone(
-            <ProjectGrid>
-              {Array.from({ length: SKELETON_PROJECTS }, (_, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: des cartes vides, jamais réordonnées.
-                <ProjectCardSkeleton key={index} />
-              ))}
-            </ProjectGrid>,
-          )}
-        </ProjectsSection>
-      }
-      side={
-        <SidePanel>
-          {rows(
-            t(($) => $.search.tabs.members),
-            SKELETON_MEMBERS,
-            'round',
-          )}
-          {rows(
-            t(($) => $.search.tabs.tools),
-            SKELETON_TOOLS,
-            'square',
-          )}
-        </SidePanel>
-      }
-    />
-  )
-}
-
-/**
- * R16 : « Projets » en grand, son titre de section (comme « Récents » d'Explorer, choix 5 des
- * planches), puis sa grille de cartes compactes (`GridCardsContext`) : la grille compte ses colonnes
- * dans la largeur que lui laisse le panneau (`ui/ProjectGrid`), quatre à 1 920, trois à 1 440.
- */
-function ProjectsSection({ children }: { children: ReactNode }) {
-  const { t } = useTranslation()
-  return (
-    <GridCardsContext.Provider value="compact">
-      <Stack gap="md" align="stretch">
-        <Text variant="heading" heading={2}>
-          {t(($) => $.search.tabs.projects)}
-        </Text>
-        {children}
-      </Stack>
-    </GridCardsContext.Provider>
-  )
 }
 
 function MemberSearch() {

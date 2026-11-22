@@ -31,9 +31,8 @@ import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useAcceptInvitation, useMyHives, useRefuseInvitation } from '../hives/api'
 import { useSuspension } from '../moderation/suspension'
-import { TopNav } from '../navigation/TopNav'
 import { Button } from '../ui/Button'
-import { CardGrid, useCardColumns, useWideTemplate } from '../ui/CardGrid'
+import { CardGrid } from '../ui/CardGrid'
 import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import {
@@ -43,19 +42,21 @@ import {
   holdsFocus,
   moveReaderTo,
 } from '../ui/focus'
-import { HiveCard, HiveCardSkeleton, hiveCardGrid } from '../ui/HiveCard'
+import { HiveCard, hiveCardGrid } from '../ui/HiveCard'
 import { HiveInvitation } from '../ui/HiveInvitation'
-import { HiveRow, HiveRowSkeleton } from '../ui/HiveRow'
+import { HiveRow } from '../ui/HiveRow'
 import { ListGroup } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { Loading } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { useScreenShownCount } from '../ui/screenFocus'
 import { Text } from '../ui/Text'
 import { useTapGuard } from '../ui/tapGuard'
 import { useCalmMotion } from '../ui/theme/motion'
+// L'attente de l'onglet et le cadre de ses pages, dans un module léger : la route les montre aussi
+// pendant l'arrivée du morceau de cet écran (app/hives.tsx).
+import { HivesLoading, usePageFrame } from './HivesLoading'
 import { SignedOutScreen } from './states'
 
 export function HivesScreen() {
@@ -63,91 +64,6 @@ export function HivesScreen() {
   // pendant celle des ruches ; une session illisible propose de réessayer ; un visiteur, de se
   // connecter. Les lectures ne partent qu'avec une session : elles vivent dans `Hives`.
   return <SessionGate loading={<HivesLoading />}>{() => <Hives />}</SessionGate>
-}
-
-/**
- * Les propriétés de la page communes à tous ses états : le titre « Ruches », lu mais jamais
- * affiché ; dès 1 280 points, le gabarit large de R15 (`width="wide"`), en dessous la largeur d'un
- * formulaire, comme avant R16. Le squelette les prend aussi : rien ne bouge à l'arrivée.
- */
-const usePageFrame = () => {
-  const { t } = useTranslation()
-  const wide = useWideTemplate()
-  return {
-    wide,
-    frame: {
-      title: t(($) => $.hives.title),
-      titleHidden: true,
-      header: <TopNav />,
-      width: wide ? 'wide' : 'form',
-    } as const,
-  }
-}
-
-/** Les lignes vides de l'attente, sous 1 280 points. */
-const LOADING_ROWS = 3
-
-/**
- * L'attente (planche R16-Ruches-Squelette-1920) : « Créer une ruche » à sa place, « Mes ruches »,
- * puis une rangée de cartes vides aux colonnes de la page finie (4 à 1 920, 3 à 1 440) ; sous
- * 1 280, trois lignes vides de la forme des vraies. Aucune place pour les invitations : souvent
- * absentes, elles s'ajoutent au-dessus quand elles arrivent (choix 8 des planches).
- */
-function HivesLoading() {
-  const { t } = useTranslation()
-  const router = useRouter()
-  const guard = useTapGuard()
-  const { wide, frame } = usePageFrame()
-  return (
-    <Screen
-      {...frame}
-      // Déjà vrai pendant l'attente (la planche) : le titre caché ne laisse au haut de la page que
-      // ce bouton, qui ne doit pas arriver après le reste.
-      titleAside={
-        <Button
-          label={t(($) => $.hives.create)}
-          icon="plus"
-          variant="secondary"
-          size="compact"
-          onPress={guard(() => router.push('/hives/new'))}
-        />
-      }
-    >
-      <Stack gap="md" align="stretch">
-        <Text variant="heading" heading={2}>
-          {t(($) => $.hives.mine)}
-        </Text>
-        <Loading>
-          {wide ? (
-            <EmptyCardRow />
-          ) : (
-            <ListGroup>
-              {Array.from({ length: LOADING_ROWS }, (_, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: des lignes vides identiques.
-                <HiveRowSkeleton key={index} />
-              ))}
-            </ListGroup>
-          )}
-        </Loading>
-      </Stack>
-    </Screen>
-  )
-}
-
-/**
- * Une rangée de cartes vides, autant que la grille aura de colonnes. Un composant à part, posé
- * dans la page : le nombre de colonnes se lit sur la largeur que `Screen` publie à son contenu.
- */
-function EmptyCardRow() {
-  const { columns } = useCardColumns(hiveCardGrid.minWidth, hiveCardGrid.gap)
-  return (
-    <CardGrid {...hiveCardGrid} list={false}>
-      {Array.from({ length: columns }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: des cartes vides identiques.
-        <HiveCardSkeleton key={index} />
-      ))}
-    </CardGrid>
-  )
 }
 
 function Hives() {

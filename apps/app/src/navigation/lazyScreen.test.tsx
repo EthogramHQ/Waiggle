@@ -24,10 +24,19 @@ const { renderToString } = require('react-dom/server') as {
   renderToString: (element: ReactElement) => string
 }
 
-// La page de chargement, réduite à une balise qu'on retrouve au serveur comme au client.
+// La page de chargement, réduite à une balise qu'on retrouve au serveur comme au client. R18 : elle
+// écrit la largeur et la forme reçues (`none` sans elles), pour vérifier ce que `lazyScreen` lui
+// transmet.
 jest.mock('../screens/states', () => {
   const { createElement: create } = require('react')
-  return { LoadingScreen: () => create('progress', { 'aria-label': 'loading-screen' }) }
+  return {
+    LoadingScreen: ({ width, shape }: { width?: string; shape?: string }) =>
+      create('progress', {
+        'aria-label': 'loading-screen',
+        'data-width': width ?? 'none',
+        'data-shape': shape ?? 'none',
+      }),
+  }
 })
 
 // L'hydratation de la page web, tenue par le test : fausse jusqu'à `hydrate()` (le vrai module la
@@ -197,6 +206,53 @@ describe('a screen loaded on demand', () => {
         writable: true,
       })
     }
+  })
+
+  // R18, relecture de design (point 1) : sur ordinateur, la barre du haut suit la largeur de la page.
+  // Un squelette plus étroit que la page qui arrive la faisait rétrécir, puis se réélargir sous la
+  // souris (Explorer et Ruches, de 48 à 224 points).
+  it('gives the loading screen the wide width of a wide page', () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    const Route = lazyScreen(async () => HeavyScreen, { width: 'wide', shape: 'grid' })
+
+    const html = renderToString(createElement(Route))
+    expect(html).toContain('data-width="wide"')
+    expect(html).toContain('data-shape="grid"')
+  })
+
+  it('lets the skeleton shape choose the width when none is given', () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    // Une ruche (`project`) est une page large : la largeur d'un formulaire, imposée jusqu'ici,
+    // rétrécissait sa barre et son squelette.
+    const Route = lazyScreen(async () => HeavyScreen, { shape: 'project' })
+
+    const html = renderToString(createElement(Route))
+    expect(html).toContain('data-shape="project"')
+    expect(html).toContain('data-width="none"')
+  })
+
+  it("draws the screen's own waiting page, with the route props, until the screen arrives", async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    // Le squelette propre à l'écran (R16), celui de sa garde de session : au pré-rendu, à
+    // l'hydratation et jusqu'à l'arrivée du morceau ; puis l'écran, qui montre le même pendant la
+    // lecture de la session. Rien ne change de largeur ni de forme entre les deux.
+    const Waiting = ({ id }: { id: string }) =>
+      createElement('section', { 'aria-label': `waiting-${id}` })
+    const Screen = ({ id }: { id: string }) =>
+      createElement('article', { 'aria-label': `heavy-${id}` })
+    const Route = lazyScreen(async () => Screen, { loading: Waiting })
+
+    const html = renderToString(createElement(Route, { id: 'famille' }))
+    expect(html).toContain('waiting-famille')
+    expect(html).not.toContain('loading-screen')
+
+    await render(createElement(Route, { id: 'famille' }))
+    expect(count('section')).toBe(1)
+    expect(count('progress')).toBe(0)
+
+    await hydrate()
+    await waitFor(() => expect(count('article')).toBe(1))
+    expect(count('section')).toBe(0)
   })
 
   it('leaves a failed chunk to the error screen on a phone, without reloading', async () => {
