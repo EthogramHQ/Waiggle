@@ -91,7 +91,8 @@ export function SettingsCatalogue() {
         <ListRow label="English" selected={false} busy onPress={() => {}} />
       </ListGroup>
       <Text tone="secondary">
-        À essayer : toucher « English » la charge une seconde et demie, puis la coche.
+        À essayer : toucher une langue la charge trois secondes, puis la coche ; pendant ce temps,
+        l’autre choix, Espace et les flèches ne font rien.
       </Text>
       <LanguageTrial />
       <Text tone="secondary">
@@ -105,7 +106,7 @@ export function SettingsCatalogue() {
 }
 
 /** Le temps que l'essai de la langue fait attendre, comme un morceau anglais qui arrive. */
-const TRIAL_MS = 1500
+const TRIAL_MS = 3000
 
 /**
  * L'essai de la langue occupée (R18) : la ligne touchée attend `TRIAL_MS`, puis devient le choix
