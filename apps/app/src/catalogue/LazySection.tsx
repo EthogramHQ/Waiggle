@@ -42,6 +42,21 @@ const useEverything = (): boolean => {
 /** Ce navigateur sait-il prévenir de l'approche d'un élément ? (Non sur téléphone ni sous Jest.) */
 const canObserve = () => typeof IntersectionObserver !== 'undefined'
 
+/**
+ * Le cadre qui fait défiler la section. L'écran défile dans une `ScrollView` (une `div` qui défile),
+ * pas la page : observée depuis la fenêtre, une section hors de ce cadre est coupée par lui, et la
+ * marge `NEAR` n'y changerait rien (elle ne s'applique qu'à la racine de l'observateur). La racine
+ * est donc ce cadre, le premier parent qui défile ; sans lui, la fenêtre (`null`).
+ */
+const scrollingFrame = (element: Element): Element | null => {
+  if (typeof getComputedStyle !== 'function') return null
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    const { overflowY } = getComputedStyle(parent)
+    if (overflowY === 'auto' || overflowY === 'scroll') return parent
+  }
+  return null
+}
+
 export function LazySection({ title, children }: { title: string; children: ReactNode }) {
   const hydrated = useHydrated()
   const everything = useEverything()
@@ -72,7 +87,7 @@ export function LazySection({ title, children }: { title: string; children: Reac
         }
         startTransition(() => setNear(last.isIntersecting))
       },
-      { rootMargin: `${NEAR}px 0px` },
+      { root: scrollingFrame(element), rootMargin: `${NEAR}px 0px` },
     )
     observer.observe(element)
     return () => observer.disconnect()
