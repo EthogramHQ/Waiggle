@@ -109,3 +109,7 @@ export const parseAcceptLanguage = (header: string | undefined | null): string[]
       .map(({ tag }) => tag)
   )
 }
+
+// R18 : les espaces insécables des textes des membres, à l'affichage (spacing.ts). Ici pour que
+// les deux entrées du paquet donnent le même nom.
+export { keepPunctuation } from './spacing'

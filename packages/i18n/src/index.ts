@@ -30,4 +30,3 @@ export const ensureLanguage = async (i18n: LanguageHost, language: Language): Pr
     i18n.addResourceBundle(language, 'translation', resources[language].translation)
   }
 }
-export { keepPunctuation } from './spacing'
