@@ -53,7 +53,9 @@ describe('ProjectCard, the punctuation of a member', () => {
   })
 
   it('adds nothing to a title typed without a space (control)', async () => {
-    await renderWithProviders(<ProjectCard {...card} title="Ça marche?" onPress={() => {}} />)
+    await renderWithProviders(
+      <ProjectCard {...card} title="Ça marche?" pitch="Une accroche" onPress={() => {}} />,
+    )
 
     expect(shown()).toContain('Ça marche?')
   })
