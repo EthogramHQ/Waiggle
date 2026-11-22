@@ -15,19 +15,35 @@
 // - `React.lazy` garde un échec en mémoire : « Réessayer » de l'écran de secours relancerait la
 //   même erreur sans redemander le morceau. Ici, un échec s'oublie, et un nouvel essai redemande.
 import { type ComponentType, useEffect, useState } from 'react'
-import { Platform } from 'react-native'
+// Le rechargement unique par adresse, partagé avec l'anglais à la demande (R18, `src/i18n.ts`).
+import { forgetReload, reloadOnce } from '../chunkReload'
 import { LoadingScreen, type PageShape } from '../screens/states'
 import { useHydrated } from '../ui/theme/hydration'
 
-export type LazyScreenOptions = {
-  /** La largeur de la page de chargement, celle de l'écran qu'elle précède (`LoadingScreen`). */
-  width?: 'form' | 'page'
+export type LazyScreenOptions<P extends object = object> = {
+  /**
+   * La largeur de la page de chargement, celle de l'écran qu'elle précède (`LoadingScreen`). Sans
+   * elle, la forme (`shape`) choisit la sienne ; sans l'une ni l'autre, celle d'un formulaire.
+   * R18 (relecture de design) : sur ordinateur, la barre du haut suit cette largeur ; plus étroite
+   * que la page qui arrive, elle rétrécissait, puis se réélargissait sous la souris.
+   */
+  width?: 'form' | 'page' | 'wide'
   /**
    * R16 : la forme du squelette, celle de l'écran qu'il précède (`LoadingScreen shape`), la même que
    * l'attente de sa garde de session (`SessionGate loading`) : le morceau arrivé, l'attente de la
    * session prend la place sans que rien ne bouge. Sans elle, `width` choisit.
    */
   shape?: PageShape
+  /**
+   * R18 : l'attente propre à l'écran, à la place de la page de chargement commune : la même que celle
+   * de sa garde de session (`SessionGate loading`), à sa largeur et à sa forme, qui changent parfois
+   * avec la fenêtre (le gabarit large des Ruches dès 1 280 points), ce qu'une `width` fixe ne peut
+   * pas dire. Elle reçoit les propriétés de la route (l'`id` d'une ruche).
+   * Elle part dans le script de départ, avec le fichier de la route : elle vit donc dans un module à
+   * elle, léger (`screens/ExploreWaiting.tsx`…), jamais dans le fichier de l'écran, qui y
+   * ramènerait tout l'écran.
+   */
+  loading?: ComponentType<P>
   /**
    * Une feuille posée sur la page d'avant (`sheetRoute` de `app/_layout.tsx`) : ouverte dans
    * l'appli, rien ne s'affiche pendant son morceau, et la page d'avant reste visible dessous,
@@ -37,60 +53,6 @@ export type LazyScreenOptions = {
   sheet?: boolean
 }
 
-// Ce que le navigateur prête ici, décrit sans dépendre des types du DOM (le code tourne aussi sur
-// téléphone, où ni `location` ni `sessionStorage` n'existent).
-type Browser = {
-  navigator?: { onLine?: boolean }
-  location?: { pathname: string; reload: () => void }
-  sessionStorage?: {
-    getItem: (key: string) => string | null
-    setItem: (key: string, value: string) => void
-    removeItem: (key: string) => void
-  }
-}
-
-// La clé qui se souvient, le temps de l'onglet (sessionStorage), qu'une adresse a déjà été
-// rechargée pour un morceau introuvable.
-const reloadKey = (pathname: string) => `waiggle.chunkReload:${pathname}`
-
-/**
- * Un morceau introuvable, sur le web : le plus souvent, un onglet ouvert avant une mise en ligne
- * demande un fichier qui n'existe plus (son nom change à chaque construction). Recharger la page
- * donne la nouvelle version. Une seule fois par adresse : si le morceau manque encore, c'est un vrai
- * défaut, et l'écran de secours de la route prend le relais (sinon la page se rechargerait sans
- * fin). Hors ligne, jamais : le navigateur remplacerait l'appli par sa propre page d'erreur ;
- * l'écran de secours, lui, garde l'appli et propose « Réessayer » (relecture de design du 17/11).
- * Rend vrai si la page se recharge.
- */
-const reloadOnce = (): boolean => {
-  if (Platform.OS !== 'web') return false
-  const { navigator, location, sessionStorage } = globalThis as Browser
-  if (navigator?.onLine === false) return false
-  if (!location || !sessionStorage) return false
-  try {
-    const key = reloadKey(location.pathname)
-    if (sessionStorage.getItem(key) !== null) return false
-    sessionStorage.setItem(key, '1')
-  } catch {
-    // Stockage refusé (navigation privée stricte) : sans mémoire, pas de rechargement, qui
-    // pourrait boucler.
-    return false
-  }
-  location.reload()
-  return true
-}
-
-/** Le morceau est arrivé : l'adresse pourra se recharger de nouveau après une autre mise en ligne. */
-const forgetReload = () => {
-  if (Platform.OS !== 'web') return
-  const { location, sessionStorage } = globalThis as Browser
-  try {
-    if (location && sessionStorage) sessionStorage.removeItem(reloadKey(location.pathname))
-  } catch {
-    // Rien à oublier si le stockage est refusé.
-  }
-}
-
 /**
  * Fabrique le composant d'une route dont l'écran se charge à la demande. À appeler une fois, en tête
  * du fichier de route :
@@ -98,7 +60,7 @@ const forgetReload = () => {
  */
 export function lazyScreen<P extends object>(
   load: () => Promise<ComponentType<P>>,
-  options: LazyScreenOptions = {},
+  options: LazyScreenOptions<P> = {},
 ): ComponentType<P> {
   // L'écran, une fois arrivé, sert à toutes les visites suivantes (rien à attendre) ; la promesse en
   // cours, partagée si deux pages le demandent à la fois ; oubliée si elle échoue.
@@ -156,7 +118,13 @@ export function lazyScreen<P extends object>(
       return <Screen {...props} />
     }
     if (options.sheet && openedInApp) return null
-    return <LoadingScreen width={options.width ?? 'form'} shape={options.shape} />
+    if (options.loading) {
+      const Waiting = options.loading
+      return <Waiting {...props} />
+    }
+    // Sans largeur donnée, `LoadingScreen` prend celle de la forme (une ruche, `project` : une page
+    // large), et sans forme, celle d'un formulaire.
+    return <LoadingScreen width={options.width} shape={options.shape} />
   }
   return LazyScreen
 }

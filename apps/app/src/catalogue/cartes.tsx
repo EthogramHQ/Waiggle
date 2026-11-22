@@ -3,6 +3,8 @@
 // `chip`) dans tous ses états, de jour et de nuit : à suivre, suivie (« Tu suis Max ✓ »), inactive,
 // avec un nom long, et la carte sans pastille (ses propres projets). La première se touche
 // vraiment : elle passe de « Suivre Nora » à « Tu suis Nora ✓ », et retour.
+// R18 : la carte au nom long, sans photo, serre son verre sur téléphone sous la colonne de la
+// pastille (planche R18-Carte-Sans-Photo) ; ses autres états sont dans « Le fil » (`fil.tsx`).
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais.
@@ -80,7 +82,8 @@ const papillon = 'GdkFJYTHYFSbVnaPWUZndpajf7QG' // gitleaks:allow
 
 const noop = () => {}
 // La hauteur de SummaryCard (celle de ProjectCard par défaut) : à texte agrandi, le panneau du bas
-// y laisse la place de la pastille ; sur une carte de 360 points, il montait dessous.
+// y laisse la place de la pastille ; sur une carte de 360 points, il montait dessous. R18 : les
+// cartes à photo seulement ; la carte sans photo prend la hauteur qu'elle aurait dans l'appli.
 const height = 476
 
 export function CardsCatalogue() {
@@ -190,7 +193,8 @@ function Cards({ l }: { l: typeof fr }) {
           status={{ label: l.idea, strong: false }}
           image={null}
           onPress={noop}
-          height={height}
+          // R18 : sans photo, la carte du téléphone n'a plus de hauteur imposée (celle de son
+          // verre, sous la colonne de la pastille) ; ici, celle de l'écran, sans `height`.
           overlay={
             <FollowButton
               variant="chip"

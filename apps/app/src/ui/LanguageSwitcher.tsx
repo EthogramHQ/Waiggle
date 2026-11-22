@@ -1,9 +1,21 @@
 // Le choix de la langue, en contrôle segmenté. Pour un membre connecté, le choix est aussi
 // enregistré sur son compte (voir profile/useChooseLanguage.ts).
+//
+// R18 : l'anglais arrive à la demande dans le navigateur. L'option touchée est occupée le temps que
+// ses textes arrivent, l'ancienne reste cochée ; s'ils n'arrivent pas, la langue reste, et un
+// message avec « Réessayer » paraît sous le contrôle.
+import { layout, space } from '@ruche/brand'
 import { type Language, supportedLanguages } from '@ruche/i18n'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useChooseLanguage } from '../profile/useChooseLanguage'
-import { Segmented } from './Segmented'
+import { View } from 'react-native'
+import {
+  type LanguageChoice,
+  useChooseLanguage,
+  useSwitchLanguage,
+} from '../profile/useChooseLanguage'
+import { Notice } from './Notice'
+import { Segmented, type SegmentedHandle } from './Segmented'
 
 type Props = {
   /** compact : « FR / EN », pour un coin d'écran ; sinon les noms complets. */
@@ -21,34 +33,40 @@ export function LanguageSwitcher({ compact = false, visitor = false }: Props) {
 }
 
 function MemberChoice({ compact }: { compact: boolean }) {
-  const { current, choose } = useChooseLanguage()
-  return <Choice compact={compact} current={current} choose={choose} />
+  return <Choice compact={compact} choice={useChooseLanguage()} />
 }
 
 function VisitorChoice({ compact }: { compact: boolean }) {
-  const { i18n } = useTranslation()
-  return (
-    <Choice
-      compact={compact}
-      current={i18n.language as Language}
-      choose={(language) => void i18n.changeLanguage(language)}
-    />
-  )
+  return <Choice compact={compact} choice={useSwitchLanguage()} />
 }
 
-function Choice({
-  compact,
-  current,
-  choose,
-}: {
-  compact: boolean
-  current: Language
-  choose: (language: Language) => unknown
-}) {
-  const { t } = useTranslation()
+// En version compacte, le contrôle est posé seul au bout d'une rangée (`Row justify="end"`) : il en
+// prend la largeur, contrôle à droite comme avant, pour que le message d'un échec ait la place de
+// se lire dessous, au lieu de se tasser dans la largeur de « FR / EN ». Le contrôle compact se cale
+// lui-même à gauche (`alignSelf` de `Segmented`) : une vue alignée à droite le ramène au bout.
+const compactFrame = { flexGrow: 1, flexShrink: 1, gap: space.sm } as const
+const fullFrame = { gap: space.sm } as const
+const atEnd = { alignSelf: 'flex-end' } as const
+const stretched = { alignSelf: 'stretch' } as const
+// Le message d'un échec de la version compacte : sous le contrôle, calé à droite comme lui, et
+// jamais plus large qu'un formulaire. Sans cette borne, posé dans une rangée de toute la largeur
+// (la connexion sur ordinateur), il devenait un bandeau de 1 254 points, loin de « FR / EN »
+// (relecture de design R18).
+const compactNotice = { alignSelf: 'flex-end', maxWidth: layout.formWidth } as const
 
-  return (
-    <Segmented
+function Choice({ compact, choice }: { compact: boolean; choice: LanguageChoice }) {
+  const { t } = useTranslation()
+  const { current, choose, loading, failed, retry } = choice
+  const control = useRef<SegmentedHandle>(null)
+  const onRetry = () => {
+    // « Réessayer » part avec le message : le focus du clavier revient d'abord au contrôle (sur la
+    // langue cochée, que Tab atteint), pour ne pas tomber sur la page entière.
+    control.current?.focusChecked()
+    void retry()
+  }
+
+  const segmented = (
+    <Segmented<Language>
       label={t(($) => $.common.language)}
       // .map() transforme chaque langue en option du contrôle
       options={supportedLanguages.map((language) => ({
@@ -58,8 +76,24 @@ function Choice({
         spokenLabel: t(($) => $.common.languages[language]),
       }))}
       value={current}
+      busy={loading}
       onChange={(language) => void choose(language)}
       fill={!compact}
+      handle={control}
     />
+  )
+
+  return (
+    <View style={compact ? compactFrame : fullFrame}>
+      {compact ? <View style={atEnd}>{segmented}</View> : segmented}
+      {failed ? (
+        <View style={compact ? compactNotice : stretched}>
+          <Notice
+            message={t(($) => $.account.language.loadFailed)}
+            action={{ label: t(($) => $.common.retry), role: 'button', onPress: onRetry }}
+          />
+        </View>
+      ) : null}
+    </View>
   )
 }

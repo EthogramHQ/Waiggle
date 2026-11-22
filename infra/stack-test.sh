@@ -269,6 +269,47 @@ if web "https://$APP_HOST$script" | grep -q 'localhost:8081'; then
 fi
 echo "ok : $script sans adresse de développement"
 
+# R18 : la compression à l'avance (infra/web/precompress.mjs, « precompressed br zstd » du
+# Caddyfile). Le même script, demandé en brotli puis en zstd : mêmes en-têtes de cache et de type,
+# « vary: accept-encoding », et une fois décompressé le même contenu que sans compression (même
+# empreinte SHA-256). Node décompresse (curl n'a pas toujours brotli et zstd).
+decoded_sha() { # decoded_sha <br|zstd> <adresse> : l'empreinte du corps reçu, décompressé
+  web -H "Accept-Encoding: $1" "$2" | node -e '
+    const z = require("node:zlib");
+    const chunks = [];
+    process.stdin.on("data", (c) => chunks.push(c));
+    process.stdin.on("end", () => {
+      const body = Buffer.concat(chunks);
+      const plain = { br: z.brotliDecompressSync, zstd: z.zstdDecompressSync }[process.argv[1]](body);
+      console.log(require("node:crypto").createHash("sha256").update(plain).digest("hex"));
+    });' "$1"
+}
+same_headers() { # same_headers <br|zstd|identity> : les en-têtes à comparer, un par ligne
+  headers_of -H "Accept-Encoding: $1" "https://$APP_HOST$script" |
+    grep -E '^(content-type|cache-control|x-content-type-options|vary):'
+}
+for coding in br zstd; do
+  grep -qx "content-encoding: $coding" <<<"$(headers_of -H "Accept-Encoding: $coding" "https://$APP_HOST$script")" ||
+    die "$script : pas servi en $coding"
+done
+expect "$script : en-têtes en br et en zstd" "$(same_headers br)" "$(same_headers zstd)"
+# Et les mêmes que sans compression (relecture de sécurité R18, A1) : un `Content-Type` changé sur
+# les seuls fichiers précompressés ferait refuser le script par le navigateur (`nosniff`). La
+# réponse non compressée n'a pas `vary` : on le retire des deux côtés.
+expect "$script : en-têtes compressés comme sans compression" \
+  "$(same_headers br | grep -v '^vary:')" "$(same_headers identity | grep -v '^vary:')"
+grep -qx 'vary: accept-encoding' <<<"$(same_headers br)" || die "$script : « vary: accept-encoding » manquant"
+plain_sha=$(web -H 'Accept-Encoding: identity' "https://$APP_HOST$script" | sha256sum | cut -d' ' -f1)
+expect "$script : contenu en br" "$(decoded_sha br "https://$APP_HOST$script")" "$plain_sha"
+expect "$script : contenu en zstd" "$(decoded_sha zstd "https://$APP_HOST$script")" "$plain_sha"
+echo "ok : $script en br et zstd, mêmes en-têtes que sans compression, même contenu"
+# Une page publique n'est jamais précompressée : Caddy la lit comme un gabarit à chaque visite.
+page_br=$(headers_of -H 'Accept-Encoding: br' "https://$APP_HOST/fr/")
+if grep -qx 'content-encoding: br' <<<"$page_br"; then die "/fr/ : précompressée en brotli"; fi
+[[ $(web -H 'Accept-Encoding: br' "https://$APP_HOST/fr/") != *'[[waiggle'* ]] ||
+  die "/fr/ : une instruction de gabarit est restée"
+echo "ok : /fr/ jamais précompressée, gabarit lu"
+
 step "Les moteurs de recherche : les pages publiques par langue, la connexion et l'inscription"
 # R11 puis R12 (scénario, « Ce que lisent les moteurs ») : robots.txt (apps/app/public/robots.txt)
 # propose ces adresses, et les anciennes qui y redirigent, écarte le reste, refuse tout aux robots

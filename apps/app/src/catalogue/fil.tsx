@@ -8,6 +8,8 @@
 // côte (la lueur de la seconde part 150 ms plus tard), la carte dont la catégorie arrive
 // (`category="pending"`, avec et sans photo), et « Proches à suivre » qui charge
 // (`SuggestionListSkeleton`, en rangée puis empilée comme dans la colonne du Fil).
+// R18 (« Les finitions ») : la carte sans photo du téléphone, qui serre son verre, seule, en
+// compacte, puis dans la mosaïque d'un membre (`NoPhoto`).
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais.
@@ -21,6 +23,7 @@ import { ListGroup } from '../ui/ListGroup'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { ProjectCard, ProjectCardSkeleton } from '../ui/ProjectCard'
 import { ProjectGrid } from '../ui/ProjectGrid'
+import { ProjectMosaic } from '../ui/ProjectMosaic'
 import { PublishPrompt } from '../ui/PublishPrompt'
 import { RelativeTime } from '../ui/RelativeTime'
 import { PageHeading } from '../ui/Screen'
@@ -95,6 +98,29 @@ const fr = {
     'Dix questions par jour, de plus en plus dures.',
     'Qui joue samedi ? Le planning se remplit tout seul.',
   ],
+  noPhoto: {
+    card: 'R18 · Sans photo, sur téléphone : la carte serre son verre, la lumière miel en liseré autour, la catégorie dans le verre (sur tablette et ordinateur : 476 points, comme avant)',
+    largeText:
+      'R18 · À texte agrandi (dès 150 %) : le titre sur quatre lignes au plus, sans couper un mot, l’accroche sur deux. Pour la voir, agrandir le texte de l’appareil ou du navigateur (essai texte-200)',
+    compact: 'R18 · Une compacte sans photo, seule : la hauteur de son contenu (et non 230)',
+    list: 'R18 · Une liste (page d’un membre) : la grande carte sans auteur ; la compacte sans photo s’étire à côté d’une compacte à photo (230) ; deux compactes sans photo descendent à leur contenu',
+    author: 'Papi Jean',
+    title: 'Les anniversaires de la famille',
+    pitch: 'Il rappelle chaque anniversaire et propose une idée de cadeau selon l’âge.',
+    family: 'Famille et enfants',
+    money: 'Argent et budget',
+    idea: 'Idée',
+    mosaic: [
+      {
+        title: 'Le tri des factures',
+        pitch: 'Tu photographies une facture, il la range et te rappelle la date à payer.',
+      },
+      { title: 'Arrosage malin', pitch: 'Il me dit quand arroser mes plantes, selon la météo.' },
+      { title: 'Minuteur de thé', pitch: 'Il chronomètre l’infusion selon le thé choisi.' },
+      { title: 'Le carnet des plantes', pitch: 'Il reconnaît une plante et note quand l’arroser.' },
+      { title: 'Mes courses du samedi', pitch: 'Il range la liste selon les rayons du magasin.' },
+    ],
+  },
 }
 
 const en: typeof fr = {
@@ -149,6 +175,29 @@ const en: typeof fr = {
     'Ten questions a day, harder and harder.',
     'Who plays on Saturday? The planner fills itself.',
   ],
+  noPhoto: {
+    card: 'R18 · No photo, on a phone: the card hugs its glass, the honey light a thin rim around it, the category in the glass (on a tablet and a computer: 476 points, as before)',
+    largeText:
+      'R18 · With larger text (from 150 %): the title on four lines at most, never cutting a word, the pitch on two. To see it, enlarge the device’s or the browser’s text (texte-200 run)',
+    compact: 'R18 · A compact card without a photo, alone: the height of its content (not 230)',
+    list: 'R18 · A list (a member’s page): the large card without an author; the compact card without a photo stretches beside a compact card with one (230); two compact cards without a photo go down to their content',
+    author: 'Grandpa Jean',
+    title: 'The family birthdays',
+    pitch: 'It reminds you of every birthday and suggests a gift idea for the age.',
+    family: 'Family and kids',
+    money: 'Money and budget',
+    idea: 'Idea',
+    mosaic: [
+      {
+        title: 'Sorting the bills',
+        pitch: 'You take a photo of a bill, it files it and reminds you when to pay.',
+      },
+      { title: 'Smart watering', pitch: 'It tells me when to water my plants, from the forecast.' },
+      { title: 'Tea timer', pitch: 'It times the brewing for the tea you chose.' },
+      { title: 'The plant notebook', pitch: 'It recognises a plant and notes when to water it.' },
+      { title: 'Saturday shopping', pitch: 'It sorts the list by the shop’s aisles.' },
+    ],
+  },
 }
 
 // Des résumés flous (ThumbHash) de visuels de projet, les mêmes que ceux de cartes.tsx.
@@ -258,6 +307,8 @@ function Pieces({ l }: { l: typeof fr }) {
           </Loading>
         </Captioned>
       </ProjectGrid>
+
+      <NoPhoto l={l} />
 
       <Captioned caption={l.skeletonPair}>
         <Loading shown>
@@ -397,6 +448,74 @@ function Pieces({ l }: { l: typeof fr }) {
           />
           <TesterRow title={club} author="Hugo Lefèvre" image={null} onTest={noop} onOpen={noop} />
         </ListGroup>
+      </Captioned>
+    </Stack>
+  )
+}
+
+/**
+ * R18 (planche R18-Carte-Sans-Photo) : la carte sans photo du téléphone. La carte de Papi Jean
+ * (première rangée de la planche), le même texte rappelé pour le texte agrandi, une compacte sans
+ * photo seule, puis la page de Nora (troisième rangée) : une mosaïque sans auteur, où la compacte
+ * sans photo s'étire à côté d'une compacte à photo, et où deux compactes sans photo côte à côte
+ * descendent à leur contenu. La capture de téléphone montre la forme neuve ; celle d'ordinateur, la
+ * forme d'avant (476 et 230), qui ne change pas.
+ */
+function NoPhoto({ l }: { l: typeof fr }) {
+  const n = l.noPhoto
+  const papiJean = {
+    title: n.title,
+    pitch: n.pitch,
+    author: { name: n.author, avatar: null, onPress: noop },
+    when: <RelativeTime date={hoursAgo(3)} now={now} />,
+    status: { label: l.building, strong: false },
+    category: { label: n.family, icon: 'users-three' as const },
+    reactionTotal: 23,
+    onPress: noop,
+  }
+  // La page de Nora : la grande carte (catégorie, sans auteur), puis les compactes, la deuxième
+  // seule avec une photo.
+  const items = n.mosaic.map((project, rank) => ({ id: `r18-${rank}`, ...project }))
+  const status = [l.building, l.building, l.testable, n.idea, n.idea]
+  const reactions = [8, 31, 12, 5, 9]
+  return (
+    <Stack gap="xl">
+      {/* Le texte agrandi ne se force pas dans une partie de page : la même carte le montre quand
+          on agrandit le texte (la légende le rappelle, capture `texte-200`). */}
+      <Captioned caption={`${n.card}. ${n.largeText}`}>
+        <ProjectCard {...papiJean} />
+      </Captioned>
+      <Captioned caption={n.compact}>
+        <ProjectCard
+          size="compact"
+          title={n.mosaic[2]?.title ?? ''}
+          pitch={n.mosaic[2]?.pitch ?? ''}
+          status={{ label: l.testable, strong: true }}
+          reactionTotal={12}
+          onPress={noop}
+        />
+      </Captioned>
+      <Captioned caption={n.list}>
+        <ProjectMosaic
+          items={items}
+          render={(item, size) => {
+            const rank = Number(item.id.slice('r18-'.length))
+            return (
+              <ProjectCard
+                size={size}
+                title={item.title}
+                pitch={item.pitch}
+                image={rank === 1 ? { source: null, thumbhash: papillon, label: l.photo } : null}
+                status={{ label: status[rank] ?? n.idea, strong: rank === 2 }}
+                reactionTotal={reactions[rank] ?? 0}
+                {...(rank === 0
+                  ? { category: { label: n.money, icon: 'piggy-bank' as const } }
+                  : null)}
+                onPress={noop}
+              />
+            )
+          }}
+        />
       </Captioned>
     </Stack>
   )

@@ -398,6 +398,7 @@ export const en: Translation = {
     language: {
       title: 'Language',
       hint: 'Your emails are also sent in this language.',
+      loadFailed: 'This language could not load. Check your connection.',
     },
     appearance: {
       title: 'Appearance',

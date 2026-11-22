@@ -8,9 +8,10 @@ import { join } from 'node:path'
 describe('the app entry point', () => {
   it('loads the back relay before Expo Router', () => {
     const entry = readFileSync(join(__dirname, '..', '..', 'index.ts'), 'utf8')
-    const imports = [...entry.matchAll(/^import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1])
-    const relay = imports.indexOf('./src/navigation/backRelay')
-    const router = imports.indexOf('expo-router/entry')
+    // Les positions dans le fichier : un `import` en tête, ou (R18) le `require` d'Expo Router,
+    // lancé après la langue de la page ; plus loin dans le fichier veut dire exécuté plus tard.
+    const relay = entry.search(/^import\s+['"]\.\/src\/navigation\/backRelay['"]/m)
+    const router = entry.search(/(?:^import\s+|require\()['"]expo-router\/entry['"]/m)
     expect(relay).toBeGreaterThanOrEqual(0)
     expect(router).toBeGreaterThanOrEqual(0)
     expect(relay).toBeLessThan(router)

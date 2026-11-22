@@ -37,12 +37,20 @@ const closest = (node: Node, test: (props: Record<string, unknown>) => boolean):
   return null
 }
 
-/** Le `paddingTop` de la vue qui porte le verre (celle qui a la hauteur minimale de la carte). */
+/**
+ * Le `paddingTop` de la vue qui porte le verre : celle qui le pousse en bas de la carte
+ * (`justifyContent: 'flex-end'`) et réserve la colonne du haut. R18 : sur téléphone, une carte sans
+ * photo n'a plus de hauteur minimale ; on ne la retrouve donc plus par elle.
+ */
 const panelTop = () => {
   const title = screen.getByText(card.title, { includeHiddenElements: true }) as unknown as Node
   const styleOf = (props: Record<string, unknown> | undefined) =>
     (StyleSheet.flatten(props?.style as ViewStyle) ?? {}) as ViewStyle
-  const body = closest(title, (props) => Number(styleOf(props).minHeight ?? 0) > 0)
+  const body = closest(
+    title,
+    (props) =>
+      styleOf(props).justifyContent === 'flex-end' && typeof styleOf(props).paddingTop === 'number',
+  )
   return styleOf(body?.props).paddingTop as number
 }
 

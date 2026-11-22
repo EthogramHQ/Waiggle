@@ -58,8 +58,22 @@
 // R16 (« Les squelettes ») : `ProjectCardSkeleton`, la carte vide qui tient sa place pendant le
 // chargement, à sa hauteur, avec son panneau en bas (voir en fin de fichier). Et la catégorie en
 // attente (`category="pending"`) : tant que son nom charge, la carte en garde la place, vide.
+//
+// R18 (« Les finitions », planche R18-Carte-Sans-Photo validée le 22/11/2026), sur téléphone
+// seulement (sous `breakpoints.medium` ; tablette et ordinateur ne changent pas, choix 8) :
+// - une carte sans photo serre son verre (choix 1 et 2) : sa hauteur est celle de son contenu, et la
+//   lumière miel n'est plus qu'un liseré (la marge `INSET`) autour du verre, au lieu d'un grand vide
+//   de 476 points au-dessus de lui. Une compacte sans photo fait de même ; dans une case de la
+//   mosaïque, elle s'étire encore à la hauteur de sa rangée (choix 6) : à côté d'une compacte à
+//   photo, 230 points ; à côté d'une autre sans photo, leur contenu ;
+// - à texte agrandi (dès 150 %, `useLargeText`), le titre passe à quatre lignes au plus, et aucun de
+//   ses mots ne se coupe : son agrandissement s'arrête quand le plus long mot remplit la ligne (la
+//   garde `wholeWords` de `Text`, choix 3), avec ou sans photo. L'accroche reste sur deux lignes
+//   (choix 4).
+// Le squelette garde 476 et 230, la hauteur d'une carte à photo, le cas courant (choix 7).
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import {
   type ComponentProps,
   createContext,
@@ -91,6 +105,7 @@ import { Tag } from './Tag'
 import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
+import { useLargeText } from './textScale'
 import { useLayout } from './theme/layout'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -179,7 +194,8 @@ type Props = {
   onPress?: () => void
   /**
    * La hauteur de la carte ; elle grandit si le texte agrandi ne tient pas dedans. Par défaut, celle
-   * de sa taille (`PROJECT_CARD_HEIGHT`, `PROJECT_CARD_COMPACT_HEIGHT`).
+   * de sa taille (`PROJECT_CARD_HEIGHT`, `PROJECT_CARD_COMPACT_HEIGHT`) ; R18 : sur téléphone, une
+   * carte sans photo n'en a pas (celle de son contenu), sauf si on la donne ici.
    */
   height?: number
   /**
@@ -315,7 +331,16 @@ export function ProjectCard({
   const web = Platform.OS === 'web'
   // R15 (planches R15-Membre-1920) : sur ordinateur, le titre d'une compacte en `heading` (22) ; sur
   // téléphone et tablette, `headline` (18), où une compacte n'a que 110 à 230 points de texte.
-  const wide = useLayout().sizeClass === 'wide'
+  const { sizeClass } = useLayout()
+  const wide = sizeClass === 'wide'
+  // R18 : le téléphone (sous `breakpoints.medium`), où la carte sans photo serre son verre et où le
+  // titre gagne des lignes à texte agrandi. Avant l'hydratation du web, `useLayout` répond déjà
+  // « téléphone » (largeur 0) : le pré-rendu dessine cette forme.
+  const phone = sizeClass === 'compact'
+  // Le texte agrandi (dès 150 %) : le système le dit sur téléphone ; sur le web, une ligne cachée
+  // (`probe`) le mesure. Seul le téléphone s'en sert : l'ordinateur ne pose pas la ligne.
+  const largeText = useLargeText()
+  const longTitle = phone && largeText.large
   // Sans taille donnée, la grille décide (relecture de design de R15, planche R15-Explorer-1920) :
   // sous `GridCardsContext` à `compact` (« Récents » d'Explorer), sur ordinateur, la compacte, et
   // non la grande carte du Fil resserrée (470 points de haut : aucune rangée entière dans une
@@ -324,7 +349,14 @@ export function ProjectCard({
   const gridCards = useContext(GridCardsContext)
   const size: ProjectCardSize = givenSize ?? (gridCards === 'compact' && wide ? 'compact' : 'full')
   const compact = size === 'compact'
-  const height = givenHeight ?? (compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
+  const hasPhoto = Boolean(image)
+  // R18 (choix 1 et 6) : sur téléphone, une carte sans photo, grande ou compacte, n'a pas de hauteur
+  // minimale ; elle prend celle de son verre, plus le liseré de lumière autour. Une hauteur donnée
+  // par l'appelant reste un minimum.
+  const hugsContent = phone && !hasPhoto && givenHeight === undefined
+  const height =
+    givenHeight ??
+    (hugsContent ? null : compact ? PROJECT_CARD_COMPACT_HEIGHT : PROJECT_CARD_HEIGHT)
   const panelPadding = compact ? COMPACT_PANEL_PADDING : PANEL_PADDING
   // Une compacte que sa grille a choisie (R15, « Récents » d'Explorer), et non une case de la
   // mosaïque d'un membre, où l'écran donne la taille.
@@ -382,6 +414,14 @@ export function ProjectCard({
   // l'extrait d'une recherche, si : c'est lui qui dit pourquoi le projet est trouvé (planche
   // R16-Recherche-1440), au prix d'un verre un peu plus haut.
   const showPitch = !compact || !image || excerpt !== null
+  // Le titre : sa variante, ses lignes et sa garde, les mêmes surligné (recherche) ou non.
+  // R18 (choix 3) : sur téléphone, quatre lignes à texte agrandi (la compacte en avait trois, la
+  // grande deux), et jamais un mot coupé (`wholeWords`) ; l'ordinateur ne change pas (choix 8).
+  const titleProps = {
+    variant: compact ? (wide ? 'heading' : 'headline') : 'title3',
+    numberOfLines: longTitle ? 4 : compact ? 3 : 2,
+    ...(phone ? { wholeWords: title } : null),
+  } as const
   // Sa ligne décrit le lien à la place de l'accroche, avec sa famille (« Nouveau : Un compte à
   // rebours… »), puis « et 2 autres changements » : la pastille de famille ne la dit qu'en couleur.
   const changeId = useId()
@@ -406,7 +446,6 @@ export function ProjectCard({
     .filter(Boolean)
     .join(' ')
   const hint = [changeDescription, categoryDescription].filter(Boolean).join('. ')
-  const hasPhoto = Boolean(image)
   // La colonne du haut de la photo : la catégorie (avec photo) et l'emplacement (« Suivre »).
   // Une catégorie en attente y garde déjà sa place (R16) : la colonne existe avant l'étiquette, et
   // « Suivre », dessous, ne descend pas quand elle arrive.
@@ -452,7 +491,8 @@ export function ProjectCard({
   const body = (
     <View
       style={{
-        minHeight: height,
+        // R18 : sans hauteur (carte sans photo sur téléphone), celle du verre et de ses marges.
+        ...(height === null ? null : { minHeight: height }),
         justifyContent: 'flex-end',
         padding: INSET,
         // Le verre ne monte jamais sous la colonne du haut (catégorie, « Suivre ») : à texte
@@ -468,9 +508,11 @@ export function ProjectCard({
           `onLayout` restait périmée sur le web : react-native-web ne remesure une vue que si sa
           boîte de contenu change (un `ResizeObserver`, qui ignore les marges intérieures), et la
           carte grandit justement par sa marge du haut quand la colonne de « Suivre » arrive. Dans
-          « Récents », la photo s'arrêtait 52 points au-dessus du bas de la carte. */}
+          « Récents », la photo s'arrêtait 52 points au-dessus du bas de la carte.
+          R18 : sans hauteur, la lumière part de 0 et grandit jusqu'au bas de la carte serrée : elle
+          ne dépasse jamais sous elle, et se voit en liseré autour du verre. */}
       <View ref={coverRef} style={{ position: 'absolute', inset: 0 }} {...decorative}>
-        <ProjectCover height={height} grow image={image ?? null} shadow="card" />
+        <ProjectCover height={height ?? 0} grow image={image ?? null} shadow="card" />
       </View>
       {tilt.active ? (
         // Le reflet qui suit la souris : une lueur blanche, rognée au rayon de la photo, posée
@@ -494,7 +536,17 @@ export function ProjectCard({
           />
         </View>
       ) : null}
-      <Surface variant="panel" padding={compact ? 'md' : 'lg'} gap="sm">
+      {/* R18 (relecture de design) : une carte sans photo qui serre son verre, étirée par sa
+          rangée, le fait grandir jusqu'au bas de la case (`fit="fill"`) : le liseré de lumière
+          reste le même tout autour, et les titres de la rangée s'alignent en haut. Sans cela, le
+          verre restait collé au bas (`justifyContent: 'flex-end'` du calque) et la carte la plus
+          courte avait plus de lumière au-dessus. Les cartes à photo gardent leur verre en bas. */}
+      <Surface
+        variant="panel"
+        padding={compact ? 'md' : 'lg'}
+        gap="sm"
+        fit={hugsContent && stretched ? 'fill' : undefined}
+      >
         {/* La place de la rangée de l'auteur, posée par-dessus ; sans auteur, aucune. */}
         {author ? <View style={{ height: measures.author }} /> : null}
         <View onLayout={measure('title')} style={{ gap: ROW_GAP }}>
@@ -508,20 +560,16 @@ export function ProjectCard({
               lignes coupaient les titres de plus de 25 signes à 390 (relecture de design R14). */}
           {/* R16 : dans un résultat de recherche, les mots cherchés y sont surlignés ; le titre
               reste un seul texte, lu d'un tenant. */}
+          {/* R18 (choix 3) : sur téléphone, à texte agrandi, quatre lignes au plus ; et la garde
+              des mots entiers (`wholeWords`) : « Les / anniversa… » ne se coupait plus au mot, mais
+              au milieu. Sur le web, la garde est une formule de taille posée d'avance (le texte
+              agrandi par le navigateur ne se lit pas au rendu). */}
           {match ? (
-            <HighlightedText
-              variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
-              numberOfLines={compact ? 3 : 2}
-              text={title}
-              words={match.words}
-            />
+            <HighlightedText {...titleProps} text={title} words={match.words} />
           ) : (
-            <Text
-              variant={compact ? (wide ? 'heading' : 'headline') : 'title3'}
-              numberOfLines={compact ? 3 : 2}
-            >
-              {title}
-            </Text>
+            // R18 : l'espace tapée devant ? ! : ; devient insécable, à l'affichage seulement (le nom
+            // du lien, plus bas, garde le titre tel qu'enregistré).
+            <Text {...titleProps}>{keepPunctuation(title)}</Text>
           )}
           {change ? (
             <UpdateChange line={change.line} more={change.more} />
@@ -536,7 +584,7 @@ export function ProjectCard({
             />
           ) : showPitch ? (
             <Text variant="callout" tone="secondary" numberOfLines={2} nativeID={pitchId}>
-              {pitch}
+              {pitch ? keepPunctuation(pitch) : pitch}
             </Text>
           ) : null}
         </View>
@@ -787,6 +835,9 @@ export function ProjectCard({
               {overlay}
             </View>
           ) : null}
+          {/* R18 : sur le web, la ligne cachée qui mesure le texte agrandi (`useLargeText`),
+              posée seulement sur téléphone, le seul à s'en servir. */}
+          {phone ? largeText.probe : null}
           {changeDescription || categoryDescription ? (
             // La description du lien, lue seulement par lui (`aria-describedby` lit aussi un texte
             // caché) : cachée à l'œil et au parcours du lecteur d'écran, qui ne l'entend pas deux fois.

@@ -374,6 +374,12 @@ export const passageArrived = (): void => {
   current?.arrived()
 }
 
+/**
+ * Vrai quand la première page de la visite est posée (R18) : avant elle, le navigateur garde son
+ * propre focus (ui/arrivalFocus.ts ne prend rien).
+ */
+export const visitStarted = (): boolean => firstPageShown
+
 /** Ce que doit faire la page qui arrive (ui/ScreenFade.tsx). */
 export const arrivalStyle = (): ArrivalStyle => style
 

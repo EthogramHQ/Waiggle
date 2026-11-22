@@ -1,7 +1,10 @@
 // Mise en place des traductions dans l'appli, avec la bibliothèque i18next.
-// Les textes eux-mêmes viennent du paquet partagé @ruche/i18n.
+// Les textes eux-mêmes viennent du paquet partagé @ruche/i18n. Sur le web, ce paquet n'a d'abord
+// que le français (R18) : l'anglais se charge à la demande, par `ensureLanguage`, avant tout
+// changement de langue, et avant l'hydratation d'une page anglaise (`preparePageLanguage`).
 import {
   defaultLanguage,
+  ensureLanguage,
   type Language,
   resolveLanguage,
   resources,
@@ -13,6 +16,13 @@ import i18next, { type i18n } from 'i18next'
 import { useContext, useEffect } from 'react'
 import { I18nContext, initReactI18next, useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
+import { reloadOnce } from './chunkReload'
+import { languageOfPath } from './publicPath'
+
+// La plateforme, lue une fois au chargement du module : `preparePageLanguage` sert au démarrage,
+// juste après ce chargement (l'entrée de l'appli). Les tests chargent ce module neuf pour une
+// « page du navigateur », plateforme web comprise, et l'appellent ensuite.
+const webAtLoad = Platform.OS === 'web'
 
 /** Langue de l'appareil si on la gère, le français sinon. */
 export const detectLanguage = (): Language =>
@@ -100,9 +110,55 @@ export const createPageI18n = (language: Language): i18n => {
  * écrit à chaque changement) : la langue du navigateur n'est plus adoptée ensuite, elle ne doit pas
  * défaire le choix porté par l'adresse.
  */
-export const keepAddressLanguage = (appI18n: i18n, language: Language) => {
+export const keepAddressLanguage = (appI18n: i18n, language: Language): Promise<void> => {
   browserLanguageAdopted = true
-  if (appI18n.language !== language) void appI18n.changeLanguage(language)
+  if (appI18n.language === language) return Promise.resolve()
+  return switchWhenReady(appI18n, language)
+}
+
+/**
+ * Passe une instance à une langue une fois ses textes arrivés (R18) : jamais de texte anglais
+ * manquant à l'écran, remplacé par le français en attendant. Si l'anglais n'arrive pas (réseau
+ * coupé, nouvelle version en ligne), l'instance garde sa langue : la promesse se termine sans
+ * erreur, la page reste lisible.
+ */
+const switchWhenReady = (instance: i18n, language: Language): Promise<void> =>
+  ensureLanguage(instance, language).then(
+    async () => {
+      await instance.changeLanguage(language)
+    },
+    () => {
+      // La langue affichée reste : rien à défaire.
+    },
+  )
+
+/**
+ * La langue dans laquelle la page va s'hydrater, préparée avant (R18 ; appelée par l'entrée de
+ * l'appli, `index.ts`, avant Expo Router) : celle de l'adresse (`/fr/…`, `/en/…`), sinon celle du
+ * navigateur. Une page en français n'a rien à charger. Pour l'anglais, on attend son morceau : le
+ * premier rendu du client trouve alors le texte du HTML pré-rendu, sans écart.
+ *
+ * Si le morceau manque (une mise en ligne entre-temps : son nom a changé), la page se recharge une
+ * fois, avec la mémoire de `reloadOnce` (une clé par adresse, partagée avec `lazyScreen`), et la
+ * promesse ne se termine pas : la page s'en va. S'il manque encore après, ou si la page ne peut pas
+ * se recharger (hors ligne, stockage refusé), elle s'hydrate en français (relecture de sécurité du
+ * plan, S3) : jamais de boucle, jamais de page blanche.
+ */
+export const preparePageLanguage = async (): Promise<Language> => {
+  if (!webAtLoad) return detectLanguage()
+  const { location } = globalThis as { location?: { pathname: string } }
+  const language = languageOfPath(location?.pathname ?? '/') ?? detectLanguage()
+  if (language === defaultLanguage) return language
+  try {
+    // L'instance de l'appli n'existe pas encore (la racine la crée au premier rendu, avec les
+    // textes partagés que l'anglais vient de rejoindre) : une instance à part reçoit le morceau.
+    await ensureLanguage(createI18n(defaultLanguage), language)
+    return language
+  } catch {
+    // Une promesse jamais tenue : la page se recharge, rien ne doit s'hydrater d'ici là.
+    if (reloadOnce(webAtLoad)) return new Promise<Language>(() => {})
+    return defaultLanguage
+  }
 }
 
 /**
@@ -126,6 +182,7 @@ export const useBrowserLanguage = () => {
     if (provided && addressLanguage.has(provided)) return
     if (Platform.OS !== 'web' || browserLanguageAdopted) return
     browserLanguageAdopted = true
-    void i18n.changeLanguage(detectLanguage())
+    // L'instance elle-même (celle du fournisseur) reçoit l'anglais, s'il le faut, avant d'y passer.
+    void switchWhenReady(provided ?? i18n, detectLanguage())
   }, [i18n, provided])
 }

@@ -17,6 +17,7 @@
 // La ligne se pose dans un `ListGroup list`, qui rogne ce qui dépasse : l'anneau du clavier se
 // dessine dedans. À 320 points ou à texte agrandi, « Supprimer » passe sous le texte, à droite.
 import { space } from '@ruche/brand'
+import { keepPunctuation } from '@ruche/i18n'
 import { type Ref, useId } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { describedBy } from './aria'
@@ -117,7 +118,7 @@ export function MyCommentRow({
         ) : null}
         <View style={{ flexGrow: 0, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
           <Text variant="callout" weight={600} tone={gone ? 'muted' : 'default'} breakAnywhere>
-            {projectTitle ?? goneLabel}
+            {projectTitle === null ? goneLabel : keepPunctuation(projectTitle)}
           </Text>
         </View>
         <View style={{ flexShrink: 0, maxWidth: '100%' }}>
@@ -142,7 +143,7 @@ export function MyCommentRow({
         {...(gone ? null : { numberOfLines: large ? EXCERPT_LINES_LARGE : EXCERPT_LINES })}
         breakAnywhere
       >
-        {body}
+        {keepPunctuation(body)}
       </Text>
       {marks.map((mark) => (
         <View

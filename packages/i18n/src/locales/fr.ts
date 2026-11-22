@@ -504,6 +504,9 @@ export const fr = {
     language: {
       title: 'Langue',
       hint: 'Tes e‑mails te sont aussi envoyés dans cette langue.',
+      // R18 : la langue choisie se charge à la demande ; si elle n'arrive pas (réseau coupé),
+      // l'appli garde la langue d'avant et propose « Réessayer » (common.retry).
+      loadFailed: 'Cette langue n’a pas pu se charger. Vérifie ta connexion.',
     },
     appearance: {
       title: 'Apparence',

@@ -22,6 +22,7 @@
 // actions du menu et l'adresse de la photo arrivent toutes prêtes.
 import { space } from '@ruche/brand'
 import type { Removal } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -140,7 +141,7 @@ export function CallCard({
       {/* breakAnywhere : une adresse collée (« Essayez sur https://… ») passe à la ligne au lieu de
           sortir de la carte à 320 points (relecture d'interface A4), comme la bulle d'un retour. */}
       <Text selectable breakAnywhere {...(focusRef ? { focusRef } : null)}>
-        {text}
+        {keepPunctuation(text)}
       </Text>
       {photoRemoval ? (
         // La photo retirée, que l'auteur voit encore, suivie de la notice : un groupe nommé « La

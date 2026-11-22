@@ -5,6 +5,7 @@
 // compacte avec photo (qui n'en montre aucune d'ordinaire). L'extrait décrit le lien de la carte
 // (`aria-describedby` sur le web), dont le nom reste le titre seul, lu d'un tenant.
 import { palettes } from '@ruche/brand'
+import { keepPunctuation } from '@ruche/i18n'
 import { screen } from '@testing-library/react-native'
 import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -88,6 +89,7 @@ describe('ProjectCard, a search result (R16)', () => {
         (node) => typeof node.props.nativeID === 'string' && ids.includes(node.props.nativeID),
       )
       .map((node) => textOf(node))
-    expect(described).toContain(EXCERPT)
+    // R18 : l'extrait affiché garde ses espaces insécables autour des guillemets (keepPunctuation).
+    expect(described).toContain(keepPunctuation(EXCERPT))
   })
 })

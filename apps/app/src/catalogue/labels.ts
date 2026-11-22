@@ -165,6 +165,32 @@ const fr = {
     '## Comment je l’ai fait\n\nJ’ai pris **une photo de chaque tasse**, puis Claude m’a aidée à écrire les fiches.\n\n- Moulin réglé sur *moyen*\n- 15 g de café pour 250 ml\n\n> Le meilleur café, c’est celui qu’on partage.\n\nLe code est sur [GitHub](https://github.com).',
   prompt:
     'Tu es un barista patient. Décris ce café en trois mots, puis propose un réglage du moulin.',
+  // R18 : les titres des places réservées, le temps qu'un groupe de sections soit monté
+  // (LazySection) ; chaque section y garde ensuite son propre titre.
+  lazy: {
+    activity: 'Activité et actualité d’une ruche',
+    comments: 'Commentaires',
+    moderation: 'Signalements et modération',
+    visitors: 'Pages légales et visiteurs',
+    myData: 'Mes commentaires et mes retours',
+    hives: 'Ruches',
+    account: 'Menus, compte et feuilles',
+    settings: 'Entrée, réglages et garde-fous',
+    navigation: 'Navigation et cartes',
+    feed: 'Le fil et Explorer',
+    tools: 'Outils et filtres',
+    admin: 'Administration et recherche',
+    project: 'La page d’un projet',
+    examples: 'Exemples et pages des membres',
+    publish: 'Publier un projet',
+    projectParts: 'Les pièces d’un projet',
+    testers: 'Mises à jour et testeurs',
+    updates: 'Les mises à jour',
+    fluidity: 'Fluidité',
+    brand: 'Marque, contrôles et matières',
+    light: 'Jetons, lumière et chargement',
+    grids: 'Grilles, fin du fil et mascotte',
+  },
 }
 
 // `typeof fr` : l'anglais doit avoir exactement les mêmes textes (TypeScript le vérifie).
@@ -328,6 +354,30 @@ const en: typeof fr = {
     '## How I made it\n\nI took **a photo of every cup**, then Claude helped me write the notes.\n\n- Grinder set to *medium*\n- 15 g of coffee for 250 ml\n\n> The best coffee is the one you share.\n\nThe code is on [GitHub](https://github.com).',
   prompt:
     'You are a patient barista. Describe this coffee in three words, then suggest a grinder setting.',
+  lazy: {
+    activity: 'Activity and hive news',
+    comments: 'Comments',
+    moderation: 'Reports and moderation',
+    visitors: 'Legal pages and visitors',
+    myData: 'My comments and my feedback',
+    hives: 'Hives',
+    account: 'Menus, account and sheets',
+    settings: 'Entry, settings and safeguards',
+    navigation: 'Navigation and cards',
+    feed: 'The feed and Explore',
+    tools: 'Tools and filters',
+    admin: 'Administration and search',
+    project: 'A project page',
+    examples: 'Examples and member pages',
+    publish: 'Publishing a project',
+    projectParts: 'Parts of a project',
+    testers: 'Updates and testers',
+    updates: 'Updates',
+    fluidity: 'Fluidity',
+    brand: 'Brand, controls and materials',
+    light: 'Tokens, light and loading',
+    grids: 'Grids, feed end and mascot',
+  },
 }
 
 export const labels = { fr, en }

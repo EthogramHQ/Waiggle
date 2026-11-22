@@ -10,6 +10,8 @@
 // R16 : `ListRowSkeleton`, la ligne vide d'une liste qui charge (en bas du fichier), et
 // `TextLineShape`, une ligne de texte vide à la hauteur d'une ligne écrite ; un groupe qui charge
 // garde son titre lu et visible (`pending`).
+// R18 : une ligne qu'on touche peut être occupée (`busy` avec `onPress`, le choix d'une langue qui
+// se charge) : annoncée occupée, elle ignore un second geste, et un choix occupé fige son groupe.
 import {
   borders,
   layout,
@@ -97,6 +99,12 @@ type RadioSlot = {
   onArrow: (step: 1 | -1) => void
   /** Pour que le groupe retrouve l'élément de la ligne, et y pose le focus. */
   setNode: (node: View | null) => void
+  /**
+   * R18 : un choix du groupe est occupé (`busy`, la langue anglaise qui se charge). Tant qu'il
+   * l'est, aucun choix ne part : ni un toucher, ni Espace ou Entrée, ni les flèches. Sinon un
+   * second choix partirait pendant le premier, et l'écran ne saurait plus lequel garder.
+   */
+  locked: boolean
 }
 
 const RadioSlotContext = createContext<RadioSlot | null>(null)
@@ -145,9 +153,13 @@ export function ListGroup({
     : []
   const checked = choices.findIndex((choice) => choice?.selected === true)
   const tabStop = checked === -1 ? choices.findIndex((choice) => choice !== null) : checked
+  // R18 : un choix occupé fige tout le groupe, le temps que son action finisse.
+  const locked = choices.some((choice) => choice?.busy === true)
   // Une flèche depuis la ligne `from` : le prochain choix actif dans ce sens, en faisant le tour
-  // (après le dernier, le premier). Un choix inactif est sauté.
+  // (après le dernier, le premier). Un choix inactif est sauté. Groupe figé : rien ne bouge, ni la
+  // coche ni le focus.
   const move = (from: number, step: 1 | -1) => {
+    if (locked) return
     const count = choices.length
     for (let k = 1; k <= count; k++) {
       const index = (((from + step * k) % count) + count) % count
@@ -165,6 +177,7 @@ export function ListGroup({
     setNode: (node) => {
       nodes.current[index] = node
     },
+    locked,
   })
   const notes = footer === undefined ? [] : typeof footer === 'string' ? [footer] : footer
   const asList = list && !radio
@@ -352,6 +365,12 @@ type RowBase = {
   /**
    * Une ligne qui attend (« Chargement… ») : une roue à droite, et les lecteurs d'écran
    * l'annoncent comme une attente en cours (rôle progressbar, aria-busy), avec son libellé.
+   * R18 : sur une ligne qu'on touche (`onPress`), son action est en cours (la langue anglaise qui
+   * se charge) : la ligne garde son rôle et son nom, elle est annoncée occupée (`aria-busy`), et
+   * un second toucher est ignoré tant qu'elle l'est. Un choix occupé (avec `selected`) montre la
+   * roue à la place de son rond, et fige tout son groupe (`ListGroup radio`) : ni un autre choix,
+   * ni les flèches ne partent pendant ce temps. Le choix coché le reste : c'est l'écran qui le
+   * change quand l'action a réussi.
    */
   busy?: boolean
   /**
@@ -426,16 +445,38 @@ export function ListRow({
   // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
   const slot = useContext(RadioSlotContext)
   const isChoice = selected !== undefined
-  const right =
-    trailing === 'chevron' ? (
-      <Icon name="caret-right" size={18} tone="muted" />
-    ) : trailing === 'check' || isChoice ? (
-      <RadioMark selected={selected === true} />
-    ) : typeof trailing === 'string' ? (
-      <Icon name={trailing as IconName} size={20} tone={tone === 'danger' ? 'danger' : 'muted'} />
-    ) : (
-      (trailing ?? null)
-    )
+  // R18 : un choix dont l'action est en cours. Sa roue prend la place du rond, à la même taille
+  // (le rond est gardé, invisible, sous la roue) : rien ne bouge dans la ligne quand elle paraît,
+  // ni quand la coche revient.
+  const busyChoice = busy && isChoice && onPress !== undefined
+  const right = busyChoice ? (
+    <View>
+      <View style={{ opacity: 0 }}>
+        <RadioMark selected={selected === true} />
+      </View>
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator color={colors.textMuted} aria-hidden />
+      </View>
+    </View>
+  ) : trailing === 'chevron' ? (
+    <Icon name="caret-right" size={18} tone="muted" />
+  ) : trailing === 'check' || isChoice ? (
+    <RadioMark selected={selected === true} />
+  ) : typeof trailing === 'string' ? (
+    <Icon name={trailing as IconName} size={20} tone={tone === 'danger' ? 'danger' : 'muted'} />
+  ) : (
+    (trailing ?? null)
+  )
   // La précision : un texte prend le style des précisions ; un nœud (surligné) porte le sien.
   const detailText =
     typeof detail === 'string' ? (
@@ -543,7 +584,7 @@ export function ListRow({
         >
           {detail && detailRight ? detailText : null}
           {accessory}
-          {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
+          {busy && !busyChoice ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
           {right}
         </View>
       ) : null}
@@ -557,6 +598,19 @@ export function ListRow({
   )
 
   if (!onPress) return content
+
+  // R18 : la ligne occupée, ou un groupe de choix figé par un voisin occupé, ignore le geste :
+  // toucher, Espace ou Entrée. La ligne reste dans le parcours de Tab et garde son focus (une ligne
+  // `disabled` le perdrait sur le web, et serait lue « inactive » au lieu d'« occupée »). Une
+  // ligne-lien retient aussi le navigateur, qui suivrait sinon son adresse.
+  const ignored = busy || slot?.locked === true
+  const press = (event?: PressEvent) => {
+    if (!ignored) {
+      onPress(event)
+      return
+    }
+    if (href) event?.preventDefault?.()
+  }
 
   // La vue d'un choix va au groupe (les flèches) et à l'écran qui la demande. Une `ref` peut être
   // une fonction ou un objet `{ current }` : les deux formes sont servies.
@@ -607,14 +661,20 @@ export function ListRow({
       // téléphone, ils sont ignorés ; sur le web, react-native-web dessine un vrai `<a>`).
       {...(href ? { href, ...(current ? { 'aria-current': 'page' } : null) } : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
+      // R18 : occupée, annoncée comme telle (`aria-busy` : react-native-web le pose sur le web,
+      // React Native le donne aux lecteurs d'écran du téléphone).
+      {...(busy ? { 'aria-busy': true } : null)}
       // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
       ref={isChoice ? choiceRef : ref}
-      {...(isChoice ? choiceKeys(onPress) : null)}
+      {...(isChoice ? choiceKeys(press) : null)}
       disabled={disabled}
-      onPress={onPress}
+      onPress={press}
       // Le groupe rogne ce qui dépasse : l'anneau de focus se dessine à l'intérieur de la ligne.
       {...insetFocus}
-      style={({ pressed }) => (pressed ? { backgroundColor: colors.surfaceGrouped } : null)}
+      // Un geste ignoré ne fonce pas la ligne : elle ne fait pas croire qu'elle a répondu.
+      style={({ pressed }) =>
+        pressed && !ignored ? { backgroundColor: colors.surfaceGrouped } : null
+      }
     >
       {content}
     </Pressable>

@@ -22,6 +22,7 @@
 
 import { layout, radii, space } from '@ruche/brand'
 import type { ProjectUpdate, Removal } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
@@ -199,7 +200,7 @@ export function UpdateEntry({
                 focusRef={focusRef}
                 breakAnywhere
               >
-                {title}
+                {keepPunctuation(title)}
               </Text>
             </View>
             {versionBeside && !compact ? <VersionText version={versionBeside} /> : null}
@@ -327,7 +328,7 @@ function LineText({ text, read }: { text: string; read: string }) {
     return (
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text breakAnywhere readable accessibilityLabel={read}>
-          {text}
+          {keepPunctuation(text)}
         </Text>
       </View>
     )
@@ -336,7 +337,7 @@ function LineText({ text, read }: { text: string; read: string }) {
     <View style={{ flex: 1, minWidth: 0 }}>
       <View aria-hidden>
         <Text breakAnywhere readable>
-          {text}
+          {keepPunctuation(text)}
         </Text>
       </View>
       <View style={hiddenFrame} pointerEvents="none">

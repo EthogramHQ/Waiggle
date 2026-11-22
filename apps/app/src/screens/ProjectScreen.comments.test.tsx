@@ -8,6 +8,7 @@
 // L'API est remplacée par de faux appels ; les aides et données communes sont dans
 // ProjectScreen.testkit.tsx (la page) et ProjectComments.testkit.tsx (les commentaires).
 import { NO_REACTIONS } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { createRef } from 'react'
 import { View } from 'react-native'
@@ -257,7 +258,8 @@ describe('the comments of a project', () => {
       sheet()
         .getAllByText(pattern)
         .map((node) => node.props.children),
-    ).toEqual(sixTexts)
+      // R18 : l'espace tapée devant ! et ? s'affiche insécable (keepPunctuation).
+    ).toEqual(sixTexts.map(keepPunctuation))
   })
 
   it('leads from a comment of the sheet to the page of its author', async () => {

@@ -183,10 +183,13 @@ describe('the funnel of Expo Router (guard: breaks if an upgrade moves it)', () 
 describe('the app entry point', () => {
   it('loads the passage relay after the back relay and before Expo Router', () => {
     const entry = readFileSync(join(__dirname, '..', '..', 'index.ts'), 'utf8')
-    const imports = [...entry.matchAll(/^import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1])
-    const back = imports.indexOf('./src/navigation/backRelay')
-    const passages = imports.indexOf('./src/navigation/passageRelay')
-    const router = imports.indexOf('expo-router/entry')
+    // Les positions dans le fichier : un `import` en tête, ou (R18) le `require` d'Expo Router,
+    // lancé après la langue de la page (index.ts) ; dans les deux cas, plus loin dans le fichier
+    // veut dire exécuté plus tard.
+    const at = (pattern: RegExp) => entry.search(pattern)
+    const back = at(/^import\s+['"]\.\/src\/navigation\/backRelay['"]/m)
+    const passages = at(/^import\s+['"]\.\/src\/navigation\/passageRelay['"]/m)
+    const router = at(/(?:^import\s+|require\()['"]expo-router\/entry['"]/m)
     expect(back).toBeGreaterThanOrEqual(0)
     expect(passages).toBeGreaterThan(back)
     expect(router).toBeGreaterThan(passages)

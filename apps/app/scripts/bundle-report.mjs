@@ -9,18 +9,43 @@
 // un ordre de grandeur, pas l'octet près du serveur). Puis les morceaux chargés à la demande (les
 // écrans rares, `navigation/lazyScreen.tsx`), absents du départ.
 //
-// Usage : node apps/app/scripts/bundle-report.mjs <dossier construit> [--json]
+// R18 : `--max-start [Ko]` en fait une garde (la CI la lance après la construction). Elle additionne
+// le poids en brotli (qualité 11, ce que sert le serveur depuis la compression à l'avance,
+// infra/web/precompress.mjs) des seuls scripts de départ de `/fr/`, et rend le code 1 au-delà de la
+// limite, ou si `/fr/` manque. Sans nombre, la limite est MAX_START_KB, ci-dessous.
+//
+// Usage : node apps/app/scripts/bundle-report.mjs <dossier construit> [--json] [--max-start [Ko]]
 // La sortie ne nomme que des chemins relatifs à la construction : elle se colle telle quelle dans un
 // bilan ou une pull request.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import { brotliCompressSync, gzipSync } from 'node:zlib'
+import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
+
+// La limite de la garde, en Ko de brotli : écrite une seule fois, ici. À relever (ou à baisser)
+// à la main quand le départ change volontairement. R18 : 686 Ko mesurés (1 096 avant) ; la cible
+// de 650 n'est pas atteinte, la garde est posée à 700 pour empêcher toute rechute (Louis, 22/11).
+const MAX_START_KB = 700
 
 const args = process.argv.slice(2)
 const json = args.includes('--json')
-const dist = args.find((arg) => !arg.startsWith('--'))
+// `--max-start` seul prend MAX_START_KB ; suivi d'un nombre, ce nombre (qui n'est alors pas le dossier).
+const maxStartAt = args.indexOf('--max-start')
+let maxStart = null
+let maxStartValue = -1
+if (maxStartAt !== -1) {
+  const next = args[maxStartAt + 1]
+  if (next !== undefined && /^\d+(\.\d+)?$/.test(next)) {
+    maxStart = Number(next)
+    maxStartValue = maxStartAt + 1
+  } else {
+    maxStart = MAX_START_KB
+  }
+}
+const dist = args.find((arg, i) => !arg.startsWith('--') && i !== maxStartValue)
 if (!dist) {
-  console.error('Usage : node apps/app/scripts/bundle-report.mjs <dossier construit> [--json]')
+  console.error(
+    'Usage : node apps/app/scripts/bundle-report.mjs <dossier construit> [--json] [--max-start [Ko]]',
+  )
   process.exit(2)
 }
 
@@ -32,11 +57,13 @@ const PAGES = [
   { name: '/fr/projects/<id>', file: 'fr/projects/[id].html' },
 ]
 
-/** Les poids d'un fichier : brut, gzip et brotli, en octets. */
+/** Les poids d'un fichier : brut, gzip et brotli (qualité 11, comme le serveur), en octets. */
 const sizes = (buffer) => ({
   raw: buffer.length,
   gzip: gzipSync(buffer).length,
-  brotli: brotliCompressSync(buffer).length,
+  brotli: brotliCompressSync(buffer, {
+    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+  }).length,
 })
 
 // Une adresse de la page (« /_expo/static/js/web/index-1a2b.js?v=3 ») devient le fichier construit
@@ -123,6 +150,25 @@ const onDemand = scriptsIn(dist)
   .map((file) => ({ file, ...sizes(readFileSync(join(dist, file))) }))
   .sort((a, b) => b.raw - a.raw)
 const onDemandTotal = onDemand.reduce(add, zero)
+
+// --- La garde : les scripts de départ de /fr/ pèsent-ils plus que la limite ? ----------------------
+if (maxStart !== null) {
+  const home = pages.find((page) => page.name === '/fr/')
+  if (!home || home.missing) {
+    console.error('bundle-report : la page /fr/ manque, son poids de départ ne se mesure pas.')
+    process.exit(1)
+  }
+  const scripts = home.files.filter((f) => f.kind === 'script')
+  const startKb = scripts.reduce((sum, f) => sum + f.brotli, 0) / 1024
+  const line = `scripts de départ de /fr/ : ${startKb.toFixed(1)} Ko en brotli (limite ${maxStart} Ko)`
+  if (startKb > maxStart) {
+    console.error(
+      `bundle-report : ${line}. Trop lourd : un écran ou une bibliothèque est entré au départ.`,
+    )
+    process.exit(1)
+  }
+  console.log(line)
+}
 
 if (json) {
   console.log(
