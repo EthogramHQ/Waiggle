@@ -4,7 +4,7 @@
 // R18 : l'anglais arrive à la demande dans le navigateur. L'option touchée est occupée le temps que
 // ses textes arrivent, l'ancienne reste cochée ; s'ils n'arrivent pas, la langue reste, et un
 // message avec « Réessayer » paraît sous le contrôle.
-import { space } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import { type Language, supportedLanguages } from '@ruche/i18n'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -48,6 +48,11 @@ const compactFrame = { flexGrow: 1, flexShrink: 1, gap: space.sm } as const
 const fullFrame = { gap: space.sm } as const
 const atEnd = { alignSelf: 'flex-end' } as const
 const stretched = { alignSelf: 'stretch' } as const
+// Le message d'un échec de la version compacte : sous le contrôle, calé à droite comme lui, et
+// jamais plus large qu'un formulaire. Sans cette borne, posé dans une rangée de toute la largeur
+// (la connexion sur ordinateur), il devenait un bandeau de 1 254 points, loin de « FR / EN »
+// (relecture de design R18).
+const compactNotice = { alignSelf: 'flex-end', maxWidth: layout.formWidth } as const
 
 function Choice({ compact, choice }: { compact: boolean; choice: LanguageChoice }) {
   const { t } = useTranslation()
@@ -82,7 +87,7 @@ function Choice({ compact, choice }: { compact: boolean; choice: LanguageChoice 
     <View style={compact ? compactFrame : fullFrame}>
       {compact ? <View style={atEnd}>{segmented}</View> : segmented}
       {failed ? (
-        <View style={stretched}>
+        <View style={compact ? compactNotice : stretched}>
           <Notice
             message={t(($) => $.account.language.loadFailed)}
             action={{ label: t(($) => $.common.retry), role: 'button', onPress: onRetry }}

@@ -374,3 +374,71 @@ describe('ProjectCard without a photo, beyond the phone (R18)', () => {
     expect(titleText().props.numberOfLines).toBe(2)
   })
 })
+
+// R18, relecture de design : les deux défauts vus de 320 à 399 points sur le web.
+describe('compact cards on a small web phone (R18, review fixes)', () => {
+  it('never draws the title of a compact card smaller than its pitch, whatever the window', async () => {
+    // La garde des mots entiers venait avec le terme `4,5 vw` des grands titres : à 320 points,
+    // il ramenait le titre de la compacte (18) à 14,4, sous son accroche (15). Seul le plafond du
+    // plus long mot reste, qui tient à 18 jusqu'à 13 lettres.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    setWindow(320, 700)
+    await renderWithProviders(<ProjectCard {...card} size="compact" />)
+
+    const size = fontSizeOf(titleText())
+    expect(typeof size).toBe('string') // témoin : la formule existe
+    expect(size).toMatch(/^min\(18px, calc\(/)
+    // « anniversaires » (13 lettres) tient sur 320 points, à 200 %, sans descendre sous 15.
+    const [, minus, perLetter] = String(size).match(/\(100vw - (\d+)px\) \/ ([\d.]+)\)/) ?? []
+    expect((320 - Number(minus)) / Number(perLetter)).toBeGreaterThanOrEqual(15)
+  })
+
+  it('keeps the vw ceiling on the title of a full card', async () => {
+    // Témoin : la grande carte (27) garde la formule des grands titres ; ses 21,6 à 320 points
+    // restent au-dessus de l'accroche.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    setWindow(320, 700)
+    await renderWithProviders(<ProjectCard {...card} />)
+
+    expect(fontSizeOf(titleText())).toMatch(/^min\(27px, 6\.75vw, calc\(/)
+  })
+})
+
+describe('two compact cards without a photo side by side (R18, review fixes)', () => {
+  /** Les ancêtres du titre, dans le lien de la carte, dont la hauteur grandit avec la case. */
+  const growing = () => {
+    const chain = titleAncestors()
+    const link = chain.findIndex((node) => node.props.accessibilityRole === 'link')
+    return chain.slice(0, link).filter((node) => styleOf(node).flex === 1)
+  }
+
+  it('fills its stretched cell with its glass, so the honey margin stays the same all round', async () => {
+    // Le verre de la carte la plus courte restait collé en bas de la case (32 points de lumière au
+    // lieu du liseré) : il grandit avec elle (planche, rangée 3).
+    await renderWithProviders(
+      <CardStretchContext.Provider value>
+        <ProjectCard {...card} size="compact" />
+      </CardStretchContext.Provider>,
+    )
+
+    expect(growing().length).toBeGreaterThan(0)
+  })
+
+  it('leaves the glass of a compact card with a photo at its content', async () => {
+    await renderWithProviders(
+      <CardStretchContext.Provider value>
+        <ProjectCard {...card} image={photo} size="compact" />
+      </CardStretchContext.Provider>,
+    )
+
+    expect(screen.getByRole('link', { name: card.title })).toBeTruthy() // témoin
+    expect(growing()).toHaveLength(0)
+  })
+
+  it('leaves the glass of a card that is not stretched at its content', async () => {
+    await renderWithProviders(<ProjectCard {...card} size="compact" />)
+
+    expect(screen.getByRole('link', { name: card.title })).toBeTruthy() // témoin
+    expect(growing()).toHaveLength(0)
+  })
+})

@@ -536,7 +536,17 @@ export function ProjectCard({
           />
         </View>
       ) : null}
-      <Surface variant="panel" padding={compact ? 'md' : 'lg'} gap="sm">
+      {/* R18 (relecture de design) : une carte sans photo qui serre son verre, étirée par sa
+          rangée, le fait grandir jusqu'au bas de la case (`fit="fill"`) : le liseré de lumière
+          reste le même tout autour, et les titres de la rangée s'alignent en haut. Sans cela, le
+          verre restait collé au bas (`justifyContent: 'flex-end'` du calque) et la carte la plus
+          courte avait plus de lumière au-dessus. Les cartes à photo gardent leur verre en bas. */}
+      <Surface
+        variant="panel"
+        padding={compact ? 'md' : 'lg'}
+        gap="sm"
+        fit={hugsContent && stretched ? 'fill' : undefined}
+      >
         {/* La place de la rangée de l'auteur, posée par-dessus ; sans auteur, aucune. */}
         {author ? <View style={{ height: measures.author }} /> : null}
         <View onLayout={measure('title')} style={{ gap: ROW_GAP }}>

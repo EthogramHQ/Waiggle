@@ -193,8 +193,12 @@ const wholeWordsWebStyle = (variant: TextVariant, words: string): TextStyle => {
   const style = textStyles[variant]
   const perLetter = LARGEST_TEXT_SCALE * longestWord(words) * GIANT_LETTER_WIDTH
   const fit = `calc((100vw - ${GIANT_MARGINS}px) / ${perLetter.toFixed(2)})`
+  // Le terme en `vw` est celui des grands titres (22 points ou plus). Un titre plus petit (le titre
+  // d'une petite carte, 18) le garde hors de sa formule : à 320 points, il le ramenait à 14,4,
+  // sous l'accroche de la carte (15). Le plafond du plus long mot suffit à empêcher la coupure.
+  const vw = style.size >= textStyles.heading.size ? `${(style.size / 4).toFixed(2)}vw, ` : ''
   return {
-    fontSize: `min(${style.size}px, ${(style.size / 4).toFixed(2)}vw, ${fit})`,
+    fontSize: `min(${style.size}px, ${vw}${fit})`,
     lineHeight: `${(style.lineHeight / style.size).toFixed(3)}`,
     letterSpacing: `${style.tracking}em`,
   } as unknown as TextStyle
