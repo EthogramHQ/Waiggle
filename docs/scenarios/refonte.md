@@ -4411,3 +4411,90 @@ trois bandes grises.
 Le focus et ce que lit un lecteur d'écran suivent les règles d'aujourd'hui (le titre à l'arrivée,
 la carte au retour). Les feuilles (Publier, Signaler…) gardent leur mouvement. Le préchargement des
 pages avant le clic n'est pas dans cette tranche.
+
+## R18 — Les finitions
+
+Quatre restes des tranches passées, avant la gamification : le premier chargement encore lourd
+(pistes mesurées en R13), le focus qui tombe sur toute la page à l'arrivée (relectures de R17), le
+catalogue des composants qui bloque l'ordinateur 45 s (D1 de R17), et l'ordre de Tab sur ordinateur
+(liste « À reprendre », 26/10). Les leçons à retoucher se font hors du dépôt.
+
+### Le premier chargement plus léger
+
+Aujourd'hui, le navigateur reçoit 1 096 Ko de script avant de pouvoir répondre : le serveur le
+compresse à la volée, au niveau le plus rapide (mesuré sur waiggle.com le 22/11).
+
+- Étant donné une personne qui ouvre waiggle.com pour la première fois
+  Quand la page arrive
+  Alors le script lui parvient compressé à l'avance, au plus fort (brotli, sinon zstd, sinon gzip),
+  selon ce que sait son navigateur ;
+  Et elle ne télécharge ni les messages d'erreur de Zod dans 64 langues, ni le code qu'Expo ne sert à
+  aucune page ;
+  Et elle ne télécharge que la langue de la page (le français sur /fr/, l'anglais sur /en/).
+- Quand un membre change de langue (Réglages)
+  Alors l'autre langue arrive en moins d'une seconde, pendant que le choix montre qu'il travaille ;
+  Et si elle n'arrive pas (réseau coupé), la langue reste celle d'avant, avec un message et
+  « Réessayer ».
+- Étant donné un visiteur (sans compte)
+  Alors il ne télécharge aucun écran réservé aux membres (Fil, Réglages, Publier, Ruches…) ;
+  Quand un membre ouvre pour la première fois de sa visite une page de membre
+  Alors il voit le squelette de cette page (R16) le temps que son morceau arrive, puis plus jamais
+  pendant la visite.
+
+### Le focus à l'arrivée sur une page
+
+- Étant donné une personne qui se sert du clavier ou d'un lecteur d'écran
+  Quand elle ouvre une page plus profonde (un lien, une ligne, une tuile, une carte) ou change
+  d'onglet
+  Alors le focus va au titre de la page, et le lecteur d'écran le lit ;
+  Et le Tab suivant mène au premier contrôle sous le titre ;
+  Et l'anneau du focus ne se montre qu'au clavier : au doigt ou à la souris, rien ne se voit.
+- Une page dont le titre est caché (Ruches, Fil) reçoit le focus sur ce titre caché : le lecteur
+  d'écran le lit, l'anneau ne se voit pas, le Tab suivant reprend sous lui.
+- Quand elle revient (le « Retour » de la page ou celui du navigateur)
+  Alors le focus revient sur la carte, la ligne ou le lien qui l'avait menée là.
+- La première page de la visite garde le comportement du navigateur ; une feuille garde le sien
+  (le focus dans la feuille, puis sur ce qui l'a ouverte).
+
+### L'ordre de Tab sur ordinateur
+
+- Étant donné la page d'un projet, ou le Fil, à deux colonnes
+  Quand on avance au clavier
+  Alors on parcourt d'abord la colonne principale, puis la colonne latérale (Suivre, réactions),
+  dans l'ordre où on les lit.
+
+### Les textes des membres bien ponctués
+
+- Étant donné un membre qui écrit « Ça marche ? Oui ! » ou « Note : à tester » (titre, accroche,
+  description, mise à jour, commentaire)
+  Quand le texte s'affiche en français
+  Alors une espace fine insécable précède ? ! : ; et suit « (et précède ») : le signe ne part
+  jamais seul en début de ligne ;
+  Et le texte enregistré ne change pas (copier le texte rend ce que le membre a tapé).
+- En anglais, rien ne change.
+
+### Les cartes sans photo sur téléphone
+
+- Étant donné un projet sans photo, dans le Fil ou une liste, sur téléphone
+  Alors sa carte n'est pas plus haute qu'il ne faut (sur planche) ;
+  Et avec un texte à 200 %, le titre reste lisible, sans mot coupé au milieu.
+
+### Le catalogue sur ordinateur
+
+- Étant donné le catalogue des composants (outil de développement, absent de l'appli publiée)
+  Quand on l'ouvre sur ordinateur
+  Alors il est utilisable en 10 s au plus (aujourd'hui 45 s), sans tâche de plus d'une seconde
+  (aujourd'hui 19 s) ;
+  Et ses captures montrent toujours chaque composant dans tous ses états.
+
+### Les cibles (mesurées avant et après par le même passage)
+
+- Script reçu au premier chargement de /fr/ : 1 096 Ko → 650 Ko au plus (décision de Louis du 22/11).
+- Les captures ne rougissent plus au hasard : `feuille-retour-erreur` passe à chaque exécution.
+- Catalogue sur ordinateur : 45 s → 10 s ; tâche la plus longue : 19 s → 1 s.
+- Focus après l'arrivée : BODY → le titre de la page, sur chaque page des captures.
+
+### Le reste ne change pas
+
+Les passages de page (R17), les squelettes (R16) et les feuilles gardent leur mouvement. Les pages
+publiques rendues dans le HTML viennent avec R22.
