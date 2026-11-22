@@ -65,6 +65,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # R18, la garde de poids : les scripts de départ de /fr/ pèsent au plus le seuil de
+      # apps/app/scripts/bundle-report.mjs (brotli 11) ; un écran lourd entré au départ fait échouer.
+      - run: node apps/app/scripts/bundle-report.mjs apps/app/dist --max-start
       # Le catalogue des composants est un outil de développement : dans l'appli publiée, sa page
       # doit rester « introuvable ».
       - run: test -f apps/app/dist/catalogue.html && ! grep -q "Catalogue des composants" apps/app/dist/catalogue.html
@@ -76,7 +79,8 @@ jobs:
       # un motif prendrait aussi leurs tests (.mjs) et le contrat.
       - run: shellcheck -x infra/*.sh infra/server/*.sh infra/vps-dev/waiggle-deployer infra/vps-dev/waiggle-retour infra/vps-dev/installer.sh infra/production/waiggle-deploy-force
       # Les tests du déploiement de nuit (faux gh, ssh, curl…, vrai git) ; Linux seulement.
-      - run: node --test infra/vps-dev/*.test.mjs infra/production/*.test.mjs
+      # R18 : et ceux de la compression à l'avance de l'appli web (infra/web/precompress.mjs).
+      - run: node --test infra/vps-dev/*.test.mjs infra/production/*.test.mjs infra/web/*.test.mjs
 
   # Photographie l'appli web (catalogue des composants et écrans, sur téléphone et ordinateur, de
   # jour et de nuit) et joint les images à la vérification : page de la vérification, rubrique
