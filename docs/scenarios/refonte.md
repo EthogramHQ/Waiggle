@@ -4494,7 +4494,9 @@ colonne latérale du Fil vient après son contenu. La tranche le vérifie au cla
 
 ### Les cibles (mesurées avant et après par le même passage)
 
-- Script reçu au premier chargement de /fr/ : 1 096 Ko → 650 Ko au plus (décision de Louis du 22/11).
+- Script reçu au premier chargement de /fr/ : 1 096 Ko → 700 Ko au plus (686 mesurés ; la cible
+  de 650 visée d'abord n'est pas atteinte, la garde de la CI est posée à 700 : décision de Louis
+  du 22/11).
 - Les captures ne rougissent plus au hasard : `feuille-retour-erreur` passe à chaque exécution.
 - Catalogue sur ordinateur : 45 s → 10 s ; tâche la plus longue : 19 s → 1 s.
 - Focus après l'arrivée : BODY → le titre de la page, sur chaque page des captures.

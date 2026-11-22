@@ -22,8 +22,9 @@ import { join, relative, sep } from 'node:path'
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
 
 // La limite de la garde, en Ko de brotli : écrite une seule fois, ici. À relever (ou à baisser)
-// à la main quand le départ change volontairement.
-const MAX_START_KB = 650
+// à la main quand le départ change volontairement. R18 : 686 Ko mesurés (1 096 avant) ; la cible
+// de 650 n'est pas atteinte, la garde est posée à 700 pour empêcher toute rechute (Louis, 22/11).
+const MAX_START_KB = 700
 
 const args = process.argv.slice(2)
 const json = args.includes('--json')
