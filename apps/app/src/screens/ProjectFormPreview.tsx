@@ -1,6 +1,7 @@
 // La colonne de l'aperçu de la feuille de publication, sur ordinateur (R6a, planche
 // R6-Publier-Desktop), sortie de `ProjectFormScreen` après les relectures (ui-C6) : la carte du fil
 // telle qu'elle paraîtra, qui suit la frappe, puis « Qui peut le voir ? ».
+import { keepPunctuation } from '@ruche/i18n'
 import type { RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMe } from '../profile/hooks'
@@ -48,8 +49,8 @@ export function ProjectFormPreview({ form, cover, change, hiveError, hiveRef }: 
         </Text>
         <CardPreview image={cover}>
           <ProjectCard
-            title={form.title.trim() || t(($) => $.project.form.previewUntitled)}
-            pitch={form.pitch.trim() || t(($) => $.project.form.previewNoPitch)}
+            title={keepPunctuation(form.title.trim()) || t(($) => $.project.form.previewUntitled)}
+            pitch={keepPunctuation(form.pitch.trim()) || t(($) => $.project.form.previewNoPitch)}
             author={{ name: me.data?.name ?? '', avatar: null }}
             image={cover}
             when={t(($) => $.project.preview.now)}

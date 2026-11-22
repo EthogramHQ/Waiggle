@@ -11,6 +11,7 @@
 // - `ProjectHeaderView`, le dessin seul, sans lecture : le catalogue le montre dans chaque état.
 // Ce fichier n'écrit aucun style (règle Biome de `src/projects/**`) : il assemble des composants.
 import type { Project } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { useRouter } from 'expo-router'
 import { type Ref, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -274,7 +275,7 @@ export function ProjectHeaderView({
       </Stack>
       <Stack gap="xs">
         <Text variant="title2" heading={1} breakAnywhere focusRef={titleRef}>
-          {project.title}
+          {keepPunctuation(project.title)}
         </Text>
         {/* « Publié le 3 oct. » ou « Créé le 12 oct. » (privé : il n'est publié pour personne),
             puis « Mis à jour hier · v1.2 » d'après la dernière mise à jour publiée (R7a : plus
@@ -296,7 +297,7 @@ export function ProjectHeaderView({
       <AuthorLine {...author} />
       {project.pitch !== null ? (
         <Text variant="headline" tone="secondary" weight={400} readable>
-          {project.pitch}
+          {keepPunctuation(project.pitch)}
         </Text>
       ) : (
         <HeaderLineShape line="pitch" />
