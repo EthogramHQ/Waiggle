@@ -15,7 +15,8 @@
 // - `React.lazy` garde un échec en mémoire : « Réessayer » de l'écran de secours relancerait la
 //   même erreur sans redemander le morceau. Ici, un échec s'oublie, et un nouvel essai redemande.
 import { type ComponentType, useEffect, useState } from 'react'
-import { Platform } from 'react-native'
+// Le rechargement unique par adresse, partagé avec l'anglais à la demande (R18, `src/i18n.ts`).
+import { forgetReload, reloadOnce } from '../chunkReload'
 import { LoadingScreen, type PageShape } from '../screens/states'
 import { useHydrated } from '../ui/theme/hydration'
 
@@ -35,60 +36,6 @@ export type LazyScreenOptions = {
    * pré-rendu, puis l'hydratation), la page de chargement, comme pour un écran.
    */
   sheet?: boolean
-}
-
-// Ce que le navigateur prête ici, décrit sans dépendre des types du DOM (le code tourne aussi sur
-// téléphone, où ni `location` ni `sessionStorage` n'existent).
-type Browser = {
-  navigator?: { onLine?: boolean }
-  location?: { pathname: string; reload: () => void }
-  sessionStorage?: {
-    getItem: (key: string) => string | null
-    setItem: (key: string, value: string) => void
-    removeItem: (key: string) => void
-  }
-}
-
-// La clé qui se souvient, le temps de l'onglet (sessionStorage), qu'une adresse a déjà été
-// rechargée pour un morceau introuvable.
-const reloadKey = (pathname: string) => `waiggle.chunkReload:${pathname}`
-
-/**
- * Un morceau introuvable, sur le web : le plus souvent, un onglet ouvert avant une mise en ligne
- * demande un fichier qui n'existe plus (son nom change à chaque construction). Recharger la page
- * donne la nouvelle version. Une seule fois par adresse : si le morceau manque encore, c'est un vrai
- * défaut, et l'écran de secours de la route prend le relais (sinon la page se rechargerait sans
- * fin). Hors ligne, jamais : le navigateur remplacerait l'appli par sa propre page d'erreur ;
- * l'écran de secours, lui, garde l'appli et propose « Réessayer » (relecture de design du 17/11).
- * Rend vrai si la page se recharge.
- */
-const reloadOnce = (): boolean => {
-  if (Platform.OS !== 'web') return false
-  const { navigator, location, sessionStorage } = globalThis as Browser
-  if (navigator?.onLine === false) return false
-  if (!location || !sessionStorage) return false
-  try {
-    const key = reloadKey(location.pathname)
-    if (sessionStorage.getItem(key) !== null) return false
-    sessionStorage.setItem(key, '1')
-  } catch {
-    // Stockage refusé (navigation privée stricte) : sans mémoire, pas de rechargement, qui
-    // pourrait boucler.
-    return false
-  }
-  location.reload()
-  return true
-}
-
-/** Le morceau est arrivé : l'adresse pourra se recharger de nouveau après une autre mise en ligne. */
-const forgetReload = () => {
-  if (Platform.OS !== 'web') return
-  const { location, sessionStorage } = globalThis as Browser
-  try {
-    if (location && sessionStorage) sessionStorage.removeItem(reloadKey(location.pathname))
-  } catch {
-    // Rien à oublier si le stockage est refusé.
-  }
 }
 
 /**
