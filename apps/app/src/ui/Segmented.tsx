@@ -12,9 +12,13 @@
 // Sur téléphone, avec le texte très agrandi, chaque choix prend sa propre ligne.
 // R16 (« rien ne bouge à l'arrivée ») : un choix peut attendre son nombre (`waiting`) : son nom,
 // une pièce vide à la place du nombre, et il ne se choisit pas encore.
+// R18 : un choix peut prendre du temps (la langue anglaise qui se charge) : l'option touchée est
+// annoncée occupée (`busy`), une roue à la place de son texte, et l'option cochée le reste jusqu'à
+// ce que l'écran change la valeur ; aucun autre choix ne part pendant ce temps.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type Ref, useEffect, useImperativeHandle, useRef } from 'react'
 import {
+  ActivityIndicator,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -90,6 +94,14 @@ type Props<T extends string> = {
   fill?: boolean
   /** Pour ramener le focus sur le choix actif (après un bouton qui a changé ce choix). */
   handle?: Ref<SegmentedHandle>
+  /**
+   * R18 : la valeur touchée dont le changement est en cours (la langue anglaise qui se charge) ;
+   * rien d'occupé sans elle. Cette option est annoncée occupée (`aria-busy`) et montre une roue à
+   * la place de son texte, à la même largeur : la rangée ne bouge pas. L'option cochée reste
+   * `value`, que l'écran change quand l'action a réussi. Tant qu'une option est occupée, aucun
+   * choix ne part (toucher, Espace, Entrée, flèches) : le focus reste où il est.
+   */
+  busy?: T | undefined
 }
 
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
@@ -101,6 +113,7 @@ export function Segmented<T extends string>({
   onChange,
   fill = true,
   handle,
+  busy,
 }: Props<T>) {
   const { colors, shadows } = useTheme()
   // fontScale : la taille de texte choisie sur l'appareil. Très agrandie, les choix vont à la ligne.
@@ -118,6 +131,12 @@ export function Segmented<T extends string>({
   const tabStop = checkedIndex === -1 ? 0 : checkedIndex
   // Un choix qui attend son nombre ne se choisit pas encore ; le choix actif, lui, reste actif.
   const waits = (index: number) => options[index]?.waiting === true && index !== checkedIndex
+  // R18 : un choix en cours fige le contrôle, sans le rendre inactif (il garde son focus, et se
+  // lit « occupé », pas « indisponible »).
+  const locked = busy !== undefined
+  const choose = (next: T) => {
+    if (!locked) onChange(next)
+  }
 
   // La bande qui défile : sa largeur visible, sa position, et la place de chaque choix, gardées
   // dans des refs (les lire ne redessine rien).
@@ -160,9 +179,11 @@ export function Segmented<T extends string>({
               // preventDefault : l'espace ne fait pas défiler la page. Une touche gardée enfoncée
               // (repeat) ne rechoisit pas dix fois le même choix.
               event.preventDefault()
-              if (!event.repeat && !waits(index)) onChange(options[index]?.value ?? value)
+              if (!event.repeat && !waits(index)) choose(options[index]?.value ?? value)
             } else if (step !== 0) {
               event.preventDefault()
+              // Un choix en cours : ni la coche ni le focus ne bougent.
+              if (locked) return
               // Le voisin qui peut se choisir, en sautant ceux qui attendent leur nombre (et en
               // faisant le tour) ; aucun : le focus reste où il est.
               let next = index
@@ -185,6 +206,7 @@ export function Segmented<T extends string>({
   const choices = options.map((option, index) => {
     const checked = option.value === value
     const disabled = waits(index)
+    const working = busy !== undefined && option.value === busy
     return (
       <Pressable
         key={option.value}
@@ -202,7 +224,9 @@ export function Segmented<T extends string>({
             ? { 'aria-disabled': true }
             : { accessibilityState: { checked, disabled: true } }
           : null)}
-        onPress={() => onChange(option.value)}
+        // R18 : l'option touchée, en cours (`aria-busy`, lu sur le web comme sur téléphone).
+        {...(working ? { 'aria-busy': true } : null)}
+        onPress={() => choose(option.value)}
         onLayout={measurePlace(index)}
         {...keys(index)}
         // L'anneau du clavier à l'intérieur du choix : la bande qui défile rognerait un anneau
@@ -229,14 +253,36 @@ export function Segmented<T extends string>({
         ) : null}
         {/* Le choix actif : l'encre sur la goutte, jour et nuit (paire de contraste
             onHoney / surfaceRaised dans packages/brand/src/colors.ts). */}
-        <Text
-          variant="callout"
-          weight={checked ? 700 : 500}
-          tone={checked ? 'onHoney' : 'muted'}
-          align="center"
-        >
-          {option.label}
-        </Text>
+        {/* R18 : en cours, la roue se pose sur le texte, qui garde sa place sans se voir : la
+            goutte et la rangée gardent leur taille, avant comme après. */}
+        <View style={{ flexShrink: 1, minWidth: 0 }}>
+          <View style={working ? { opacity: 0 } : null}>
+            <Text
+              variant="callout"
+              weight={checked ? 700 : 500}
+              tone={checked ? 'onHoney' : 'muted'}
+              align="center"
+            >
+              {option.label}
+            </Text>
+          </View>
+          {working ? (
+            <View
+              {...hiddenFromReaders}
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ActivityIndicator size="small" color={colors.textMuted} />
+            </View>
+          ) : null}
+        </View>
         {option.waiting ? (
           // La place du nombre (« 6 », « 20+ »), à la hauteur d'une ligne du libellé : la goutte
           // et la rangée gardent leur taille quand il arrive.
