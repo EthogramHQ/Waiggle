@@ -10,6 +10,7 @@
 
 import { type FontWeight, radii, textStyles } from '@ruche/brand'
 import { foldForSearch, foldWithMap } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import type { ReactElement } from 'react'
 import { Text as NativeText, Platform, type TextStyle } from 'react-native'
 import { Text, type TextProps } from './Text'
@@ -104,17 +105,20 @@ export function HighlightedText({ text, words, ...props }: HighlightedTextProps)
     ...weight,
     ...markShape,
   }
+  // Les morceaux sont découpés sur le texte enregistré, puis affichés avec la ponctuation protégée
+  // (R18) : `keepPunctuation` garde la longueur, les positions restent donc justes.
+  const shown = keepPunctuation(text)
   const parts: (string | ReactElement)[] = []
   let from = 0
   for (const [start, end] of ranges) {
-    if (start > from) parts.push(text.slice(from, start))
+    if (start > from) parts.push(shown.slice(from, start))
     parts.push(
       <NativeText key={start} style={mark}>
-        {text.slice(start, end)}
+        {shown.slice(start, end)}
       </NativeText>,
     )
     from = end
   }
-  if (from < text.length) parts.push(text.slice(from))
+  if (from < text.length) parts.push(shown.slice(from))
   return <Text {...props}>{parts}</Text>
 }

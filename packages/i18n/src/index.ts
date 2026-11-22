@@ -107,3 +107,4 @@ export const parseAcceptLanguage = (header: string | undefined | null): string[]
       .map(({ tag }) => tag)
   )
 }
+export { keepPunctuation } from './spacing'
