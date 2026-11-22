@@ -34,10 +34,12 @@ Ce qui se fait tout seul :
 - **les certificats HTTPS** : Caddy les obtient et les renouvelle seul ;
 - **après un redémarrage** : les conteneurs repartent seuls.
 
-Ce qui ne se fait pas tout seul : **déployer une nouvelle version**. Louis fusionne une pull
-request, la CI publie les images, puis Louis demande à l'assistant de code de déployer. L'assistant de code lance
-alors `infra/deploy-from-pc.sh`, qui vérifie d'abord que les images ont bien été construites par
-la CI de main (leur « attestation de provenance »), puis les met en ligne par leur empreinte.
+Ce qui ne se fait pas tout seul : **déployer une nouvelle version**. Louis approuve et fusionne
+une pull request, la CI publie les images, puis l'assistant de code déploie le commit de fusion
+depuis vps-dev (`waiggle-deployer`, plus bas : « Le déploiement de nuit depuis vps-dev »), ou
+depuis le PC par `infra/deploy-from-pc.sh`. Les deux chemins vérifient d'abord que les images ont
+bien été construites par la CI de main (leur « attestation de provenance »), puis les mettent en
+ligne par leur empreinte.
 
 ## 2. Ce que Louis fait lui-même
 
@@ -215,13 +217,17 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
   enregistrements mail (SPF, DKIM, DMARC, MX) ; c'est arrivé à `waiggle.io` le 23/10/2026.
 
   Pour DMARC, commence par `p=none` : on observe d'abord, on durcit ensuite. L'enregistrement de
-  `waiggle.com` est aujourd'hui `v=DMARC1; p=none; sp=reject; rua=mailto:contact@waiggle.com` :
-  les rapports des messageries (adresse `rua`) arrivent dans la boîte `contact@` (depuis le
-  24/10/2026 ; audit de sécurité du 25/10, C10), et `sp=reject` refuse tout e-mail d'un
-  sous-domaine qui n'envoie rien (depuis le 25/10). Avant de passer à `p=quarantine` (prévu
-  mi-novembre 2026, décision du 7/11) : ces rapports montrent Scaleway (et Brevo, s'il envoie) en
-  SPF ou DKIM `pass`, et Louis lit `dkim=pass` et `dmarc=pass` dans les en-têtes d'un vrai e-mail
-  reçu de Waiggle. Le changement d'enregistrement est une action de Louis.
+  `waiggle.com` est aujourd'hui `v=DMARC1; p=quarantine; sp=reject; rua=mailto:contact@waiggle.com`
+  (depuis le 22/11/2026) :
+  - les rapports des messageries (adresse `rua`) arrivent dans la boîte `contact@` (depuis le
+    24/10/2026 ; audit de sécurité du 25/10, C10) ;
+  - `sp=reject` refuse tout e-mail d'un sous-domaine qui n'envoie rien (depuis le 25/10) ;
+  - `p=quarantine` envoie dans les spams un e-mail qui se dit de `waiggle.com` sans passer SPF ou
+    DKIM.
+
+  On n'est passé de `p=none` à `p=quarantine` qu'une fois que les en-têtes d'un vrai e-mail de
+  Waiggle montraient SPF, DKIM et DMARC à `pass`. Prochaine marche possible : `p=reject`, avec la
+  même vérification. Changer l'enregistrement est une action de Louis, dans hPanel.
 
 - **MTA-STS et TLS-RPT** (audit de sécurité du 7/11/2026) : les e-mails reçus à `contact@waiggle.com`
   voyagent d'un serveur de messagerie à l'autre. Sans règle, un intermédiaire peut retirer le
@@ -464,7 +470,13 @@ instructions.
 ### Déployer une nouvelle version
 
 Après la fusion d'une pull request, attendre que la CI de main soit verte : le job « Publish
-images » doit être terminé. Puis, depuis le dossier du dépôt sur le PC :
+images » doit être terminé. Puis, depuis vps-dev, avec le commit de fusion en entier :
+
+```bash
+sudo -n /usr/local/sbin/waiggle-deployer <commit de fusion, 40 caractères>
+```
+
+Ou, depuis le dossier du dépôt sur le PC :
 
 ```bash
 infra/deploy-from-pc.sh
@@ -476,7 +488,8 @@ pas** : on prévient Louis.
 
 ### Le déploiement de nuit depuis vps-dev : le gardien
 
-vps-dev peut aussi déployer seul, la nuit (`infra/vps-dev/contrat.md`, partie A). Il se connecte
+vps-dev déploie le commit de fusion dès que Louis a fusionné, de jour comme de nuit
+(`infra/vps-dev/contrat.md`, partie A ; le nom « de nuit » vient de son premier usage). Il se connecte
 avec deux clés à lui, et chacune ne peut lancer qu'une seule commande sur la production : le
 **gardien**, `infra/production/waiggle-deploy-force`. Le gardien n'accepte que deux demandes,
 `version` (la version en service) et `deploy <commit> <image api> <image web>`, comparées en
@@ -567,7 +580,8 @@ lit que pour la comparer.
 ### Revenir en arrière
 
 - **Sans changement de la base** (la plupart des cas) : redéployer le commit précédent, affiché à
-  la fin du déploiement raté.
+  la fin du déploiement raté. C'est Louis seul qui le fait : depuis vps-dev, sous `admin`, par le
+  script de retour (`infra/vps-dev/installation.md`, « L'usage »), ou depuis le PC :
 
   ```bash
   infra/deploy-from-pc.sh <commit précédent>
@@ -964,8 +978,9 @@ images inutilisées depuis plus d'une semaine.
   - l'état du domaine chez Scaleway : vérifié, et les enregistrements DNS toujours en place ;
   - les logs de `api`.
 - **La connexion SSH a coupé pendant un déploiement** : regarder `compose ps` et la version de
-  `/health`, puis relancer `infra/deploy-from-pc.sh <même commit>`. Le déploiement peut être
-  rejoué sans risque.
+  `/health`, puis relancer le même commit : `sudo -n /usr/local/sbin/waiggle-deployer <même commit>`
+  depuis vps-dev, ou `infra/deploy-from-pc.sh <même commit>` depuis le PC. Le déploiement peut
+  être rejoué sans risque.
 - **Plus d'accès SSH** : la console de hPanel (VNC). Elle ne passe pas par SSH.
 - **Le serveur est perdu** : restaurer la dernière sauvegarde hebdomadaire de Hostinger (le
   serveur entier, dans hPanel), avec l'accord explicite de Louis. Puis, comme après toute
@@ -985,7 +1000,8 @@ Par défaut, l'assistant de code demande ton accord avant chaque commande. Pour 
 autorise dans tes réglages locaux (jamais dans le dépôt) **seulement des commandes exactes, sans
 joker** :
 
-- le déploiement : `infra/deploy-from-pc.sh` ;
+- le déploiement : `sudo -n /usr/local/sbin/waiggle-deployer` sur vps-dev (son `sudoers` le permet
+  déjà), ou `infra/deploy-from-pc.sh` sur le PC ;
 - l'état des conteneurs : `ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose ps'` ;
 - une sauvegarde : `ssh waiggle /srv/ruche/repo/infra/backup.sh manuel`.
 

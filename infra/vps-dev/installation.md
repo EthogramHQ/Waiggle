@@ -17,6 +17,11 @@ fichier dit comment les installer, et les gestes que Louis fait à la main. Aucu
 Sous `admin`, sur vps-dev. Les commandes qui touchent un secret le lisent au terminal, jamais dans
 un argument ni dans un tube : `ps` montre les lignes de commande à tous les comptes.
 
+0. **Un `gh` récent, sur vps-dev comme sur la production.** Celui de Debian (2.46) ne sait pas
+   vérifier une attestation par empreinte : `waiggle-deployer` refuse alors à l'étape 9, sans rien
+   déployer (vu au premier essai, le 21/11/2026). Installer celui du dépôt de GitHub
+   (2.105 le 21/11/2026), puis vérifier `gh --version`.
+
 1. **L'adresse de la production.** Dans `waiggle-deployer` et `waiggle-retour`, la ligne
    `PRODUCTION=louis@…` du bloc des chemins porte l'IPv4 de la production. Elle doit être juste
    **dans le commit installé** (l'installation compare chaque fichier au commit) : la corriger par
@@ -37,11 +42,21 @@ un argument ni dans un tube : `ps` montre les lignes de commande à tous les com
    ```sh
    sudo /usr/bin/env GH_CONFIG_DIR=/root/.config/waiggle-deploy/gh gh auth login --hostname github.com --git-protocol https --with-token
    ```
-   Colle le jeton **au terminal**, Entrée, puis Ctrl-D. Vérifie ensuite que
-   `/root/.config/waiggle-deploy/gh/` et son contenu sont à root, en 0700 et 0600.
-4. **Le premier `fetch`**, à la main, mot pour mot celui du script (contrat, A3) :
+   Colle le jeton **au terminal**, Entrée, puis Ctrl-D. `gh` crée son dossier avec les droits par
+   défaut : les resserrer, puis vérifier (root partout, 0700 pour le dossier, 0600 pour les
+   fichiers) :
    ```sh
-   sudo git -C /srv/waiggle-deploy/depot.git -c credential.helper= -c "credential.helper=!/usr/bin/env GH_CONFIG_DIR=/root/.config/waiggle-deploy/gh /usr/bin/gh auth git-credential" fetch --quiet --no-tags --prune https://github.com/EthogramHQ/Waiggle.git +refs/heads/main:refs/remotes/origin/main
+   sudo chmod 0700 /root/.config/waiggle-deploy/gh
+   sudo sh -c 'chmod 0600 /root/.config/waiggle-deploy/gh/*'
+   sudo ls -la /root/.config/waiggle-deploy/gh
+   ```
+   (`sudo sh -c '…'` : le `*` doit être lu par root ; sinon c'est le shell d'`admin`, qui ne voit
+   pas dans le dossier, qui le remplace, et la commande échoue.)
+4. **Le premier `fetch`**, à la main, le même que celui du script (contrat, A3). Les guillemets
+   sont simples : dans un terminal, un `!` entre guillemets doubles rappelle une commande de
+   l'historique au lieu de rester un `!`.
+   ```sh
+   sudo git -C /srv/waiggle-deploy/depot.git -c credential.helper= -c 'credential.helper=!/usr/bin/env GH_CONFIG_DIR=/root/.config/waiggle-deploy/gh /usr/bin/gh auth git-credential' fetch --quiet --no-tags --prune https://github.com/EthogramHQ/Waiggle.git +refs/heads/main:refs/remotes/origin/main
    ```
 
 ## L'installation (et chaque mise à jour)
@@ -68,7 +83,9 @@ ne touche ni au `sudoers`, ni aux clés, ni au jeton, ni au sujet ntfy, ni à `k
 
 ## Les gestes de Louis après la première installation, dans l'ordre
 
-1. **Le `sudoers`** : `sudo visudo -f <le fichier de l'aperçu de louis>`, et ajouter
+1. **Le `sudoers`** : trouver le fichier de l'aperçu de `louis` par
+   `sudo sh -c 'grep -l pilote-deployer /etc/sudoers.d/*'` (le `*` lu par root : `admin` ne voit
+   pas dans `/etc/sudoers.d`), puis `sudo visudo -f <ce fichier>`, et ajouter
    `/usr/local/sbin/waiggle-deployer` à l'alias de l'aperçu de `louis` (celui qui porte déjà
    `pilote-deployer`). Jamais `waiggle-retour` ; ni `SETENV`, ni `env_keep`, ni `!env_reset`.
 2. **Les deux clés de root** :
@@ -120,7 +137,8 @@ Sur vps-dev, sous `admin` :
   chaque maillon est à root, et non inscriptible par le groupe ni par les autres ;
 - `sysctl kernel.yama.ptrace_scope` : 1 au moins ;
 - `sudo ssh -F /dev/null -4 -i /root/.ssh/waiggle-prod <production> id` : refusé par le gardien ;
-  `… -N -L 1:127.0.0.1:22 <production>` : refusé ;
+  `… -W 127.0.0.1:22 <production>` : refusé (le relais demandé tout de suite ; avec `-N -L`, rien
+  n'est demandé avant une connexion au port local, et la commande attend sans rien montrer) ;
 - `sudo ssh-keygen -y -f /root/.ssh/waiggle-retour` : demande la phrase de passe.
 
 Depuis une autre machine : la clé de déploiement est refusée par `from=`.
@@ -131,8 +149,9 @@ le faux `gh` des tests.
 Sur GitHub :
 - `gh api repos/EthogramHQ/Waiggle/collaborators/<compte machine>/permission --jq .permission` :
   `read` ;
-- « Fork pull request workflows » : ni jeton en écriture, ni secrets envoyés aux PR de fork, sans
-  approbation à chaque exécution ;
+- les PR de fork : sur un dépôt public, GitHub ne leur donne jamais de jeton en écriture ni de
+  secrets, et les cases « Send write tokens » et « Send secrets » n'existent pas. Reste à voir le
+  réglage « Approval for running fork pull request workflows » (Settings, Actions, General) ;
 - la fusion par rebase est désactivée ;
 - `gh api user --jq .id`, sous le compte de Louis : la valeur de `ID_LOUIS` dans
   `waiggle-deployer` ;
