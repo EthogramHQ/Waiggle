@@ -77,8 +77,9 @@ Chaque fonctionnalité est une tranche verticale, dans cet ordre :
    - le juridique et l'éthique, si la tranche touche aux données, aux e-mails, à l'IA ou à la
      modération.
 7. **Le bilan pour Louis**, selon ses consignes personnelles, gardées hors du dépôt.
-8. Une branche et une pull request par fonctionnalité. **Rien n'est fusionné ni déployé sans
-   l'accord écrit de Louis, donné pour cette pull request ou ce commit.**
+8. Une branche et une pull request par fonctionnalité. **Rien n'est fusionné sans l'approbation de
+   Louis sur GitHub, donnée à la dernière poussée de cette pull request ; c'est lui qui fusionne.**
+   Le déploiement suit la fusion : on ne fusionne que ce qui peut partir tout de suite.
 
 Toute fonctionnalité non triviale commence par un plan, validé avant le code. Si un scénario est ambigu, pose la question
 plutôt que d'inventer une règle métier.
@@ -199,4 +200,4 @@ le PC de Louis, par `ssh waiggle`.
 - `pnpm check` est vert, la CI aussi.
 - Les textes existent en français et en anglais.
 - Les relectures n'ont relevé aucun problème bloquant.
-- Louis a approuvé la pull request, par écrit et en la nommant.
+- Louis a approuvé la dernière poussée de la pull request sur GitHub, puis l'a fusionnée.

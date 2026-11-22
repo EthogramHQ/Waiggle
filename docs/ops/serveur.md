@@ -488,7 +488,8 @@ pas** : on prévient Louis.
 
 ### Le déploiement de nuit depuis vps-dev : le gardien
 
-vps-dev peut aussi déployer seul, la nuit (`infra/vps-dev/contrat.md`, partie A). Il se connecte
+vps-dev déploie le commit de fusion dès que Louis a fusionné, de jour comme de nuit
+(`infra/vps-dev/contrat.md`, partie A ; le nom « de nuit » vient de son premier usage). Il se connecte
 avec deux clés à lui, et chacune ne peut lancer qu'une seule commande sur la production : le
 **gardien**, `infra/production/waiggle-deploy-force`. Le gardien n'accepte que deux demandes,
 `version` (la version en service) et `deploy <commit> <image api> <image web>`, comparées en
@@ -977,8 +978,9 @@ images inutilisées depuis plus d'une semaine.
   - l'état du domaine chez Scaleway : vérifié, et les enregistrements DNS toujours en place ;
   - les logs de `api`.
 - **La connexion SSH a coupé pendant un déploiement** : regarder `compose ps` et la version de
-  `/health`, puis relancer `infra/deploy-from-pc.sh <même commit>`. Le déploiement peut être
-  rejoué sans risque.
+  `/health`, puis relancer le même commit : `sudo -n /usr/local/sbin/waiggle-deployer <même commit>`
+  depuis vps-dev, ou `infra/deploy-from-pc.sh <même commit>` depuis le PC. Le déploiement peut
+  être rejoué sans risque.
 - **Plus d'accès SSH** : la console de hPanel (VNC). Elle ne passe pas par SSH.
 - **Le serveur est perdu** : restaurer la dernière sauvegarde hebdomadaire de Hostinger (le
   serveur entier, dans hPanel), avec l'accord explicite de Louis. Puis, comme après toute
@@ -998,7 +1000,8 @@ Par défaut, l'assistant de code demande ton accord avant chaque commande. Pour 
 autorise dans tes réglages locaux (jamais dans le dépôt) **seulement des commandes exactes, sans
 joker** :
 
-- le déploiement : `infra/deploy-from-pc.sh` ;
+- le déploiement : `sudo -n /usr/local/sbin/waiggle-deployer` sur vps-dev (son `sudoers` le permet
+  déjà), ou `infra/deploy-from-pc.sh` sur le PC ;
 - l'état des conteneurs : `ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose ps'` ;
 - une sauvegarde : `ssh waiggle /srv/ruche/repo/infra/backup.sh manuel`.
 
