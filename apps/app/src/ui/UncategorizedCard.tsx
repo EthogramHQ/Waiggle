@@ -8,6 +8,7 @@
 // vérifier le projet rangé. Tout ce que le membre a écrit (titre, accroche) s'affiche en texte brut.
 import { borders, radii, space } from '@ruche/brand'
 import type { UncategorizedProject } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -72,14 +73,14 @@ export function UncategorizedCard({
         {/* Le titre, un lien vers la page du projet : rangé à gauche, jamais plus large que la
             carte (un titre long passe à la ligne dans son lien). */}
         <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
-          <TextLink label={project.title} onPress={openGuard(onOpenProject)} />
+          <TextLink label={keepPunctuation(project.title)} onPress={openGuard(onOpenProject)} />
         </View>
         <Text variant="caption" tone="muted">
           {project.author.name}
         </Text>
       </View>
       <Text variant="callout" tone="secondary" selectable>
-        {project.pitch}
+        {keepPunctuation(project.pitch)}
       </Text>
       <DecidedZone
         result={

@@ -28,6 +28,7 @@ import type {
   TesterMessageKind,
   TesterRole,
 } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, Platform, View } from 'react-native'
@@ -279,7 +280,7 @@ export function MessageBubble({
       {head}
       {text ? (
         <Text variant="callout" breakAnywhere selectable>
-          {text}
+          {keepPunctuation(text)}
         </Text>
       ) : null}
       {captureRemoval ? (
