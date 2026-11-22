@@ -11,13 +11,16 @@
 // Sans relais, l'appli marche, sans passage.
 //
 // **Le Retour du navigateur.** `src/ui` n'importe pas `navigation/` : c'est donc ce relais qui écoute
-// `popstate` (par backRelay.ts, avant Expo Router) et le dit au moteur (`notePopState`).
+// `popstate` (par backRelay.ts, avant Expo Router) et le dit au moteur (`notePopState`), puis au
+// focus à l'arrivée (R18, ui/arrivalFocus.ts), que le relais prévient aussi de chaque passage.
 //
 // Importé par `index.ts` après backRelay et avant `expo-router/entry`. Rien sur iOS et Android : la
 // pile native anime elle-même ses pages.
 import { routingQueue } from 'expo-router/build/global-state/routingQueue'
 import { Platform } from 'react-native'
+import { focusAfterPopState, focusArrival, rememberOrigin } from '../ui/arrivalFocus'
 import {
+  afterPassage,
   expectPopState,
   notePopState,
   passageBusy,
@@ -56,14 +59,25 @@ const install = (page: RelayWindow & { location?: { pathname?: string } }) => {
     // `Redirect`) n'est jamais ignoré : il attend la fin du passage.
     if (busy && event === 'PUSH' && href !== undefined && href === passingTo) return
     const kind = classifyPassage(link, page.location?.pathname ?? '/', takeHint())
+    // R18 : l'élément qui a le focus est retenu avant le passage (l'origine, rendue au Retour), et
+    // la page arrivée reçoit le focus à la fin du passage (ui/arrivalFocus.ts). Un passage `none`
+    // (une feuille, un préchargement) n'y touche pas.
+    const watched = kind !== 'none'
+    if (watched) rememberOrigin(kind)
     runPassage(kind, () => {
       if (goesBackInHistory(link)) expectPopState()
       send.call(routingQueue, action)
     })
+    if (watched) afterPassage(focusArrival)
     if (!busy && passageBusy()) passingTo = href
   }
 
-  listenPopState(page, () => notePopState())
+  listenPopState(page, () => {
+    notePopState()
+    // Le Retour du navigateur : l'origine de l'entrée retrouvée reprend le focus. Celui qui suit
+    // notre propre Retour, déjà retenu ci-dessus, n'ajoute rien.
+    focusAfterPopState()
+  })
 }
 
 // Au chargement : sur le web seulement (ni téléphone, ni pré-rendu, où `window` n'existe pas).
