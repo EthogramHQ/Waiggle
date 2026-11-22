@@ -51,6 +51,10 @@ const fr = {
   waiting:
     'Pendant la recherche (R16) : les vrais noms des onglets, une pièce vide à la place de chaque nombre ; « Tout » reste choisi, les autres attendent.',
   waitingTabs: ['Tout', 'Projets', 'Membres', 'Outils'],
+  busy: 'Un choix en cours (R18) : « EN » touché, la langue anglaise se charge ; l’option est annoncée occupée, une roue à la place de son texte, « FR » reste choisi et aucun autre choix ne part.',
+  language: 'Langue',
+  french: 'Français',
+  english: 'English',
   initials:
     'Les initiales d’un avatar sans photo suivent la taille du rond, de 96 à 20 points, et n’en sortent jamais, même avec le texte agrandi.',
   radioTitle: 'Pourquoi le signales-tu ?',
@@ -93,6 +97,10 @@ const en: typeof fr = {
   waiting:
     'While searching (R16): the real names of the tabs, an empty piece in place of each count; “All” stays checked, the others wait.',
   waitingTabs: ['All', 'Projects', 'Members', 'Tools'],
+  busy: 'A choice in progress (R18): “EN” touched, English is loading; the option is announced busy, a spinner in place of its text, “FR” stays checked and no other choice goes through.',
+  language: 'Language',
+  french: 'Français',
+  english: 'English',
   initials:
     'The initials of an avatar without a photo follow the size of the round, from 96 to 20 points, and never leave it, even with larger text.',
   radioTitle: 'Why are you reporting it?',
@@ -236,6 +244,33 @@ export function ControlsCatalogue() {
           waiting: index > 0,
         }))}
         value="0"
+        onChange={noop}
+      />
+
+      {/* R18 : le choix de la langue du visiteur, compact (« FR », « EN ») puis en toutes lettres,
+          pendant que l'anglais se charge. */}
+      <Text variant="caption" tone="muted">
+        {l.busy}
+      </Text>
+      <Segmented
+        label={l.language}
+        fill={false}
+        options={[
+          { value: 'fr', label: 'FR', spokenLabel: l.french },
+          { value: 'en', label: 'EN', spokenLabel: l.english },
+        ]}
+        value="fr"
+        busy="en"
+        onChange={noop}
+      />
+      <Segmented
+        label={l.language}
+        options={[
+          { value: 'fr', label: l.french },
+          { value: 'en', label: l.english },
+        ]}
+        value="fr"
+        busy="en"
         onChange={noop}
       />
 
