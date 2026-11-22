@@ -284,7 +284,7 @@ decoded_sha() { # decoded_sha <br|zstd> <adresse> : l'empreinte du corps reçu, 
       console.log(require("node:crypto").createHash("sha256").update(plain).digest("hex"));
     });' "$1"
 }
-same_headers() { # same_headers <br|zstd> : les en-têtes à comparer, un par ligne
+same_headers() { # same_headers <br|zstd|identity> : les en-têtes à comparer, un par ligne
   headers_of -H "Accept-Encoding: $1" "https://$APP_HOST$script" |
     grep -E '^(content-type|cache-control|x-content-type-options|vary):'
 }
@@ -293,11 +293,16 @@ for coding in br zstd; do
     die "$script : pas servi en $coding"
 done
 expect "$script : en-têtes en br et en zstd" "$(same_headers br)" "$(same_headers zstd)"
+# Et les mêmes que sans compression (relecture de sécurité R18, A1) : un `Content-Type` changé sur
+# les seuls fichiers précompressés ferait refuser le script par le navigateur (`nosniff`). La
+# réponse non compressée n'a pas `vary` : on le retire des deux côtés.
+expect "$script : en-têtes compressés comme sans compression" \
+  "$(same_headers br | grep -v '^vary:')" "$(same_headers identity | grep -v '^vary:')"
 grep -qx 'vary: accept-encoding' <<<"$(same_headers br)" || die "$script : « vary: accept-encoding » manquant"
 plain_sha=$(web -H 'Accept-Encoding: identity' "https://$APP_HOST$script" | sha256sum | cut -d' ' -f1)
 expect "$script : contenu en br" "$(decoded_sha br "https://$APP_HOST$script")" "$plain_sha"
 expect "$script : contenu en zstd" "$(decoded_sha zstd "https://$APP_HOST$script")" "$plain_sha"
-echo "ok : $script en br et zstd, mêmes en-têtes, même contenu"
+echo "ok : $script en br et zstd, mêmes en-têtes que sans compression, même contenu"
 # Une page publique n'est jamais précompressée : Caddy la lit comme un gabarit à chaque visite.
 page_br=$(headers_of -H 'Accept-Encoding: br' "https://$APP_HOST/fr/")
 if grep -qx 'content-encoding: br' <<<"$page_br"; then die "/fr/ : précompressée en brotli"; fi
