@@ -102,8 +102,9 @@ describe('member routes loaded on demand', () => {
   it.each(PAGES)('loads $screen on demand with the page skeleton ($file)', (route) => {
     const call = lazyCallOf(route)
     expect(call).toMatch(new RegExp(`navigation/chunks/${route.chunk}'`))
-    // Les réglages de `lazyScreen` (son second argument) donnent la forme du squelette.
-    expect(call).toMatch(/\bshape\s*:\s*'[a-z]+'/)
+    // Les réglages de `lazyScreen` (son second argument) donnent la forme du squelette commun, ou,
+    // R18 (relecture de design), l'attente propre à l'écran (`loading`), à sa largeur.
+    expect(call).toMatch(/\bshape\s*:\s*'[a-z]+'|\bloading\s*:\s*[A-Z]\w+/)
   })
 
   it('loads the hive creation sheet on demand as a sheet, without a page skeleton', () => {
@@ -129,6 +130,14 @@ describe('member routes loaded on demand', () => {
       expect.arrayContaining(['HiveCreateSheet', 'HiveScreen', 'HivesScreen']),
     )
     expect(exported('hives')).not.toEqual(expect.arrayContaining(['ExploreScreen']))
+  })
+
+  // R18 (relecture de design) : l'attente propre d'un écran (`loading`, screens/HivesLoading.tsx…)
+  // part avec sa route dans le script de départ ; elle ne doit y ramener aucun de ces écrans.
+  it.each([...PAGES, SHEET])('reaches no member screen through the imports of $file', (route) => {
+    const screens = MEMBER_SCREENS.map((screen) => `src/screens/${screen}.tsx`)
+    const reached = reachedFrom([route.file])
+    expect(screens.filter((screen) => reached.has(screen))).toEqual([])
   })
 
   it('reaches none of these screens from app/index.tsx or app/_layout.tsx', () => {

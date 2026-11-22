@@ -5,16 +5,18 @@
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { lazyScreen } from '../../src/navigation/lazyScreen'
+import { HivesLoading } from '../../src/screens/HivesLoading'
 
 // La feuille : rien ne s'affiche pendant son morceau, la page d'avant reste visible dessous.
 const HiveCreateSheet = lazyScreen(
   () => import('../../src/navigation/chunks/hives').then((m) => m.HiveCreateSheet),
   { sheet: true },
 )
-// L'onglet Ruches, posé dessous seulement si l'on arrive par un lien direct.
+// L'onglet Ruches, posé dessous seulement si l'on arrive par un lien direct ; pendant son morceau,
+// l'attente de l'onglet, à sa largeur (comme app/hives.tsx).
 const HivesScreen = lazyScreen(
   () => import('../../src/navigation/chunks/hives').then((m) => m.HivesScreen),
-  { shape: 'list' },
+  { loading: HivesLoading },
 )
 
 export default function HiveCreatePage() {

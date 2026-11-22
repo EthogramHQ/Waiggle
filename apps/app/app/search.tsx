@@ -1,10 +1,13 @@
 // Page : la recherche par mots (« /search?q=carn »). L'écran lit lui-même `q` dans l'adresse ; il se
-// charge quand on ouvre la page (R18, navigation/lazyScreen.tsx), avec un squelette de liste.
+// charge quand on ouvre la page (R18, navigation/lazyScreen.tsx), avec l'attente de la page elle-même
+// (`SearchWaiting`, un module léger) : dès 1 280 points, le gabarit large, sans quoi la barre du haut
+// rétrécissait (relecture de design R18).
 import { lazyScreen } from '../src/navigation/lazyScreen'
+import { SearchWaiting } from '../src/screens/SearchWaiting'
 
 const SearchScreen = lazyScreen(
   () => import('../src/navigation/chunks/explore').then((m) => m.SearchScreen),
-  { shape: 'list', width: 'page' },
+  { loading: SearchWaiting },
 )
 
 export default function SearchPage() {
