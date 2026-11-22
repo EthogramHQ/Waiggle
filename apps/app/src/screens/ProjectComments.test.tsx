@@ -7,6 +7,7 @@
 // Les aides communes (la feuille, le champ, le menu, les touches, le focus) sont dans
 // ProjectComments.testkit.tsx.
 import type { Comment, Project } from '@ruche/contracts'
+import { keepPunctuation } from '@ruche/i18n'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { createRef } from 'react'
 import { Platform, View } from 'react-native'
@@ -536,10 +537,10 @@ describe('writing a comment in the sheet', () => {
     )
 
     const shown = sheet().getAllByText(/^(Bravo !|Ça marche aussi en anglais \?)$/)
-    expect(shown.map((node) => node.props.children)).toEqual([
-      'Bravo !',
-      'Ça marche aussi en anglais ?',
-    ])
+    // R18 : l'espace tapée devant ! et ? s'affiche insécable (keepPunctuation).
+    expect(shown.map((node) => node.props.children)).toEqual(
+      ['Bravo !', 'Ça marche aussi en anglais ?'].map(keepPunctuation),
+    )
     expect(screen.getAllByRole('header', { name: 'Commentaires, 2 commentaires' })).toHaveLength(2)
   })
 
