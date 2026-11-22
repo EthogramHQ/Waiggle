@@ -1,7 +1,15 @@
-// Page : l'onglet Ruches (« /hives ») : mes invitations, mes ruches, « Créer une ruche » (R10).
-import { HivesScreen } from '../src/screens/HivesScreen'
+// Page : l'onglet Ruches (« /hives ») : mes invitations, mes ruches, « Créer une ruche » (R10). Il se
+// charge quand on ouvre la page, pas avec l'accueil (R18, navigation/lazyScreen.tsx).
+import { lazyScreen } from '../src/navigation/lazyScreen'
 
-export default HivesScreen
+const HivesScreen = lazyScreen(
+  () => import('../src/navigation/chunks/hives').then((m) => m.HivesScreen),
+  { shape: 'list' },
+)
 
-// Si la page plante, un écran de secours s'affiche à sa place.
+export default function HivesPage() {
+  return <HivesScreen />
+}
+
+// Si la page plante, ou si son morceau manque, un écran de secours s'affiche à sa place.
 export { RouteErrorBoundary as ErrorBoundary } from '../src/ui/RouteErrorBoundary'
