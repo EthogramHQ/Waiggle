@@ -44,6 +44,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
+import { useArrivalTitle } from './arrivalFocus'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { CoverReturnScope, useCoverReturn } from './coverTransition'
@@ -73,6 +74,16 @@ import { markHydrated } from './theme/hydration'
 import { ContentWidthContext, useLayout, wideContentWidth } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
+
+/**
+ * Donne `node` à une ref passée par l'écran, quelle que soit sa forme : une fonction (« ref de
+ * rappel », appelée avec la vue) ou un objet `{ current }` (`useRef`, `createRef`). C'est ce que
+ * React fait lui-même d'une ref posée sur une vue ; ici, une seule vue sert deux refs.
+ */
+const shareRef = (ref: Ref<Focusable> | undefined, node: Focusable | null) => {
+  if (typeof ref === 'function') ref(node)
+  else if (ref) ref.current = node
+}
 
 type Props = {
   title?: string
@@ -404,6 +415,21 @@ export function Screen({
   // Seul l'écran affiché soulève le toast : sur le web, la page quittée reste montée, cachée.
   const focused = useScreenFocused()
   useFloatingClaim(focused ? floatingTop : 0)
+  // R18 (le focus à l'arrivée, ui/arrivalFocus.ts) : la vue du titre, affiché ou caché, est donnée
+  // au module, qui y pose le focus quand la page arrive. Seul l'écran affiché la donne (`focused`) :
+  // une page restée montée dessous, cachée, ne compte pas. La vue est tenue ici même si l'écran
+  // ne passe pas de `titleRef` ; s'il en passe une, elle reçoit la même vue (le Fil y rend le focus
+  // après « Nouveautés »). Le titre devient ainsi focalisable par le code seulement
+  // (`tabIndex: -1`, posé par `Text focusRef`), sans être une étape de Tab.
+  const arrivalTitle = useRef<Focusable | null>(null)
+  const titleView = useCallback(
+    (node: Focusable | null) => {
+      arrivalTitle.current = node
+      shareRef(titleRef, node)
+    },
+    [titleRef],
+  )
+  useArrivalTitle(arrivalTitle, focused)
   // RF : combien de fois la route de l'écran est devenue affichée (ui/screenFocus.ts). Chaque
   // arrivée date l'écran auprès de l'hôte de la lumière : la lumière dessinée est celle de l'écran
   // devenu affiché en dernier (ui-11).
@@ -507,7 +533,7 @@ export function Screen({
         asideRef={asideBeside}
         end={stickyInTitle ? sticky : undefined}
         subtitle={subtitle}
-        titleRef={titleRef}
+        titleRef={titleView}
         {...(keepAsideInView
           ? {
               onLayout: aside.onHeadingLayout,
