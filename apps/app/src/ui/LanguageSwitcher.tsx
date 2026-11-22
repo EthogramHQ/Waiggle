@@ -42,9 +42,11 @@ function VisitorChoice({ compact }: { compact: boolean }) {
 
 // En version compacte, le contrôle est posé seul au bout d'une rangée (`Row justify="end"`) : il en
 // prend la largeur, contrôle à droite comme avant, pour que le message d'un échec ait la place de
-// se lire dessous, au lieu de se tasser dans la largeur de « FR / EN ».
-const compactFrame = { flexGrow: 1, flexShrink: 1, alignItems: 'flex-end', gap: space.sm } as const
+// se lire dessous, au lieu de se tasser dans la largeur de « FR / EN ». Le contrôle compact se cale
+// lui-même à gauche (`alignSelf` de `Segmented`) : une vue alignée à droite le ramène au bout.
+const compactFrame = { flexGrow: 1, flexShrink: 1, gap: space.sm } as const
 const fullFrame = { gap: space.sm } as const
+const atEnd = { alignSelf: 'flex-end' } as const
 const stretched = { alignSelf: 'stretch' } as const
 
 function Choice({ compact, choice }: { compact: boolean; choice: LanguageChoice }) {
@@ -58,23 +60,27 @@ function Choice({ compact, choice }: { compact: boolean; choice: LanguageChoice 
     void retry()
   }
 
+  const segmented = (
+    <Segmented<Language>
+      label={t(($) => $.common.language)}
+      // .map() transforme chaque langue en option du contrôle
+      options={supportedLanguages.map((language) => ({
+        value: language,
+        // En version compacte, on affiche le code (« FR ») mais on lit le nom (« Français »).
+        label: compact ? language.toUpperCase() : t(($) => $.common.languages[language]),
+        spokenLabel: t(($) => $.common.languages[language]),
+      }))}
+      value={current}
+      busy={loading}
+      onChange={(language) => void choose(language)}
+      fill={!compact}
+      handle={control}
+    />
+  )
+
   return (
     <View style={compact ? compactFrame : fullFrame}>
-      <Segmented<Language>
-        label={t(($) => $.common.language)}
-        // .map() transforme chaque langue en option du contrôle
-        options={supportedLanguages.map((language) => ({
-          value: language,
-          // En version compacte, on affiche le code (« FR ») mais on lit le nom (« Français »).
-          label: compact ? language.toUpperCase() : t(($) => $.common.languages[language]),
-          spokenLabel: t(($) => $.common.languages[language]),
-        }))}
-        value={current}
-        busy={loading}
-        onChange={(language) => void choose(language)}
-        fill={!compact}
-        handle={control}
-      />
+      {compact ? <View style={atEnd}>{segmented}</View> : segmented}
       {failed ? (
         <View style={stretched}>
           <Notice

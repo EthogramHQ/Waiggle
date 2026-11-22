@@ -3705,6 +3705,9 @@ const fillVisitorReport = async (page) => {
   await page.getByRole('radio', { name: /^Lien, démo ou prompt dangereux/ }).click()
   await page.getByLabel(fr.report.visitor.email).fill('camille.carnot@exemple.fr')
 }
+// R18 : le morceau des textes anglais, chargé à la demande (`ensureLanguage` de `@ruche/i18n`) ;
+// Metro le nomme d'après son module, `en`, suivi de son empreinte.
+const englishChunk = /\/_expo\/static\/js\/web\/en-[0-9a-f]+\.js$/
 // La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
 // servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
 // simulée du contexte), puis la page est relue.
@@ -4496,6 +4499,42 @@ const pages = [
     },
   },
   { name: 'reglages-langue', path: '/settings/language', signedIn: true, fullPage: true },
+  // R18 (« Le premier chargement plus léger ») : l'anglais arrive à la demande. Pendant son
+  // chargement, la ligne touchée est occupée et le français reste coché (le morceau `en-….js` ne
+  // répond jamais) ; s'il n'arrive pas (requête coupée), le français reste, avec le message et
+  // « Réessayer » sous le groupe. Même chose pour le choix du visiteur, sur la connexion.
+  {
+    name: 'reglages-langue-attente',
+    path: '/settings/language',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.route(englishChunk, () => {})
+      await page.getByRole('radio', { name: 'English' }).click()
+      await page.locator('[aria-busy="true"]').first().waitFor()
+    },
+  },
+  {
+    name: 'reglages-langue-echec',
+    path: '/settings/language',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.route(englishChunk, (route) => route.abort())
+      await page.getByRole('radio', { name: 'English' }).click()
+      await page.getByText(fr.account.language.loadFailed).waitFor()
+    },
+  },
+  {
+    name: 'connexion-langue-echec',
+    path: '/sign-in',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.route(englishChunk, (route) => route.abort())
+      await page.getByRole('radio', { name: 'English' }).click()
+      await page.getByText(fr.account.language.loadFailed).waitFor()
+    },
+  },
   { name: 'reglages-apparence', path: '/settings/appearance', signedIn: true, fullPage: true },
   { name: 'reglages-donnees', path: '/settings/data', signedIn: true, fullPage: true },
   { name: 'reglages-securite', path: '/settings/security', signedIn: true, fullPage: true },
