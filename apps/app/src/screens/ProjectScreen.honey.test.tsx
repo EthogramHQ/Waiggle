@@ -16,11 +16,15 @@
 // est relu par `getProject`, qui rend ce que le faux serveur sait (`honeyGiven`).
 import type { Project } from '@ruche/contracts'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import type { ComponentProps } from 'react'
 import { getProject } from '../projects/api'
+import { labelOf } from '../testing/arrivedFocus'
 import { passTapGuard } from '../testing/dialog'
 import { exampleProject, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
+import { focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import type { Sheet } from '../ui/Sheet'
 import { ToastProvider } from '../ui/theme/toast'
 import { gameServer, honeyGifts, leaHarvest, never } from './Game.testkit'
 import { ProjectScreen } from './ProjectScreen'
@@ -28,6 +32,27 @@ import { id, mockPush, resetProjectScreenMocks } from './ProjectScreen.testkit'
 import { pressEscape } from './TestersCorner.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// La vraie feuille, enveloppée : le test lit ses dernières props (nom en `mock`, permis par jest.mock).
+const mockSheet: { props: ComponentProps<typeof Sheet> | null } = { props: null }
+jest.mock('../ui/Sheet', () => {
+  const actual = jest.requireActual('../ui/Sheet')
+  return {
+    ...actual,
+    Sheet: (props: ComponentProps<typeof Sheet>) => {
+      mockSheet.props = props
+      return actual.Sheet(props)
+    },
+  }
+})
+// Les aides de focus, telles quelles, mais dont le test lit les appels.
+jest.mock('../ui/focus', () => {
+  const actual = jest.requireActual('../ui/focus')
+  return {
+    ...actual,
+    focusWithoutScroll: jest.fn((node: unknown) => actual.focusWithoutScroll(node)),
+    moveReaderTo: jest.fn((node: unknown) => actual.moveReaderTo(node)),
+  }
+})
 // Le client réseau : le faux serveur du jeu répond à ses adresses, la liste des catégories est
 // rendue telle quelle, et toute autre demande reçoit « introuvable », jamais le réseau.
 jest.mock('../api/client', () => {
@@ -136,6 +161,9 @@ const openSheet = async () => {
 const sheetShown = () => screen.queryByRole('header', { name: T.sheetTitle }) !== null
 
 beforeEach(() => {
+  mockSheet.props = null
+  jest.mocked(focusWithoutScroll).mockClear()
+  jest.mocked(moveReaderTo).mockClear()
   resetProjectScreenMocks()
   gameServer.reset()
   mockSession({ user: { id: 'u3', name: 'Inès' } })
@@ -230,6 +258,19 @@ describe('the sheet that confirms the gift', () => {
     expect(screen.queryByRole('button', { name: T.offer })).toBeNull()
   })
 
+  it('gives the focus back to « Miel offert » once the honey is offered', async () => {
+    await renderPage()
+    await openSheet()
+    await screen.findByText(T.balance)
+
+    await fireEvent.press(screen.getByRole('button', { name: T.confirm }))
+    await screen.findByRole('button', { name: T.given })
+
+    // Le bouton « Offrir du miel » a disparu au profit de « Miel offert » : l'ouvreur retrouvé par
+    // son nom ne serait plus là, la feuille doit rendre le focus au bouton de la page.
+    expect(labelOf(mockSheet.props?.returnFocusTo?.())).toBe(T.given)
+  })
+
   it('keeps the sheet open while the gift is being sent', async () => {
     gameServer.honeyAnswer = never
     await renderPage()
@@ -270,6 +311,25 @@ describe('a short balance', () => {
     await fireEvent.press(screen.getByRole('button', { name: T.close }))
 
     await waitFor(() => expect(sheetShown()).toBe(false))
+  })
+
+  it('puts the focus on the message when there is not enough honey', async () => {
+    gameServer.honeyAnswer = async () => ({ ok: false, error: 'honeyShort' }) as never
+    await renderPage()
+    await openSheet()
+    await screen.findByText(T.balance)
+    jest.mocked(focusWithoutScroll).mockClear()
+    jest.mocked(moveReaderTo).mockClear()
+
+    await fireEvent.press(screen.getByRole('button', { name: T.confirm }))
+    await screen.findByText(T.how)
+
+    // Les boutons ont disparu avec le focus : il va sur le message, jamais sur la page entière.
+    const reached = [
+      ...jest.mocked(focusWithoutScroll).mock.calls,
+      ...jest.mocked(moveReaderTo).mock.calls,
+    ]
+    expect(reached.some(([node]) => labelOf(node) === fr.t(($) => $.errors.honeyShort))).toBe(true)
   })
 
   it('explains a refusal for a short balance sent back by the server, without the toast', async () => {
