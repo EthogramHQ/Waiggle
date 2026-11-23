@@ -75,15 +75,31 @@ export function ChallengeCard({
           {title}
         </Text>
       ) : null}
-      <Text
-        weight={600}
-        {...(title ? { tone: 'secondary' as const } : null)}
-        {...(labelRef ? { focusRef: labelRef } : null)}
-      >
-        {label}
-      </Text>
-      {/* La jauge, l'avancée et le miel sur une rangée, qui passe à la ligne quand la place
-          manque (320 points, texte à 200 %) : le miel descend, rangé à droite. */}
+      {/* Le libellé et le miel, à sa droite (planche R19-Recolte, « Mon défi ») : la rangée passe
+          à la ligne quand la place manque (320 points, texte à 200 %), le miel descend, rangé à
+          droite. La jauge garde ainsi sa ligne à elle, avec l'avancée. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm }}>
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 140, minWidth: 0 }}>
+          <Text
+            weight={600}
+            {...(title ? { tone: 'secondary' as const } : null)}
+            {...(labelRef ? { focusRef: labelRef } : null)}
+          >
+            {label}
+          </Text>
+        </View>
+        <View style={{ marginLeft: 'auto', flexShrink: 0 }}>
+          {state === 'done' ? (
+            <StatusPill
+              label={t(($) => $.game.harvest.challenge.reward, { amount: honey })}
+              strong
+            />
+          ) : (
+            <StatusPill label={t(($) => $.game.harvest.challenge.price, { amount: honey })} />
+          )}
+        </View>
+      </View>
+      {/* La jauge et l'avancée, qui passent à la ligne l'une sous l'autre si la place manque. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm }}>
         <View style={{ flexShrink: 0 }}>
           <HoneyComb
@@ -110,16 +126,6 @@ export function ChallengeCard({
             {progressText}
           </Text>
         )}
-        <View style={{ marginLeft: 'auto' }}>
-          {state === 'done' ? (
-            <StatusPill
-              label={t(($) => $.game.harvest.challenge.reward, { amount: honey })}
-              strong
-            />
-          ) : (
-            <StatusPill label={t(($) => $.game.harvest.challenge.price, { amount: honey })} />
-          )}
-        </View>
       </View>
     </Surface>
   )

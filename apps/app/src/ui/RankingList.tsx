@@ -46,8 +46,11 @@ type Props = {
 }
 
 /** La photo d'une ligne, en points ; l'alvéole du rang, un peu plus petite. */
-const AVATAR = 36
-const RANK_CELL = 28
+// Resserrées (32 et 24, un petit écart entre les deux) pour laisser au nom sa place à côté du
+// pollen sur 320 points : à 28 et 36, le pollen passait sous le nom d'une ligne sur deux (capture
+// du catalogue à 390 px, colonne de 322).
+const AVATAR = 32
+const RANK_CELL = 24
 
 export function RankingList({ rows, toSource }: Props) {
   const { t } = useTranslation()
@@ -97,7 +100,7 @@ export function RankingList({ rows, toSource }: Props) {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: space.md,
+                    gap: space.sm,
                     flexShrink: 0,
                   }}
                 >
