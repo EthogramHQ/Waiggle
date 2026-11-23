@@ -22,6 +22,7 @@
 // n'existe pas, pour un inconnu, un invité ou un ancien membre (le scénario : « sans dire si la ruche
 // existe »).
 import { z } from 'zod'
+import { HiveChallenge } from './game'
 import { MemberId } from './members'
 import { ProjectSummary } from './projects'
 import { ShortLabel } from './text'
@@ -198,6 +199,11 @@ export const HivePage = z
     seekingTesters: z.array(ProjectSummary).max(HIVE_TESTERS_MAX),
     projectCount: z.int().nonnegative(),
     successor: z.object({ name: z.string() }).nullable(),
+    /**
+     * R19 : le défi de la semaine de la ruche (game.ts), son avancée sans dire qui a fait quoi ;
+     * null pour une ruche de moins de 3 membres. La page n'est lue que par ses membres.
+     */
+    challenge: HiveChallenge.nullable(),
   })
   .meta({ id: 'HivePage' })
 export type HivePage = z.infer<typeof HivePage>

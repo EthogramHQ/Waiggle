@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import { ExampleFlag } from './example'
 import { FollowState } from './follows'
+import { MemberGame } from './game'
 import { PROJECT_LIST_MAX, ProjectSummary, PublicProjectCard } from './projects'
 import { RemovedPart } from './removal'
 import { Suspension } from './suspension'
@@ -50,6 +51,12 @@ export const Member = z
      * favoris, photo), sur sa propre page seulement (`isMe`) ; vide pour tout autre visiteur.
      */
     removedParts: z.array(RemovedPart),
+    /**
+     * R19 : son niveau, son titre, ses sceaux et son rayon (game.ts), pour tout membre connecté,
+     * soi compris (le miel et les réglages sont dans « Ma récolte », jamais ici). null pour un
+     * compte d'exemple (il ne joue pas) et pour un membre bloqué (la page n'en montre que l'en-tête).
+     */
+    game: MemberGame.nullable(),
     /**
      * Ce que seul un administrateur voit de ce membre (tranche 7c) ; null pour tout autre visiteur.
      * `canSuspend` : faux pour soi-même, pour un administrateur en fonction ou un membre déjà
