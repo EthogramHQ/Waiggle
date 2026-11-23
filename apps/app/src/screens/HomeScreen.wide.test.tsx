@@ -93,6 +93,17 @@ jest.mock('../ui/ProjectCard', () => {
       ),
   }
 })
+// R19 : la récolte (`gamification/api`), que l'écran lit pour soi ; ces tests ne la regardent
+// pas : une lecture qui n'arrive jamais, une écriture qui ne fait rien. `virtual` : le module
+// n'existe pas encore quand ces lignes sont écrites (tests avant le code), Jest ne le cherche pas.
+jest.mock(
+  '../gamification/api',
+  () => ({
+    useHarvest: () => ({ data: undefined, isPending: true, isError: false, refetch: jest.fn() }),
+    useGameSettings: () => ({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false }),
+  }),
+  { virtual: true },
+)
 // R16 : ses ruches, lues pour de vrai par défaut ; le test du chargement les garde en route.
 jest.mock('../hives/api', () => {
   const actual = jest.requireActual('../hives/api')
