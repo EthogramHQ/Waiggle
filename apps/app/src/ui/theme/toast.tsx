@@ -52,6 +52,9 @@ type ToastApi = {
 
 type Shown = { id: number; text: string } & ToastOptions
 
+/** La hauteur du toast sur tablette et ordinateur (voir `BOTTOM` plus bas). */
+const BOTTOM_WIDE = 32
+
 // Sans fournisseur (un test d'écran, le pré-rendu), `show` ne fait rien plutôt que de planter.
 const ToastContext = createContext<ToastApi>({ show: () => {} })
 
@@ -68,9 +71,35 @@ const ToastShownContext = createContext(false)
  */
 export const useToastShown = (): boolean => useContext(ToastShownContext)
 
+// La hauteur où se pose le toast en ce moment (au-dessus de la barre d'onglets et de la capsule
+// des réactions), pour ce qui se montre à sa place (`ToastPlace`). Un contexte à part, comme
+// `ToastShownContext` : ceux qui ne font qu'afficher un toast ne sont pas redessinés.
+const ToastBottomContext = createContext<number>(BOTTOM_WIDE)
+
+/**
+ * R19 : une place à l'endroit du toast, en bas de l'écran, pour ce qui se montre à sa place (la
+ * pastille de gain des gestes sans place à eux, gamification/PollenGainHost). Une boîte sans
+ * hauteur, centrée, au bord bas du toast : ce qu'elle porte s'y pose par-dessus la page (hors du
+ * flux) et ne prend aucune tape. Elle suit le toast : jamais sous la barre d'onglets ni sous la
+ * capsule des réactions.
+ */
+export function ToastPlace({ children }: { children: ReactNode }) {
+  const bottom = useContext(ToastBottomContext)
+  return (
+    <ToastLayer>
+      <View
+        pointerEvents="box-none"
+        style={{ ...pinned, left: 0, right: 0, bottom, height: 0, alignItems: 'center' }}
+      >
+        <View pointerEvents="none">{children}</View>
+      </View>
+    </ToastLayer>
+  )
+}
+
 // La hauteur du toast au-dessus du bas de l'écran : près du bas sur tablette et ordinateur ; plus
 // haut sur téléphone, où un pied collé (les boutons d'un formulaire) occupe souvent le bas.
-const BOTTOM = { compact: 104, wide: 32 } as const
+const BOTTOM = { compact: 104, wide: BOTTOM_WIDE } as const
 
 /**
  * Le décalage du toast : jamais sous la barre d'onglets du téléphone (R3), ni sous la place
@@ -177,11 +206,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // useMemo : le même objet d'un rendu à l'autre (show ne change pas), pour que les écrans qui
   // lisent le contexte ne soient pas redessinés à chaque toast.
   const api = useMemo<ToastApi>(() => ({ show }), [show])
+  const bottom = toastBottom(sizeClass, tabBar.height, floatingTop)
 
   return (
     <ToastContext.Provider value={api}>
       <ToastShownContext.Provider value={shown !== null}>
-        <FloatingSpaceContext.Provider value={floating}>{children}</FloatingSpaceContext.Provider>
+        <ToastBottomContext.Provider value={bottom}>
+          <FloatingSpaceContext.Provider value={floating}>{children}</FloatingSpaceContext.Provider>
+        </ToastBottomContext.Provider>
       </ToastShownContext.Provider>
       <ToastLayer>
         <View
@@ -197,7 +229,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ...pinned,
             left: 0,
             right: 0,
-            bottom: toastBottom(sizeClass, tabBar.height, floatingTop),
+            bottom,
             alignItems: 'center',
             paddingHorizontal: layout.screenPadding.compact,
           }}

@@ -12,11 +12,21 @@
 // (ui/HoneyMeter) : un nom (« Mon rayon »), une valeur (les alvéoles remplies) et la phrase qui la
 // dit (« 7 alvéoles sur 10 vers le niveau 5 »). Les alvéoles, elles, sont du dessin : rien d'autre
 // n'est lu.
-import { type ColorName, layout } from '@ruche/brand'
+import { type ColorName, durations, layout } from '@ruche/brand'
 import type { DecorationPattern, DecorationTint } from '@ruche/contracts'
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { View } from 'react-native'
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 import Svg, { Circle, ClipPath, Defs, G, Path } from 'react-native-svg'
+import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Les alvéoles qui mènent au niveau suivant (option a1). */
@@ -104,9 +114,22 @@ type Props = {
   size: 'regular' | 'small'
   /** Le nombre d'alvéoles : 10 pour le rayon, celui du défi pour une jauge (5 pour « 5 retours »). */
   count?: number
+  /**
+   * R19, le passage de niveau (planche R19-Niveau) : le rayon se vide. `from` est le nombre
+   * d'alvéoles pleines d'avant (10, le rayon plein) : elles sont dessinées pleines, puis se vident
+   * de droite à gauche jusqu'à `cells`, une seule fois (un nouveau rendu avec le même passage ne
+   * rejoue rien). Avec « Réduire les animations », elles s'effacent ensemble, en fondu. Le lecteur
+   * d'écran lit tout de suite la vraie valeur (`cells`) : le mouvement n'est que du dessin.
+   */
+  drain?: { from: number } | undefined
 }
 
-export function HoneyComb({ cells, label, valueText, tint, pattern, size, count }: Props) {
+/** Le temps où le rayon se vide (planche R19-Niveau : de 880 à 1 440 ms, `slow`). */
+const DRAIN_MS = durations.slow
+/** L'opacité d'une alvéole en train de se vider (`g.sort` de la planche). */
+const DRAINING_OPACITY = 0.35
+
+export function HoneyComb({ cells, label, valueText, tint, pattern, size, count, drain }: Props) {
   const { colors } = useTheme()
   // Un identifiant propre à ce rayon pour son `clipPath` : deux rayons sur la même page (le profil
   // et la feuille de décoration) ne doivent pas se découper l'un l'autre. Les deux-points de
@@ -126,6 +149,10 @@ export function HoneyComb({ cells, label, valueText, tint, pattern, size, count 
   const cy = height / 2
   const colorsOfTint = combTints[tint]
   const motif = pattern === 'smooth' ? '' : patternPath(pattern, width, height, scale)
+  // Les alvéoles qui se vident : celles qui étaient pleines avant le passage et ne le sont plus.
+  const drainFrom = drain ? Math.min(Math.max(0, Math.round(drain.from)), total) : 0
+  const drained = centers.slice(filled, Math.max(filled, drainFrom))
+  const calm = useCalmMotion()
 
   return (
     <View
@@ -207,6 +234,110 @@ export function HoneyComb({ cells, label, valueText, tint, pattern, size, count 
           </G>
         )}
       </Svg>
+      {/* Le rayon qui se vide : une alvéole pleine posée sur chaque alvéole vidée, qui s'efface.
+          En pourcentages de la boîte, qui se resserre dans une colonne étroite. */}
+      {drained.map((cx, i) => (
+        <DrainCell
+          key={cx}
+          index={filled + i}
+          // De droite à gauche : la plus à droite part la première.
+          order={drained.length - 1 - i}
+          steps={drained.length}
+          passage={`${drainFrom}>${filled}`}
+          calm={calm}
+          left={(cx - cell / 2) / width}
+          span={cell / width}
+          height={height}
+          cell={cell}
+          drawn={drawn}
+          fill={colors[colorsOfTint.fill]}
+          stroke={colors[colorsOfTint.stroke]}
+        />
+      ))}
     </View>
+  )
+}
+
+type DrainProps = {
+  index: number
+  order: number
+  steps: number
+  /** Le passage joué (« 10>1 ») : le même passage ne se rejoue pas. */
+  passage: string
+  calm: boolean
+  /** La place de l'alvéole, en fraction de la largeur du rayon. */
+  left: number
+  span: number
+  height: number
+  cell: number
+  drawn: number
+  fill: string
+  stroke: string
+}
+
+/** Une durée fixe, même en mode calme : c'est le rayon qui décide de ce qui reste (un fondu). */
+const fade = (to: number, duration: number) =>
+  withTiming(to, { duration, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never })
+
+/** Une alvéole qui se vide : pleine au départ, puis à demi transparente, puis partie. */
+function DrainCell({
+  index,
+  order,
+  steps,
+  passage,
+  calm,
+  left,
+  span,
+  height,
+  cell,
+  drawn,
+  fill,
+  stroke,
+}: DrainProps) {
+  const opacity = useSharedValue(1)
+  // Le passage déjà joué : un nouveau rendu avec le même passage ne rejoue rien.
+  const played = useRef<string | null>(null)
+  useEffect(() => {
+    if (played.current === passage) return
+    played.current = passage
+    if (calm) {
+      // Mode calme : toutes ensemble, un fondu sur place.
+      opacity.value = fade(0, durations.base)
+      return
+    }
+    const step = DRAIN_MS / Math.max(1, steps)
+    opacity.value = withDelay(
+      order * step,
+      withSequence(fade(DRAINING_OPACITY, step / 2), fade(0, step / 2)),
+    )
+  }, [passage, calm, order, steps, opacity])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  return (
+    <Animated.View
+      testID={`comb-drain-${index}`}
+      pointerEvents="none"
+      aria-hidden
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: `${left * 100}%`,
+          width: `${span * 100}%`,
+        },
+        style,
+      ]}
+    >
+      <Svg width="100%" height="100%" viewBox={`0 0 ${cell.toFixed(2)} ${height.toFixed(2)}`}>
+        <Path
+          d={hexagonPath(cell / 2, height / 2, drawn)}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1.2}
+        />
+      </Svg>
+    </Animated.View>
   )
 }

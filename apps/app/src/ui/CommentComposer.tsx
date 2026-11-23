@@ -38,6 +38,7 @@ import type { ImageSource } from './image'
 import { escapeCloses } from './keyboard'
 import { type MentionSuggestion, useMentionField } from './MentionField'
 import { Notice, type NoticeAction } from './Notice'
+import { type PlacedGain, PollenGainSpot } from './PollenGainSpot'
 import { Text } from './Text'
 import { TextField, type TextFieldInput } from './TextField'
 import { useTapGuard } from './tapGuard'
@@ -107,6 +108,11 @@ type Props = MentionProps & {
   placeholder?: string | undefined
   /** Le nom lu du bouton d'envoi (« Envoyer la réponse ») ; absent : « Envoyer le commentaire ». */
   sendLabel?: string | undefined
+  /**
+   * R19 : le pollen que l'envoi vient de rapporter. La pastille « +2 pollen » naît au-dessus du
+   * bouton d'envoi, sans rien déplacer ; absent ou `null` : rien.
+   */
+  gain?: PlacedGain | null | undefined
 }
 
 /** Une recherche de mentions qui n'écoute rien : celle d'un champ sans mentions. */
@@ -195,6 +201,7 @@ export function CommentComposer({
   inputRef,
   placeholder,
   sendLabel,
+  gain,
 }: Props) {
   const { t } = useTranslation()
   const { width, height } = useLayout()
@@ -406,30 +413,33 @@ export function CommentComposer({
           ) : null}
           <View style={{ flex: 1, minWidth: 0 }}>{field}</View>
         </View>
-        {place === 'sheet' ? (
-          <IconButton
-            ref={sendControl}
-            icon="arrow-up"
-            variant="honey"
-            label={spokenSend}
-            onPress={send}
-            disabled={blocked}
-            loading={pending}
-          />
-        ) : (
-          // Blanc, pas miel : sur la page d'un projet, l'action miel est « Tester la démo ».
-          <Button
-            ref={sendControl}
-            icon="arrow-up"
-            variant="secondary"
-            size="compact"
-            label={t(($) => $.project.comments.send)}
-            spokenLabel={spokenSend}
-            onPress={send}
-            disabled={blocked}
-            loading={pending}
-          />
-        )}
+        {/* R19 : le bouton d'envoi dans la boîte qui porte la pastille de gain, au-dessus de lui. */}
+        <PollenGainSpot gain={gain} placement="above">
+          {place === 'sheet' ? (
+            <IconButton
+              ref={sendControl}
+              icon="arrow-up"
+              variant="honey"
+              label={spokenSend}
+              onPress={send}
+              disabled={blocked}
+              loading={pending}
+            />
+          ) : (
+            // Blanc, pas miel : sur la page d'un projet, l'action miel est « Tester la démo ».
+            <Button
+              ref={sendControl}
+              icon="arrow-up"
+              variant="secondary"
+              size="compact"
+              label={t(($) => $.project.comments.send)}
+              spokenLabel={spokenSend}
+              onPress={send}
+              disabled={blocked}
+              loading={pending}
+            />
+          )}
+        </PollenGainSpot>
       </View>
       {/* Dans la colonne, sous le champ, au bord de son texte ; dans la feuille, où la place manque,
           sur toute la largeur. */}

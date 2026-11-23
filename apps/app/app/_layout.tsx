@@ -11,6 +11,7 @@ import { I18nextProvider } from 'react-i18next'
 import { Platform } from 'react-native'
 import { useMemberMarkerSync } from '../src/accounts/memberMarker'
 import { queryClient } from '../src/api/query-client'
+import { PollenGainHost } from '../src/gamification/PollenGainHost'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { EditorPreload } from '../src/navigation/chunks/preload'
@@ -111,6 +112,9 @@ export default function RootLayout() {
                     </>
                   )}
                 </CoverTransitionProvider>
+                {/* R19 : la pastille « +3 pollen » des gestes sans place à eux (suivre, publier,
+                    une ruche…), à la place du toast ; elle attend qu'un toast affiché parte. */}
+                <PollenGainHost />
               </ToastProvider>
             </TabBarHost>
           </HoneyWaveHost>

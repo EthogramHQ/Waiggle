@@ -72,6 +72,7 @@ import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import { ListGroup } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
+import { PollenGainSpot } from '../ui/PollenGainSpot'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
 import { ScreenFooterSlot } from '../ui/ScreenFooterSlot'
@@ -383,19 +384,22 @@ function CornerPage({ project, corner, member, memberId, memberName }: PageProps
         former ? t(($) => $.project.testers.formerTester, { name: project.author.name }) : null
       }
       closed={corner.closed}
-      layout={({ messages, footer }) => (
+      layout={({ messages, footer, feedbackGain }) => (
         <Stack gap="lg">
           {messages}
           {former ? null : (
             // L'action miel de l'onglet (planche validée 9), tant que le compositeur n'en montre pas
             // une : sur téléphone, sa flèche est miel, et une seule action miel se voit à la fois
-            // (K12, correction 14). Sur ordinateur, son « Envoyer » est blanc.
-            <Button
-              label={t(($) => $.project.testers.feedback.send)}
-              icon="plus"
-              {...(footer !== null && !columns ? { variant: 'secondary' as const } : null)}
-              onPress={() => router.push(`${cornerPath}/new-feedback`)}
-            />
+            // (K12, correction 14). Sur ordinateur, son « Envoyer » est blanc. R19 : le pollen du
+            // retour envoyé depuis sa feuille naît au-dessus de ce bouton, à la fermeture.
+            <PollenGainSpot gain={feedbackGain} placement="above">
+              <Button
+                label={t(($) => $.project.testers.feedback.send)}
+                icon="plus"
+                {...(footer !== null && !columns ? { variant: 'secondary' as const } : null)}
+                onPress={() => router.push(`${cornerPath}/new-feedback`)}
+              />
+            </PollenGainSpot>
           )}
           {/* Sur téléphone, le compositeur collé au pied de l'écran, comme dans le fil de l'auteur
               (K12) ; sur ordinateur, sous le fil. */}

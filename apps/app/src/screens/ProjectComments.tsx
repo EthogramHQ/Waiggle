@@ -26,6 +26,7 @@ import { useMediaSources } from '../api/media'
 import { type CommentContextState, useCommentContext, useComments } from '../comments/api'
 import { type PreviewLine, previewLines, previewThreads, threadLines } from '../comments/lines'
 import { useCommentDraft } from '../comments/useCommentDraft'
+import { usePollenGain } from '../gamification/pollen'
 import { useMentionable } from '../mentions/api'
 import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
@@ -120,6 +121,8 @@ export function Comments({
   const lowWindow = useLowWindow()
   const comments = useComments(project.id)
   const draft = useCommentDraft(project.id)
+  // R19 : le pollen d'un commentaire envoyé, montré au-dessus d'« Envoyer ».
+  const commentPollen = usePollenGain('comment')
   const failure = useCommentFailure()
   const signInAgain = useSignInAgain()
   // Un compte suspendu lit les commentaires, mais n'a ni champ ni « Répondre » (tranche 7c).
@@ -456,6 +459,7 @@ export function Comments({
       onChangeText={changeText}
       onSend={() => void send()}
       pending={draft.sending}
+      gain={commentPollen ? { amount: commentPollen.amount, trigger: commentPollen.key } : null}
       error={sendError}
       errorAction={sendAction}
       banner={

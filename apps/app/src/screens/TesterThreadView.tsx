@@ -42,6 +42,7 @@ import { type ReactElement, type ReactNode, useContext, useEffect, useRef, useSt
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
 import { useMediaSources } from '../api/media'
+import { usePollenGain } from '../gamification/pollen'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { removalBanner } from '../reports/removal'
 import {
@@ -61,6 +62,7 @@ import { type Focusable, focusTarget, moveReaderTo } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import { type ActionMenuItem, MessageBubble } from '../ui/MessageBubble'
 import { Notice } from '../ui/Notice'
+import type { PlacedGain } from '../ui/PollenGainSpot'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { shortDate } from '../ui/relativeDate'
 import { SkeletonList } from '../ui/Skeleton'
@@ -77,6 +79,11 @@ export type TesterThreadParts = {
   messages: ReactNode
   /** Le compositeur et la phrase de qui lit, ou la phrase de la lecture seule ; null : rien. */
   footer: ReactNode
+  /**
+   * R19 : le pollen d'un retour envoyé depuis sa feuille (« Envoyer un retour ») ; la page le pose
+   * près de ce bouton. Celui d'une réponse va au compositeur. `null` : rien.
+   */
+  feedbackGain?: PlacedGain | null
 }
 
 type Props = {
@@ -160,6 +167,13 @@ export function TesterThreadView({
   // ramène pas.
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set())
   const shown = (frozen ?? live).filter((message) => !gone.has(message.id))
+  // R19 : le pollen d'un message envoyé. Le message part en tête du fil avant le gain : le dernier
+  // message dit d'où vient le geste (une réponse : le compositeur ; un retour : sa feuille).
+  const messagePollen = usePollenGain('feedback')
+  const placedPollen = messagePollen
+    ? { amount: messagePollen.amount, trigger: messagePollen.key }
+    : null
+  const fromReply = shown.at(-1)?.kind === 'reply'
 
   // --- Le fil lu à l'affichage ---------------------------------------------------------------------
 
@@ -539,10 +553,11 @@ export function TesterThreadView({
       placeholder={t(($) => $.project.testers.thread.replyPlaceholder, { name: otherName })}
       sendLabel={t(($) => $.project.testers.thread.replyLabel)}
       inputRef={inputRef}
+      gain={fromReply ? placedPollen : null}
     />
   ) : null
 
-  return layout({ messages, footer })
+  return layout({ messages, footer, feedbackGain: fromReply ? null : placedPollen })
 }
 
 /**
