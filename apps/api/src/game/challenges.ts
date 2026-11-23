@@ -7,8 +7,8 @@
 // l'ancienne n'est plus lue (la purge de nuit l'efface ensuite).
 //
 // L'avancée se calcule à la lecture, depuis le grand livre de la semaine (`pollen_entry`) : seules
-// les entrées payées et non révoquées comptent. Un geste plafonné n'écrit pas d'entrée, il ne compte
-// donc pas. La réussite, elle, est notée une fois (`completed_at`), dans la transaction du geste
+// les entrées payées et non révoquées comptent, et pour le défi perso celles d'après son choix
+// (`chosen_at`). Un geste plafonné n'écrit pas d'entrée, il ne compte donc pas. La réussite, elle, est notée une fois (`completed_at`), dans la transaction du geste
 // (after-award.ts) : 10 miel et 20 pollen pour le défi perso, 10 miel à chaque participant et un avis
 // à chaque membre pour le défi de ruche.
 import { randomUUID } from 'node:crypto'
@@ -28,7 +28,7 @@ import {
   weekOf,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, count, countDistinct, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm'
+import { and, count, countDistinct, eq, gte, inArray, isNull, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import type { AwardedEntry } from './after-award'
 import { award, lockMembers, type Tx } from './award'
@@ -89,14 +89,18 @@ const personalRowOf = async (db: Writer, memberId: string, now: Date, forUpdate 
  * `pollen_entry_member_week_idx`, (member_id, week)). « Réagis à 5 projets » compte des projets
  * différents (`count(distinct project_id)`) ; « de tes proches » ne garde que les gestes sur le
  * projet d'un membre suivi (l'autre membre de l'entrée, l'auteur du projet ; clé primaire de
- * `member_follow`, (follower_id, member_id)). Toute la semaine compte, même avant le choix : choisir
- * un défi déjà fait le réussit aussitôt.
+ * `member_follow`, (follower_id, member_id)). Seuls comptent les gestes faits depuis le choix
+ * (`created_at >= chosen_at`, décision du 23/11) : un défi choisi jeudi ne compte pas ceux de lundi,
+ * et choisir un défi déjà fait ne le réussit pas. L'index lit les entrées de la semaine du membre
+ * (quelques dizaines), la condition sur l'heure les trie ensuite. `chosenAt` null (une ligne écrite
+ * sans heure, jamais par l'API) : toute la semaine, comme avant la décision.
  */
 const personalProgress = async (
   db: Pick<Database, 'select'>,
   memberId: string,
   challenge: ChallengeDefinition,
   week: string,
+  chosenAt: Date | null,
 ) => {
   const followed = db
     .select({ id: schema.memberFollow.memberId })
@@ -111,6 +115,7 @@ const personalProgress = async (
         eq(p.week, week),
         eq(p.gesture, challenge.gesture),
         isNull(p.revokedAt),
+        chosenAt === null ? undefined : gte(p.createdAt, chosenAt),
         challenge.followedAuthors ? inArray(p.counterpartId, followed) : undefined,
       ),
     )
@@ -136,7 +141,7 @@ export const personalChallengeOf = async (
   if (row.completedAt !== null) return { state: 'done', code }
   const challenge = PERSONAL_BY_CODE.get(code)
   if (!challenge) return { state: 'choose', offered }
-  const progress = await personalProgress(db, memberId, challenge, row.week)
+  const progress = await personalProgress(db, memberId, challenge, row.week, row.chosenAt)
   return {
     state: 'active',
     code,
@@ -160,13 +165,14 @@ const settlePersonal = async (
   gesture?: string,
 ) => {
   const [row] = await tx
-    .select({ chosen: pc.chosen, completedAt: pc.completedAt })
+    .select({ chosen: pc.chosen, chosenAt: pc.chosenAt, completedAt: pc.completedAt })
     .from(pc)
     .where(and(eq(pc.memberId, memberId), eq(pc.week, week)))
   if (!row || row.completedAt !== null || row.chosen === null) return
   const challenge = PERSONAL_BY_CODE.get(row.chosen)
   if (!challenge || (gesture !== undefined && challenge.gesture !== gesture)) return
-  if ((await personalProgress(tx, memberId, challenge, week)) < challenge.target) return
+  const progress = await personalProgress(tx, memberId, challenge, week, row.chosenAt)
+  if (progress < challenge.target) return
   const done = await tx
     .update(pc)
     .set({ completedAt: now })
@@ -200,7 +206,9 @@ const settlePersonal = async (
  * transaction de la route. Rend `'invalid_challenge'` (422) pour un code hors des trois proposés,
  * ou un second choix de la semaine (« Pas cette semaine » compris, une fois un défi choisi) ; null
  * sinon. « Pas cette semaine » se défait en choisissant un des trois ; le redire ne change rien.
- * Choisir un défi déjà atteint par les gestes de la semaine le réussit aussitôt.
+ * Le choix d'un défi note son heure (`chosen_at`) : il ne compte que les gestes faits depuis
+ * (décision du 23/11). « Pas cette semaine » la laisse à null : rien n'est compté, et un défi choisi
+ * ensuite part de l'heure de ce second choix.
  *
  * Le verrou de jeu du membre d'abord, puis la ligne : le même ordre que les gestes (award prend le
  * verrou, puis after-award lit la ligne), pour que les deux ne s'attendent jamais l'un l'autre.
@@ -218,8 +226,10 @@ export const choosePersonalChallenge = async (
   if (choice !== 'none' && !row.offered.includes(choice)) return 'invalid_challenge'
   await tx
     .update(pc)
-    .set({ chosen: choice })
+    .set({ chosen: choice, chosenAt: choice === 'none' ? null : now })
     .where(and(eq(pc.memberId, memberId), eq(pc.week, row.week)))
+  // Un geste de la même milliseconde que le choix compte (« depuis », bornes comprises) : sans ce
+  // dernier compte, un tel geste, payé avant que le défi soit choisi, ne le réussirait jamais.
   if (choice !== 'none') await settlePersonal(tx, memberId, row.week, now)
   return null
 }

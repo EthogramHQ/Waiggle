@@ -225,6 +225,13 @@
       "when": 1795417924530,
       "tag": "0031_recap_harvest",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795453339305,
+      "tag": "0032_personal_challenge_chosen_at",
+      "breakpoints": true
     }
   ]
 }
