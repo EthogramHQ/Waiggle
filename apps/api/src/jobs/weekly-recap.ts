@@ -38,11 +38,18 @@ import { z } from 'zod'
 import { isExampleAccountSql } from '../accounts/example'
 import { languageOfMember } from '../email/language'
 import { categoryTile, recapThumb } from '../email/recap-images'
-import { type Attachment, type RecapData, type RecapLine, recapEmail } from '../email/templates'
+import {
+  type Attachment,
+  type RecapData,
+  type RecapHive,
+  type RecapLine,
+  recapEmail,
+} from '../email/templates'
 import { loadNotificationsSince, utc } from '../notifications/load'
 import { mediaOnCoversSql } from '../projects/media-visibility'
 import { listedVerifiedProjectFor } from '../projects/visibility'
 import { activeSuspensionSql } from '../suspension/load'
+import { type RecapHarvestHive, recapHarvestOf } from './recap-harvest'
 import { hiveInvitationsOf, hiveNewsOf } from './recap-hives'
 import {
   BATCH_SIZE,
@@ -114,6 +121,8 @@ const Candidate = Choices.extend({
   id: z.string(),
   recap_sent_at: isoDate,
   recap_v2_at: isoDate,
+  // R19 : le premier récap qui a porté « Ta semaine » (null : la note « Nouveau : ta récolte » reste à dire).
+  recap_harvest_at: isoDate,
   instant_sent_at: isoDate,
   seen_at: isoDate,
 })
@@ -141,6 +150,7 @@ const candidates = async (db: Database, now: Date, after: string): Promise<Candi
     select u.id,
       to_char(ep.recap_sent_at, ${ISO}) as recap_sent_at,
       to_char(ep.recap_v2_at, ${ISO}) as recap_v2_at,
+      to_char(ep.recap_harvest_at, ${ISO}) as recap_harvest_at,
       to_char(ep.instant_sent_at, ${ISO}) as instant_sent_at,
       to_char(ns.seen_at, ${ISO}) as seen_at,
       ${choiceColumns}
@@ -437,17 +447,21 @@ const Taken = Choices.extend({
  * seconde trouve la date déjà notée par la première, et ne prend rien. « with taken as (…) » (une
  * requête nommée, dans la même instruction) permet de joindre "user" pour rendre l'adresse.
  * R8 : `recap_v2_at` reçoit la date du premier récap habillé, une seule fois (coalesce).
+ * R19 : `recap_harvest_at` reçoit de même la date du premier récap qui porte « Ta semaine »
+ * (`withHarvest`), une seule fois ; un récap sans le bloc la laisse nulle.
  */
-const take = async (db: Database, userId: string, now: Date) => {
+const take = async (db: Database, userId: string, now: Date, withHarvest: boolean) => {
+  const harvestAt: SQL = withHarvest ? utc(now) : sql`null::timestamp`
   const query: SQL = sql`
     with taken as (
       insert into email_preference (user_id, weekly_recap, mention_emails, recap_sent_at,
-        recap_unvisited, recap_v2_at)
-      select u.id, true, false, ${utc(now)}, 0, ${utc(now)} from "user" u
+        recap_unvisited, recap_v2_at, recap_harvest_at)
+      select u.id, true, false, ${utc(now)}, 0, ${utc(now)}, ${harvestAt} from "user" u
       where u.id = ${userId} and u.email_verified
       on conflict (user_id) do update set
         recap_sent_at = excluded.recap_sent_at,
         recap_v2_at = coalesce(email_preference.recap_v2_at, excluded.recap_v2_at),
+        recap_harvest_at = coalesce(email_preference.recap_harvest_at, excluded.recap_harvest_at),
         recap_unvisited = case when ${visitedSince('email_preference')} then 0
           else email_preference.recap_unvisited + 1 end
       where email_preference.weekly_recap
@@ -512,6 +526,30 @@ const imagesFor = async (
   return images
 }
 
+/**
+ * R19 : joint à « Dans tes ruches » le défi de la semaine de chaque ruche. Une ruche qui a des
+ * nouveautés reçoit le sien sous son nom ; une ruche sans nouveauté mais avec un défi vient ensuite,
+ * avec son défi seul. Les défis suivent « Ma récolte », pas le réglage « Ruches » (le pied du récap
+ * le dit : « Ta semaine et les défis suivent ton réglage « Ma récolte » »).
+ */
+const withChallenges = (news: RecapHive[], challenges: RecapHarvestHive[]): RecapHive[] => {
+  const byHive = new Map(challenges.map((hive) => [hive.hiveId, hive]))
+  const merged = news.map((hive) => {
+    const found = hive.hiveId === undefined ? undefined : byHive.get(hive.hiveId)
+    if (found === undefined) return hive
+    byHive.delete(found.hiveId)
+    return { ...hive, challenge: found.challenge }
+  })
+  const alone = [...byHive.values()].map((hive) => ({
+    hiveId: hive.hiveId,
+    name: hive.name,
+    items: [],
+    more: 0,
+    challenge: hive.challenge,
+  }))
+  return [...merged, ...alone]
+}
+
 /** Le récap d'un membre : true s'il est parti. */
 const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   // Rien d'après `now`, la date notée comme celle du récap (voir loadNotificationsSince).
@@ -563,12 +601,21 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     hiveParts.wanted === undefined &&
     hiveParts.hives.length === 0 &&
     hiveParts.invitations.length === 0
-  if (isEmpty(early) && nothingElse({ friends, wanted, hives, invitations: invitations.shown })) {
+  // R19 (choix 16) : le jeu de la semaine. Le pollen de la semaine suffit à envoyer le récap ; un
+  // défi de ruche seul, non (il paraît si le récap part pour autre chose). « Ma récolte » coupé :
+  // `game.on` est faux, rien du jeu n'entre.
+  const game = await recapHarvestOf(deps.db, member.id, now, deps.appUrl)
+  const pollenNews = game.on && game.pollen > 0
+  if (
+    !pollenNews &&
+    isEmpty(early) &&
+    nothingElse({ friends, wanted, hives, invitations: invitations.shown })
+  ) {
     return false
   }
   let taken: z.infer<typeof Taken> | null
   try {
-    taken = await take(deps.db, member.id, now)
+    taken = await take(deps.db, member.id, now, game.harvest !== null)
   } catch (error) {
     if (isDeletedMember(error)) return false
     throw error
@@ -595,6 +642,7 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   const friendsKept = taken.discoveries === 'never' ? [] : friends
   const wantedKept = taken.discoveries === 'never' ? undefined : wanted
   if (
+    !pollenNews &&
     isEmpty(content) &&
     nothingElse({
       friends: friendsKept,
@@ -654,10 +702,13 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     testersMore: Math.max(0, content.testers.length - RECAP_MAX_LINES),
     // R10 : sans aucune vignette (imagesFor n'en donne jamais à un projet réservé, et la partie
     // n'en montre pas) ; le lien « Voir mes ruches » mène à l'onglet, jamais à une ruche.
-    hives: hivesKept,
+    hives: withChallenges(hivesKept, game.hives),
     hiveInvitations: invitationsKept.shown,
     hiveInvitationsMore: invitationsKept.more,
     hivesUrl: new URL('/hives', deps.appUrl).toString(),
+    // R19 : « Ta semaine », avec la note « Nouveau : ta récolte » au premier récap qui la porte.
+    harvest:
+      game.harvest === null ? null : { ...game.harvest, news: member.recap_harvest_at === null },
     links: linksFor(deps, member.id, 'recap'),
   }
   const language = languageOfMember(taken)

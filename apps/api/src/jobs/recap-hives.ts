@@ -209,11 +209,13 @@ const groupByHive = (
       known.at = at
     }
   }
-  return [...hives.values()]
-    .sort((a, b) => b.last - a.last)
-    .map((hive) => {
+  // R19 : l'identifiant suit chaque ruche, pour que le récap y joigne son défi de la semaine.
+  return [...hives.entries()]
+    .sort(([, a], [, b]) => b.last - a.last)
+    .map(([hiveId, hive]) => {
       const lines = [...hive.lines.values()].sort((a, b) => b.at - a.at)
       return {
+        hiveId,
         name: hive.name,
         items: lines.slice(0, RECAP_MAX_LINES).map((line) => line.item),
         more: Math.max(0, lines.length - RECAP_MAX_LINES),

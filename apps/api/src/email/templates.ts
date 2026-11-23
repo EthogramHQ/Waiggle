@@ -16,7 +16,7 @@
 // Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 7a, règle 23), écrite en
 // texte et jamais en lien « mailto: » : tout lien d'un e-mail mène à l'appli ou à l'API.
 import { appName, contactEmail, palettes, radii } from '@ruche/brand'
-import type { RemovalGround, ReportReason } from '@ruche/contracts'
+import type { HiveChallengeCode, RemovalGround, ReportReason } from '@ruche/contracts'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
 
@@ -782,7 +782,34 @@ export type RecapData = {
   hiveInvitationsMore?: number
   /** R10 : « Voir mes ruches », l'onglet Ruches de l'appli (fabriqué par la tâche). */
   hivesUrl?: string
+  /**
+   * R19 (planche R19-Recap), « Ta semaine » : le pollen de la semaine (jamais écrit s'il vaut 0),
+   * « défi réussi » si le défi perso de la semaine l'est, la note « Nouveau : ta récolte » (`news`,
+   * une seule fois par compte, relecture J1) et « Voir ma récolte » (`url`, fabriquée par la tâche).
+   * Absent ou null : pas de bloc (rien à dire, ou « Ma récolte » coupé).
+   */
+  harvest?: RecapHarvest | null
   links: NotificationLinks
+}
+
+/** R19 : le bloc « Ta semaine » du récap (voir `RecapData.harvest`). */
+export type RecapHarvest = {
+  pollen: number
+  challengeDone: boolean
+  news: boolean
+  url: string
+}
+
+/**
+ * R19 : le défi de la semaine d'une ruche, sous son nom dans « Dans tes ruches ». `isNew` : aucun
+ * geste encore (« Défi de la semaine : … », jamais « 0 sur 5 ») ; `done` : réussi.
+ */
+export type RecapHiveChallenge = {
+  code: HiveChallengeCode
+  progress: number
+  target: number
+  done: boolean
+  isNew: boolean
 }
 
 /**
@@ -803,9 +830,13 @@ export type RecapHiveItem = {
  * retiré (« Ruche sans nom »). `more` : les nouveautés de plus, non montrées.
  */
 export type RecapHive = {
+  /** R19 : l'identifiant de la ruche, pour y joindre son défi (jamais écrit dans l'e-mail). */
+  hiveId?: string
   name: string | null
   items: RecapHiveItem[]
   more: number
+  /** R19 : son défi de la semaine, si « Ma récolte » est allumé ; absent ou null : aucun. */
+  challenge?: RecapHiveChallenge | null
 }
 
 /** R10 : une invitation en attente ; `inviter` null si son compte a été supprimé. */
@@ -905,9 +936,44 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
   // de la ruche, écrit par un membre, est désarmé (une adresse devient « [lien] ») et ne sera
   // qu'échappé dans le HTML, jamais posé dans un lien. Aucune vignette : un projet réservé n'en a
   // jamais (plan R10, point 1), et les autres en ont déjà dans les parties de R8.
+  // R19 : les textes du jeu (« Ta semaine », les défis), rangés sous `game.recap`.
+  const g = resources[language].translation.game
+  const challengeLine = (challenge: RecapHiveChallenge | null | undefined) => {
+    if (!challenge) return null
+    const name = g.challenges.hive[challenge.code]
+    if (challenge.done) return fill(g.recap.hiveDone, { challenge: name })
+    if (challenge.isNew || challenge.progress === 0)
+      return fill(g.recap.hiveNew, { challenge: name })
+    return fill(g.recap.hive, {
+      challenge: name,
+      progress: String(challenge.progress),
+      target: String(challenge.target),
+    })
+  }
+  // « Ta semaine » : une phrase (le pollen, jamais « 0 pollen » ; puis les défis de lundi), la note
+  // unique, et le lien « Voir ma récolte ».
+  const harvest = data.harvest ?? null
+  const harvestLead = fill(g.recap.lead)
+  // Ce qui suit « Ta semaine : » ; le HTML met le début en gras, le texte l'écrit à la suite.
+  const harvestRest =
+    harvest === null
+      ? ''
+      : [
+          ...(harvest.pollen > 0
+            ? [
+                fill(harvest.challengeDone ? g.recap.pollenDone : g.recap.pollen, {
+                  amount: String(harvest.pollen),
+                }),
+              ]
+            : []),
+          fill(g.recap.newChallenges),
+        ].join(' ')
+  const harvestSentence = harvest === null ? null : `${harvestLead} ${harvestRest}`
+  const harvestNews = harvest?.news ? fill(g.recap.news) : null
   const hives = (data.hives ?? [])
-    .filter((hive) => hive.items.length > 0)
+    .filter((hive) => hive.items.length > 0 || challengeLine(hive.challenge) !== null)
     .map((hive) => ({
+      challenge: challengeLine(hive.challenge),
       heading:
         hive.name === null ? fill(r.hiveUnnamed) : fill(r.hiveName, { hive: clean(hive.name) }),
       items: hive.items.map((item) => ({
@@ -958,6 +1024,17 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
           ...(accountFollows === null ? [] : [accountFollows, '']),
         ]
       : []),
+    // R19 : « Ta semaine », juste après « Tes projets » (planche R19-Recap).
+    ...(harvest === null || harvestSentence === null
+      ? []
+      : [
+          harvestSentence,
+          '',
+          ...(harvestNews === null ? [] : [harvestNews, '']),
+          fill(g.recap.button),
+          harvest.url,
+          '',
+        ]),
     ...(data.friends.length > 0
       ? [
           r.friendsTitle,
@@ -1004,6 +1081,7 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
           '',
           ...hives.flatMap((hive) => [
             hive.heading,
+            ...(hive.challenge === null ? [] : [hive.challenge]),
             ...hive.items.flatMap((item) => [`• ${item.line}`, `  ${item.url}`]),
             ...(hive.more === null ? [] : [hive.more]),
             '',
@@ -1022,6 +1100,8 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
     ...(hasHivesPart && hivesUrl !== undefined ? [r.viewHives, hivesUrl, ''] : []),
     '—',
     fill(r.reason),
+    // R19 : pourquoi « Ta semaine » est là, et comment la couper.
+    ...(harvest === null ? [] : [fill(g.recap.reason)]),
     '',
     t.changePreferences,
     data.links.manage,
@@ -1092,6 +1172,18 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
           ),
         ]
       : []),
+    // R19 : « Ta semaine », le début en gras, puis le bouton miel vers « Ma récolte ».
+    ...(harvest === null
+      ? []
+      : [
+          part(
+            [
+              `<p style="margin:0 0 12px;${body};color:${c.text}"><strong>${escapeHtml(harvestLead)}</strong> ${escapeHtml(harvestRest)}</p>`,
+              harvestNews === null ? '' : paragraph(harvestNews),
+              button(fill(g.recap.button), harvest.url, true),
+            ].join(''),
+          ),
+        ]),
     ...(data.friends.length > 0
       ? [
           part(
@@ -1163,7 +1255,8 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
               ...hives.map((hive) =>
                 [
                   `<p style="margin:0 0 8px;font-size:17px;line-height:1.3;font-weight:bold;color:${c.text};${wrap}">${escapeHtml(hive.heading)}</p>`,
-                  list(hive.items),
+                  hive.challenge === null ? '' : paragraph(hive.challenge),
+                  hive.items.length > 0 ? list(hive.items) : '',
                   hive.more === null ? '' : paragraph(hive.more),
                 ].join(''),
               ),
@@ -1201,6 +1294,7 @@ export const recapEmail = (language: Language, data: RecapData, appUrl?: string)
     <div class="part" style="padding:24px 28px;background:${c.surfaceGrouped};border-top:1px solid ${c.line}">
       <p style="margin:0 0 10px;font-size:18px;font-weight:bold;color:${c.text}">${escapeHtml(appName)}</p>
       <p style="margin:0 0 6px;${small}">${escapeHtml(fill(r.reason))}</p>
+      ${harvest === null ? '' : `<p style="margin:0 0 6px;${small}">${escapeHtml(fill(g.recap.reason))}</p>`}
       ${footerLink(t.changePreferences, data.links.manage)}
       ${footerLink(r.unsubscribe, data.links.unsubscribe)}
       <p style="margin:6px 0 0;${small}">${escapeHtml(fill(t.footer))}</p>
