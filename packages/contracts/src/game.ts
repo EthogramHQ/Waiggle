@@ -15,7 +15,7 @@
 // l'importent (`Member.game`, `HivePage.challenge`, les avis de l'Activité). Une importation dans
 // l'autre sens ferait une boucle, et un schéma lu avant d'être défini vaudrait `undefined`.
 import { z } from 'zod'
-import { type CategoryIcon, OTHER_CATEGORY } from './categories'
+import { CategoryCode, type CategoryIcon, OTHER_CATEGORY } from './categories'
 import { PROJECT_CATEGORIES } from './projects'
 
 // --- Les familles et les gestes ---
@@ -358,7 +358,7 @@ export interface ChallengeDefinition {
 export const PERSONAL_CHALLENGES = [
   // « Fais un retour sur un projet »
   {
-    code: 'feedback_1',
+    code: 'feedback',
     gesture: 'feedback',
     target: 1,
     distinctProjects: false,
@@ -366,7 +366,7 @@ export const PERSONAL_CHALLENGES = [
   },
   // « Publie une mise à jour »
   {
-    code: 'update_1',
+    code: 'update',
     gesture: 'update',
     target: 1,
     distinctProjects: false,
@@ -374,7 +374,7 @@ export const PERSONAL_CHALLENGES = [
   },
   // « Teste le projet d'un proche »
   {
-    code: 'tester_1',
+    code: 'test',
     gesture: 'tester',
     target: 1,
     distinctProjects: false,
@@ -390,7 +390,7 @@ export const PERSONAL_CHALLENGES = [
   },
   // « Réagis à 5 projets »
   {
-    code: 'reaction_5',
+    code: 'react_5',
     gesture: 'reaction',
     target: 5,
     distinctProjects: true,
@@ -406,7 +406,7 @@ export const PERSONAL_CHALLENGES = [
 export const HIVE_CHALLENGES = [
   // « 5 retours entre vous »
   {
-    code: 'hive_feedback_5',
+    code: 'feedback_5',
     gesture: 'feedback',
     target: 5,
     distinctProjects: false,
@@ -414,7 +414,7 @@ export const HIVE_CHALLENGES = [
   },
   // « 3 mises à jour entre vous »
   {
-    code: 'hive_update_3',
+    code: 'updates_3',
     gesture: 'update',
     target: 3,
     distinctProjects: false,
@@ -422,7 +422,7 @@ export const HIVE_CHALLENGES = [
   },
   // « 3 projets testés entre vous »
   {
-    code: 'hive_tester_3',
+    code: 'tested_3',
     gesture: 'tester',
     target: 3,
     distinctProjects: false,
@@ -430,7 +430,7 @@ export const HIVE_CHALLENGES = [
   },
   // « 10 réactions entre vous »
   {
-    code: 'hive_reaction_10',
+    code: 'reactions_10',
     gesture: 'reaction',
     target: 10,
     distinctProjects: false,
@@ -438,7 +438,7 @@ export const HIVE_CHALLENGES = [
   },
   // « 5 commentaires entre vous »
   {
-    code: 'hive_comment_5',
+    code: 'comments_5',
     gesture: 'comment',
     target: 5,
     distinctProjects: false,
@@ -611,7 +611,7 @@ export const MILESTONE_SEALS = [
     rule: { kind: 'count', gesture: 'feedback', target: 1 },
   },
   {
-    code: 'first_fix',
+    code: 'first_settled',
     matter: 'honey',
     icon: 'check-circle',
     rule: { kind: 'count', gesture: 'feedback_settled', target: 1 },
@@ -634,7 +634,7 @@ export const MILESTONE_SEALS = [
     icon: 'hexagon',
     rule: { kind: 'count', gesture: 'hive_created', target: 1 },
   },
-  { code: 'hive_of_5', matter: 'cream', icon: 'house-line', rule: { kind: 'hiveSize', target: 5 } },
+  { code: 'hive_5', matter: 'cream', icon: 'house-line', rule: { kind: 'hiveSize', target: 5 } },
   {
     code: 'invitations_5',
     matter: 'cream',
@@ -674,32 +674,49 @@ const CATEGORY_SEAL_ICONS: Readonly<Record<SealCategory, CategoryIcon>> = {
 export const CATEGORY_SEAL_TARGET = 3
 
 /**
- * Un sceau par catégorie de départ (« Exploratrice du jardin »), « Autre » exclue. Une catégorie
- * créée plus tard par un administrateur n'a pas de sceau en R19 : il lui faudrait un nom de sceau
- * dans chaque langue.
+ * Un sceau par catégorie de départ (« Cuisine explorée »), « Autre » exclue. Son code est celui de
+ * la catégorie, tel qu'en base (`home-garden`) : il ne peut pas se confondre avec un sceau de palier,
+ * dont le code a toujours un « _ » qu'un code de catégorie n'a jamais (`CategoryCode`).
  */
 const CATEGORY_SEALS = PROJECT_CATEGORIES.filter(
   (category): category is SealCategory => category !== OTHER_CATEGORY,
 ).map((category) => ({
-  code: `category:${category}` as const,
+  code: category,
   matter: 'cream' as const,
   icon: CATEGORY_SEAL_ICONS[category],
   rule: { kind: 'category' as const, category, target: CATEGORY_SEAL_TARGET },
 }))
 
-type SealCodeLiteral = (typeof MILESTONE_SEALS)[number]['code'] | `category:${SealCategory}`
+type MilestoneSealCode = (typeof MILESTONE_SEALS)[number]['code']
 
-/** Tous les sceaux de la V1 : les onze, puis les quinze catégories. */
-export const SEALS: readonly (SealDefinition & { code: SealCodeLiteral })[] = [
+/**
+ * Tous les sceaux connus d'avance : les onze, puis les quinze catégories de départ. Une catégorie
+ * créée plus tard par un administrateur a aussi son sceau, à la même règle (`sealCategory`) : son
+ * icône est celle de la catégorie (GET /v1/categories), son nom le texte `categoryOther`.
+ */
+export const SEALS: readonly (SealDefinition & { code: MilestoneSealCode | SealCategory })[] = [
   ...MILESTONE_SEALS,
   ...CATEGORY_SEALS,
 ]
 
-/** Le code d'un sceau ; `as` dit à TypeScript que la liste n'est pas vide (elle en a 26). */
-export const SealCode = z.enum(
-  SEALS.map((seal) => seal.code) as [SealCodeLiteral, ...SealCodeLiteral[]],
+/** Le code d'un sceau de palier ; `as` dit à TypeScript que la liste n'est pas vide (elle en a 11). */
+export const MilestoneSealCode = z.enum(
+  MILESTONE_SEALS.map((seal) => seal.code) as [MilestoneSealCode, ...MilestoneSealCode[]],
 )
+
+/**
+ * Le code d'un sceau : un palier, ou le code d'une catégorie (de départ ou créée ensuite), jamais
+ * « Autre ». `z.union` essaie chaque forme dans l'ordre et garde la première qui convient.
+ */
+export const SealCode = z.union([
+  MilestoneSealCode,
+  CategoryCode.refine((code) => code !== OTHER_CATEGORY, { message: 'no seal for « other »' }),
+])
 export type SealCode = z.infer<typeof SealCode>
+
+/** La catégorie d'un sceau de catégorie, ou null pour un sceau de palier. */
+export const sealCategory = (code: SealCode): string | null =>
+  MilestoneSealCode.safeParse(code).success ? null : code
 
 /** Un sceau gagné et sa date : il reste, même si le contenu qui l'a fait gagner est retiré. */
 export const EarnedSeal = z
@@ -719,7 +736,8 @@ export const MemberGame = z
     level: z.int().positive(),
     cells: z.int().min(0).max(LEVEL_CELLS),
     title: GameTitle.nullable(),
-    seals: z.array(EarnedSeal).max(SEALS.length),
+    // Sans maximum : une catégorie créée par un administrateur ajoute un sceau possible.
+    seals: z.array(EarnedSeal),
     decoration: Decoration,
   })
   .meta({ id: 'MemberGame' })
@@ -767,7 +785,8 @@ export const Harvest = z
     honey: z.int().nonnegative(),
     personalChallenge: PersonalChallengeState,
     hiveChallenges: z.array(HarvestHiveChallenge).max(GAME_HIVES_MAX),
-    seals: z.array(EarnedSeal).max(SEALS.length),
+    // Sans maximum : une catégorie créée par un administrateur ajoute un sceau possible.
+    seals: z.array(EarnedSeal),
     decoration: Decoration,
     ownedDecorations: OwnedDecorations,
     settings: GameSettings,

@@ -29,6 +29,7 @@ import {
   RECEIVE_DAILY_CAP,
   SEALS,
   SealCode,
+  sealCategory,
   weekOf,
 } from './game'
 import { HIVE_LIMITS } from './hives'
@@ -177,7 +178,7 @@ describe('the challenges', () => {
   })
 
   it('offers the same three again after « Pas cette semaine »', () => {
-    const offered = ['feedback_1', 'update_1', 'comment_3']
+    const offered = ['feedback', 'update', 'comment_3']
     expect(PersonalChallengeState.safeParse({ state: 'none', offered }).success).toBe(true)
     expect(PersonalChallengeState.safeParse({ state: 'none' }).success).toBe(false)
     expect(
@@ -226,15 +227,25 @@ describe('the seals', () => {
     const categories = PROJECT_CATEGORIES.filter((category) => category !== 'other')
     expect(SEALS).toHaveLength(11 + categories.length)
     for (const category of categories) {
-      const seal = SEALS.find((s) => s.code === `category:${category}`)
+      const seal = SEALS.find((s) => s.code === category)
       expect(seal?.rule).toEqual({ kind: 'category', category, target: CATEGORY_SEAL_TARGET })
       expect(seal?.matter).toBe('cream')
     }
-    expect(SealCode.safeParse('category:other').success).toBe(false)
+    expect(SealCode.safeParse('other').success).toBe(false)
   })
 
   it('gives each seal a single code', () => {
     expect(new Set(SEALS.map((seal) => seal.code)).size).toBe(SEALS.length)
+  })
+
+  it('accepts a category created later as a seal, and tells milestones from categories', () => {
+    expect(SealCode.safeParse('gardening-tools').success).toBe(true)
+    expect(SealCode.safeParse('first_settled').success).toBe(true)
+    expect(SealCode.safeParse('first_fix').success).toBe(false)
+    expect(sealCategory('cooking')).toBe('cooking')
+    expect(sealCategory('hive_5')).toBeNull()
+    // Un code de palier a toujours un « _ », qu'un code de catégorie n'a jamais.
+    for (const seal of MILESTONE_SEALS) expect(seal.code).toContain('_')
   })
 })
 
@@ -259,7 +270,7 @@ describe('GameSettingsUpdate', () => {
       {},
       { honey: 100 },
       { pinnedFamily: 'scout' },
-      { personalChallenge: 'hive_feedback_5' },
+      { personalChallenge: 'feedback_5' },
       { levelSeen: 0 },
       { titleForm: 'x' },
     ]) {
