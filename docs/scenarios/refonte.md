@@ -4618,7 +4618,8 @@ des Éclaireuses, R20).
 
 ### Le classement de la semaine
 
-- Les **proches** d'un membre, pour le classement : les membres qu'il suit et qui le suivent.
+- Les **proches** d'un membre, pour le classement : les membres qu'il suit (comme partout
+  ailleurs). Un suivi réciproque dirait qui le suit, que l'appli garde secret (décision du 23/11).
 - Étant donné un membre
   Quand il ouvre le classement
   Alors il voit, pour la semaine en cours, le pollen gagné par lui et ses proches, du plus au moins ;
