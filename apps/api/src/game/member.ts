@@ -101,7 +101,8 @@ export type FamilyPollen = Record<Family, { total: number; recent: number }>
  * colonne.
  */
 export const familyPollenOf = async (
-  db: Database,
+  // `Pick<Database, 'select'>` : la base ou une transaction (PATCH /v1/me/game relit sous verrou).
+  db: Pick<Database, 'select'>,
   memberId: string,
   now: Date,
 ): Promise<FamilyPollen> => {

@@ -25,6 +25,7 @@ import { commentRoutes } from './routes/comments'
 import { emailRoutes, UNSUBSCRIBE_PATH } from './routes/email'
 import { feedRoutes } from './routes/feed'
 import { followRoutes } from './routes/follows'
+import { gameRoutes } from './routes/game'
 import { hiveInvitationRoutes } from './routes/hive-invitations'
 import { hiveRoutes } from './routes/hives'
 import { meRoutes } from './routes/me'
@@ -270,9 +271,10 @@ export const createApp = ({
     // Une mise à jour (16 Ko : cinq lignes, un titre, quatre photos citées) ou un commentaire pèse
     // peu, une réaction ou une inscription de testeur n'a pas de corps : la petite limite suffit.
     // R7b : les appels (500 caractères), les fils, les messages (1 000 caractères), les retours
-    // réglés, la lecture d'un fil et la liste des retours ouverts n'ont pas plus de corps.
+    // réglés, la lecture d'un fil et la liste des retours ouverts n'ont pas plus de corps. R19 :
+    // l'offre de miel n'a pas de corps du tout.
     if (
-      /^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions|calls|threads|messages|feedback)(\/|$)/.test(
+      /^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions|calls|threads|messages|feedback|honey)(\/|$)/.test(
         c.req.path,
       )
     ) {
@@ -427,6 +429,8 @@ export const createApp = ({
   // Les classements de la semaine : les proches, ou une ruche (R19).
   app.route('/', rankingRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
+  // Le jeu (R19) : « Ma récolte », les réglages du jeu, la décoration du rayon, l'offre de miel.
+  app.route('/', gameRoutes({ db, limiter }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
