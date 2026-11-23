@@ -41,6 +41,7 @@ describe('discoveries', () => {
       recapUnvisited: 0,
       instantSentAt: null,
       recapV2At: null,
+      recapHarvestAt: null,
       updatedAt: null,
     }
     expect(EmailPreferencesExport.parse(exported).discoveries).toBe('digest')

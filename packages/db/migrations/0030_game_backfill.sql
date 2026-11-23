@@ -164,9 +164,15 @@ FROM (
   -- Le profil : la photo, la bio, le premier outil favori (10 chacun, une fois). Aucune colonne ne
   -- garde la date de chacun : celle de la dernière modification du profil, sinon de l'inscription.
   UNION ALL
+  -- Une photo retirée par la modération garde sa ligne mais change de clé (`withheld/<id de la ligne
+  -- de retrait>`, moderation/parts.ts) : l'entrée est révoquée, à la date du retrait (la date de la
+  -- dernière modification du profil si la ligne de retrait a été purgée depuis).
   SELECT pf.user_id, 'profile_photo', 'profile', pf.user_id, 'photo', NULL, NULL,
-    coalesce(pf.updated_at, u.created_at), NULL::timestamp
+    coalesce(pf.updated_at, u.created_at),
+    CASE WHEN pf.avatar_key LIKE 'withheld/%'
+      THEN coalesce(cpr.created_at, pf.updated_at, u.created_at) END
   FROM profile pf JOIN "user" u ON u.id = pf.user_id
+  LEFT JOIN content_part_removal cpr ON pf.avatar_key = 'withheld/' || cpr.id::text
   WHERE pf.avatar_key IS NOT NULL
   UNION ALL
   SELECT pf.user_id, 'profile_bio', 'profile', pf.user_id, 'bio', NULL, NULL,

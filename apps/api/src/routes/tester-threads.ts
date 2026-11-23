@@ -610,20 +610,22 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
             change.where,
           ),
         )
-        .returning({ id: k.id, testerId: k.testerId })
+        .returning({ id: k.id, testerId: k.testerId, createdAt: k.createdAt })
       const [settled] = written
       if (settled) {
         // R19 : le testeur gagne son retour réglé ; l'auteur, qui règle, ne gagne rien (aucun
-        // en-tête sur sa réponse). La clé est le message : régler, défaire puis régler de nouveau
-        // ne paie qu'une fois. La source est le message, comme son retour : retiré, il révoque
-        // les deux. Les verrous de jeu viennent après celui du projet (relecture S1).
+        // en-tête sur sa réponse). La clé est celle du retour payé (le fil et le jour de Paris du
+        // message) : le pollen d'un retour réglé se paie une fois par retour payé, pas par message,
+        // et régler, défaire puis régler de nouveau ne paie qu'une fois. La source est le message,
+        // comme son retour : retiré, il révoque les deux. Les verrous de jeu viennent après celui
+        // du projet (relecture S1).
         if (change.pays) {
           await award(tx, {
             memberId: settled.testerId,
             gesture: 'feedback_settled',
             sourceKind: 'tester_message',
             sourceId: settled.id,
-            sourceKey: settled.id,
+            sourceKey: `${projectId}:${settled.testerId}:${dayOf(settled.createdAt)}`,
             counterpartId: viewerId,
             projectId,
             now: new Date(),

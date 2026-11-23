@@ -333,6 +333,7 @@ describe('exporting my data', () => {
       recapUnvisited: 0,
       instantSentAt: null,
       recapV2At: null,
+      recapHarvestAt: null,
       updatedAt: null,
     })
     // La dernière utilisation de chaque session, qui sert désormais à décider du récap.
@@ -377,6 +378,8 @@ describe('exporting my data', () => {
       instantSentAt: instantAt.toISOString(),
       // R8 : ce récap est le premier habillé ; sa date reste toute la vie du compte, donc ici aussi.
       recapV2At: recapAt.toISOString(),
+      // R19 : ce récap est aussi le premier à porter « Ta semaine » ; sa date reste elle aussi.
+      recapHarvestAt: recapAt.toISOString(),
       updatedAt: changedAt,
     })
     // Jamais de jeton de désinscription dans l'export, ni l'ancien interrupteur.
@@ -387,6 +390,19 @@ describe('exporting my data', () => {
     expect(raw).not.toMatch(/token/i)
     expect(raw).not.toContain('mentionEmails')
     expect(raw).not.toContain('mentionSentAt')
+  })
+
+  it('exports the date of the first recap that carried the harvest', async () => {
+    await act.setPreferences(ines, { comments: 'now' })
+    // La date que le récap écrit dans `recap_harvest_at` (job : jobs/weekly-recap.ts).
+    const harvestAt = new Date('2026-11-23T08:00:00.000Z')
+    await ctx.db.execute(
+      sql`update email_preference set recap_harvest_at = ${harvestAt.toISOString()}::timestamptz at time zone 'UTC' where user_id = ${inesId}`,
+    )
+
+    const data = await exportOf(ines)
+
+    expect(data.emailPreferences.recapHarvestAt).toBe(harvestAt.toISOString())
   })
 })
 

@@ -72,9 +72,11 @@ describe('the nightly purge of the game', () => {
     later(60 * DAY)
     await signInAgain(ines)
     await publish(ines, 'Jardin')
+    // Sans l'avis d'introduction (R19 : tout compte le reçoit à sa création) : ce test suit les
+    // avis du sceau et du niveau.
     const notices = () =>
       rows<{ kind: string }>(
-        sql`select kind from game_notice where member_id = ${ines.id} order by created_at`,
+        sql`select kind from game_notice where member_id = ${ines.id} and kind <> 'intro' order by created_at`,
       )
     expect((await notices()).map((row) => row.kind)).toEqual(['seal', 'level'])
 

@@ -90,9 +90,10 @@ const sealsOf = async (memberId: string) =>
     (row) => row.code,
   )
 
+// Sans l'avis d'introduction (R19 : tout compte le reçoit à sa création, game.notices.test.ts).
 const gameNotices = async (member: TestMember) =>
-  (await harvestGestures(act).notifications(member.cookie)).filter((item) =>
-    item.kind.startsWith('game_'),
+  (await harvestGestures(act).notifications(member.cookie)).filter(
+    (item) => item.kind.startsWith('game_') && item.kind !== 'game_intro',
   )
 
 describe('the level and the seals after an entry', () => {

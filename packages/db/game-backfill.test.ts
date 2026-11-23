@@ -142,6 +142,22 @@ beforeAll(async () => {
     insert into profile (user_id, bio, avatar_key, updated_at)
     values (${SAM}, 'Je cuisine avec des agents.', 'avatars/sam.webp', '2026-01-03 10:00:00')
   `)
+  // La photo de Max, retirée par la modération : la clé garde `withheld/<id de la ligne de retrait>`
+  // (moderation/parts.ts), et la ligne de retrait porte la date du retrait.
+  const decision = randomUUID()
+  const removal = randomUUID()
+  await db.execute(sql`
+    insert into moderation_decision (id, target_kind, target_id, action, ground, explanation, created_at)
+    values (${decision}, 'member', ${MAX}, 'remove', 'rules', 'Photo retirée.', '2026-02-20 10:00:00')
+  `)
+  await db.execute(sql`
+    insert into content_part_removal (id, removal_id, author_id, object_kind, field, created_at)
+    values (${removal}, ${decision}, ${MAX}, 'member', 'avatar', '2026-02-20 10:00:00')
+  `)
+  await db.execute(sql`
+    insert into profile (user_id, bio, avatar_key, updated_at)
+    values (${MAX}, '', ${`withheld/${removal}`}, '2026-01-04 10:00:00')
+  `)
   const tools = await rowsOf<{ id: string }>(sql`select id from tool order by slug limit 2`)
   for (const [position, tool] of tools.entries()) {
     await db.execute(
@@ -362,6 +378,7 @@ describe('the backfill of the game by migration 0030', () => {
     expect(revoked.map((entry) => `${entry.member_id}:${entry.gesture}`).sort()).toEqual([
       'max:comment',
       'max:feedback',
+      'max:profile_photo',
       'max:publish',
       'sam:receive_comment',
       'sam:receive_feedback',
@@ -369,6 +386,18 @@ describe('the backfill of the game by migration 0030', () => {
     // Son seul retour et son seul projet ont été retirés : ni « Premier retour », ni « Premier
     // projet ».
     expect(await sealsOf(MAX)).toEqual([])
+  })
+
+  it('backfills a profile photo removed by moderation as revoked', async () => {
+    const photo = (await entries()).filter(
+      (entry) => entry.member_id === MAX && entry.gesture === 'profile_photo',
+    )
+
+    // Une entrée, révoquée à la date du retrait (pas de l'inscription, pas de la migration).
+    expect(photo).toHaveLength(1)
+    expect(photo[0]?.revoked_at).toBe('2026-02-20 10:00:00')
+    // Témoin : la photo de Sam, qui n'a pas été retirée, compte.
+    expect(await pollenOf(SAM)).toMatchObject({ profile_photo: 10 })
   })
 
   it('awards the seals of what the members already did', async () => {
