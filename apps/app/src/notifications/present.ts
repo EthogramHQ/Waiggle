@@ -11,20 +11,17 @@
 // les transformer en sources d'image (`useMediaSources`, la session voyage avec la demande).
 import {
   type Category,
-  type MILESTONE_SEALS,
   type Notification,
   type NotifiedCover,
   REACTION_KINDS,
   type ReactionKind,
   type ReportPartField,
-  SEALS,
-  type SealCode,
   type SealMatter,
-  sealCategory,
 } from '@ruche/contracts'
 import type { Translation } from '@ruche/i18n'
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
+import { sealOf } from '../gamification/sealOf'
 import { contestSubjectOf, partContestSubject } from '../ui/contestSubject'
 import type { IconName } from '../ui/Icon'
 import { type Part, splitMarks } from '../ui/marks'
@@ -70,38 +67,8 @@ export type Presented = {
   target: Href | null
 }
 
-/** Le code d'un sceau de palier (« first_feedback »), la clé de son nom. */
-type MilestoneSeal = (typeof MILESTONE_SEALS)[number]['code']
-
 /** R19 : « Ma récolte », où mènent un niveau, un sceau et l'avis d'arrivée de la récolte. */
 const HARVEST: Href = '/harvest'
-
-/**
- * R19 : le nom, l'icône et la matière d'un sceau. Un sceau connu d'avance (`SEALS` du contrat) a
- * les siens ; le sceau d'une catégorie créée ensuite prend l'icône de la catégorie (si la liste est
- * lue) et le texte `categoryOther`, en cire crème comme les autres catégories.
- */
-const sealOf = (
-  code: SealCode,
-  t: T,
-  categories: readonly Category[] | undefined,
-): { name: string; icon: IconName; matter: SealMatter } => {
-  const known = SEALS.find((seal) => seal.code === code)
-  const category = sealCategory(code)
-  const name =
-    category === null
-      ? t(($) => $.game.seals[code as MilestoneSeal])
-      : known
-        ? t(($) => $.game.seals.category[code as keyof Translation['game']['seals']['category']])
-        : t(($) => $.game.seals.categoryOther, {
-            category: categories?.find((one) => one.code === category)?.name ?? category,
-          })
-  // L'icône vient du contrat (une chaîne : un test vérifie que chacune existe dans Icon).
-  const icon = (known?.icon ??
-    categories?.find((one) => one.code === category)?.icon ??
-    'shapes') as IconName
-  return { name, icon, matter: known?.matter ?? 'cream' }
-}
 
 /** L'onglet des ruches : où l'on rejoint une ruche ou refuse une invitation. */
 const HIVES_TAB: Href = '/hives'

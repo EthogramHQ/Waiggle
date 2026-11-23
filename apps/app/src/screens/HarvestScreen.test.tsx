@@ -367,9 +367,42 @@ describe('HarvestScreen, « Mon miel »', () => {
     expect(screen.getByRole('header', { name: T.honeyTitle })).toBeTruthy()
     expect(screen.getByText(honeyAmount(35))).toBeTruthy()
     expect(screen.getByText(T.honeyHelp)).toBeTruthy()
-    expect(screen.getAllByText(containing(T.offer)).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(containing(T.offerHint)).length).toBeGreaterThan(0)
+    // Offrir du miel n'est plus une ligne qui ne fait rien : la carte du solde dit où le faire.
+    expect(screen.getByText(T.offerWhere)).toBeTruthy()
     expect(screen.getByRole('button', { name: startingWith(T.decorate) })).toBeTruthy()
+  })
+})
+
+// Planches R19-Niveau, option a10 : « Nouveau » jusqu'à la visite suivante, aussi sur « Ma récolte »
+// (c'est là que mène l'avis « Tu passes au niveau N »).
+describe('HarvestScreen, a new level', () => {
+  const risen: Harvest = {
+    ...leaHarvest,
+    level: 5,
+    total: 1000,
+    cells: 0,
+    toNext: 1000,
+    levelSeen: 4,
+  }
+
+  it('keeps « Nouveau » for the whole visit after the level is marked seen', async () => {
+    await openHarvest(risen)
+    await waitFor(() => expect(screen.getByText(T.isNew)).toBeTruthy())
+
+    await waitFor(
+      () =>
+        expect(
+          sentTo('PATCH', '/v1/me/game').filter((one) =>
+            JSON.stringify(one.body).includes('levelSeen'),
+          ),
+        ).toHaveLength(1),
+      { timeout: 5000 },
+    )
+    // La relecture qui suit l'écriture dit `levelSeen: 5` : la visite garde « Nouveau ».
+    const reads = () => sentTo('GET', '/v1/me/harvest').length
+    await waitFor(() => expect(reads()).toBeGreaterThan(1))
+
+    expect(screen.getByText(T.isNew)).toBeTruthy()
   })
 })
 
@@ -385,6 +418,25 @@ describe('HarvestScreen, « Mes sceaux »', () => {
     ]) {
       expect(screen.getAllByText(containing(name)).length).toBeGreaterThan(0)
     }
+  })
+
+  // Les administrateurs créent des catégories : le sceau d'une catégorie née après R19 porte le
+  // nom de la catégorie, jamais son code.
+  it('names the seal of a category created later by the name of the category', async () => {
+    mockServer.categories = {
+      categories: [
+        ...mockServer.categories.categories,
+        { code: 'impression-3d', name: 'Impression 3D', icon: 'plant', projectCount: 0 },
+      ],
+    }
+    await openHarvest({
+      ...leaHarvest,
+      seals: [...leaHarvest.seals, { code: 'impression-3d', earnedAt: '2026-10-15T09:00:00.000Z' }],
+    })
+
+    const name = fr.t(($) => $.game.seals.categoryOther, { category: 'Impression 3D' })
+    await waitFor(() => expect(screen.getAllByText(containing(name)).length).toBeGreaterThan(0))
+    expect(screen.queryByText(containing('impression-3d'))).toBeNull()
   })
 
   // Option a4 : pas de vitrine des sceaux manquants, une ligne sobre.

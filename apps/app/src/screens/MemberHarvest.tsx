@@ -13,12 +13,12 @@
 // mouvement l'écran écrit le niveau comme vu (PATCH /v1/me/game { levelSeen }). Ce qui est vu à
 // l'arrivée est figé pour toute la visite : la relecture qui suit l'écriture ne retire pas
 // « Nouveau » sous les yeux (relecture d'interface du plan, UI-4).
-import { type EarnedSeal, type GameTitle, type MemberGame, SEALS } from '@ruche/contracts'
-import { useRef, useState } from 'react'
+import type { EarnedSeal, GameTitle, MemberGame } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
-import { useGameSettings, useHarvest } from '../gamification/api'
+import { useHarvest } from '../gamification/api'
+import { useLevelRise } from '../gamification/levelRise'
+import { useSealOf } from '../gamification/sealOf'
 import { HarvestPanel } from '../ui/HarvestPanel'
-import { type IconName, iconPaths } from '../ui/icons.generated'
 import { LevelCell } from '../ui/LevelCell'
 import { SealShelf, type ShelfSeal } from '../ui/SealShelf'
 import { Stack } from '../ui/Stack'
@@ -31,12 +31,6 @@ type Props = {
   column: boolean
 }
 
-/** L'icône d'un sceau est-elle dessinée ? (Une catégorie créée plus tard n'a pas d'icône connue.) */
-const isIcon = (name: string): name is IconName => name in iconPaths
-
-/** Le dessin d'un sceau par son code ; un sceau de catégorie créée ensuite prend l'alvéole. */
-const sealDefinition = (code: string) => SEALS.find((seal) => seal.code === code)
-
 /** Hook : le titre d'un membre, accordé à sa forme (« Gardienne », « Gardien »), ou undefined. */
 function useTitleText(title: GameTitle | null): string | undefined {
   const { t } = useTranslation()
@@ -48,23 +42,10 @@ function useTitleText(title: GameTitle | null): string | undefined {
 
 /** Hook : les sceaux gagnés, prêts pour l'étagère (dessin et nom traduit). */
 function useShelfSeals(seals: EarnedSeal[]): ShelfSeal[] {
-  const { t } = useTranslation()
-  return seals.map((earned) => {
-    const code = earned.code
-    const known = sealDefinition(code)
-    // Un sceau de palier a toujours un « _ » dans son code, une catégorie jamais (contrat).
-    const name = known
-      ? code.includes('_')
-        ? t(($) => $.game.seals[code as keyof typeof $.game.seals & `${string}_${string}`])
-        : t(($) => $.game.seals.category[code as keyof typeof $.game.seals.category])
-      : t(($) => $.game.seals.categoryOther, { category: code })
-    return {
-      key: code,
-      icon: known && isIcon(known.icon) ? known.icon : 'hexagon',
-      matter: known?.matter ?? 'cream',
-      name,
-    }
-  })
+  // La même règle que « Ma récolte » et l'Activité : le nom de la catégorie d'un sceau créé plus
+  // tard, une seule icône pour ce qu'on ne connaît pas.
+  const sealOf = useSealOf()
+  return seals.map((earned) => ({ key: earned.code, ...sealOf(earned.code) }))
 }
 
 /** « Mes sceaux · 2 » ou « Ses sceaux · 2 », puis les sceaux ; rien sans aucun sceau. */
@@ -90,22 +71,8 @@ function Seals({ seals, mine, column }: { seals: EarnedSeal[]; mine: boolean; co
 /** Sa propre page : tout le panneau, avec ce que seule « Ma récolte » sait. */
 export function MyHarvest({ game, column }: Props) {
   const harvest = useHarvest().data
-  const settings = useGameSettings()
-  // Le passage vu à l'arrivée de la récolte, figé pour la visite : `undefined` tant qu'elle n'est
-  // pas là, `null` sans passage. Changer l'état pendant le dessin est permis par React pour suivre
-  // une donnée qui arrive (une seule fois ici).
-  const [risen, setRisen] = useState<{ from: number; level: number } | null | undefined>(undefined)
-  if (harvest && risen === undefined)
-    setRisen(
-      harvest.levelSeen < harvest.level ? { from: harvest.levelSeen, level: harvest.level } : null,
-    )
-  // L'écriture du niveau vu, une fois par visite, même si l'alvéole prévenait deux fois.
-  const marked = useRef(false)
-  const markSeen = () => {
-    if (!risen || marked.current) return
-    marked.current = true
-    settings.mutate({ levelSeen: risen.level })
-  }
+  // Le passage vu à l'arrivée de la récolte, figé pour la visite, et son écriture (une fois).
+  const { risen, markSeen } = useLevelRise(harvest)
 
   const level = harvest?.level ?? game.level
   const title = useTitleText(harvest?.title ?? game.title)
