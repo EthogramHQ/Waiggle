@@ -25,6 +25,7 @@ import {
 import { useMemo } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError, type ApiErrorKey, errorKey } from '../api/errors'
+import { earnPollen } from '../gamification/earn'
 import { projectQueryKey } from '../projects/hooks'
 
 /**
@@ -148,8 +149,14 @@ const asBoolean =
 
 // --- Les écritures --------------------------------------------------------------------------------
 
-/** Publie un commentaire ou une réponse (POST /v1/projects/{id}/comments). */
-export const postComment = async (projectId: string, comment: NewComment): Promise<Comment> => {
+/**
+ * Publie un commentaire ou une réponse (POST /v1/projects/{id}/comments) et rend aussi le pollen
+ * gagné (en-tête de la réponse, R19), pour la pastille au-dessus d'« Envoyer ».
+ */
+const sendComment = async (
+  projectId: string,
+  comment: NewComment,
+): Promise<{ comment: Comment; pollen?: number }> => {
   const result = await request(
     commentsPath(projectId),
     {
@@ -160,8 +167,12 @@ export const postComment = async (projectId: string, comment: NewComment): Promi
     Comment,
   )
   if (!result.ok) throw new ApiError(result.error)
-  return result.data
+  return { comment: result.data, ...(result.pollen !== undefined && { pollen: result.pollen }) }
 }
+
+/** Publie un commentaire ou une réponse (POST /v1/projects/{id}/comments). */
+export const postComment = async (projectId: string, comment: NewComment): Promise<Comment> =>
+  (await sendComment(projectId, comment)).comment
 
 /** Modifie son commentaire (PATCH /v1/projects/{id}/comments/{commentId}). */
 export const patchComment = async (
@@ -209,8 +220,10 @@ export const usePostComment = (projectId: string): PostState => {
   const queryClient = useQueryClient()
   // useMutation : une écriture vers l'API, dont React Query suit l'état (en cours, échouée).
   const mutation = useMutation({
-    mutationFn: (comment: NewComment) => postComment(projectId, comment),
-    onSuccess: (comment, { replyTo }) => {
+    mutationFn: (comment: NewComment) => sendComment(projectId, comment),
+    onSuccess: ({ comment, pollen }, { replyTo }) => {
+      // Le pollen gagné : la pastille se pose au-dessus d'« Envoyer » du composeur.
+      earnPollen(queryClient, pollen, 'comment')
       if (replyTo) {
         // Une réponse n'a pas de réponses à elle : on ne garde que ses champs de réponse.
         const { replies: _none, ...reply } = comment

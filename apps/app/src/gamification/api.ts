@@ -18,10 +18,12 @@ import { useCallback } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError, errorKey } from '../api/errors'
 import { projectQueryKey } from '../projects/hooks'
+import { harvestQueryKey } from './keys'
 import { reportPollen } from './pollen'
 
-/** La clé de « Ma récolte » dans le cache : un geste qui rapporte du pollen l'invalide. */
-export const harvestQueryKey = ['harvest'] as const
+// La clé de « Ma récolte » vit dans keys.ts (les hooks de geste l'invalident sans importer ce
+// fichier) ; on la garde exportée d'ici pour les écrans.
+export { harvestQueryKey }
 
 /** Les classements ont tous cette tête de clé (`['rankings', 'close']`, `['rankings', 'hive', id]`). */
 export const rankingsQueryKey = ['rankings'] as const

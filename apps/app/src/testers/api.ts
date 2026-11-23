@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { requestWithoutBody } from '../api/client'
 import { ApiError, errorKey } from '../api/errors'
+import { earnPollen } from '../gamification/earn'
 import { projectQueryKey } from '../projects/hooks'
 
 /**
@@ -41,12 +42,16 @@ type Change = { join: boolean; previous: Project | undefined }
 
 const testersPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}/testers`
 
-/** POST pour rejoindre, DELETE pour quitter. L'API répond 204, sans contenu. */
-export const setTester = async (projectId: string, join: boolean): Promise<void> => {
+/**
+ * POST pour rejoindre, DELETE pour quitter. L'API répond 204, sans contenu ; elle peut ajouter le
+ * pollen gagné (en-tête), rendu ici : seule la première inscription en rapporte (R19).
+ */
+export const setTester = async (projectId: string, join: boolean): Promise<number | undefined> => {
   const result = await requestWithoutBody(testersPath(projectId), {
     method: join ? 'POST' : 'DELETE',
   })
   if (!result.ok) throw new ApiError(result.error)
+  return result.pollen
 }
 
 /**
@@ -62,6 +67,10 @@ const useTesterChange = (projectId: string, join: boolean) => {
     mutationKey,
     mutationFn: (change: Change) => setTester(projectId, change.join),
     scope: { id: mutationKey.join(':') },
+    // Le pollen gagné : la pastille se pose à droite du « Coin des testeurs ». Quitter n'en rapporte pas.
+    onSuccess: (pollen, { join: joined }) => {
+      if (joined) earnPollen(queryClient, pollen, 'tester')
+    },
     // Refusé : le projet revient à ce qu'il était avant ce toucher.
     onError: (_error, { previous }) => {
       if (previous) queryClient.setQueryData(projectQueryKey(projectId), previous)
