@@ -98,6 +98,7 @@ import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
 import { HarvestCatalogue } from './harvest'
+import { HarvestChoicesCatalogue } from './harvestChoices'
 import { HarvestMotionCatalogue } from './harvestMotion'
 import { TokensCatalogue } from './jetons'
 import { LazySection } from './LazySection'
@@ -1019,6 +1020,8 @@ export function CatalogueScreen() {
       <LazySection title={l.lazy.harvest}>
         <HarvestCatalogue />
         <HarvestMotionCatalogue />
+        {/* Le choix du défi, la décoration du rayon et le pollen par famille (harvestChoices.tsx). */}
+        <HarvestChoicesCatalogue />
       </LazySection>
     </Screen>
   )
