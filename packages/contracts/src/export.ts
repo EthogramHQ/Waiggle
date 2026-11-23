@@ -5,6 +5,7 @@ import { Me } from './accounts'
 import { BlockExport } from './blocks'
 import { CommentId } from './comments'
 import { EmailPreferencesExport } from './email'
+import { GameExport } from './game'
 import { HiveExport } from './hives'
 import { PublicPageSettings } from './members'
 import { Project, ProjectId } from './projects'
@@ -192,6 +193,11 @@ export const AccountExport = z
      * l'accueil »), des plus anciens aux plus récents. Jamais l'administrateur qui les a choisis.
      */
     showcase: z.array(ShowcaseExport),
+    /**
+     * R19 : son jeu (game.ts) : les entrées de son pollen (sans l'autre membre), ses sceaux, les
+     * mouvements de son miel, ses défis perso et ses réglages.
+     */
+    game: GameExport,
     /**
      * R11 : sa dernière visite connue (au plus une mise à jour par jour), celle qui compte pour la
      * suppression d'un compte inactif depuis 3 ans (`INACTIVE_ACCOUNT_YEARS`, email.ts).

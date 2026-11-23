@@ -333,6 +333,11 @@ export const Project = z
     version: z.string().nullable(),
     /** Vrai si le visiteur s'est inscrit comme testeur de ce projet (R7a). */
     isTester: z.boolean(),
+    /**
+     * R19 : vrai si le visiteur a déjà offert du miel à ce projet (une fois par projet : « Miel
+     * offert ») ; toujours faux pour l'auteur.
+     */
+    honeyGiven: z.boolean(),
     /** Le nombre de testeurs, pour l'auteur seul ; null pour tous les autres (R7a). */
     testerCount: z.int().nonnegative().nullable(),
     /**
