@@ -72,9 +72,15 @@ function dotPath(cx: number, cy: number, radius: number) {
 /**
  * Le motif d'une décoration, sur toute la largeur du rayon : il est ensuite découpé à la forme des
  * alvéoles pleines (le `clipPath`). `scale` ramène les mesures de la planche (des alvéoles de 30)
- * à la taille dessinée. Lisse : aucun motif, les grains de pollen suffisent.
+ * à la taille dessinée. Lisse : aucun motif, les grains de pollen suffisent. Exporté pour les
+ * pastilles du choix de la décoration (ui/DecorationPicker) : le même dessin aux deux endroits.
  */
-function patternPath(pattern: DecorationPattern, width: number, height: number, scale: number) {
+export function patternPath(
+  pattern: DecorationPattern,
+  width: number,
+  height: number,
+  scale: number,
+) {
   const parts: string[] = []
   if (pattern === 'striped') {
     // Des rayures à 45°, de 3 de large tous les 9.

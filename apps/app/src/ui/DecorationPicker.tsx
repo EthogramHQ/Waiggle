@@ -31,7 +31,7 @@ import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View } from 'react-native'
 import Svg, { Circle, ClipPath, Defs, G, Path } from 'react-native-svg'
 import { describedBy } from './aria'
-import { combTints } from './HoneyComb'
+import { combTints, patternPath } from './HoneyComb'
 import { Icon } from './Icon'
 import { spaceToggles } from './keyboard'
 import { Text } from './Text'
@@ -84,28 +84,12 @@ const HEXAGON = (() => {
 })()
 
 /**
- * Le motif d'une pastille, sur toute sa boîte, découpé ensuite à sa forme. Les mêmes mesures que le
- * motif du rayon (`patternPath` de ui/HoneyComb, à la taille de ses alvéoles de 30) : rayures à 45°
- * de 3 tous les 9, grille tous les 8, points tous les 8. Si le dessin du rayon change, celui-ci
- * change avec lui.
+ * Le motif d'une pastille, sur toute sa boîte, découpé ensuite à sa forme : le dessin même du rayon
+ * (`patternPath` de ui/HoneyComb), à l'échelle de ses alvéoles de 30. Un seul dessin : si celui du
+ * rayon change, celui-ci change avec lui.
  */
-function swatchPattern(pattern: DecorationPattern) {
-  const w = SWATCH_WIDTH
-  const h = SWATCH_HEIGHT
-  const parts: string[] = []
-  if (pattern === 'striped') {
-    for (let x = -h; x < w; x += 9) parts.push(`M${x} ${h}L${x + h} 0`)
-  } else if (pattern === 'waffle') {
-    for (let x = 4; x < w; x += 8) parts.push(`M${x} 0V${h}`)
-    for (let y = 4; y < h; y += 8) parts.push(`M0 ${y}H${w}`)
-  } else if (pattern === 'dotted') {
-    for (let y = 4; y < h; y += 8) {
-      for (let x = 4; x < w; x += 8)
-        parts.push(`M${x - 1.5} ${y}a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0`)
-    }
-  }
-  return parts.join('')
-}
+const swatchPattern = (pattern: DecorationPattern) =>
+  patternPath(pattern, SWATCH_WIDTH, SWATCH_HEIGHT, 1)
 
 /** La pastille dessinée : la teinte, ses grains de pollen (Lisse) ou son motif de cire. */
 function Swatch({ tint, pattern }: { tint: DecorationTint; pattern: DecorationPattern }) {
