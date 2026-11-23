@@ -3161,7 +3161,7 @@ export const en: Translation = {
     },
     families: {
       forager: 'Comments and reactions',
-      builder: 'My projects',
+      builder: 'Projects and updates',
       keeper: 'Tests and feedback',
       dancer: 'Hives and invitations',
     },
@@ -3271,7 +3271,7 @@ export const en: Translation = {
         work: 'Workplace explorer',
         code: 'Code explorer',
         animals: 'Animal explorer',
-        science: 'Star explorer',
+        science: 'Science explorer',
       },
       categoryOther: 'Category explored: {{category}}',
     },

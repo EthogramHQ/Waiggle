@@ -3848,7 +3848,7 @@ export const fr = {
     // titres restent au profil. Bâtisseuse compte aussi ce qui est reçu sur ses projets.
     families: {
       forager: 'Commentaires et réactions',
-      builder: 'Mes projets',
+      builder: 'Projets et mises à jour',
       keeper: 'Tests et retours',
       dancer: 'Ruches et invitations',
     },
