@@ -481,6 +481,45 @@ describe('my avatar', () => {
   })
 })
 
+// R19 (« La gamification ») : compléter son profil rapporte 10 pollen pour la photo, 10 pour la bio
+// et 10 pour un premier outil, chacun une fois. Le rayon de sa page (`Member.game.cells`) le montre :
+// une alvéole par dizaine de pollen, jusqu'au niveau 2 (100 pollen).
+describe('my profile in my comb (R19)', () => {
+  /** Les alvéoles pleines de mon rayon, lues sur ma propre page. */
+  const myCells = async () => {
+    const { id } = await getMe()
+    const res = await ctx.request(`/v1/members/${encodeURIComponent(id)}`, { headers: { cookie } })
+    expect(res.status).toBe(200)
+    const { game } = Member.parse(await res.json())
+    if (!game) throw new Error('no game on my own page')
+    return game.cells
+  }
+
+  it('fills one cell for my bio and one for my first tool, once each', async () => {
+    expect(await myCells()).toBe(0)
+    expect(
+      (await patchMe({ bio: 'Je bricole des agents IA.', favoriteTools: ['Claude'] })).status,
+    ).toBe(200)
+    expect(await myCells()).toBe(2)
+
+    // Une autre bio, un deuxième outil : rien de plus.
+    expect(
+      (await patchMe({ bio: 'Je bricole des robots.', favoriteTools: ['Claude', 'Cursor'] }))
+        .status,
+    ).toBe(200)
+    expect(await myCells()).toBe(2)
+  })
+
+  it('fills one cell for my photo, once', async () => {
+    expect((await uploadAvatar(avatarForm(await pngImage()))).status).toBe(200)
+    expect(await myCells()).toBe(1)
+
+    // Une nouvelle photo remplace l'ancienne, sans pollen de plus.
+    expect((await uploadAvatar(avatarForm(await pngImage()))).status).toBe(200)
+    expect(await myCells()).toBe(1)
+  })
+})
+
 describe('serving images', () => {
   it('forbids the browser from running anything found in an image', async () => {
     await uploadAvatar(avatarForm(await photoWithGps()))
