@@ -254,7 +254,8 @@ selon les règles de visibilité de l'appli.
     d'office avec un réglage de retrait : 6.1.f, à vérifier. Un titre déduit des gestes peut être
     un profilage (article 4.4) ; il n'a pas d'effet juridique, donc l'article 22 ne s'appliquerait
     pas, à vérifier. Le retrait vaut opposition (article 21) ; il est annoncé une fois, par l'avis
-    `intro` et le récap.
+    `intro` (écrit au lancement pour les comptes déjà là, puis à la création de chaque compte), par
+    le récap, et par les Règles du 23/11/2026, que chacun accepte de nouveau.
 - **Personnes et données** : les membres, sauf les comptes d'exemple.
   - `pollen_entry` : le geste, la famille, le montant, la chose concernée, l'autre membre, le
     jour, la semaine, la révocation ;
@@ -268,7 +269,10 @@ selon les règles de visibilité de l'appli.
   - le niveau, le titre, le rayon, les sceaux et la décoration : les membres connectés, sauf
     blocage, et jamais sur la page publique ;
   - le pollen de la semaine : les membres qui le suivent (leur classement « Ceux que je suis ») et
-    les membres de ses ruches, sauf retrait ou blocage ;
+    les membres de ses ruches, sauf retrait ou blocage. Les classements ne comptent ni les réactions
+    données, ni les abonnements, ni le défi « Réagis à 5 projets » : leurs montants diraient qui a
+    réagi à un projet ou qui s'abonne à un membre, que l'appli ne montre jamais (relecture de
+    sécurité de R19) ;
   - le miel, les défis et les réglages : le membre seul ;
   - l'avancée d'un défi de ruche : les membres de la ruche, sans nom ;
   - le récap (Scaleway, 2.9) : le bloc « Ta semaine ».
@@ -277,6 +281,9 @@ selon les règles de visibilité de l'appli.
     retire, pour qu'il ne paie qu'une fois ;
   - `counterpart_id` : remis à nul après la semaine suivante, et quand l'autre compte est
     supprimé (`set null`) ;
+  - `source_key` (et `source_id` d'un suivi) : la chose concernée et, pour un geste reçu,
+    l'identifiant de qui l'a fait, tant que le compte existe, pour payer une seule fois ; jamais
+    montré ni exporté ;
   - les défis : effacés après la semaine suivante ;
   - les avis : 90 jours (`nightly-purge.ts`).
 - **Sécurité** : une seule fonction écrit le grand livre (`apps/api/src/game/award.ts`, vérifié

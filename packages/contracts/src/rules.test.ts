@@ -26,8 +26,9 @@ describe('RULES_VERSION', () => {
   })
 
   // R12 : la deuxième version dit ce qui change (choix 13 du plan R12) ; la première n'avait rien.
-  it('lists what changes in the R12 version: public projects, visitors, the showcase', () => {
-    expect(RULES_CHANGES).toEqual(['public', 'visitors', 'showcase'])
+  // R19, la troisième : le classement de la semaine et la valeur du pollen et du miel.
+  it('lists what changes in the R19 version: the weekly ranking and the harvest', () => {
+    expect(RULES_CHANGES).toEqual(['harvest'])
   })
 
   it('differs from the R11 version, already accepted by the members', () => {
