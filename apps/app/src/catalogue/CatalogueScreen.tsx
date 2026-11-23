@@ -99,6 +99,7 @@ import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
 import { HarvestCatalogue } from './harvest'
 import { HarvestMotionCatalogue } from './harvestMotion'
+import { HarvestPanelsCatalogue } from './harvestPanels'
 import { TokensCatalogue } from './jetons'
 import { LazySection } from './LazySection'
 import { labels } from './labels'
@@ -1019,6 +1020,8 @@ export function CatalogueScreen() {
       <LazySection title={l.lazy.harvest}>
         <HarvestCatalogue />
         <HarvestMotionCatalogue />
+        {/* Le panneau du niveau, la carte d'un défi et le classement (harvestPanels.tsx). */}
+        <HarvestPanelsCatalogue />
       </LazySection>
     </Screen>
   )
