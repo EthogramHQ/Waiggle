@@ -25,6 +25,7 @@ import type { Appearance } from '../../ui/theme/appearance'
 import { useHydrated } from '../../ui/theme/hydration'
 import { useTheme } from '../../ui/theme/ThemeProvider'
 import { EmailSettings } from './EmailSettings'
+import { RankingsSetting } from './GameSettings'
 import { useSignOut } from './useSignOut'
 
 /** Les rubriques qui ont un contenu ici (Mon profil et Modération ont leur propre page). */
@@ -133,17 +134,21 @@ function AppearanceSection() {
   const { t } = useTranslation()
   const { appearance, setAppearance } = useTheme()
   return (
-    <ListGroup footer={t(($) => $.account.appearance.hint)} radio>
-      {appearances.map(({ value, icon }) => (
-        <ListRow
-          key={value}
-          label={t(($) => $.account.appearance[value])}
-          icon={icon}
-          selected={value === appearance}
-          onPress={() => setAppearance(value)}
-        />
-      ))}
-    </ListGroup>
+    <Stack gap="lg">
+      <ListGroup footer={t(($) => $.account.appearance.hint)} radio>
+        {appearances.map(({ value, icon }) => (
+          <ListRow
+            key={value}
+            label={t(($) => $.account.appearance[value])}
+            icon={icon}
+            selected={value === appearance}
+            onPress={() => setAppearance(value)}
+          />
+        ))}
+      </ListGroup>
+      {/* R19 (option a8) : le groupe « Classements », sous les choix d'apparence. */}
+      <RankingsSetting />
+    </Stack>
   )
 }
 

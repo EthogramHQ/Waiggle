@@ -29,7 +29,7 @@
 // R12 : un geste qui écrit sur place (« Retirer de l'accueil ») dit ce qu'il a donné sous lui
 // (`actionNotice`) : l'erreur sous le geste, qui reste ; la réussite à sa place.
 import { borders, radii, space } from '@ruche/brand'
-import type { ReactionKind } from '@ruche/contracts'
+import type { ReactionKind, SealMatter } from '@ruche/contracts'
 import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View, type ViewStyle } from 'react-native'
@@ -39,6 +39,7 @@ import { hiddenFrame } from './HiddenHeading'
 import { Icon, type IconName } from './Icon'
 import { InitialTile } from './InitialTile'
 import type { ImageSource } from './image'
+import { LevelCell } from './LevelCell'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import type { CoverImage } from './ProjectCover'
@@ -48,6 +49,7 @@ import { useRelativeDate } from './RelativeTime'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
 import { useTheme } from './theme/ThemeProvider'
+import { WaxSeal } from './WaxSeal'
 
 /**
  * Le geste propre à une notification, nommé par son texte affiché (WCAG 2.5.3) : un geste de
@@ -73,6 +75,10 @@ export type NotificationLeading =
       /** `honey` : les réactions ; `danger` : une décision de la modération ; `neutral` sinon. */
       tone: 'neutral' | 'honey' | 'danger'
     }
+  /** R19 : un niveau passé, son alvéole numérotée (`LevelCell` small, 40 comme le rond). */
+  | { kind: 'level'; level: number }
+  /** R19 : un sceau gagné, le petit sceau de cire (`WaxSeal` small, 40) ; la phrase le nomme. */
+  | { kind: 'seal'; icon: IconName; matter: SealMatter }
 
 /** Un morceau de la phrase : du texte simple, en gras (`strong`), ou une version (`version`). */
 export type NotificationPart = { text: string; style?: 'strong' | 'version' }
@@ -444,6 +450,11 @@ function Leading({ leading }: { leading: NotificationLeading }) {
     >
       {leading.kind === 'avatar' ? (
         <Avatar name={leading.name} source={leading.image} label={leading.name} size={LEADING} />
+      ) : leading.kind === 'level' ? (
+        <LevelCell level={leading.level} size="small" />
+      ) : leading.kind === 'seal' ? (
+        // Sans nom (`label` vide) : un décor, la phrase dit déjà « Nouveau sceau : … ».
+        <WaxSeal icon={leading.icon} matter={leading.matter} size="small" label="" />
       ) : (
         <View
           style={{
