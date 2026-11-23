@@ -46,7 +46,7 @@ const SEGMENTED_HIVES_MAX = 3
  */
 export function RankingsScreen() {
   return (
-    <SessionGate loading={<LoadingScreen shape="list" width="page" />} width="page">
+    <SessionGate loading={<LoadingScreen shape="list" width="form" />} width="form">
       {() => <Rankings />}
     </SessionGate>
   )
@@ -95,7 +95,7 @@ function Rankings() {
 
   const off = !shown && ranking.isError && errorKey(ranking.error) === 'rankingsOff'
   if (!shown && ranking.isError && errorKey(ranking.error) === 'unauthorized')
-    return <SignedOutScreen expired width="page" />
+    return <SignedOutScreen expired width="form" />
 
   // Le choix de la portée : seulement avec au moins une ruche (un seul choix ne choisit rien), et
   // jamais pour un membre retiré des classements, qui n'en voit aucun.
@@ -136,7 +136,7 @@ function Rankings() {
   const waiting = !shown && (ranking.isPending || hives.isPending)
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t(($) => $.game.rankings.title)} width="page">
+    <Screen header={<TopNav />} onBack={back} title={t(($) => $.game.rankings.title)} width="form">
       {off ? (
         // Retiré des classements : la phrase (ce qu'il garde, ce qu'il ne voit plus) et l'issue.
         <StateMessage
