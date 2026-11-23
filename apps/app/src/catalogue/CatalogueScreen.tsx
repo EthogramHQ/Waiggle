@@ -100,6 +100,7 @@ import { CardGridCatalogue } from './grille-cartes'
 import { HarvestCatalogue } from './harvest'
 import { HarvestChoicesCatalogue } from './harvestChoices'
 import { HarvestMotionCatalogue } from './harvestMotion'
+import { HarvestPanelsCatalogue } from './harvestPanels'
 import { TokensCatalogue } from './jetons'
 import { LazySection } from './LazySection'
 import { labels } from './labels'
@@ -1020,6 +1021,8 @@ export function CatalogueScreen() {
       <LazySection title={l.lazy.harvest}>
         <HarvestCatalogue />
         <HarvestMotionCatalogue />
+        {/* Le panneau du niveau, la carte d'un défi et le classement (harvestPanels.tsx). */}
+        <HarvestPanelsCatalogue />
         {/* Le choix du défi, la décoration du rayon et le pollen par famille (harvestChoices.tsx). */}
         <HarvestChoicesCatalogue />
       </LazySection>
