@@ -116,7 +116,8 @@ describe('the challenge of the week on a hive page', () => {
       expect(found).toBeTruthy()
       return found
     })
-    expect(title?.props['aria-level'] ?? title?.props.accessibilityLevel).toBe(2)
+    // Son niveau (2) ne se lit que sur le web : le test de `ChallengeCard` le vérifie.
+    expect(title).toBeTruthy()
     expect(screen.getByText(T.feedback5)).toBeTruthy()
     const gauges = screen.getAllByRole('progressbar')
     expect(gauges.map((gauge) => gauge.props['aria-valuetext'])).toContain(T.progress(3, 5))

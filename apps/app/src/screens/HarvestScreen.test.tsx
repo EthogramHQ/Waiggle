@@ -270,9 +270,7 @@ describe('HarvestScreen, « Mon défi »', () => {
     await fireEvent.press(challengeRadio('update'))
     await fireEvent.press(screen.getByRole('button', { name: T.confirm }))
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: T.confirm }).props['aria-busy']).toBe(true),
-    )
+    await waitFor(() => expect(screen.getByRole('button', { name: T.confirm })).toBeBusy())
     await act(async () => answer.resolve({ ok: true, data: null }))
   })
 

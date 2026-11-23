@@ -3,6 +3,7 @@
 // alvéoles (`HoneyComb` petit) lue « 3 sur 5 » ; un défi neuf dit « Nouveau », jamais « 0 sur 5 »
 // (option a14 des planches) ; un défi réussi montre « +10 miel » (option b2).
 import { screen } from '@testing-library/react-native'
+import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { ChallengeCard } from './ChallengeCard'
@@ -76,5 +77,15 @@ describe('ChallengeCard', () => {
 
     expect(screen.getByRole('progressbar').props['aria-valuetext']).toBe(progress(2, 5))
     expect(screen.queryByText(NEW)).toBeNull()
+  })
+
+  it('titles the card as a section heading by default (web)', async () => {
+    // Le niveau (`aria-level`) n'existe que sur le web, où il donne une vraie balise <h2>.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await renderWithProviders(
+      <ChallengeCard {...card} title="Défi de la semaine" progress={3} state="active" />,
+    )
+
+    expect(screen.getByRole('header', { name: 'Défi de la semaine' }).props['aria-level']).toBe(2)
   })
 })
