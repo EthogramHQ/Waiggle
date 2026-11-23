@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { requestWithoutBody } from '../api/client'
 import { ApiError, errorKey } from '../api/errors'
+import { earnPollen } from '../gamification/earn'
 import { projectQueryKey } from '../projects/hooks'
 
 // Un changement : ce type de réaction, posé (true) ou retiré (false).
@@ -15,12 +16,20 @@ type Change = { kind: ReactionKind; react: boolean }
 const pathOf = (projectId: string, kind: ReactionKind) =>
   `/v1/projects/${encodeURIComponent(projectId)}/reactions/${kind}`
 
-/** PUT pour réagir, DELETE pour retirer sa réaction. L'API répond 204, sans contenu. */
-export const setReaction = async (projectId: string, { kind, react }: Change): Promise<void> => {
+/**
+ * PUT pour réagir, DELETE pour retirer sa réaction. L'API répond 204, sans contenu ; elle peut
+ * ajouter le pollen gagné (en-tête), rendu ici (R19). Poser, retirer, reposer : seule la première
+ * pose rapporte, l'en-tête manque aux suivantes.
+ */
+export const setReaction = async (
+  projectId: string,
+  { kind, react }: Change,
+): Promise<number | undefined> => {
   const result = await requestWithoutBody(pathOf(projectId, kind), {
     method: react ? 'PUT' : 'DELETE',
   })
   if (!result.ok) throw new ApiError(result.error)
+  return result.pollen
 }
 
 /**
@@ -49,6 +58,8 @@ export const useReaction = (projectId: string) => {
   const mutation = useMutation({
     mutationKey,
     mutationFn: (change: Change) => setReaction(projectId, change),
+    // Le pollen gagné : la pastille s'affiche sur la capsule posée (`target` : son type).
+    onSuccess: (pollen, { kind }) => earnPollen(queryClient, pollen, 'reaction', kind),
     // Une « portée » par projet : ses réactions partent l'une après l'autre, jamais en même temps.
     // Deux touchers rapides sur « Bravo » font donc bien « réagir » puis « retirer », dans cet
     // ordre, côté serveur aussi. (Une portée par type suffirait pour l'ordre, mais React Query fixe

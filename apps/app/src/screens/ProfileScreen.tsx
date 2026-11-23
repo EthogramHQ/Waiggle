@@ -18,6 +18,7 @@ import {
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
 } from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -26,6 +27,7 @@ import { useSession } from '../accounts/api'
 import { SessionGate } from '../accounts/SessionGate'
 import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { earnPollen } from '../gamification/earn'
 import { useRouteSheet } from '../navigation/useRouteSheet'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { type ProfileFormErrors, toProfileUpdate } from '../profile/form'
@@ -301,6 +303,7 @@ function ProfileForm({ me }: { me: Me }) {
   const { t } = useTranslation()
   const { refetch: refetchSession } = useSession()
   const setMe = useSetMe()
+  const queryClient = useQueryClient()
   const toSource = useMediaSources()
 
   // Un useState par champ : la valeur affichée, et la fonction pour la changer.
@@ -419,6 +422,8 @@ function ProfileForm({ me }: { me: Me }) {
       return
     }
     setMe(result.data) // le cache partagé reçoit le profil à jour
+    // Compléter sa bio ou ses outils peut rapporter du pollen (R19) : la pastille de l'hôte global.
+    earnPollen(queryClient, result.pollen, 'global')
     // Les champs non retouchés prennent leur forme enregistrée : le pseudo nettoyé (« @Lea_M »
     // devient « lea_m »), la liste des outils sans doublons.
     if (handleKept) {
@@ -450,6 +455,8 @@ function ProfileForm({ me }: { me: Me }) {
       const result = await uploadAvatar(picked)
       if (result.ok) {
         setMe(result.data)
+        // Une première photo peut rapporter du pollen (R19) : la pastille de l'hôte global.
+        earnPollen(queryClient, result.pollen, 'global')
         setMessage({ text: t(($) => $.profile.avatar.updated), ok: true })
       } else {
         setMessage({ text: avatarError(result.error), ok: false })

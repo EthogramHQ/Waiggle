@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey } from '../api/errors'
+import { earnPollen } from '../gamification/earn'
 import { useToast } from '../ui/theme/toast'
 import { createProject, updateProject } from './api'
 import type { ProjectForm } from './form'
@@ -70,6 +71,8 @@ export function useSubmitProject({
       return result.error
     }
     setProject(result.data) // la page du projet s'affichera sans nouvelle requête
+    // Publier ou mettre à jour peut rapporter du pollen (R19) : la pastille de l'hôte global.
+    earnPollen(queryClient, result.pollen, 'global')
     const id = result.data.id
     if (!projectId) {
       // Le fil la montre tout de suite (plan, U5a) ; puis les photos partent, dans l'ordre.
