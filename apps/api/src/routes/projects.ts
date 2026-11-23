@@ -8,6 +8,8 @@ import { and, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { award, setPollen, type Tx } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import { isHiveMember } from '../hives/load'
 import { isForeignKeyViolation, lockMembershipForShare } from '../hives/write'
 import type { FileStorage } from '../media/storage'
@@ -42,6 +44,29 @@ const projectResponse = (description: string) => ({
   description,
   content: { 'application/json': { schema: Project } },
 })
+// R19 : publier (POST) et rendre public un brouillon (PATCH) rapportent du pollen, dit par
+// l'en-tête `Waiggle-Pollen` de la réponse.
+const publishedResponse = (description: string) => ({
+  ...projectResponse(description),
+  headers: pollenHeaders,
+})
+
+/**
+ * R19 (plan, choix 3) : la première publication d'un projet, quand il sort du privé pour la
+ * première fois (sa date de publication posée), rapporte 50 pollen à son auteur, dans la
+ * transaction qui l'écrit. La clé est le projet : il n'est payé qu'une fois. La source est le
+ * projet : retiré par la modération, il révoque cette publication (game/award.ts, `revokeFor`).
+ */
+const awardPublication = (tx: Tx, authorId: string, projectId: string, now: Date) =>
+  award(tx, {
+    memberId: authorId,
+    gesture: 'publish',
+    sourceKind: 'project',
+    sourceId: projectId,
+    sourceKey: projectId,
+    projectId,
+    now,
+  })
 // L'identifiant du projet dans l'adresse : {id} dans /v1/projects/{id}.
 const params = z.object({ id: z.string() })
 
@@ -51,7 +76,7 @@ const createProjectRoute = createRoute({
   summary: 'Publish a project',
   request: { body: { required: true, content: { 'application/json': { schema: ProjectInput } } } },
   responses: {
-    201: projectResponse('The new project.'),
+    201: publishedResponse('The new project.'),
     400: errorResponse('Invalid data, or a category that does not exist (`unknown_category`).'),
     401: errorResponse('Not signed in.'),
     404: errorResponse('Reserved to a hive that does not exist, or that the author is not in.'),
@@ -86,7 +111,7 @@ const updateProjectRoute = createRoute({
     body: { required: true, content: { 'application/json': { schema: ProjectChanges } } },
   },
   responses: {
-    200: projectResponse('The changed project.'),
+    200: publishedResponse('The changed project.'),
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
     403: errorResponse(
@@ -227,7 +252,9 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const retryAfter = await chargeOtherTools(limiter, user.id, counted)
     if (retryAfter !== null) return tooManyOtherTools(c, retryAfter)
     // Une transaction : le projet, ses outils et les « Autre » créés pour lui s'écrivent ensemble,
-    // ou pas du tout.
+    // ou pas du tout. R19 : son pollen aussi (rempli dans la transaction).
+    const now = new Date()
+    let pollen = 0
     const created = await db
       .transaction(async (tx) => {
         // R10, les verrous d'une publication « réservée » (relecture du plan, point 5 ; ordre écrit
@@ -263,9 +290,11 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
           // R10 : réservé à une ruche, il est publié aussi (pour ses membres) : il entre dans leurs
           // fils et l'actualité de la ruche à cette date.
-          publishedAt: visibility === 'private' ? null : new Date(),
+          publishedAt: visibility === 'private' ? null : now,
         })
         await replaceProjectTools(tx, id, resolved.tools)
+        // Un brouillon privé ne rapporte rien : il sera payé le jour où il sort du privé (PATCH).
+        if (visibility !== 'private') pollen = await awardPublication(tx, user.id, id, now)
         return resolved.created
       })
       .catch(noFreeToolSlug)
@@ -278,6 +307,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) throw new Error('project not found right after its creation')
+    setPollen(c, pollen)
     return c.json(project, 201)
   })
 
@@ -349,6 +379,8 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // pas même le titre envoyé avec lui.
     // Combien de nouveaux « Autre » la transaction a vraiment créés (rempli dans la transaction).
     let createdHere = 0
+    // R19 : le pollen de la première publication, si ce changement en est une (rempli plus bas).
+    let pollen = 0
     const outcome = await db
       .transaction(async (tx) => {
         // R10 : passer en « réservé » prend d'abord la ligne de l'auteur dans hive_member, en
@@ -364,6 +396,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           .select({
             removedAt: schema.project.removedAt,
             visibility: schema.project.visibility,
+            publishedAt: schema.project.publishedAt,
             primaryCategory: schema.project.primaryCategory,
             secondaryCategory: schema.project.secondaryCategory,
           })
@@ -459,6 +492,16 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // s'efface, dans la même transaction que l'écriture (moderation/replaced.ts). Le titre, la
         // visibilité ou l'ordre des photos ne touchent à aucune marque.
         await dropProjectPartRemovals(tx, user.id, id, replacedProjectParts(changes))
+        // R19 : sortir du privé pour la première fois (aucune date de publication, lue sous le
+        // verrou) est une publication, payée comme au POST. Repasser en privé puis rouvrir garde
+        // la date, et ne paie pas de nouveau.
+        if (
+          locked.publishedAt === null &&
+          changes.visibility !== undefined &&
+          changes.visibility !== 'private'
+        ) {
+          pollen = await awardPublication(tx, user.id, id, new Date())
+        }
         return 'ok' as const
       })
       .catch(noFreeToolSlug)
@@ -479,6 +522,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) return notFound(c)
+    setPollen(c, pollen)
     return c.json(project, 200)
   })
 
