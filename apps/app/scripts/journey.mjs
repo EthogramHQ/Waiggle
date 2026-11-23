@@ -1149,7 +1149,11 @@ try {
     const res = await lea.request.get(`${apiUrl}/v1/me/harvest`)
     return res.ok() && (await res.json()).personalChallenge.state === 'active'
   })
-  await byRole(lea.page, 'progressbar', /sur/).first().waitFor()
+  // La jauge porte le nom du défi ; son avancée, « 0 sur 5 », s'écrit à côté d'elle.
+  await lea.page
+    .getByText(/^\d+ sur \d+$/)
+    .first()
+    .waitFor()
   console.log('  ok : le défi de Léa est en cours, sa jauge à l’écran')
 
   step('Sam offre du miel au projet de Léa ; Léa le lit dans son Activité')
