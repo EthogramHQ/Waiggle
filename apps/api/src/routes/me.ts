@@ -29,6 +29,7 @@ import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
 import { readFeedReadAt } from '../feed/state'
 import { award, setPollen } from '../game/award'
+import { gameExportOf } from '../game/export'
 import { pollenHeaders } from '../game/gesture'
 import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
@@ -788,21 +789,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         formerHandle,
         projects,
         categoryChanges,
-        // R19 : sa récolte, vide en attendant le grand livre (game/export.ts).
-        game: {
-          pollen: [],
-          seals: [],
-          honey: [],
-          challenges: [],
-          settings: {
-            titleForm: 'f' as const,
-            pinnedFamily: null,
-            inRankings: true,
-            harvestNotices: true,
-            decoration: null,
-            levelSeen: 1,
-          },
-        },
+        // R19 : son jeu (pollen, sceaux, miel, défis perso, réglages), sans l'autre membre d'une
+        // entrée ni la chose qui l'a rapportée (game/export.ts, cinq requêtes).
+        game: await gameExportOf(db, user.id),
         updates,
         testerOf,
         ...testerCorner,
