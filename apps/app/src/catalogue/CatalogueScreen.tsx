@@ -161,6 +161,7 @@ import { HiveNewsCatalogue } from './ruches-actualite'
 import { HiveCellsCatalogue } from './ruches-alveoles'
 import { HiveRowsCatalogue } from './ruches-lignes'
 import { ProjectTilesCatalogue } from './ruches-tuiles'
+import { SealShelfCatalogue } from './sealShelf'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
@@ -1025,6 +1026,8 @@ export function CatalogueScreen() {
         <HarvestPanelsCatalogue />
         {/* Le choix du défi, la décoration du rayon et le pollen par famille (harvestChoices.tsx). */}
         <HarvestChoicesCatalogue />
+        {/* Les sceaux d'un membre sur sa page (sealShelf.tsx). */}
+        <SealShelfCatalogue />
       </LazySection>
     </Screen>
   )

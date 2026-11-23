@@ -32,6 +32,9 @@
 // lue d'abord, qui reste en place pendant qu'on descend dans ses projets (`Columns sideFirst
 // sticky`) ; la mosaïque prend tout le reste, et y compte ses colonnes. Plus étroit, la page de R14 :
 // l'en-tête centré, puis les projets dessous.
+//
+// Tranche R19 (la gamification) : sous l'en-tête, le rayon du membre (MemberHarvest.tsx) : le sien
+// sur « Moi », celui d'un proche sur sa page.
 import {
   type Member,
   PROJECT_LIST_MAX,
@@ -82,6 +85,7 @@ import { Loading, SkeletonPage } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
+import { MyHarvest, TheirHarvest } from './MemberHarvest'
 import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
 
 /** Les parties d'un profil que la modération peut retirer (les autres sont celles d'un projet). */
@@ -632,6 +636,16 @@ function MemberView({ member, column }: { member: Member; column: boolean }) {
           )
         }
       />
+      {/* R19 : le rayon sous l'en-tête. Le sien, avec « Ma récolte » (lue pour soi seulement) ;
+          celui d'un proche, réduit à ce que sa page dit (`member.game`). Le compte d'exemples et un
+          membre bloqué n'en ont pas (`game` vaut null). */}
+      {member.game && !blocked ? (
+        member.isMe ? (
+          <MyHarvest game={member.game} column={column} />
+        ) : (
+          <TheirHarvest game={member.game} column={column} />
+        )
+      ) : null}
       {/* R9 : sur « Moi », les parties de son profil retirées par la modération (l'API ne les
           donne qu'à leur auteur). */}
       {member.isMe ? <RemovedProfileParts member={member} /> : null}
