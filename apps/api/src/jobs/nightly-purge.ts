@@ -17,17 +17,22 @@
 // - les invitations dans une ruche de plus de 30 jours, et les traces des ruches de plus de 90 jours
 //   (R10) ;
 // - les photos de mise à jour restées « en attente » plus de 24 heures (R7a), ligne et fichier ;
-// - les images du coin des testeurs restées « en attente » plus de 24 heures (R7b), de même.
+// - les images du coin des testeurs restées « en attente » plus de 24 heures (R7b), de même ;
+// - R19 (relecture juridique du plan, J2 et J3) : les avis du jeu de plus de 90 jours, les défis
+//   (perso et de ruche) d'une semaine passée une fois la semaine suivante finie, et l'autre membre
+//   des gestes du grand livre au même moment (la ligne du geste reste, avec son pollen).
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
 // L'heure vient du paramètre `now` et entre dans le SQL par utc() (un texte ISO lu comme un instant,
 // puis ramené à l'heure UTC des colonnes), jamais par now() en SQL : la comparaison ne dépend ni de
 // l'horloge ni du fuseau de la base (relecture de sécurité S-A5).
-import { UNVERIFIED_ACCOUNT_DAYS } from '@ruche/contracts'
+import { UNVERIFIED_ACCOUNT_DAYS, weekOf } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, lt, sql } from 'drizzle-orm'
 import { AUTH_RATE_WINDOW_MAX_MS } from '../auth/auth'
+import { clearCounterparts } from '../game/award'
+import { weekShift } from '../game/weeks'
 import { purgeExpiredHandles } from '../handles/claim'
 import { invitationValidSince } from '../hives/load'
 import type { FileStorage } from '../media/storage'
@@ -177,6 +182,32 @@ export const nightlyPurge = async (
     )
     .returning({ id: schema.showcaseNotice.id })
 
+  // R19 (J2) : les avis du jeu (`game_notice` : introduction, niveau, sceau, défi de ruche, miel
+  // reçu) ne se gardent pas plus longtemps qu'ils ne se montrent dans l'Activité, 90 jours, comme
+  // ceux du catalogue. L'index `game_notice_member_idx` commence par le membre : une lecture
+  // complète par nuit, sur une table bornée (quelques avis par membre et par semaine).
+  const gameNotices = await db
+    .delete(schema.gameNotice)
+    .where(sql`${schema.gameNotice.createdAt} <= ${utc(notificationCutoff(now))}`)
+    .returning({ id: schema.gameNotice.id })
+  // R19 (J2) : un défi ne sert plus une fois la semaine suivante finie (« Ma récolte » montre la
+  // semaine en cours, le récap du dimanche la semaine qui finit) : le lundi de W+2, les défis de W
+  // partent. Le miel qu'ils ont rapporté reste (`honey_entry` ne pointe pas vers eux). Lecture par
+  // les index `personal_challenge_week_idx` et `hive_challenge_week_idx` (la semaine seule) : la
+  // plage « avant telle semaine » en est le début.
+  const lastKeptWeek = weekShift(weekOf(now), -1)
+  const personalChallenges = await db
+    .delete(schema.personalChallenge)
+    .where(lt(schema.personalChallenge.week, lastKeptWeek))
+    .returning({ week: schema.personalChallenge.week })
+  const hiveChallenges = await db
+    .delete(schema.hiveChallenge)
+    .where(lt(schema.hiveChallenge.week, lastKeptWeek))
+    .returning({ week: schema.hiveChallenge.week })
+  // R19 (J3) : au même moment, l'autre membre d'un geste s'efface du grand livre ; seul
+  // game/award.ts écrit `pollen_entry`, d'où l'appel plutôt qu'une requête ici.
+  const counterparts = await clearCounterparts(db, now)
+
   // R7a (sécurité A5) : les photos « en attente » (slot 'update', jamais rattachées à une mise à
   // jour) de plus de 24 heures : téléversées, mais la mise à jour n'a pas été publiée. La ligne
   // s'efface d'abord (`returning` rend la clé du fichier), puis le fichier : une panne entre les deux
@@ -239,6 +270,10 @@ export const nightlyPurge = async (
     hiveInvitations: hiveInvitations.length,
     hiveNotices: hiveNotices.length,
     showcaseNotices: showcaseNotices.length,
+    gameNotices: gameNotices.length,
+    personalChallenges: personalChallenges.length,
+    hiveChallenges: hiveChallenges.length,
+    counterparts,
     ...moderation,
   }
   console.log('Nightly purge', purged)

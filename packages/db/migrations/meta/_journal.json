@@ -211,6 +211,20 @@
       "when": 1795413839698,
       "tag": "0029_game",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795417910882,
+      "tag": "0030_game_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795417924530,
+      "tag": "0031_recap_harvest",
+      "breakpoints": true
     }
   ]
 }

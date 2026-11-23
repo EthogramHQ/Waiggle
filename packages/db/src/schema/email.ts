@@ -48,6 +48,9 @@ export const emailPreference = pgTable(
     // R8 : le premier récap habillé reçu. null alors que `recap_sent_at` ne l'est pas : il recevait
     // le récap avant R8, et le prochain lui dit, une seule fois, ce qui change.
     recapV2At: timestamp('recap_v2_at'),
+    // R19 (relecture juridique du plan, J1) : le premier récap qui a porté « Ta semaine » ; null :
+    // pas encore. Le récap suivant qui la porte dit alors, une seule fois, « Nouveau : ta récolte ».
+    recapHarvestAt: timestamp('recap_harvest_at'),
     // Le dernier e-mail de mentions envoyé ; null : jamais. Gardé en copie de `instant_sent_at`
     // jusqu'à R9, pour la même raison que `mention_emails`.
     mentionSentAt: timestamp('mention_sent_at'),
