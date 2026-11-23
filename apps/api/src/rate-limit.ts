@@ -204,6 +204,16 @@ export const memberCounterKeys = (userId: string) => ({
   // ensemble, comptées avant tout examen (une invitation refusée en 404 ou 409 compte aussi : on ne
   // sonde pas l'annuaire par les invitations). Le quota est celui du membre, pas de la ruche.
   hiveInvitations: `hive-invitations:${userId}`,
+  // Le jeu (R19, relecture de sécurité du plan, S4) : chaque compteur compte toute demande, mal
+  // formée comprise, avant la lecture du corps ou de l'identifiant. Lire « Ma récolte » (600 par
+  // heure, une lecture calculée), changer ses réglages du jeu (120 par heure), décorer son rayon
+  // (60 par heure), offrir du miel (10 par heure, tous projets ensemble), lire les classements
+  // (120 par heure ; la règle est dans la route des classements).
+  harvest: `harvest:${userId}`,
+  gameSettings: `game-settings:${userId}`,
+  decoration: `decoration:${userId}`,
+  honeyGift: `honey-gift:${userId}`,
+  rankings: `rankings:${userId}`,
 })
 
 /**
