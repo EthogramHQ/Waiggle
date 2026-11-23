@@ -185,6 +185,12 @@ export const EmailPreferencesExport = EmailPreferences.extend({
    * Gardée toute la vie du compte, donc dans l'export comme toute date d'envoi (règle de 6c).
    */
   recapV2At: z.iso.datetime().nullable(),
+  /**
+   * R19 : la date du premier récap qui a porté « Ta semaine » (la récolte), qui sert à dire une
+   * seule fois « Nouveau : ta récolte ». Gardée toute la vie du compte, donc dans l'export comme
+   * toute date d'envoi (règle de 6c) ; null : pas encore.
+   */
+  recapHarvestAt: z.iso.datetime().nullable(),
   /** La dernière modification des réglages ; null s'il n'y a jamais touché. */
   updatedAt: z.iso.datetime().nullable(),
 })
