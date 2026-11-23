@@ -136,6 +136,7 @@ type ProjectBase = Omit<
   | 'isTester'
   | 'testerCount'
   | 'testerJoinable'
+  | 'honeyGiven'
   | 'reactions'
   | 'commentCount'
   | 'removal'
@@ -294,6 +295,8 @@ const toProjects = async (
       ...(testers.get(row.project.id) ?? { isTester: false, testerCount: null }),
       // R7b : on ne propose plus de rejoindre les testeurs à l'auteur, ni à un membre qu'il a retiré.
       testerJoinable: row.project.authorId !== viewerId && !removedFrom.has(row.project.id),
+      // R19 : le miel offert à ce projet par le lecteur ; faux en attendant le grand livre du miel.
+      honeyGiven: false,
       reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
       commentCount: commentCounts.get(row.project.id) ?? 0,
       removal: (removalId && removals.get(removalId)) || null,

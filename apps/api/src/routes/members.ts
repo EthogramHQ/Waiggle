@@ -264,6 +264,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           // Un administrateur qui l'a bloqué lit encore sa suspension et ses décisions, mais ne
           // peut pas le suspendre (canSuspend faux, S4).
           moderation: await moderationOf(db, viewer.id, row.id, true),
+          // R19 : rien de sa récolte pour un membre bloqué.
+          game: null,
         }),
         200,
       )
@@ -302,6 +304,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         projects,
         removedParts: removedParts.get(partOwnerKey('member', row.id)) ?? [],
         moderation: await moderationOf(db, viewer.id, row.id, false),
+        // R19 : sa récolte (niveau, titre, sceaux), null en attendant le grand livre (game/harvest.ts).
+        game: null,
       }),
       200,
     )

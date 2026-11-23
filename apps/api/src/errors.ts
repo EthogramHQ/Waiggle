@@ -75,6 +75,14 @@ const errorMessages = {
   // remplit comme {{appName}}.
   visitor_report_quota: 'visitorReportQuota',
   author_declined: 'authorDeclined',
+  // Tranche R19 (la récolte) : le miel qui manque, une offre déjà faite, les classements coupés,
+  // un défi ou un niveau refusés, un titre pas encore obtenu.
+  honey_short: 'honeyShort',
+  honey_already: 'honeyAlready',
+  rankings_off: 'rankingsOff',
+  invalid_challenge: 'invalidChallenge',
+  invalid_level_seen: 'invalidLevelSeen',
+  family_not_obtained: 'familyNotObtained',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

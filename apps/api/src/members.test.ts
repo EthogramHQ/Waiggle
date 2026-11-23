@@ -152,6 +152,7 @@ describe('the page of a member', () => {
         'bio',
         'favoriteTools',
         'followerCount',
+        'game', // R19 : sa récolte (niveau, sceaux), null tant qu'elle n'existe pas
         'handle',
         'id',
         'isBlocked', // tranche 7b : si le visiteur l'a bloquée

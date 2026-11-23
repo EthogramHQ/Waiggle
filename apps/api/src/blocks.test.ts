@@ -416,6 +416,8 @@ describe('the page of a blocked member', () => {
       moderation: null,
       // R12 : sa page est-elle publique (la feuille de partage le dit) ; celle d'Inès est fermée.
       publicPage: false,
+      // R19 : la récolte d'un membre bloqué ne se montre pas.
+      game: null,
     })
   })
 

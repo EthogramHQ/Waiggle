@@ -611,6 +611,8 @@ export const loadHivePage = async (
       : null
   return {
     summary,
+    // R19 : le défi de la semaine, null en attendant les défis de ruche (game/challenges.ts).
+    challenge: null,
     invite: inviteStateOf(membership, summary.memberCount, pending),
     invitePolicy: membership.invitePolicy,
     pendingInvitations: Math.min(pending, HIVE_LIMITS.members),

@@ -750,6 +750,21 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         formerHandle,
         projects,
         categoryChanges,
+        // R19 : sa récolte, vide en attendant le grand livre (game/export.ts).
+        game: {
+          pollen: [],
+          seals: [],
+          honey: [],
+          challenges: [],
+          settings: {
+            titleForm: 'f' as const,
+            pinnedFamily: null,
+            inRankings: true,
+            harvestNotices: true,
+            decoration: null,
+            levelSeen: 1,
+          },
+        },
         updates,
         testerOf,
         ...testerCorner,
