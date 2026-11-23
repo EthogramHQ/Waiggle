@@ -97,3 +97,36 @@ describe('the Discoveries setting in the export', () => {
     expect(data.emailPreferences.discoveries).toBe('never')
   })
 })
+
+// R19 : les réglages du jeu sont dans l'export (`game.settings`), comme ceux des e-mails : la forme
+// du titre, la famille épinglée, « Apparaître dans les classements », « Ma récolte », la décoration
+// choisie et le dernier niveau vu.
+describe('the game settings in the export (R19)', () => {
+  it('exports the game settings as the member changed them', async () => {
+    // Témoin : sans réglage, les valeurs par défaut (titre au féminin, tout allumé, jamais décoré).
+    expect((await exportOf(lea)).data.game.settings).toEqual({
+      titleForm: 'f',
+      pinnedFamily: null,
+      inRankings: true,
+      harvestNotices: true,
+      decoration: null,
+      levelSeen: 1,
+    })
+
+    const res = await act.send('PATCH', '/v1/me/game', lea, {
+      titleForm: 'm',
+      inRankings: false,
+      harvestNotices: false,
+    })
+    expect(res.status).toBe(204)
+
+    expect((await exportOf(lea)).data.game.settings).toEqual({
+      titleForm: 'm',
+      pinnedFamily: null,
+      inRankings: false,
+      harvestNotices: false,
+      decoration: null,
+      levelSeen: 1,
+    })
+  })
+})

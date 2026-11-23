@@ -1699,3 +1699,124 @@ describe('passwordChangedEmail', () => {
     }
   })
 })
+
+// R19 (planche R19-Recap) : le bloc « Ta semaine » (`harvest` : le pollen de la semaine, le défi
+// perso réussi, la ligne « Nouveau : ta récolte » une seule fois, le lien « Voir ma récolte ») et le
+// défi de chaque ruche sous son nom dans « Dans tes ruches » (`RecapHive.challenge`). Absent : pas
+// de bloc. Jamais « 0 pollen », jamais « 0 sur 5 ».
+describe('the harvest of the week in the recap (R19)', () => {
+  const g = resources.fr.translation.game.recap
+  const gEn = resources.en.translation.game.recap
+  const harvestUrl = 'https://waiggle.com/harvest'
+  const harvest = (overrides: Partial<NonNullable<RecapData['harvest']>> = {}) => ({
+    pollen: 85,
+    challengeDone: false,
+    news: false,
+    url: harvestUrl,
+    ...overrides,
+  })
+  const hrefs = (html: string) => [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+
+  it('shows « Ta semaine » with the pollen, the new challenges and a link to the harvest', () => {
+    const email = recapEmail('fr', recapData({ harvest: harvest() }))
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(g.lead))
+      expect(part).toContain(fill(g.pollen, { amount: '85' }))
+      expect(part).toContain(fill(g.newChallenges))
+      expect(part).toContain(fill(g.button))
+      expect(part).not.toContain(fill(g.news))
+    }
+    expect(email.text).toContain(harvestUrl)
+    expect(hrefs(email.html)).toContain(harvestUrl)
+    // Témoin : sans `harvest`, pas de bloc.
+    const plain = recapEmail('fr', recapData())
+    expect(plain.text).not.toContain(fill(g.lead))
+    expect(plain.text).not.toContain(fill(g.newChallenges))
+  })
+
+  it('says « défi réussi » when the personal challenge of the week is done', () => {
+    const email = recapEmail('fr', recapData({ harvest: harvest({ challengeDone: true }) }))
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(g.pollenDone, { amount: '85' }))
+      expect(part).not.toContain(fill(g.pollen, { amount: '85' }))
+    }
+  })
+
+  it('writes no pollen line for a week without pollen, never « 0 pollen »', () => {
+    const email = recapEmail('fr', recapData({ harvest: harvest({ pollen: 0 }) }))
+
+    // Témoin : le bloc est là (un défi de ruche en cours suffit à l'écrire).
+    expect(email.text).toContain(fill(g.newChallenges))
+    for (const part of [email.text, email.html]) {
+      expect(part).not.toContain(fill(g.pollen, { amount: '0' }))
+      expect(part).not.toContain(fill(g.pollenDone, { amount: '0' }))
+      expect(part).not.toMatch(/\b0\s?pollen/)
+    }
+  })
+
+  it('tells « Nouveau : ta récolte » only in the recap that asks for it', () => {
+    const first = recapEmail('fr', recapData({ harvest: harvest({ news: true }) }))
+
+    for (const part of [first.text, first.html]) expect(part).toContain(fill(g.news))
+  })
+
+  it('tells the challenge of each hive under its name: its progress, a new one without « 0 on », or done', () => {
+    const hiveNames = resources.fr.translation.game.challenges.hive
+    const email = recapEmail(
+      'fr',
+      recapData({
+        harvest: harvest(),
+        hives: [
+          {
+            name: 'Famille',
+            items: [],
+            more: 0,
+            challenge: { code: 'feedback_5', progress: 3, target: 5, done: false, isNew: false },
+          },
+          {
+            name: 'Atelier',
+            items: [],
+            more: 0,
+            challenge: { code: 'tested_3', progress: 0, target: 3, done: false, isNew: true },
+          },
+          {
+            name: 'Voisins',
+            items: [],
+            more: 0,
+            challenge: { code: 'comments_5', progress: 5, target: 5, done: true, isNew: false },
+          },
+        ],
+        hivesUrl: 'https://waiggle.com/hives',
+      }),
+    )
+
+    const progress = fill(g.hive, { challenge: hiveNames.feedback_5, progress: '3', target: '5' })
+    const fresh = fill(g.hiveNew, { challenge: hiveNames.tested_3 })
+    const done = fill(g.hiveDone, { challenge: hiveNames.comments_5 })
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(fr.recap.hivesTitle))
+      for (const line of [progress, fresh, done]) expect(part).toContain(line)
+      expect(part).not.toMatch(/\b0\s?sur\s?3/)
+    }
+    // Chaque défi sous le nom de sa ruche, dans l'ordre des ruches.
+    const at = (text: string) => email.text.indexOf(text)
+    expect(at('Famille')).toBeLessThan(at(progress))
+    expect(at(progress)).toBeLessThan(at('Atelier'))
+    expect(at('Atelier')).toBeLessThan(at(fresh))
+    expect(at(fresh)).toBeLessThan(at('Voisins'))
+    expect(at('Voisins')).toBeLessThan(at(done))
+  })
+
+  it('writes « Ta semaine » in English for an English recap', () => {
+    const email = recapEmail('en', recapData({ harvest: harvest({ challengeDone: true }) }))
+
+    for (const part of [email.text, email.html]) {
+      expect(part).toContain(fill(gEn.lead))
+      expect(part).toContain(fill(gEn.pollenDone, { amount: '85' }))
+      expect(part).toContain(fill(gEn.button))
+      expect(part).not.toContain(fill(g.lead))
+    }
+  })
+})
