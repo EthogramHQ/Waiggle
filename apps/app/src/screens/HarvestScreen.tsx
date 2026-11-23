@@ -157,7 +157,14 @@ function HarvestContent({ harvest }: { harvest: Harvest }) {
           rows={[
             { main: week, side: panel },
             {
-              main: hives ? <Columns sideWidth="panel" main={challenge} side={hives} /> : challenge,
+              // `regular` (la base des colonnes de côté) : la colonne principale (916 px à
+              // 1440) ne peut donner place à `panel` (340) à côté d'un défi qui garde de la
+              // largeur ; `regular` tient, et les deux défis restent côte à côte.
+              main: hives ? (
+                <Columns sideWidth="regular" main={challenge} side={hives} />
+              ) : (
+                challenge
+              ),
               side: (
                 <Stack gap="xxl">
                   {honey}
