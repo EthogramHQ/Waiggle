@@ -204,6 +204,9 @@ export const memberCounterKeys = (userId: string) => ({
   // ensemble, comptées avant tout examen (une invitation refusée en 404 ou 409 compte aussi : on ne
   // sonde pas l'annuaire par les invitations). Le quota est celui du membre, pas de la ruche.
   hiveInvitations: `hive-invitations:${userId}`,
+  // Lire les classements de la semaine (R19) : 120 par heure, mal formées comprises ; chaque
+  // lecture recalcule le pollen de la semaine de tout un cercle.
+  rankings: `rankings:${userId}`,
 })
 
 /**

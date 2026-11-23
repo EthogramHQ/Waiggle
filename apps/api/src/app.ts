@@ -40,6 +40,7 @@ import { publicRoutes } from './routes/public'
 import { publicHeadRoutes } from './routes/public-head'
 import { publicReportRoutes } from './routes/public-reports'
 import { publicSitemapRoutes } from './routes/public-sitemap'
+import { rankingRoutes } from './routes/rankings'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { rulesRoutes } from './routes/rules'
@@ -423,6 +424,8 @@ export const createApp = ({
   app.route('/', hiveRoutes({ db, limiter, publicApiUrl }))
   // Les invitations : la recherche « Inviter », inviter, rejoindre, refuser (R10).
   app.route('/', hiveInvitationRoutes({ db, limiter, publicApiUrl }))
+  // Les classements de la semaine : les proches, ou une ruche (R19).
+  app.route('/', rankingRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
