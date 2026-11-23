@@ -3219,6 +3219,7 @@ export const en: Translation = {
         help: '5 per week of foraging, 10 per challenge completed.',
         offer: 'Give honey',
         offerHint: '5 honey, to the project of someone close',
+        offerWhere: 'You can offer 5 honey to the project of someone close, from its page.',
         decorate: 'Decorate my comb',
         decorateHint: 'A tint, a wax pattern',
       },

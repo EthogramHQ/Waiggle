@@ -3920,6 +3920,9 @@ export const fr = {
         help: '5 par semaine butinée, 10 par défi réussi.',
         offer: 'Offrir du miel',
         offerHint: '5 miel, au projet d’un proche',
+        // Relecture de design de R19 (Louis, 23/11) : on offre du miel depuis la page d'un projet ;
+        // une phrase sous le solde le dit, au lieu d'une ligne qui ne mène nulle part.
+        offerWhere: 'Tu peux offrir 5 miel au projet d’un proche, depuis sa page.',
         decorate: 'Décorer mon rayon',
         decorateHint: 'Une teinte, un motif de cire',
       },
