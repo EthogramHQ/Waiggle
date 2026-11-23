@@ -6,9 +6,21 @@
 // La date arrive déjà mise en forme par l'écran (« 12 nov. 2026 ») : la tuile ne formate rien,
 // elle ne connaît ni la langue ni le fuseau. Le nom ne se coupe jamais par « … » : il passe sur
 // deux lignes si la colonne est étroite (« Premier retour réglé »).
+import type { Space } from '@ruche/brand'
 import { Stack } from './Stack'
 import { Text } from './Text'
 import { WaxSeal, type WaxSealProps } from './WaxSeal'
+
+/**
+ * La grille des tuiles de « Mes sceaux », donnée à `CardGrid` par l'écran
+ * (`<CardGrid {...sealTileGrid}>`), qui n'écrit ainsi aucune taille (comme `hiveCardGrid`). 104 :
+ * trois tuiles sur un téléphone de 360 points, le nom d'un sceau sur deux lignes au plus ; sur
+ * ordinateur, autant qu'il en tient dans la colonne.
+ */
+export const sealTileGrid = { minWidth: 104, gap: 'md' } as const satisfies {
+  minWidth: number
+  gap: Space
+}
 
 type Props = {
   /** Le sceau : son icône, sa matière, sa taille. Son `label` est ignoré : le nom le dit déjà. */

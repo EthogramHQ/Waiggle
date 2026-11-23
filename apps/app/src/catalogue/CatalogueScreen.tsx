@@ -99,6 +99,7 @@ import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
 import { HarvestCatalogue } from './harvest'
 import { HarvestChoicesCatalogue } from './harvestChoices'
+import { HarvestFiguresCatalogue } from './harvestFigures'
 import { HarvestMotionCatalogue } from './harvestMotion'
 import { HarvestPanelsCatalogue } from './harvestPanels'
 import { TokensCatalogue } from './jetons'
@@ -1028,6 +1029,8 @@ export function CatalogueScreen() {
         <HarvestChoicesCatalogue />
         {/* Les sceaux d'un membre sur sa page (sealShelf.tsx). */}
         <SealShelfCatalogue />
+        {/* Le montant en grand de « Ma récolte » (harvestFigures.tsx). */}
+        <HarvestFiguresCatalogue />
       </LazySection>
     </Screen>
   )
