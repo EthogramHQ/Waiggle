@@ -31,6 +31,10 @@ const day = {
   honeyPressed: '#F2B000', // bouton miel pendant l'appui
   honeyLight: '#FFE58A', // lumière miel (dégradés)
   honeySoft: '#FFF0C2', // fond des pastilles de statut
+  // R19 : la cire crème (l'« opercule », planche R19-Recolte) qui ferme l'alvéole du niveau et fait
+  // les sceaux crème (paliers, catégories). La même de jour et de nuit : posée sur du miel ou en
+  // sceau, elle se lit pareil dans les deux thèmes ; elle porte l'icône brune (onHoneyTile).
+  wax: '#FFF0C2',
   // Le surlignage miel sous les lettres trouvées par la recherche (R3, HighlightedText). Il porte
   // toujours l'encre (`text`), même dans une ligne grise : la partie trouvée se lit d'un coup d'œil.
   highlight: '#FFE58A',
@@ -198,6 +202,7 @@ const night = {
   honeyPressed: '#F2B820',
   honeyLight: '#FFD666',
   honeySoft: '#3F3417',
+  wax: '#FFF0C2',
   // Un miel brun, deux fois plus clair que la carte de nuit (2:1) : la crème claire du texte
   // s'y lit encore à 8:1.
   highlight: '#5A4712',
@@ -393,6 +398,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'textSecondary', on: 'errorBand', min: 4.5 },
   { text: 'text', on: 'errorBand', min: 4.5 },
   { text: 'onHoneyTile', on: 'honey', min: 4.5 },
+  // R19 : l'icône d'un sceau crème (ui/WaxSeal) sur sa cire, et le bord ambre de ce sceau, qui le
+  // détache du fond de page (une forme : 3:1). Le sceau de miel reprend le couple d'au-dessus.
+  { text: 'onHoneyTile', on: 'wax', min: 3 },
   // La barre fixe des formulaires sur téléphone (fond « feuille »).
   { text: 'text', on: 'sheet', min: 4.5 },
   { text: 'onHoney', on: 'honey', min: 4.5 },
