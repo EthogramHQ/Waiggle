@@ -70,6 +70,17 @@ import {
 } from '../src/testing/email.ts'
 import { leaMe, suspendedMe } from '../src/testing/fixtures.ts'
 import {
+  amisRanking,
+  closeRanking,
+  emptyRanking,
+  familleFeedbackChallenge,
+  familleRanking,
+  HARVEST_WEEK,
+  leaHarvest,
+  mondayHarvest,
+  newcomerHarvest,
+} from '../src/testing/harvest.ts'
+import {
   amisId,
   amisPage,
   atelier,
@@ -619,6 +630,17 @@ const maxMember = {
   projects: feedItems
     .filter((item) => item.project.author.id === max.id)
     .map((item) => item.project),
+}
+// R19 : « Son rayon » sur la page de Max : niveau 6, Butineur, ambre gaufré, deux sceaux.
+const maxGame = {
+  level: 6,
+  cells: 3,
+  title: { family: 'forager', form: 'm', pinned: false },
+  seals: [
+    { code: 'first_feedback', earnedAt: '2026-10-10T09:00:00.000Z' },
+    { code: 'first_project', earnedAt: '2026-09-02T09:00:00.000Z' },
+  ],
+  decoration: { tint: 'amber', pattern: 'waffle' },
 }
 // R5a : Inès, l'autrice du projet de la galerie (launchProject). Sans sa page, la lecture de
 // l'auteur échoue et la page projet cache « Suivre » (décision du 2/11) : la capture le perdrait.
@@ -1591,6 +1613,37 @@ const notified = (project) => {
     cover: first ? { url: first.url, thumbhash: first.thumbhash } : null,
   }
 }
+// R19 (planche R19-Activite) : les cinq avis du jeu, du plus récent au plus ancien. Sam a offert
+// du miel aux Recettes de Léa ; le défi de Famille réussi lui rapporte 10 miel (elle y a pris
+// part) ; un niveau, un sceau, et l'annonce « Nouveau : ta récolte » des comptes d'avant R19.
+const gameNotifications = [
+  {
+    kind: 'game_honey_gift',
+    id: `game_honey_gift:${recipesProject.id}:sam-id`,
+    at: hoursAgo(0.5),
+    isNew: true,
+    actor: { id: 'sam-id', name: 'Sam Petit', avatarUrl: null },
+    project: notified(recipesProject),
+  },
+  {
+    kind: 'game_hive_challenge',
+    id: `game_hive_challenge:${familleId}:${HARVEST_WEEK}`,
+    at: hoursAgo(3),
+    isNew: true,
+    hive: { id: familleId, name: 'Famille', icon: 'house-line' },
+    code: 'feedback_5',
+    honey: 10,
+  },
+  { kind: 'game_level', id: 'game_level:4', at: hoursAgo(26), isNew: false, level: 4 },
+  {
+    kind: 'game_seal',
+    id: 'game_seal:first_feedback',
+    at: hoursAgo(50),
+    isNew: false,
+    code: 'first_feedback',
+  },
+  { kind: 'game_intro', id: 'game_intro', at: hoursAgo(120), isNew: false },
+]
 // R8 : le commentaire que « Voir en contexte » trouve (la réponse d'Inès sur le projet de Léa, dans
 // recipesComments), et un commentaire disparu (404). Les pages `contexte` et `contexte-parti`
 // s'ouvrent sur `/projects/${recipesProject.id}?comment=<l'un ou l'autre>`.
@@ -1619,6 +1672,8 @@ const notificationPages = (choice) => {
   }
   // R10 : les cinq lignes des ruches (testing/hives.ts), page `activite-ruches`.
   if (choice === 'hives') return [hiveNotifications]
+  // R19 (planche R19-Activite) : un avis de chaque sorte du jeu, page `activite-jeu`.
+  if (choice === 'game') return [gameNotifications]
   if (choice === 'moderation') {
     return [
       [
@@ -2748,7 +2803,21 @@ const fakeApi = (
   // R11 : « Mes commentaires » et « Mes retours envoyés ». 'some' : deux pages chacune (voir
   // testing/legal.ts) ; 'none' : listes vides (« Tu n'as encore écrit aucun commentaire. »).
   myData = 'some',
+  // R19 : la récolte de Léa (testing/harvest.ts). 'lea' : niveau 4, trois défis à choisir, le
+  // défi de Famille à 3 sur 5 ; 'monday' : le lundi matin (rien encore, le défi de ruche neuf,
+  // classements vides) ; 'retired' : retirée des classements (Réglages) ; 'newcomer' : un nouveau
+  // membre, niveau 1, sans titre ni sceau.
+  game = 'lea',
 ) => {
+  // « Ma récolte », telle que les écritures de ce navigateur l'ont laissée (un réglage changé, un
+  // défi choisi, une décoration achetée, du miel offert), comme le faux serveur des tests
+  // (screens/Game.testkit.ts) : la relecture qui suit montre le changement.
+  let harvest = structuredClone(
+    game === 'monday' ? mondayHarvest : game === 'newcomer' ? newcomerHarvest : leaHarvest,
+  )
+  if (game === 'retired') harvest.settings.inRankings = false
+  // Les projets auxquels Léa a offert du miel dans ce navigateur (le projet relu dit `honeyGiven`).
+  const gifted = new Set()
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
   const sessionNow = { ...session, user: { ...session.user, email: accountEmail } }
@@ -2819,6 +2888,8 @@ const fakeApi = (
     isTester: testers.has(project.id) ? testers.get(project.id) : project.isTester,
     reactions: reactions[project.id] ?? project.reactions,
     commentCount: (commentCountOf[project.id] ?? 0) + (added[project.id] ?? 0),
+    // R19 : le miel offert dans ce navigateur (« Miel offert » à la relecture).
+    honeyGiven: gifted.has(project.id) || project.honeyGiven === true,
   })
   return async (route) => {
     const url = new URL(route.request().url())
@@ -3159,6 +3230,66 @@ const fakeApi = (
       testers.set(testersOf[1], method === 'POST')
       return route.fulfill({ status: 204, body: '' })
     }
+    // R19, le jeu (apps/api/src/routes/game.ts et rankings.ts) : « Ma récolte » ; ses réglages et
+    // le défi perso (PATCH, 204) ; la décoration (PUT, 204, le miel payé une fois) ; le miel
+    // offert à un projet (POST, 204) ; les classements de la semaine, refusés (403 `rankings_off`)
+    // à qui s'en est retiré.
+    if (pathname === '/v1/me/harvest' && method === 'GET') return json(200, harvest)
+    if (pathname === '/v1/me/game' && method === 'PATCH') {
+      const { levelSeen, personalChallenge, ...settings } = JSON.parse(
+        route.request().postData() ?? '{}',
+      )
+      const offered =
+        harvest.personalChallenge.state === 'choose' || harvest.personalChallenge.state === 'none'
+          ? harvest.personalChallenge.offered
+          : ['feedback', 'update', 'comment_3']
+      harvest = {
+        ...harvest,
+        levelSeen: levelSeen ?? harvest.levelSeen,
+        settings: { ...harvest.settings, ...settings },
+        personalChallenge:
+          personalChallenge === undefined
+            ? harvest.personalChallenge
+            : personalChallenge === 'none'
+              ? { state: 'none', offered }
+              : { state: 'active', code: personalChallenge, progress: 0, target: 1 },
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === '/v1/me/game/decoration' && method === 'PUT') {
+      const { tint, pattern } = JSON.parse(route.request().postData() ?? '{}')
+      const owned = harvest.ownedDecorations
+      const price =
+        (owned.tints.includes(tint) ? 0 : 10) + (owned.patterns.includes(pattern) ? 0 : 15)
+      harvest = {
+        ...harvest,
+        honey: harvest.honey - price,
+        decoration: { tint, pattern },
+        ownedDecorations: {
+          tints: [...new Set([...owned.tints, tint])],
+          patterns: [...new Set([...owned.patterns, pattern])],
+        },
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    const honeyGift = pathname.match(/^\/v1\/projects\/([^/]+)\/honey$/)
+    if (honeyGift && method === 'POST') {
+      gifted.add(honeyGift[1])
+      harvest = { ...harvest, honey: harvest.honey - 5 }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === '/v1/rankings' && method === 'GET') {
+      if (!harvest.settings.inRankings) {
+        return json(403, { error: { code: 'rankings_off', message: '' } })
+      }
+      const hive = url.searchParams.get('hive')
+      if (game === 'monday')
+        return json(200, hive ? { ...emptyRanking, scope: 'hive', hiveId: hive } : emptyRanking)
+      if (!hive) return json(200, closeRanking)
+      if (hive === familleId) return json(200, familleRanking)
+      if (hive === amisId) return json(200, amisRanking)
+      return json(200, { scope: 'hive', hiveId: hive, week: HARVEST_WEEK, rows: [] })
+    }
     // Réagir (PUT) ou retirer sa réaction (DELETE) : les nombres changent pour la relecture qui suit.
     const reaction = pathname.match(/^\/v1\/projects\/([^/]+)\/reactions\/([a-z]+)$/)
     if (reaction) {
@@ -3172,6 +3303,20 @@ const fakeApi = (
       if (react !== state.mine.includes(kind)) {
         state.counts[kind] += react ? 1 : -1
         state.mine = react ? [...state.mine, kind] : state.mine.filter((k) => k !== kind)
+      }
+      // R19 : réagir au projet d'un autre rapporte 2 pollen, dit par l'en-tête `Waiggle-Pollen`
+      // (la pastille « +2 pollen » sur la capsule). L'appli lit l'en-tête d'une autre origine :
+      // il doit être exposé, comme le fait la vraie API.
+      const ownProject = [recipesProject, photosProject, draftProject].some((p) => p.id === id)
+      if (react && !ownProject) {
+        return route.fulfill({
+          status: 204,
+          body: '',
+          headers: {
+            'Waiggle-Pollen': '2',
+            'Access-Control-Expose-Headers': 'Waiggle-Pollen',
+          },
+        })
       }
       return route.fulfill({ status: 204, body: '' })
     }
@@ -3264,7 +3409,20 @@ const fakeApi = (
       return json(200, withExtras(removedEmptyProject))
     }
     if (pathname === `/v1/members/${leaMe.id}`) {
-      return json(200, { ...leaMember, name: me.name, handle: me.handle, bio: me.bio })
+      return json(200, {
+        ...leaMember,
+        name: me.name,
+        handle: me.handle,
+        bio: me.bio,
+        // R19 : « Mon rayon », tiré de sa récolte (une décoration achetée s'y voit à la relecture).
+        game: {
+          level: harvest.level,
+          cells: harvest.cells,
+          title: harvest.title,
+          seals: harvest.seals,
+          decoration: harvest.decoration,
+        },
+      })
     }
     if (pathname === `/v1/projects/${gardenProject.id}`) {
       return json(200, withExtras(gardenProject))
@@ -3353,6 +3511,13 @@ const fakeApi = (
               : null
       if (!page) return json(404, { error: { code: 'not_found', message: '' } })
       const done = () => route.fulfill({ status: 204, body: '' })
+      // R19 : la carte du défi de Famille (4 membres) : « 5 retours entre vous », 3 sur 5, ou neuf
+      // le lundi (« Nouveau ») ; la page de la ruche ne dit pas son nom, déjà en tête.
+      if (!part && method === 'GET' && id === familleId) {
+        const { hiveName: _name, ...challenge } = familleFeedbackChallenge
+        const shown = game === 'monday' ? { ...challenge, progress: 0, isNew: true } : challenge
+        return json(200, { ...page, challenge: shown })
+      }
       if (!part && method === 'GET') return json(200, page)
       if (!part && method === 'PATCH') {
         const changes = JSON.parse(route.request().postData() ?? '{}')
@@ -3416,7 +3581,7 @@ const fakeApi = (
     if (member && blocked.has(member[1])) {
       return json(200, blockedMemberPage(blocked.get(member[1])))
     }
-    if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
+    if (pathname === `/v1/members/${max.id}`) return json(200, { ...maxMember, game: maxGame })
     if (pathname === `/v1/members/${ines.id}`) {
       return json(200, { ...inesMember, projects: inesProjects() })
     }
@@ -5386,6 +5551,46 @@ const pages = [
     notifications: 'hives',
     fullPage: true,
   },
+  // R19, la récolte (planches R19-Recolte, R19-Recolte-Desktop, R19-Defis, R19-Classement,
+  // R19-Membre, R19-Miel, R19-Activite ; données : testing/harvest.ts, `game` de fakeApi).
+  // « Ma récolte » de Léa : le rayon au niveau 4, la semaine, trois défis à choisir, le défi de
+  // Famille à 3 sur 5, le miel, trois sceaux ; le lundi matin, le défi de ruche neuf.
+  { name: 'recolte', path: '/harvest', signedIn: true, fullPage: true },
+  { name: 'recolte-lundi', path: '/harvest', signedIn: true, fullPage: true, game: 'monday' },
+  // Les classements de la semaine : ses proches (Léa 2e à égalité avec Max), puis, retirée des
+  // classements dans ses réglages, la phrase et « Changer ce choix ».
+  { name: 'classement', path: '/harvest/rankings', signedIn: true, fullPage: true },
+  { name: 'classement-retire', path: '/harvest/rankings', signedIn: true, game: 'retired' },
+  // Sa page à elle (« Mon rayon ») ; la page de Max (« Son rayon ») est `membre-autre`.
+  { name: 'membre-moi', path: `/members/${leaMe.id}`, signedIn: true },
+  // Les cinq avis du jeu dans l'Activité.
+  {
+    name: 'activite-jeu',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'game',
+    fullPage: true,
+  },
+  // La feuille « Décorer mon rayon », ouverte depuis « Mon miel ».
+  {
+    name: 'recolte-decorer',
+    path: '/harvest',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.game.harvest.honey.decorate }).first().click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
+  // La feuille d'offre de miel, ouverte depuis le projet de Max (5 miel, une fois par projet).
+  {
+    name: 'projet-miel',
+    path: `/projects/${notMineProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.game.offer.button }).first().click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
   // R14 : la page de Tante Odile en mosaïque (avant R14, `membre-tuiles` : des tuiles), à 4 projets ;
   // puis la mosaïque à 1, 2, 3 et 5 projets, et « toutes les pastilles » (privé, exemple, mis à
   // jour, 248 réactions) sur la grande carte et les compactes.
@@ -5848,6 +6053,7 @@ if (script) {
       hives,
       rules,
       myData,
+      game,
       ...options
     } = {},
   ) => {
@@ -5874,6 +6080,7 @@ if (script) {
         hives,
         rules,
         myData,
+        game,
       ),
     )
     return context
@@ -5995,6 +6202,7 @@ async function layoutReport() {
               shot.hives,
               shot.rules,
               shot.myData,
+              shot.game,
             ),
           ),
         )
@@ -6192,6 +6400,7 @@ const capture = async ({ shot, device, scheme }) => {
           shot.hives,
           shot.rules,
           shot.myData,
+          shot.game,
         ),
       ),
     )
