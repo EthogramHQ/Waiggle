@@ -11,11 +11,16 @@
 // les transformer en sources d'image (`useMediaSources`, la session voyage avec la demande).
 import {
   type Category,
+  type MILESTONE_SEALS,
   type Notification,
   type NotifiedCover,
   REACTION_KINDS,
   type ReactionKind,
   type ReportPartField,
+  SEALS,
+  type SealCode,
+  type SealMatter,
+  sealCategory,
 } from '@ruche/contracts'
 import type { Translation } from '@ruche/i18n'
 import type { Href } from 'expo-router'
@@ -32,6 +37,9 @@ type T = ReturnType<typeof useTranslation>['t']
 export type PresentedLeading =
   | { kind: 'avatar'; name: string; image: string | null }
   | { kind: 'icon'; icon: IconName; tone: 'neutral' | 'honey' | 'danger' }
+  // R19 : l'alvéole numérotée d'un niveau passé, le petit sceau d'un sceau gagné.
+  | { kind: 'level'; level: number }
+  | { kind: 'seal'; icon: IconName; matter: SealMatter }
 
 /** À droite de la ligne : la couverture d'un projet (ou sa lumière sans photo), ou un outil. */
 export type PresentedThumb =
@@ -60,6 +68,39 @@ export type Presented = {
    */
   action?: { label: string; target: Href } | { label: string; contact: { subject: string } } | null
   target: Href | null
+}
+
+/** Le code d'un sceau de palier (« first_feedback »), la clé de son nom. */
+type MilestoneSeal = (typeof MILESTONE_SEALS)[number]['code']
+
+/** R19 : « Ma récolte », où mènent un niveau, un sceau et l'avis d'arrivée de la récolte. */
+const HARVEST: Href = '/harvest'
+
+/**
+ * R19 : le nom, l'icône et la matière d'un sceau. Un sceau connu d'avance (`SEALS` du contrat) a
+ * les siens ; le sceau d'une catégorie créée ensuite prend l'icône de la catégorie (si la liste est
+ * lue) et le texte `categoryOther`, en cire crème comme les autres catégories.
+ */
+const sealOf = (
+  code: SealCode,
+  t: T,
+  categories: readonly Category[] | undefined,
+): { name: string; icon: IconName; matter: SealMatter } => {
+  const known = SEALS.find((seal) => seal.code === code)
+  const category = sealCategory(code)
+  const name =
+    category === null
+      ? t(($) => $.game.seals[code as MilestoneSeal])
+      : known
+        ? t(($) => $.game.seals.category[code as keyof Translation['game']['seals']['category']])
+        : t(($) => $.game.seals.categoryOther, {
+            category: categories?.find((one) => one.code === category)?.name ?? category,
+          })
+  // L'icône vient du contrat (une chaîne : un test vérifie que chacune existe dans Icon).
+  const icon = (known?.icon ??
+    categories?.find((one) => one.code === category)?.icon ??
+    'shapes') as IconName
+  return { name, icon, matter: known?.matter ?? 'cream' }
 }
 
 /** L'onglet des ruches : où l'on rejoint une ruche ou refuse une invitation. */
@@ -523,6 +564,82 @@ export const presentNotification = (
         leading: iconLeading('wrench'),
         thumb: { kind: 'tool', name: toolName },
         target: { pathname: '/tags/[slug]', params: { slug: toolSlug } },
+      }
+    }
+    // R19 (planche R19-Activite, option b14) : les avis de la récolte. Aucune félicitation : la
+    // phrase dit ce qui est arrivé, l'alvéole numérotée ou le petit sceau le montrent à gauche.
+    case 'game_level': {
+      const said = say({}, () => t(($) => $.notifications.gameLevel, { level: notification.level }))
+      return {
+        ...plain,
+        ...said,
+        icon: 'hexagon',
+        leading: { kind: 'level', level: notification.level },
+        target: HARVEST,
+      }
+    }
+    case 'game_seal': {
+      const { code } = notification
+      const seal = sealOf(code, t, categories)
+      const said = say({ seal: seal.name }, (params) =>
+        t(($) => $.notifications.gameSeal, params as { seal: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: seal.icon,
+        leading: { kind: 'seal', icon: seal.icon, matter: seal.matter },
+        target: HARVEST,
+      }
+    }
+    case 'game_hive_challenge': {
+      // Annoncé à tous les membres de la ruche ; le miel, seulement à qui y a participé (la ligne
+      // ne dit jamais qui n'a rien fait). Sans nom (retiré par la modération), la ligne ne nomme
+      // aucune ruche, et ne mène nulle part sans identifiant.
+      const { hive, code, honey } = notification
+      const said =
+        hive.name === null
+          ? say({}, () => t(($) => $.notifications.gameHiveChallengeUnnamed))
+          : say({ hive: hive.name }, (params) =>
+              t(($) => $.notifications.gameHiveChallenge, params as { hive: string }),
+            )
+      const challenge = t(($) => $.game.challenges.hive[code])
+      return {
+        ...plain,
+        ...said,
+        icon: 'hexagon',
+        leading: iconLeading(hive.icon ?? 'hexagon', 'honey'),
+        detail:
+          honey > 0
+            ? t(($) => $.notifications.gameHiveChallengeHoney, { challenge, honey })
+            : challenge,
+        target: hive.id ? { pathname: '/hives/[id]', params: { id: hive.id } } : null,
+      }
+    }
+    case 'game_honey_gift': {
+      // Qui a offert, avec sa photo ; au toucher, le projet qui a reçu le miel.
+      const { actor, project } = notification
+      const said = say({ name: actor.name, title: project.title }, (params) =>
+        t(($) => $.notifications.gameHoneyGift, params as { name: string; title: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: 'hexagon',
+        leading: memberLeading(actor),
+        thumb: projectThumb(project),
+        target: projectRoute(project.id),
+      }
+    }
+    case 'game_intro': {
+      // Une fois par compte (relecture juridique du plan, J1) : au toucher, « Ma récolte ».
+      const said = say({}, () => t(($) => $.notifications.gameIntro))
+      return {
+        ...plain,
+        ...said,
+        icon: 'sparkle',
+        leading: iconLeading('sparkle', 'honey'),
+        target: HARVEST,
       }
     }
     case 'handle': {

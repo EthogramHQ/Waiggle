@@ -28,6 +28,7 @@ import { Stack } from '../../ui/Stack'
 import { StatusPill } from '../../ui/StatusPill'
 import { Switch } from '../../ui/Switch'
 import { Text } from '../../ui/Text'
+import { HarvestNoticesSetting } from './GameSettings'
 
 /**
  * Une ligne de choix : l'un des sept types d'e-mail, ou « Découvertes » (R11), qui n'est pas un
@@ -232,6 +233,8 @@ export function EmailSettings() {
 
   return (
     <Stack gap="lg">
+      {/* R19 (option a9) : « Ma récolte » en tête, le premier interrupteur de la rubrique. */}
+      <HarvestNoticesSetting />
       <Stack gap="sm">
         <NotificationExample />
         <Text variant="caption" tone="muted">

@@ -58,6 +58,7 @@ import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { ToolField } from '../ui/ToolField'
 import { TAP_GUARD_MS } from '../ui/tapGuard'
 import { useCalmMotion } from '../ui/theme/motion'
+import { TitleSettings } from './settings/GameSettings'
 import { LoadErrorScreen, LoadingScreen } from './states'
 
 /**
@@ -653,6 +654,9 @@ function ProfileForm({ me }: { me: Me }) {
           error={toolsError || undefined}
           inputRef={inputs.tools}
         />
+        {/* R19 (option a7) : « Mon titre » et « Forme », enregistrés à part (PATCH /v1/me/game),
+            au toucher, sans le bouton du formulaire. */}
+        <TitleSettings />
         <PublicPageLink />
       </Sheet>
     </Screen>
