@@ -37,6 +37,8 @@ import {
 } from '../comments/load'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { setPollen } from '../game/award'
+import { awardOnProject, pollenHeaders } from '../game/gesture'
 import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
 import { inViewerHiveColumn, projectReachableBy } from '../projects/visibility'
@@ -90,7 +92,11 @@ const postRoute = createRoute({
     body: { required: true, content: { 'application/json': { schema: NewComment } } },
   },
   responses: {
-    201: { description: 'The new comment.', content: { 'application/json': { schema: Comment } } },
+    201: {
+      description: 'The new comment.',
+      headers: pollenHeaders,
+      content: { 'application/json': { schema: Comment } },
+    },
     400: errorResponse('Invalid text or reference.'),
     401: errorResponse('Not signed in.'),
     404: errorResponse(
@@ -490,15 +496,31 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       // Rangées dans la même transaction : un commentaire n'existe jamais sans ses mentions, ni
       // l'inverse. Datées comme lui.
       if (mentions.length > 0) await saveMentions(tx, row.id, mentions, row.createdAt)
-      return mentions
+      // R19 : un commentaire ou une réponse sur le projet d'un autre rapporte du pollen à qui
+      // l'écrit, et à l'auteur du projet ce qu'il reçoit (rien sur son propre projet). La source
+      // est le commentaire : retiré par la modération, il révoque les deux.
+      const pollen = await awardOnProject(tx, {
+        actorId: user.id,
+        authorId: project.authorId,
+        projectId: id,
+        gesture: 'comment',
+        received: 'receive_comment',
+        sourceKind: 'comment',
+        sourceId: row.id,
+        sourceKey: row.id,
+        receivedKey: row.id,
+        now: row.createdAt,
+      })
+      return { mentions, pollen }
     })
     if (written === 'gone') return notFound(ctx)
     if (written === 'removed') return removed(ctx)
     if (written === 'blocked_mention') return blockedMention(ctx)
 
     const authors = await authorsOf(db, [user.id], publicApiUrl, id)
-    const shown = presentComment(row, viewer, authors, false, written)
+    const shown = presentComment(row, viewer, authors, false, written.mentions)
     if (!shown) return notFound(ctx)
+    setPollen(ctx, written.pollen)
     return ctx.json(Comment.parse({ ...shown, replies: [] }), 201)
   })
 
