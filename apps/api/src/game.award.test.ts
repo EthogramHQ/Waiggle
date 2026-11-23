@@ -280,9 +280,14 @@ describe('revocation by moderation', () => {
     await ctx.db.transaction((tx) =>
       revokeFor(tx, { kind: 'profile', memberId: max.id, part: 'avatar' }, new Date()),
     )
-    expect((await ledgerOf(ctx, max.id)).map((row) => [row.gesture, row.revoked])).toEqual([
-      ['profile_photo', true],
+    // Les deux entrées ont la même date : on les range par geste pour ne pas dépendre de l'ordre
+    // que la base choisit entre deux lignes égales.
+    const rows = (await ledgerOf(ctx, max.id))
+      .map((row) => [row.gesture, row.revoked] as const)
+      .sort(([a], [b]) => a.localeCompare(b))
+    expect(rows).toEqual([
       ['profile_bio', false],
+      ['profile_photo', true],
     ])
   })
 })

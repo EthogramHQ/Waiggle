@@ -179,8 +179,9 @@ describe('spending honey', () => {
     )
     expect(gifts).toHaveLength(1)
     expect(gifts[0]).toMatchObject({ actor: { id: lea.id }, project: { id: quiz } })
-    // Pas de circulation : l'auteur n'en gagne pas.
-    expect((await game.harvest(max.cookie)).honey).toBe(0)
+    // Pas de circulation : l'auteur n'en gagne pas (seulement les 5 miel de sa semaine butinée en
+    // publiant ses deux projets).
+    expect((await game.harvest(max.cookie)).honey).toBe(HONEY.week)
   })
 
   it('answers 404 to a honey gift on her own project, without debiting', async () => {

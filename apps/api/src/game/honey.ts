@@ -19,6 +19,9 @@ import { type Database, schema } from '@ruche/db'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { visibleTo } from '../projects/load'
 import { lockMembers, type Tx } from './award'
+// La clé d'une offre (`gift:<projet>`, une seule par membre et par projet) : celle que relit
+// « Miel offert » sur la page du projet (`honeyGiven`).
+import { giftKey } from './gifts'
 import { writeNotice } from './notices'
 
 const h = schema.honeyEntry
@@ -27,8 +30,6 @@ const h = schema.honeyEntry
 const DECORATION_KEY = 'decoration:'
 const tintKey = (tint: string) => `${DECORATION_KEY}tint:${tint}`
 const patternKey = (pattern: string) => `${DECORATION_KEY}pattern:${pattern}`
-/** La clé d'une offre : une seule par membre et par projet (index unique `honey_entry_once_idx`). */
-const giftKey = (projectId: string) => `gift:${projectId}`
 
 /** Le solde de miel d'un membre et les décorations qu'il possède (les offertes y sont toujours). */
 export type HoneyState = { balance: number; owned: OwnedDecorations }

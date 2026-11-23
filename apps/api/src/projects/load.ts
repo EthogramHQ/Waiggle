@@ -21,6 +21,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL } from
 import { isExampleAccountSql, withExampleFlag } from '../accounts/example'
 import { commentCountsOf } from '../comments/load'
 import { projectFollowStates } from '../follows/load'
+import { honeyGivenTo } from '../game/gifts'
 import { avatarUrlOf } from '../profile/me'
 import { reactionStatesOf, reactionTotalsOf } from '../reactions/load'
 import { removalsOf } from '../removals/load'
@@ -266,7 +267,7 @@ const toProjects = async (
       // R10 : le nombre dépend du lecteur (les commentaires écrits pour une ruche, comments/load.ts).
       commentCountsOf(db, ids, viewerId),
     ])
-  const [removals, tools, removedFrom, removedParts] = await Promise.all([
+  const [removals, tools, removedFrom, removedParts, honeyGiven] = await Promise.all([
     removalsOf(db, rows.map(removalIdOf)),
     toolsOfProjects(db, ids),
     // Les projets dont l'auteur a retiré ce membre des testeurs (une requête pour toute la liste).
@@ -279,6 +280,8 @@ const toProjects = async (
       viewerId,
       publicApiUrl,
     ),
+    // R19 : les projets de la liste auxquels le lecteur a offert du miel (une requête, game/gifts.ts).
+    honeyGivenTo(db, ids, viewerId),
   ])
   return rows.map((row) => {
     const removalId = removalIdOf(row)
@@ -295,8 +298,8 @@ const toProjects = async (
       ...(testers.get(row.project.id) ?? { isTester: false, testerCount: null }),
       // R7b : on ne propose plus de rejoindre les testeurs à l'auteur, ni à un membre qu'il a retiré.
       testerJoinable: row.project.authorId !== viewerId && !removedFrom.has(row.project.id),
-      // R19 : le miel offert à ce projet par le lecteur ; faux en attendant le grand livre du miel.
-      honeyGiven: false,
+      // R19 : le lecteur a-t-il offert du miel à ce projet ? Son geste à lui, lu pour lui seul.
+      honeyGiven: honeyGiven.has(row.project.id),
       reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
       commentCount: commentCounts.get(row.project.id) ?? 0,
       removal: (removalId && removals.get(removalId)) || null,

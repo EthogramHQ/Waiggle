@@ -1,7 +1,8 @@
 // Routes des réactions (tranche 5) : PUT /v1/projects/{id}/reactions/{kind} pour réagir à un
 // projet (« Bravo », « Utile »…), DELETE à la même adresse pour retirer sa réaction. Réservé aux
 // membres connectés, sur le projet visible d'un autre. Les nombres se lisent avec le projet (champ
-// `reactions` de GET /v1/projects/{id}), jamais la liste de qui a réagi.
+// `reactions` de GET /v1/projects/{id}), jamais la liste de qui a réagi. R19 : une réaction posée
+// rapporte du pollen à qui réagit et à l'auteur du projet (en-tête `Waiggle-Pollen`).
 import { createRoute, z } from '@hono/zod-openapi'
 import { ProjectId, REACTION_KINDS, ReactionKind } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -9,6 +10,8 @@ import { and, eq, ne, or, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { setPollen } from '../game/award'
+import { awardOnProject, pollenHeaders } from '../game/gesture'
 import { visibleTo } from '../projects/load'
 import { hiveMemberOf, projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -34,7 +37,7 @@ const reactRoute = createRoute({
   description: 'Asking twice changes nothing: there is one reaction of each kind per member.',
   request: { params },
   responses: {
-    204: done,
+    204: { ...done, headers: pollenHeaders },
     400: errorResponse('One cannot react to one’s own project.'),
     401: errorResponse('Not signed in.'),
     404: errorResponse('No such project or kind, or a private project of another member.'),
@@ -126,7 +129,7 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
       .where(and(eq(schema.project.id, id), reachable))
     if (!project) return notFound(c)
     if (project.authorId === userId) return ownProject(c)
-    return kind.data
+    return { kind: kind.data, authorId: project.authorId }
   }
 
   app.openapi(reactRoute, async (c) => {
@@ -134,16 +137,39 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     if (!user) return unauthorized(c)
     const { id, kind } = c.req.valid('param')
     const checked = await check(c, user.id, id, kind, false)
-    if (typeof checked !== 'string') return checked
+    if (checked instanceof Response) return checked
 
+    // R19 : la réaction et son pollen s'écrivent dans une même transaction (tout ou rien).
     // « on conflict do nothing » : la réaction existe déjà (même clé primaire) ? PostgreSQL n'écrit
     // rien et ne lève pas d'erreur. Réagir deux fois revient à réagir une fois, même si deux
-    // demandes arrivent en même temps. La date vient de l'horloge de JavaScript.
-    await db
-      .insert(schema.projectReaction)
-      .values({ projectId: id, memberId: user.id, kind: checked, createdAt: new Date() })
-      .onConflictDoNothing()
-    // 204 : « c'est fait », sans corps : rien à lire, donc rien qui puisse fuiter.
+    // demandes arrivent en même temps. `returning` rend la ligne écrite, ou rien : seule une
+    // réaction nouvelle passe par le pollen. La date vient de l'horloge de JavaScript.
+    const now = new Date()
+    const pollen = await db.transaction(async (tx) => {
+      const written = await tx
+        .insert(schema.projectReaction)
+        .values({ projectId: id, memberId: user.id, kind: checked.kind, createdAt: now })
+        .onConflictDoNothing()
+        .returning({ kind: schema.projectReaction.kind })
+      if (written.length === 0) return 0
+      // Chaque sorte de réaction se paie une fois par projet : retirer puis reposer retrouve la
+      // même clé, et ne rapporte rien de plus (ni ne reprend rien, le retrait n'y touche pas).
+      return awardOnProject(tx, {
+        actorId: user.id,
+        authorId: checked.authorId,
+        projectId: id,
+        gesture: 'reaction',
+        received: 'receive_reaction',
+        sourceKind: 'reaction',
+        sourceId: id,
+        sourceKey: `${id}:${checked.kind}`,
+        receivedKey: `${id}:${checked.kind}:${user.id}`,
+        now,
+      })
+    })
+    // 204 : « c'est fait », sans corps : rien à lire, donc rien qui puisse fuiter. L'en-tête du
+    // pollen, s'il y en a, se pose une fois la transaction validée.
+    setPollen(c, pollen)
     return c.body(null, 204)
   })
 
@@ -152,11 +178,14 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     if (!user) return unauthorized(c)
     const { id, kind } = c.req.valid('param')
     const checked = await check(c, user.id, id, kind, true)
-    if (typeof checked !== 'string') return checked
+    if (checked instanceof Response) return checked
 
-    // N'efface que la réaction du membre qui demande ; s'il n'y en avait pas, rien à faire.
+    // N'efface que la réaction du membre qui demande ; s'il n'y en avait pas, rien à faire. Le
+    // pollen déjà gagné reste (R19 : défaire ne retire rien).
     const r = schema.projectReaction
-    await db.delete(r).where(and(eq(r.projectId, id), eq(r.memberId, user.id), eq(r.kind, checked)))
+    await db
+      .delete(r)
+      .where(and(eq(r.projectId, id), eq(r.memberId, user.id), eq(r.kind, checked.kind)))
     return c.body(null, 204)
   })
 
