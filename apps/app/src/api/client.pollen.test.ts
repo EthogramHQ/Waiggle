@@ -87,24 +87,24 @@ describe('requestWithoutBody and the pollen header', () => {
     // Une réaction posée, un suivi : « 204 », et le pollen dans l'en-tête.
     fetchMock.mockResolvedValue(noContent('2'))
 
-    expect(await requestWithoutBody('/v1/projects/p1/reactions/useful', { method: 'PUT' })).toStrictEqual(
-      { ok: true, data: null, pollen: 2 },
-    )
+    expect(
+      await requestWithoutBody('/v1/projects/p1/reactions/useful', { method: 'PUT' }),
+    ).toStrictEqual({ ok: true, data: null, pollen: 2 })
   })
 
   it('leaves pollen out when the answer has no header', async () => {
     fetchMock.mockResolvedValue(noContent())
 
-    expect(await requestWithoutBody('/v1/projects/p1/reactions/useful', { method: 'PUT' })).toStrictEqual(
-      { ok: true, data: null },
-    )
+    expect(
+      await requestWithoutBody('/v1/projects/p1/reactions/useful', { method: 'PUT' }),
+    ).toStrictEqual({ ok: true, data: null })
   })
 
   it('ignores a header that is not a positive whole number', async () => {
     fetchMock.mockResolvedValue(noContent('0'))
 
-    expect(await requestWithoutBody('/v1/projects/p1/reactions/useful', { method: 'PUT' })).toStrictEqual(
-      { ok: true, data: null },
-    )
+    expect(
+      await requestWithoutBody('/v1/projects/p1/reactions/useful', { method: 'PUT' }),
+    ).toStrictEqual({ ok: true, data: null })
   })
 })

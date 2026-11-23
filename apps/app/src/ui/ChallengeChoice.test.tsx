@@ -32,10 +32,10 @@ const ERROR = fr.t(($) => $.game.harvest.challenge.error)
 
 // Le nom lu d'un choix commence par son défi ; il peut dire ensuite son miel (« …, 10 miel ») :
 // le test ne fixe que le début.
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const choice = (code: Code, checked?: boolean) =>
   screen.getByRole('radio', {
-    name: new RegExp(`^${escape(label(code))}`),
+    name: new RegExp(`^${escapeRegExp(label(code))}`),
     ...(checked === undefined ? null : { checked }),
   })
 
@@ -92,7 +92,7 @@ describe('ChallengeChoice', () => {
   it('shows the honey of each challenge', async () => {
     await renderWithProviders(<Choice />)
 
-    expect(screen.getAllByText(new RegExp(escape(PRICE)))).toHaveLength(3)
+    expect(screen.getAllByText(new RegExp(escapeRegExp(PRICE)))).toHaveLength(3)
   })
 
   it('checks the challenge that is touched', async () => {

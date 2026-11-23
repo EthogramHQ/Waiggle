@@ -24,11 +24,11 @@ const tintName = (tint: DecorationTint) => fr.t(($) => $.game.decoration.tints[t
 const patternName = (pattern: DecorationPattern) => fr.t(($) => $.game.decoration.patterns[pattern])
 const price = (amount: number) => fr.t(($) => $.game.decoration.price, { amount })
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // Le nom lu d'un choix commence par son nom ; il peut dire ensuite son prix ou « À toi ».
 const option = (name: string, checked?: boolean) =>
   screen.getByRole('radio', {
-    name: new RegExp(`^${escape(name)}`),
+    name: new RegExp(`^${escapeRegExp(name)}`),
     ...(checked === undefined ? null : { checked }),
   })
 
@@ -71,8 +71,8 @@ describe('DecorationPicker', () => {
     await renderWithProviders(<DecorationPicker {...props} onChange={jest.fn()} />)
 
     // Pollen seul, parmi les teintes ; Gaufré, Rayé, Pointillé, parmi les motifs.
-    expect(screen.getAllByText(new RegExp(escape(price(10))))).toHaveLength(1)
-    expect(screen.getAllByText(new RegExp(escape(price(15))))).toHaveLength(3)
+    expect(screen.getAllByText(new RegExp(escapeRegExp(price(10))))).toHaveLength(1)
+    expect(screen.getAllByText(new RegExp(escapeRegExp(price(15))))).toHaveLength(3)
   })
 
   it('says « À toi » instead of a price for what is already owned', async () => {
@@ -85,9 +85,9 @@ describe('DecorationPicker', () => {
     )
 
     // Un achat vaut pour toujours : plus aucune teinte n'a de prix, deux motifs seulement.
-    expect(screen.queryByText(new RegExp(escape(price(10))))).toBeNull()
-    expect(screen.getAllByText(new RegExp(escape(price(15))))).toHaveLength(2)
-    expect(screen.getAllByText(new RegExp(escape(OWNED))).length).toBeGreaterThan(0)
+    expect(screen.queryByText(new RegExp(escapeRegExp(price(10))))).toBeNull()
+    expect(screen.getAllByText(new RegExp(escapeRegExp(price(15))))).toHaveLength(2)
+    expect(screen.getAllByText(new RegExp(escapeRegExp(OWNED))).length).toBeGreaterThan(0)
   })
 
   it('tells the new choice with the other half kept', async () => {
@@ -127,8 +127,8 @@ describe('DecorationPicker', () => {
         .filter((radio) => radio.props.tabIndex !== -1)
         .map((radio) => radio.props.accessibilityLabel as string)
       expect(stops).toHaveLength(2)
-      expect(stops[0]).toMatch(new RegExp(`^${escape(tintName('amber'))}`))
-      expect(stops[1]).toMatch(new RegExp(`^${escape(patternName('smooth'))}`))
+      expect(stops[0]).toMatch(new RegExp(`^${escapeRegExp(tintName('amber'))}`))
+      expect(stops[1]).toMatch(new RegExp(`^${escapeRegExp(patternName('smooth'))}`))
     })
   })
 })
