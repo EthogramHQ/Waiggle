@@ -18,6 +18,7 @@ import { fill, parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i1
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { sql } from 'drizzle-orm'
 import { accountDeletionHooks } from '../account/delete'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
@@ -511,7 +512,20 @@ export const createAuth = ({
           // n'est ouvert aujourd'hui) n'a pas d'accord, et l'écran « Accepter » le lui demandera.
           after: async (user, context) => {
             if (context?.path !== '/sign-up/email') return
-            await acceptCurrentRules(db, user.id, new Date())
+            const now = new Date()
+            await acceptCurrentRules(db, user.id, now)
+            // R19 : l'avis d'introduction de la récolte (« Nouveau : ta récolte… ») pour chaque
+            // compte créé ; la migration du rattrapage ne l'a écrit que pour les comptes déjà là.
+            // Le hook ne tourne qu'une fois par compte (à sa création) : un seul avis, sans index
+            // unique à lui. Un compte d'exemple n'en reçoit pas ; ce marquage se pose le plus
+            // souvent après la création (infra/mark-example.sh), la condition ne couvre que celui
+            // déjà marqué.
+            await db.execute(
+              sql`insert into game_notice (id, member_id, kind, created_at)
+                select gen_random_uuid(), ${user.id}, 'intro', ${now.toISOString()}::timestamptz at time zone 'UTC'
+                where not exists (select 1 from example_account e where e.user_id = ${user.id})
+                  and not exists (select 1 from game_notice n where n.member_id = ${user.id} and n.kind = 'intro')`,
+            )
           },
         },
       },

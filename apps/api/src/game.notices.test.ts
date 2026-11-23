@@ -63,9 +63,14 @@ const publish = async (member: TestMember, title: string) => {
   return (await act.publish(member.cookie, title, { visibility: 'public' })).id
 }
 
-/** Les avis du jeu de l'Activité de ce membre (les autres notifications retirées). */
+/**
+ * Les avis du jeu de l'Activité de ce membre (les autres notifications retirées), sans l'avis
+ * d'introduction que tout compte reçoit à sa création : il a son propre test plus bas.
+ */
 const gameNotices = async (member: TestMember) =>
-  (await game.notifications(member.cookie)).filter((item) => item.kind.startsWith('game_'))
+  (await game.notifications(member.cookie)).filter(
+    (item) => item.kind.startsWith('game_') && item.kind !== 'game_intro',
+  )
 
 /**
  * Les seuls avis de miel offert : Inès publie pour recevoir le miel, ce qui lui donne aussi le
@@ -91,6 +96,19 @@ const malikOffersHoney = async () => {
   later()
   return meteo
 }
+
+describe('the introduction notice', () => {
+  it('writes the intro notice once when an account is created', async () => {
+    // Un compte créé après le déploiement : la migration du rattrapage ne l'a jamais vu.
+    const intros = await rows<{ member_id: string }>(
+      sql`select member_id from game_notice where kind = 'intro' order by member_id`,
+    )
+
+    expect(intros.map((row) => row.member_id).sort()).toEqual(
+      [ines.id, malik.id, zoe.id, sam.id].sort(),
+    )
+  })
+})
 
 describe('the notices of the level and of the seals', () => {
   it('tells a level passed and a seal earned in the activity, counted as unread', async () => {
@@ -127,7 +145,7 @@ describe('the notices of the level and of the seals', () => {
     const back = await gameNotices(ines)
     expect(back.map((notice) => notice.kind)).toEqual(['game_seal'])
     const [rowCount] = await rows<{ count: number }>(
-      sql`select count(*)::int as count from game_notice where member_id = ${ines.id}`,
+      sql`select count(*)::int as count from game_notice where member_id = ${ines.id} and kind <> 'intro'`,
     )
     expect(rowCount?.count).toBe(1)
   })

@@ -200,10 +200,11 @@ const readPage = async (cookie: string, cursor?: string) => {
 
 /**
  * Les notifications de la première page, sans celle du pseudo (que chaque membre reçoit en
- * vérifiant son adresse, et qui gênerait la lecture de la plupart des tests).
+ * vérifiant son adresse, et qui gênerait la lecture de la plupart des tests), ni l'avis
+ * d'introduction de la récolte (R19 : tout compte le reçoit à sa création).
  */
 const notifications = async (cookie: string) =>
-  (await readPage(cookie)).items.filter((n) => n.kind !== 'handle')
+  (await readPage(cookie)).items.filter((n) => n.kind !== 'handle' && n.kind !== 'game_intro')
 
 /** Le nombre de la cloche. */
 const unread = async (cookie: string) => {
@@ -748,7 +749,9 @@ describe('keeping notifications 90 days', () => {
 
 describe('the handle', () => {
   it('is the first notification of a new member, dated from the verification of her address', async () => {
-    expect((await readPage(ines)).items).toEqual([
+    // R19 : l'avis d'introduction de la récolte, reçu à la création du compte, a son propre test
+    // (game.notices.test.ts) ; ici on ne lit que celui du pseudo, et la cloche en compte deux.
+    expect((await readPage(ines)).items.filter((n) => n.kind !== 'game_intro')).toEqual([
       {
         id: expect.any(String),
         kind: 'handle',
@@ -757,20 +760,21 @@ describe('the handle', () => {
         isNew: true,
       },
     ])
-    expect(await unread(ines)).toBe(1)
+    expect(await unread(ines)).toBe(2)
   })
 
   // Ce test disait « donne le pseudo actuel après un changement » : la notification aurait alors dit
   // « Ton pseudo est @ines », comme si on le lui avait donné. Relecture juridique de la tranche 6b :
   // elle parle du pseudo reçu, et disparaît dès que le membre en choisit un lui-même.
   it('disappears once the member chooses a handle herself: it would no longer be true', async () => {
-    expect(await unread(ines)).toBe(1) // témoin : celle du pseudo reçu
+    // Témoin : celle du pseudo reçu, et l'avis d'introduction de la récolte (R19), qui reste.
+    expect(await unread(ines)).toBe(2)
     later()
     const res = await send('PATCH', '/v1/me', ines, { handle: 'ines' })
     expect(res.status).toBe(200)
 
-    expect((await readPage(ines)).items).toEqual([])
-    expect(await unread(ines)).toBe(0)
+    expect((await readPage(ines)).items.map((n) => n.kind)).toEqual(['game_intro'])
+    expect(await unread(ines)).toBe(1)
   })
 })
 
