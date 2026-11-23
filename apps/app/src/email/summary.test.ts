@@ -38,6 +38,33 @@ const allTypes = (choice: 'digest' | 'never', weeklyRecap = true): EmailPreferen
  * défaut ; ces tests gardent leur point de départ). */
 const allInRecap: EmailPreferences = { ...leaEmailPreferences, hives: 'digest' }
 
+// R19, relecture juridique du plan (B2) : quand « Ma récolte » est allumé, le récap du dimanche
+// porte aussi la semaine du jeu (« Ta semaine ») ; les phrases « proches » le disent.
+describe('emailSummary with the harvest notices on', () => {
+  const withHarvest = (preferences: EmailPreferences) =>
+    emailSummary(preferences, fr.t as unknown as T, 'fr', true)
+
+  it('names the harvest of the week in the recap of the new projects of the people I follow', () => {
+    expect(withHarvest(allTypes('never'))).toBe(fr.t(($) => $.game.emailSummary.nothingFriends))
+    expect(withHarvest({ ...allTypes('never'), replies: 'now' })).toBe(
+      fr.t(($) => $.game.emailSummary.nowFriends, { types: 'Les réponses et les mentions' }),
+    )
+    expect(withHarvest({ ...allTypes('never'), hives: 'now' })).toBe(
+      fr.t(($) => $.game.emailSummary.nowFriendsHives, { types: 'Les ruches' }),
+    )
+  })
+
+  it('keeps the other sentences, which already promise a recap', () => {
+    expect(withHarvest(allInRecap)).toBe(inFrench(allInRecap))
+  })
+
+  it('says nothing of the harvest while the harvest notices are off', () => {
+    expect(emailSummary(allTypes('never'), fr.t as unknown as T, 'fr', false)).toBe(
+      fr.t(($) => $.notifications.summary.nothingFriends),
+    )
+  })
+})
+
 describe('emailSummary', () => {
   // R10 : par défaut, les ruches partent tout de suite (contrat, `email.ts`) ; le reste, dans le récap.
   it('says the hives go at once and the rest in the Sunday recap by default', () => {

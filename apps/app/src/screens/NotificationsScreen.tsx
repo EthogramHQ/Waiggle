@@ -26,6 +26,7 @@ import { useMediaSources } from '../api/media'
 import { useCategories } from '../categories/api'
 import { useEmailPreferences } from '../email/api'
 import { emailSummary, hivesNowNote } from '../email/summary'
+import { useHarvest } from '../gamification/api'
 import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -116,6 +117,9 @@ function MemberNotifications() {
   const categories = useCategories().data?.categories
   // La colonne d'ordinateur seulement : sur téléphone, les réglages ne se lisent pas ici.
   const preferences = useEmailPreferences(columns).data
+  // R19 (B2) : la phrase des e-mails nomme « ta récolte de la semaine » quand « Ma récolte » est
+  // allumé. Lue avec la colonne seulement (ordinateur), comme les réglages d'e-mail.
+  const harvestNotices = useHarvest({ enabled: columns }).data?.settings.harvestNotices ?? false
 
   // « Vu » une seule fois par ouverture, avec l'heure du serveur de la première page.
   const asOf = list.data?.pages[0]?.asOf
@@ -312,7 +316,9 @@ function MemberNotifications() {
           side={
             <EmailSummary
               title={t(($) => $.notifications.emailColumn.title)}
-              summary={preferences ? emailSummary(preferences, t, i18n.language) : null}
+              summary={
+                preferences ? emailSummary(preferences, t, i18n.language, harvestNotices) : null
+              }
               detail={preferences ? hivesNowNote(preferences, t) : null}
               actionLabel={t(($) => $.notifications.emailColumn.settings)}
               onAction={openSettings}
