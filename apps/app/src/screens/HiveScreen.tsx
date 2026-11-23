@@ -20,7 +20,14 @@
 // L'onglet vient de l'adresse, lue après l'hydratation (la page web est pré-rendue sans connaître
 // l'adresse, comme le coin des testeurs) ; changer d'onglet remplace le paramètre, sans entrée
 // d'historique : le Retour du navigateur quitte la ruche au lieu de repasser par chaque onglet.
-import type { HiveMember, HivePage, MyHives, ProjectSummary } from '@ruche/contracts'
+import {
+  type HiveChallenge,
+  type HiveMember,
+  type HivePage,
+  HONEY,
+  type MyHives,
+  type ProjectSummary,
+} from '@ruche/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useState } from 'react'
@@ -49,6 +56,7 @@ import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { AvatarStack } from '../ui/AvatarStack'
 import { Button } from '../ui/Button'
+import { ChallengeCard } from '../ui/ChallengeCard'
 import { Columns } from '../ui/Columns'
 import { Hint } from '../ui/Hint'
 import { HiveActivityRow } from '../ui/HiveActivityRow'
@@ -342,8 +350,22 @@ function HivePageView({ page }: { page: HivePage }) {
   // Même règle que `SeekingTesters` : seuls les projets avec une démo se testent.
   const hasTesters = page.seekingTesters.some((project) => project.demoUrl !== null)
 
+  // R19 (planche R19-Defis) : le défi de la semaine, pour une ruche de 3 membres au moins ; l'API
+  // envoie `null` en dessous, et la page n'en garde aucune place (« Les cousins »). En tête de
+  // l'Actualité sur téléphone, en tête de la colonne de droite sur ordinateur.
+  const challenge = page.challenge ? <HiveChallengeCard challenge={page.challenge} /> : null
+  // La colonne de droite : le défi puis les projets à tester ; absente sans l'un ni l'autre.
+  const aside =
+    challenge || hasTesters ? (
+      <Stack gap="lg">
+        {challenge}
+        {hasTesters ? testers : null}
+      </Stack>
+    ) : undefined
+
   const activity = (
     <Stack gap="lg">
+      {desktop ? null : challenge}
       {ready ? (
         <StateMessage
           kind="empty"
@@ -445,9 +467,9 @@ function HivePageView({ page }: { page: HivePage }) {
               </Stack>
             }
             main={tabs}
-            // La colonne de droite n'existe que si elle a un contenu : sans projet à tester, la
-            // page garde deux colonnes, sans vide à droite.
-            aside={hasTesters ? testers : undefined}
+            // La colonne de droite n'existe que si elle a un contenu : sans défi ni projet à
+            // tester, la page garde deux colonnes, sans vide à droite.
+            aside={aside}
           />
         ) : (
           tabs
@@ -472,6 +494,29 @@ function HivePageView({ page }: { page: HivePage }) {
         onClosed={releaseMembers}
       />
     </Screen>
+  )
+}
+
+/**
+ * R19 (« Les défis », options a14 et b13) : la carte « Défi de la semaine » (titre de niveau 2),
+ * son libellé (« 5 retours entre vous ») et l'avancée de toute la ruche (« 3 sur 5 »), sans nommer
+ * personne. Le lundi, un défi sans geste dit « Nouveau » (jamais « 0 sur 5 ») ; réussi, « Défi
+ * réussi » et le miel qu'il rapporte à ceux qui y ont participé.
+ */
+function HiveChallengeCard({ challenge }: { challenge: HiveChallenge }) {
+  const { t } = useTranslation()
+  // Le code, recopié dans une constante avant le sélecteur de texte (clé fabriquée).
+  const code = challenge.code
+  const state = challenge.done ? 'done' : challenge.isNew ? 'new' : 'active'
+  return (
+    <ChallengeCard
+      title={t(($) => $.game.challenges.hiveTitle)}
+      label={t(($) => $.game.challenges.hive[code])}
+      progress={challenge.progress}
+      target={challenge.target}
+      state={state}
+      honey={HONEY.hiveChallenge}
+    />
   )
 }
 
