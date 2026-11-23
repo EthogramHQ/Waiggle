@@ -141,7 +141,11 @@ beforeEach(() => {
   mockSession({ user: { id: 'u3', name: 'Inès' } })
   jest
     .mocked(getProject)
-    .mockImplementation(async () => ({ ...server, honeyGiven: gameServer.gifted.has(server.id) }))
+    // Déjà offert avant la visite (`honeyGiven` du projet rendu), ou offert pendant le test.
+    .mockImplementation(async () => ({
+      ...server,
+      honeyGiven: server.honeyGiven || gameServer.gifted.has(server.id),
+    }))
 })
 
 describe('« Offrir du miel » on the page of a project', () => {

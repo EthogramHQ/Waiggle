@@ -165,8 +165,15 @@ describe('the title and its form in « Mon profil »', () => {
     return view
   }
 
-  /** Le groupe « Forme » (féminin ou masculin), un groupe de boutons radio. */
-  const formGroup = () => screen.queryByRole('radiogroup', { name: T.form })
+  /**
+   * Le groupe « Forme » (féminin ou masculin), un groupe de boutons radio. On le cherche par son nom
+   * puis on lit son rôle : sur téléphone, un groupe qui ne se rend pas « accessible » d'un bloc
+   * (pour laisser chaque choix se lire seul) n'est pas trouvé par son rôle.
+   */
+  const formGroup = () => {
+    const group = screen.queryByLabelText(T.form)
+    return group?.props.accessibilityRole === 'radiogroup' ? group : null
+  }
 
   it('offers « Selon mes gestes » and the titles already obtained, with the help', async () => {
     await openProfile()
