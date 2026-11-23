@@ -97,6 +97,8 @@ import { FormSamples } from './formulaire'
 import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
+import { HarvestCatalogue } from './harvest'
+import { HarvestMotionCatalogue } from './harvestMotion'
 import { TokensCatalogue } from './jetons'
 import { LazySection } from './LazySection'
 import { labels } from './labels'
@@ -1011,6 +1013,12 @@ export function CatalogueScreen() {
         <ToolsWideCatalogue />
         <FeedEndCatalogue />
         <MascotCatalogue />
+      </LazySection>
+      {/* Tranche R19, la gamification : le rayon, les sceaux et leurs tuiles (harvest.tsx), puis ce
+          qui bouge, l'alvéole du niveau et la pastille de pollen (harvestMotion.tsx). */}
+      <LazySection title={l.lazy.harvest}>
+        <HarvestCatalogue />
+        <HarvestMotionCatalogue />
       </LazySection>
     </Screen>
   )
