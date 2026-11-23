@@ -52,6 +52,7 @@ import { DeleteAccountScreen } from './DeleteAccountScreen'
 import { EmailChangeResultScreen } from './EmailChangeResultScreen'
 import { ExploreScreen } from './ExploreScreen'
 import { FeedbackSheet } from './FeedbackSheet'
+import { HarvestScreen } from './HarvestScreen'
 import { HiveScreen } from './HiveScreen'
 import { HiveSettingsScreen } from './HiveSettingsScreen'
 import { HivesScreen } from './HivesScreen'
@@ -68,6 +69,7 @@ import { ProjectFormScreen } from './ProjectFormScreen'
 import { ProjectScreen } from './ProjectScreen'
 import { ProjectUpdatesScreen } from './ProjectUpdatesScreen'
 import { PublicPageSettingsScreen } from './PublicPageSettingsScreen'
+import { RankingsScreen } from './RankingsScreen'
 import { ReportSheet } from './ReportSheet'
 import { SearchScreen } from './SearchScreen'
 import { SettingsScreen } from './SettingsScreen'
@@ -376,6 +378,13 @@ const guarded: Guarded[] = [
     visitor: 'sheet',
   },
   {
+    name: 'HarvestScreen',
+    render: () => <HarvestScreen />,
+    pathname: '/harvest',
+    file: 'src/screens/HarvestScreen.tsx',
+    visitor: 'signIn',
+  },
+  {
     name: 'HiveScreen',
     render: () => <HiveScreen id={hiveId} />,
     pathname: `/hives/${hiveId}`,
@@ -497,6 +506,13 @@ const guarded: Guarded[] = [
     visitor: 'signIn',
   },
   {
+    name: 'RankingsScreen',
+    render: () => <RankingsScreen />,
+    pathname: '/harvest/rankings',
+    file: 'src/screens/RankingsScreen.tsx',
+    visitor: 'signIn',
+  },
+  {
     name: 'SearchScreen',
     render: () => <SearchScreen />,
     pathname: '/search',
@@ -561,6 +577,8 @@ const excluded: Record<string, string> = {
   'src/navigation/PageLanguage.tsx': 'un aiguillage, pas un écran',
   'src/navigation/chunks/preload.ts': 'un aiguillage, pas un écran',
   'src/moderation/SuspendSheet.tsx': 'une feuille de la modération, gardée telle quelle',
+  'src/projects/ProjectActions.tsx':
+    'lit seulement le nom du membre pour la feuille d’offre de miel, n’attend pas la session',
   'src/screens/HiveInviteSheet.tsx': 'rend `null` sans session',
   'src/screens/ReportSheet.tsx': 'sa branche visiteur de R12',
   'src/screens/ShowcaseScreen.tsx': 'l’accueil public, pré-rendu pour le visiteur',
