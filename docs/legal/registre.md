@@ -15,7 +15,7 @@ données (relecture juridique complète du 15/11/2026, tranche R11), et suit le 
   même pull request. La page « Confidentialité » de l'appli (`packages/i18n`) dit la même chose aux
   membres : les deux changent ensemble.
 
-Dernière mise à jour : 16/11/2026 (tranche R12, les projets publics).
+Dernière mise à jour : 23/11/2026 (tranche R19, la récolte).
 
 ## 1. Le responsable du traitement
 
@@ -114,7 +114,7 @@ selon les règles de visibilité de l'appli.
   nombres seulement, jamais qui ; une mention, le mentionné ; un blocage, celui qui le pose.
 - **Durées** : jusqu'au retrait par le membre ou à la suppression du compte. Un commentaire
   supprimé qui a des réponses garde seulement son identifiant, son projet et ses dates, sans auteur
-  ni texte, tant qu'il a des réponses.
+  ni texte, tant qu'il a des réponses. La ligne de pollen d'un geste reste après son retrait (2.15).
 
 ### 2.6 Le coin des testeurs
 
@@ -242,6 +242,45 @@ selon les règles de visibilité de l'appli.
 - **Durées** : tant que le projet reste `web`, non retiré, et que ni l'auteur ni l'éditeur ne l'en
   retirent (un projet qui quitte `web` quitte la vitrine dans la même transaction) ; l'avis,
   90 jours (`nightly-purge.ts`).
+
+### 2.15 La récolte : pollen, niveau, sceaux, miel, défis et classements (R19)
+
+- **Finalité** : compter les gestes qui aident un proche ou font avancer un projet, en tirer un
+  niveau, un titre et des sceaux, proposer des défis, tenir un solde de miel (sans valeur, qui ne
+  s'achète pas), et montrer un classement de la semaine entre proches et par ruche.
+- **Base** :
+  - le décompte et ce que voit le membre : 6.1.b ;
+  - l'affichage aux autres membres (niveau, titre, sceaux) et les classements, où chacun paraît
+    d'office avec un réglage de retrait : 6.1.f, à vérifier. Un titre déduit des gestes peut être
+    un profilage (article 4.4) ; il n'a pas d'effet juridique, donc l'article 22 ne s'appliquerait
+    pas, à vérifier. Le retrait vaut opposition (article 21) ; il est annoncé une fois, par l'avis
+    `intro` et le récap.
+- **Personnes et données** : les membres, sauf les comptes d'exemple.
+  - `pollen_entry` : le geste, la famille, le montant, la chose concernée, l'autre membre, le
+    jour, la semaine, la révocation ;
+  - `honey_entry`, `seal`, `personal_challenge`, `hive_challenge`, `game_notice` ;
+  - `member_game` : la forme du titre, le titre épinglé, les classements, les avis, la
+    décoration, le niveau vu ;
+  - `email_preference.recap_harvest_at` : la date du premier récap qui a porté « Ta semaine ».
+  - Le passé est rattrapé au lancement (`0030_game_backfill.sql`) ; les contenus déjà retirés y
+    entrent révoqués.
+- **Destinataires** :
+  - le niveau, le titre, le rayon, les sceaux et la décoration : les membres connectés, sauf
+    blocage, et jamais sur la page publique ;
+  - le pollen de la semaine : les membres qui le suivent (leur classement « Ceux que je suis ») et
+    les membres de ses ruches, sauf retrait ou blocage ;
+  - le miel, les défis et les réglages : le membre seul ;
+  - l'avancée d'un défi de ruche : les membres de la ruche, sans nom ;
+  - le récap (Scaleway, 2.9) : le bloc « Ta semaine ».
+- **Durées** :
+  - tant que le compte existe (`on delete cascade`). La ligne d'un geste reste quand le membre le
+    retire, pour qu'il ne paie qu'une fois ;
+  - `counterpart_id` : remis à nul après la semaine suivante, et quand l'autre compte est
+    supprimé (`set null`) ;
+  - les défis : effacés après la semaine suivante ;
+  - les avis : 90 jours (`nightly-purge.ts`).
+- **Sécurité** : une seule fonction écrit le grand livre (`apps/api/src/game/award.ts`, vérifié
+  par un test statique), avec un verrou par membre. L'export ne nomme pas l'autre membre.
 
 ## 3. Les sous-traitants
 
