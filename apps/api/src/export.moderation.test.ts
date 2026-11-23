@@ -296,3 +296,35 @@ describe('the moderation decisions in the export', () => {
     ])
   })
 })
+
+// R19 : un retrait de la modération révoque le pollen que le contenu a rapporté (choix 9 du plan) ;
+// l'export garde l'entrée, avec la date de sa révocation (`revokedAt`), et un rétablissement la
+// fait compter de nouveau.
+describe('the revoked pollen in the export (R19)', () => {
+  const publishedEntry = async () => {
+    const entry = (await exportOfLea()).data.game.pollen.find((one) => one.gesture === 'publish')
+    if (!entry) throw new Error('no pollen entry for the publication of Météo')
+    return entry
+  }
+
+  it('exports the pollen of a removed project as revoked, at the date of the removal', async () => {
+    // Témoin : avant le retrait, la publication de Météo compte.
+    expect(await publishedEntry()).toMatchObject({
+      family: 'builder',
+      amount: 50,
+      sourceKind: 'project',
+      revokedAt: null,
+    })
+
+    const removedAt = await remove(meteo())
+
+    expect((await publishedEntry()).revokedAt).toBe(removedAt)
+  })
+
+  it('exports the pollen of a restored project as counting again', async () => {
+    await remove(meteo())
+    await restore(meteo())
+
+    expect((await publishedEntry()).revokedAt).toBeNull()
+  })
+})

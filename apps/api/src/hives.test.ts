@@ -14,12 +14,15 @@
 // échoue tant que la route n'existe pas (le témoin de la charte, R4).
 import { readFileSync } from 'node:fs'
 import {
+  challengeFor,
   ErrorResponse,
+  HIVE_CHALLENGES,
   HIVE_ICONS,
   HiveActivityPage,
   HivePage,
   HiveProjectsPage,
   Project,
+  weekOf,
 } from '@ruche/contracts'
 import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -350,6 +353,91 @@ describe('the page of a hive', () => {
 
     expect((await hives.page(famille.id, ines.cookie)).successor).toEqual({ name: 'Léa' })
     expect((await hives.page(famille.id, lea.cookie)).successor).toBeNull()
+  })
+})
+
+// ─── Le défi de la semaine (R19) ──────────────────────────────────────────────────────────────────
+
+// Chaque lundi, une ruche de 3 membres au moins reçoit un défi commun, tiré de la liste fixe de
+// game.ts à la première lecture de la semaine (choix 7 du plan) : `challengeFor(id de la ruche,
+// semaine, HIVE_CHALLENGES)[0]`, le même pour tous ses membres. Ses membres seuls le voient, sur la
+// page de la ruche (`HivePage.challenge`), sans qui a fait quoi. Scénario R19, « Les défis ».
+describe('the challenge of the week on the page of a hive (R19)', () => {
+  /** Le défi que la liste fixe donne à cette ruche pour la semaine de l'horloge du test. */
+  const drawnFor = (hiveId: string) => {
+    const drawn = challengeFor(hiveId, weekOf(new Date(Date.now())), HIVE_CHALLENGES)[0]
+    if (!drawn) throw new Error('no hive challenge in the list')
+    return drawn
+  }
+
+  it('shows every member of a hive of three the same new challenge of the week', async () => {
+    const famille = await family()
+    const drawn = drawnFor(famille.id)
+    const expected = {
+      hiveId: famille.id,
+      code: drawn.code,
+      progress: 0,
+      target: drawn.target,
+      done: false,
+      // Aucun geste encore : l'appli écrit « Nouveau », jamais « 0 sur 5 ».
+      isNew: true,
+    }
+
+    expect((await hives.page(famille.id, ines.cookie)).challenge).toEqual(expected)
+    later()
+    expect((await hives.page(famille.id, max.cookie)).challenge).toEqual(expected)
+    // Relu, il ne change pas : il est gardé à la première lecture de la semaine.
+    later()
+    expect((await hives.page(famille.id, lea.cookie)).challenge).toEqual(expected)
+  })
+
+  it('gives no challenge to a hive of two members, until a third one joins', async () => {
+    later()
+    const famille = await hives.create(ines.cookie)
+    later()
+    await hives.join(famille.id, ines.cookie, lea)
+
+    expect((await hives.page(famille.id, ines.cookie)).challenge).toBeNull()
+
+    // Témoin : au troisième membre, la ruche reçoit son défi de la semaine.
+    later()
+    await hives.join(famille.id, ines.cookie, max)
+    expect((await hives.page(famille.id, max.cookie)).challenge?.code).toBe(
+      drawnFor(famille.id).code,
+    )
+  })
+
+  it('draws a new challenge on Monday, at midnight in Paris', async () => {
+    const famille = await family()
+    // Le samedi 14 novembre 2026 : on lit le défi de la semaine du lundi 9.
+    expect((await hives.page(famille.id, ines.cookie)).challenge?.code).toBe(
+      drawnFor(famille.id).code,
+    )
+
+    // Lundi 16 novembre, 0 h 01 à Paris (23 h 01 le dimanche en temps universel).
+    vi.setSystemTime(new Date('2026-11-15T23:01:00.000Z'))
+    const monday = (await hives.page(famille.id, ines.cookie)).challenge
+
+    expect(monday).toMatchObject({
+      code: challengeFor(famille.id, '2026-11-16', HIVE_CHALLENGES)[0]?.code,
+      progress: 0,
+      done: false,
+      isNew: true,
+    })
+  })
+
+  it('never shows the challenge of a hive to a member outside it', async () => {
+    const famille = await family()
+    // Témoin : un membre le voit.
+    expect((await hives.page(famille.id, lea.cookie)).challenge).not.toBeNull()
+
+    const res = await act.send('GET', `/v1/hives/${famille.id}`, nora.cookie)
+
+    // La page entière est refusée, du même 404 qu'une ruche qui n'existe pas.
+    expect(res.status).toBe(404)
+    const raw = await res.text()
+    expect(raw).not.toContain('challenge')
+    expect(raw).toBe(await (await act.send('GET', `/v1/hives/${UNKNOWN}`, nora.cookie)).text())
   })
 })
 

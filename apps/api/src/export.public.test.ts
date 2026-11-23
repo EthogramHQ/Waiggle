@@ -166,3 +166,31 @@ describe('a visitor report in the export', () => {
     expect(ofInes.raw).not.toMatch(/reporterEmail|reporter_email/)
   })
 })
+
+// R19 : le jeu dans l'export (`game`). Ce qu'un projet public fait recevoir à son autrice y est,
+// mais jamais qui l'a donné : ni l'identifiant, ni le nom de l'autre membre, ni celui de sa réaction
+// ou de son commentaire (game.ts, `GameExport` : une réaction reçue appartient à qui l'a posée).
+describe('the game in the export (R19)', () => {
+  it('exports what her public project received, never who gave it', async () => {
+    const zoeId = (await act.me(zoe)).id
+    later()
+    const meteo = await ctx.webProject(ines, { title: 'Météo du potager' })
+    later()
+    await act.react(meteo, 'bravo', zoe)
+    later()
+    const comment = await act.comment(meteo, zoe, 'Super idée, Inès !')
+
+    const ofInes = (await exportOf(ines)).data.game
+    expect(ofInes.pollen.map((entry) => entry.gesture)).toEqual(
+      expect.arrayContaining(['receive_comment', 'receive_reaction']),
+    )
+    const block = JSON.stringify(ofInes)
+    for (const trace of [zoeId, 'Zoé', comment.id, 'counterpart']) {
+      expect(block).not.toContain(trace)
+    }
+    // Zoé retrouve ses gestes à elle dans son propre export, sans le projet d'Inès.
+    const ofZoe = (await exportOf(zoe)).data.game
+    expect(ofZoe.pollen.map((entry) => entry.gesture).sort()).toEqual(['comment', 'reaction'])
+    expect(JSON.stringify(ofZoe)).not.toContain(meteo)
+  })
+})
