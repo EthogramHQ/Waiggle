@@ -289,6 +289,28 @@ describe('the pollen of the testers', () => {
     )
     expect(await onlyGesture(max.id, 'feedback_settled')).toHaveLength(1)
   })
+
+  it('pays a settled feedback once per paid feedback, not per message', async () => {
+    const first = await maxSendsFeedback()
+    // Deux autres retours le même jour, dans le même fil : un seul retour est payé ce jour-là.
+    const others = []
+    for (let i = 0; i < 2; i++) {
+      const res = await done(
+        201,
+        'POST',
+        `${project()}/threads/${max.id}/messages`,
+        max.cookie,
+        feedback,
+      )
+      others.push(TesterMessage.parse(await res.json()))
+    }
+    for (const message of [first.message, ...others]) {
+      await done(204, 'POST', `${project()}/messages/${message.id}/settled`, lea.cookie)
+    }
+
+    expect(await onlyGesture(max.id, 'feedback')).toHaveLength(1)
+    expect(await onlyGesture(max.id, 'feedback_settled')).toEqual([['feedback_settled', 25]])
+  })
 })
 
 describe('the pollen of her own projects', () => {

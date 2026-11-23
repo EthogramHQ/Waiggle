@@ -92,4 +92,28 @@ describe('a feedback settled by an update', () => {
       ['update', 20],
     ])
   })
+
+  it('pays a settled feedback once per paid feedback, not per message', async () => {
+    const project = `/v1/projects/${meteo}`
+    await send(204, 'POST', `${project}/testers`, max.cookie)
+    // Trois retours le même jour dans le même fil : un seul est payé (un par fil et par jour).
+    const ids: string[] = []
+    for (let i = 0; i < 3; i++) {
+      const sent = await send(201, 'POST', `${project}/threads/${max.id}/messages`, max.cookie, {
+        kind: 'feedback',
+        outcome: 'partly',
+        device: 'phone',
+        text: `Le score repart à zéro au niveau ${i + 3}.`,
+        captureId: null,
+      })
+      ids.push(TesterMessage.parse(await sent.json()).id)
+    }
+    // Deux réglés par une mise à jour, le troisième à la main : 25 pollen en tout, pas 75.
+    await send(201, 'POST', `${project}/updates`, lea.cookie, update(ids.slice(0, 2)))
+    await send(204, 'POST', `${project}/messages/${ids[2]}/settled`, lea.cookie)
+
+    expect((await gesturesOf(ctx, max.id)).filter(([g]) => g === 'feedback_settled')).toEqual([
+      ['feedback_settled', 25],
+    ])
+  })
 })

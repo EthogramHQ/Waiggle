@@ -6,6 +6,7 @@
 // leur identifiant et les rattache. La dernière mise à jour se lit avec le projet (projects/load.ts).
 import { createRoute, z } from '@hono/zod-openapi'
 import {
+  dayOf,
   NewProjectUpdate,
   ProjectUpdate,
   ProjectUpdatePage,
@@ -195,7 +196,7 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // toute la publication est annulée (400 `invalid_feedback`, la même réponse dans tous ces
         // cas). Le règlement porte la date de la mise à jour : « Réglé dans la mise à jour du … ».
         // L'index partiel tester_message_open_feedback_idx (project_id) donne les retours ouverts.
-        let settled: { id: string; testerId: string }[] = []
+        let settled: { id: string; testerId: string; createdAt: Date }[] = []
         if (body.settledFeedbackIds.length > 0) {
           const k = schema.testerMessage
           settled = await tx
@@ -210,13 +211,13 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
                 isNull(k.removedAt),
               ),
             )
-            .returning({ id: k.id, testerId: k.testerId })
+            .returning({ id: k.id, testerId: k.testerId, createdAt: k.createdAt })
           if (settled.length !== body.settledFeedbackIds.length) throw new InvalidFeedback()
         }
         // R19 : la mise à jour rapporte du pollen à son auteur (la source est la mise à jour :
         // retirée par la modération, elle le révoque), et chaque retour qu'elle règle paie son
-        // testeur, comme « Marquer comme réglé » (routes/tester-threads.ts, même clé : le message,
-        // payé une fois quelle que soit la façon de le régler). Les verrous de jeu de l'auteur et de
+        // testeur, comme « Marquer comme réglé » (routes/tester-threads.ts, même clé : celle du
+        // retour payé, payée une fois quelle que soit la façon de le régler). Les verrous de jeu de l'auteur et de
         // ses testeurs sont pris ensemble, triés, avant les paiements : un `award` après l'autre les
         // prendrait dans un ordre qui pourrait croiser celui d'une autre transaction (S1).
         await lockMembers(tx, [user.id, ...settled.map((one) => one.testerId)])
@@ -235,7 +236,8 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             gesture: 'feedback_settled',
             sourceKind: 'tester_message',
             sourceId: one.id,
-            sourceKey: one.id,
+            // La clé du retour payé : le fil et le jour de Paris du message, pas son identifiant.
+            sourceKey: `${id}:${one.testerId}:${dayOf(one.createdAt)}`,
             counterpartId: user.id,
             projectId: id,
             now: update.createdAt,
