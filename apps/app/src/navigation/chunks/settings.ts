@@ -5,6 +5,9 @@
 export { ChangeEmailScreen } from '../../screens/ChangeEmailScreen'
 export { ChangePasswordScreen } from '../../screens/ChangePasswordScreen'
 export { DeleteAccountScreen } from '../../screens/DeleteAccountScreen'
+// R19 : « Ma récolte » et le classement de la semaine, ouverts depuis sa propre page comme les
+// réglages : ils partent dans ce morceau plutôt que dans un neuf.
+export { HarvestScreen } from '../../screens/HarvestScreen'
 export { ProfileScreen } from '../../screens/ProfileScreen'
 export { PublicPageSettingsScreen } from '../../screens/PublicPageSettingsScreen'
 export { SettingsScreen } from '../../screens/SettingsScreen'

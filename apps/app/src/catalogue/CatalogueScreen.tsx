@@ -99,6 +99,7 @@ import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
 import { HarvestCatalogue } from './harvest'
 import { HarvestChoicesCatalogue } from './harvestChoices'
+import { HarvestFiguresCatalogue } from './harvestFigures'
 import { HarvestMotionCatalogue } from './harvestMotion'
 import { HarvestPanelsCatalogue } from './harvestPanels'
 import { TokensCatalogue } from './jetons'
@@ -1025,6 +1026,8 @@ export function CatalogueScreen() {
         <HarvestPanelsCatalogue />
         {/* Le choix du défi, la décoration du rayon et le pollen par famille (harvestChoices.tsx). */}
         <HarvestChoicesCatalogue />
+        {/* Le montant en grand de « Ma récolte » (harvestFigures.tsx). */}
+        <HarvestFiguresCatalogue />
       </LazySection>
     </Screen>
   )
