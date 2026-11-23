@@ -13,6 +13,7 @@
 // reçoit « introuvable », la même réponse qu'un projet inconnu.
 import { createRoute, z } from '@hono/zod-openapi'
 import {
+  dayOf,
   MESSAGE_TEXT_MAX,
   NewTesterMessage,
   OpenFeedbackList,
@@ -31,6 +32,8 @@ import { requireUser } from '../auth/session'
 import { lockPair } from '../blocks/write'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { award, setPollen } from '../game/award'
+import { awardOnProject, pollenHeaders } from '../game/gesture'
 import type { FileStorage } from '../media/storage'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { type CornerAccess, cornerAccess, isMissingMember } from '../testers/access'
@@ -116,6 +119,7 @@ const postMessageRoute = createRoute({
   responses: {
     201: {
       description: 'The new message.',
+      headers: pollenHeaders,
       content: { 'application/json': { schema: TesterMessage } },
     },
     400: errorResponse(
@@ -389,7 +393,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     // 3. enfin, tout l'accès est relu : l'état a pu changer depuis le garde.
     let outcome:
       | { kind: 'refused'; reply: 'not_found' | 'closed' | 'thread_closed' | 'forbidden' }
-      | { kind: 'ok'; capture: typeof schema.testerMedia.$inferSelect | undefined }
+      | { kind: 'ok'; capture: typeof schema.testerMedia.$inferSelect | undefined; pollen: number }
     try {
       outcome = await db.transaction(async (tx) => {
         const [known] = await tx
@@ -427,8 +431,28 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
             .onConflictDoNothing()
         }
         await tx.insert(schema.testerMessage).values(row)
+        // R19 : un retour du testeur rapporte du pollen, le premier du fil puis un par jour de
+        // Paris et par fil (la clé nomme le fil et le jour), et l'auteur reçoit le sien. Une
+        // réponse, ou un message de l'auteur, ne rapporte rien. La source est le message : retiré
+        // par la modération, il révoque les deux. Si la capture plus bas n'est pas rattachable,
+        // toute la transaction est annulée, pollen compris.
+        const pollen =
+          actor === 'tester' && body.kind === 'feedback'
+            ? await awardOnProject(tx, {
+                actorId: user.id,
+                authorId: known.authorId,
+                projectId: id,
+                gesture: 'feedback',
+                received: 'receive_feedback',
+                sourceKind: 'tester_message',
+                sourceId: row.id,
+                sourceKey: `${id}:${testerId}:${dayOf(row.createdAt)}`,
+                receivedKey: `${id}:${testerId}:${dayOf(row.createdAt)}`,
+                now: row.createdAt,
+              })
+            : 0
         if (body.kind !== 'feedback' || body.captureId === null) {
-          return { kind: 'ok' as const, capture: undefined }
+          return { kind: 'ok' as const, capture: undefined, pollen }
         }
 
         // Le rattachement de la capture : UNE écriture conditionnelle, comme la photo d'un appel
@@ -452,7 +476,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
           )
           .returning()
         if (!attached) throw new InvalidCapture()
-        return { kind: 'ok' as const, capture: attached }
+        return { kind: 'ok' as const, capture: attached, pollen }
       })
     } catch (error) {
       if (error instanceof InvalidCapture) {
@@ -469,6 +493,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
       if (outcome.reply === 'forbidden') return forbidden(c)
       return threadClosed(c)
     }
+    setPollen(c, outcome.pollen)
     return c.json(
       toTesterMessage(row, {
         viewerId: user.id,
@@ -558,7 +583,12 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     projectId: string,
     viewerId: string,
     messageId: string,
-    change: { set: Partial<typeof schema.testerMessage.$inferInsert>; where: SQL | undefined },
+    change: {
+      set: Partial<typeof schema.testerMessage.$inferInsert>
+      where: SQL | undefined
+      /** R19 : régler paie le testeur (une fois par retour) ; défaire « réglé » ne retire rien. */
+      pays: boolean
+    },
   ): Promise<'closed' | 'unknown' | 'done'> =>
     db.transaction(async (tx) => {
       await tx
@@ -580,8 +610,27 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
             change.where,
           ),
         )
-        .returning({ id: k.id })
-      if (written.length > 0) return 'done' as const
+        .returning({ id: k.id, testerId: k.testerId })
+      const [settled] = written
+      if (settled) {
+        // R19 : le testeur gagne son retour réglé ; l'auteur, qui règle, ne gagne rien (aucun
+        // en-tête sur sa réponse). La clé est le message : régler, défaire puis régler de nouveau
+        // ne paie qu'une fois. La source est le message, comme son retour : retiré, il révoque
+        // les deux. Les verrous de jeu viennent après celui du projet (relecture S1).
+        if (change.pays) {
+          await award(tx, {
+            memberId: settled.testerId,
+            gesture: 'feedback_settled',
+            sourceKind: 'tester_message',
+            sourceId: settled.id,
+            sourceKey: settled.id,
+            counterpartId: viewerId,
+            projectId,
+            now: new Date(),
+          })
+        }
+        return 'done' as const
+      }
       // Aucune ligne écrite : soit le retour est déjà réglé (rejouer garde la première date : 204),
       // soit il n'existe pas, ou n'est pas un retour de ce projet (404).
       const [exists] = await tx
@@ -610,6 +659,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     const outcome = await writeSettled(id, user.id, messageId, {
       set: { settledAt: new Date(), settledUpdateId: null },
       where: isNull(schema.testerMessage.settledAt),
+      pays: true,
     })
     if (outcome === 'closed') return cornerClosed(c)
     if (outcome === 'unknown') return notFound(c)
@@ -626,6 +676,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     const outcome = await writeSettled(id, user.id, messageId, {
       set: { settledAt: null, settledUpdateId: null },
       where: undefined,
+      pays: false,
     })
     if (outcome === 'closed') return cornerClosed(c)
     if (outcome === 'unknown') return notFound(c)

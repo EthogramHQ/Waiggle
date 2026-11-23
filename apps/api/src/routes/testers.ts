@@ -12,6 +12,8 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
+import { setPollen } from '../game/award'
+import { awardOnProject, pollenHeaders } from '../game/gesture'
 import { currentHandleOf } from '../handles/load'
 import { avatarUrlOf } from '../profile/me'
 import { visibleTo } from '../projects/load'
@@ -37,7 +39,7 @@ const joinRoute = createRoute({
     'Only a testable project with a demo takes new testers, and at most 200.',
   request: { params },
   responses: {
-    204: done,
+    204: { ...done, headers: pollenHeaders },
     400: errorResponse('One cannot test one’s own project (`cannot_test_own`).'),
     401: errorResponse('Not signed in.'),
     403: errorResponse('A suspended account.'),
@@ -209,15 +211,31 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       if ((counted?.n ?? 0) >= TESTERS_MAX) return 'testers_full' as const
       // La date vient de l'horloge de JavaScript : la source des notifications la compare à celle
       // des mises à jour. `on conflict do nothing` : la clé primaire écarte un doublon sans erreur.
+      const now = new Date()
       await tx
         .insert(t)
-        .values({ memberId: viewer.id, projectId: id, createdAt: new Date() })
+        .values({ memberId: viewer.id, projectId: id, createdAt: now })
         .onConflictDoNothing()
-      return 'done' as const
+      // R19 : devenir testeur rapporte du pollen, une fois par projet (la clé est le projet :
+      // quitter puis revenir ne paie pas deux fois), et l'auteur reçoit le sien. Les verrous de jeu
+      // viennent après ceux de la paire et du projet (relecture de sécurité S1).
+      return awardOnProject(tx, {
+        actorId: viewer.id,
+        authorId: project.authorId,
+        projectId: id,
+        gesture: 'tester',
+        received: 'receive_tester',
+        sourceKind: 'tester',
+        sourceId: id,
+        sourceKey: id,
+        receivedKey: `${id}:${viewer.id}`,
+        now,
+      })
     })
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'not_testable') return c.json(errorBody(languageOf(c), 'not_testable'), 409)
     if (outcome === 'testers_full') return c.json(errorBody(languageOf(c), 'testers_full'), 409)
+    if (typeof outcome === 'number') setPollen(c, outcome)
     return ok(c)
   })
 
