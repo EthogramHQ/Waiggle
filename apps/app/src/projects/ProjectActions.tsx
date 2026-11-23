@@ -33,6 +33,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type Ref, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useFollow } from '../follows/api'
+import { usePollenGain } from '../gamification/pollen'
 import { useSuspension } from '../moderation/suspension'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
@@ -46,6 +47,7 @@ import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll, moveReaderTo, revealWithoutJump } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import type { NoticeAction } from '../ui/Notice'
+import { type PlacedGain, PollenGainSpot } from '../ui/PollenGainSpot'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useTapGuard } from '../ui/tapGuard'
@@ -107,6 +109,8 @@ type ViewProps = {
   testersRef?: Ref<Focusable>
   /** « Suivre ce projet », où va le focus quand « Rejoindre les testeurs » n'est plus là (R7b). */
   followRef?: Ref<Focusable>
+  /** R19 : le pollen de l'inscription aux testeurs, à droite du « Coin des testeurs ». */
+  testersGain?: PlacedGain | null
 }
 
 /** Le projet cherche-t-il des testeurs ? « Testable », avec une démo à essayer (scénario R7a). */
@@ -126,6 +130,7 @@ export function ProjectActionsView({
   onOpenCorner,
   testersRef,
   followRef,
+  testersGain,
 }: ViewProps) {
   const { t } = useTranslation()
   const followers = t(($) => $.follow.followers, { count: project.followerCount })
@@ -174,23 +179,28 @@ export function ProjectActionsView({
   const testers =
     showTesters && testersAction ? (
       <Row wrap key="testers">
-        <Button
-          ref={testersRef}
-          label={
-            project.isTester ? t(($) => $.project.testers.corner) : t(($) => $.project.testers.join)
-          }
-          icon="users-three"
-          variant="secondary"
-          size="compact"
-          // « Le coin des testeurs » mène à une autre page : il se lit « lien » (interface A10) ;
-          // « Rejoindre les testeurs » ouvre une feuille sur la page : un bouton. Le même élément
-          // pour les deux (voir le rôle dans Button) : le focus ne se perd pas au changement.
-          role={project.isTester ? 'link' : 'button'}
-          onPress={testersAction}
-          disabled={!project.isTester && !canJoin}
-          // Inactif après un départ : toujours atteint au clavier, le focus ne retombe pas en haut.
-          focusableWhenDisabled
-        />
+        {/* R19 : la pastille de gain de l'inscription, à droite du bouton. */}
+        <PollenGainSpot gain={testersGain} placement="end">
+          <Button
+            ref={testersRef}
+            label={
+              project.isTester
+                ? t(($) => $.project.testers.corner)
+                : t(($) => $.project.testers.join)
+            }
+            icon="users-three"
+            variant="secondary"
+            size="compact"
+            // « Le coin des testeurs » mène à une autre page : il se lit « lien » (interface A10) ;
+            // « Rejoindre les testeurs » ouvre une feuille sur la page : un bouton. Le même élément
+            // pour les deux (voir le rôle dans Button) : le focus ne se perd pas au changement.
+            role={project.isTester ? 'link' : 'button'}
+            onPress={testersAction}
+            disabled={!project.isTester && !canJoin}
+            // Inactif après un départ : toujours atteint au clavier, le focus ne retombe pas en haut.
+            focusableWhenDisabled
+          />
+        </PollenGainSpot>
       </Row>
     ) : null
 
@@ -333,6 +343,8 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
   const signInAgain = useSignInAgain()
 
   const become = useBecomeTester(project.id)
+  // R19 : le pollen de l'inscription, montré à droite du « Coin des testeurs ».
+  const testerPollen = usePollenGain('tester')
   // La feuille d'inscription : ouverte ou non. Elle reste montée pendant son fondu de sortie.
   const [sheetOpen, setSheetOpen] = useState(false)
   // Le refus de la dernière demande se montre après un envoi seulement, et disparaît à la
@@ -447,6 +459,9 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
         onOpenCorner={openCorner}
         testersRef={testersRef}
         followRef={followRef}
+        testersGain={
+          testerPollen ? { amount: testerPollen.amount, trigger: testerPollen.key } : null
+        }
       />
       {project.isMine ? null : (
         <TesterSheet
