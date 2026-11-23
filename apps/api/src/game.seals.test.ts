@@ -83,7 +83,7 @@ describe('the seals of first times and milestones', () => {
     const message = await game.feedback(project, lea)
     expect(await sealsOfLea()).toEqual(['first_feedback'])
 
-    await game.settle(project, lea.id, message.id, max.cookie)
+    await game.settle(project, message.id, max.cookie)
     expect(await sealsOfLea()).toEqual(['first_settled', 'first_feedback'])
   })
 

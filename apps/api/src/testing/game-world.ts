@@ -131,12 +131,12 @@ export const gameWorld = (ctx: TestContext, act: ReturnType<typeof activity>) =>
     return TesterMessage.parse(await res.json())
   }
 
-  /** L'auteur marque « réglé » le retour d'un testeur. */
-  const settle = async (projectId: string, testerId: string, messageId: string, cookie: string) => {
+  /** L'auteur marque « réglé » le retour d'un testeur (la route des fils de testeurs, sans le testeur dans le chemin). */
+  const settle = async (projectId: string, messageId: string, cookie: string) => {
     later()
     const res = await act.send(
       'POST',
-      `/v1/projects/${projectId}/threads/${testerId}/messages/${messageId}/settled`,
+      `/v1/projects/${projectId}/messages/${messageId}/settled`,
       cookie,
     )
     expect([200, 204], `settle: ${res.status}`).toContain(res.status)

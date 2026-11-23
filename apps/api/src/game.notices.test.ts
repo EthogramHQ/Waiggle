@@ -67,6 +67,13 @@ const publish = async (member: TestMember, title: string) => {
 const gameNotices = async (member: TestMember) =>
   (await game.notifications(member.cookie)).filter((item) => item.kind.startsWith('game_'))
 
+/**
+ * Les seuls avis de miel offert : Inès publie pour recevoir le miel, ce qui lui donne aussi le
+ * sceau « Premier envol », que ces tests ne regardent pas.
+ */
+const giftNotices = async (member: TestMember) =>
+  (await gameNotices(member)).filter((item) => item.kind === 'game_honey_gift')
+
 /** Une requête SQL brute ; on précise nous-mêmes la forme du résultat. */
 const rows = async <T>(query: ReturnType<typeof sql>) =>
   ((await ctx.db.execute(query)) as unknown as { rows: T[] }).rows
@@ -152,7 +159,7 @@ describe('the notice of a honey gift', () => {
   it('tells the author who offered honey to which project', async () => {
     const meteo = await malikOffersHoney()
 
-    const notices = await gameNotices(ines)
+    const notices = await giftNotices(ines)
     expect(notices).toEqual([
       expect.objectContaining({
         kind: 'game_honey_gift',
@@ -167,30 +174,30 @@ describe('the notice of a honey gift', () => {
 
   it('hides a honey gift notice once the receiver blocks the giver', async () => {
     await malikOffersHoney()
-    expect(await gameNotices(ines)).toHaveLength(1) // témoin
+    expect(await giftNotices(ines)).toHaveLength(1) // témoin
 
     await act.block(malik.id, ines.cookie)
 
-    expect(await gameNotices(ines)).toEqual([])
+    expect(await giftNotices(ines)).toEqual([])
   })
 
   it('hides a honey gift notice once either member blocked the other', async () => {
     await malikOffersHoney()
-    expect(await gameNotices(ines)).toHaveLength(1) // témoin
+    expect(await giftNotices(ines)).toHaveLength(1) // témoin
 
     // C'est Malik, qui a offert, qui bloque Inès : la ligne se cache aussi chez elle.
     await act.block(ines.id, malik.cookie)
 
-    expect(await gameNotices(ines)).toEqual([])
+    expect(await giftNotices(ines)).toEqual([])
   })
 
   it('removes the honey gift notice when the giver deletes the account', async () => {
     await malikOffersHoney()
-    expect(await gameNotices(ines)).toHaveLength(1) // témoin
+    expect(await giftNotices(ines)).toHaveLength(1) // témoin
 
     await act.deleteAccount(malik.cookie, malik.password)
 
-    expect(await gameNotices(ines)).toEqual([])
+    expect(await giftNotices(ines)).toEqual([])
   })
 
   it('drops a honey gift notice when the giver deletes the account', async () => {

@@ -314,7 +314,10 @@ describe('the notice of a honey gift', () => {
         new Date(),
       ),
     )
-    expect(await gameNotices(ines)).toEqual([
+    // Publier a aussi valu à Inès le sceau « Premier envol » : on ne regarde que le miel offert.
+    const gifts = async () =>
+      (await gameNotices(ines)).filter((notice) => notice.kind === 'game_honey_gift')
+    expect(await gifts()).toEqual([
       expect.objectContaining({
         kind: 'game_honey_gift',
         actor: expect.objectContaining({ id: max.id, name: 'Max' }),
@@ -323,6 +326,6 @@ describe('the notice of a honey gift', () => {
     ])
 
     await act.block(ines.id, max.cookie)
-    expect(await gameNotices(ines)).toEqual([])
+    expect(await gifts()).toEqual([])
   })
 })

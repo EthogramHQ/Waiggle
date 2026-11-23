@@ -231,13 +231,16 @@ describe('the personal challenge of the week', () => {
   it('forgets an unfinished challenge the following Monday, without a trace', async () => {
     const code = (await offeredToLea())[0] as PersonalChallengeCode
     expect((await game.patchGame(lea.cookie, { personalChallenge: code })).status).toBe(204)
+    // Léa a déjà le miel de sa semaine butinée (elle a publié en préparant le test) : on compare à
+    // ce solde plutôt qu'à zéro.
+    const before = await game.harvest(lea.cookie)
 
     nextMonday(vi)
     const harvest = await game.harvest(lea.cookie)
 
     // Une semaine neuve : trois défis à choisir, et rien gagné pour l'ancien.
     expect(harvest.personalChallenge.state).toBe('choose')
-    expect(harvest.honey).toBe(0)
+    expect(harvest.honey).toBe(before.honey)
   })
 })
 
