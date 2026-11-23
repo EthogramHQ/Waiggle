@@ -219,12 +219,12 @@ export const fr = {
           // « probables » : à faire valider par un professionnel.
           data: {
             title: 'Ce qui est gardé, et pourquoi',
-            body: 'Sauf mention contraire, la base est le contrat : les règles que tu acceptes pour utiliser {{appName}}.\n\n- **Ton compte** : ton nom affiché, ton adresse e‑mail, ta langue, ton mot de passe (seulement son empreinte, jamais le mot de passe lui-même). Pour te connecter et t’écrire. Les membres connectés voient ton nom ; tout le monde, sur tes projets et ta page publics. Personne ne voit ton adresse.\n- **Ton profil** : ton pseudo, ta bio, ta photo et tes outils favoris. Vus des membres connectés. Ta page publique, de tout le monde, avec ce que tu y coches ; ton nom et ta photo accompagnent aussi tes projets publics. La photo est recadrée et nettoyée de ses informations cachées.\n- **Tes projets et leurs mises à jour** : textes, prompts, photos, liens des démos, catégories. Vus des personnes que tu choisis : tous les membres connectés, une ruche, toi seul, ou tout le monde quand il est public.\n- **Ce qui est public** : un projet ou une page publics sont lus et copiés par les moteurs de recherche, y compris ceux des assistants d’IA, qui peuvent les citer ou les résumer. Après un retour en arrière, ils les montrent jusqu’à leur prochain passage ; tu peux aussi leur demander de retirer leur copie. {{appName}} demande aux robots qui collectent pour entraîner des IA de ne pas lire le site ; certains ne respectent pas cette demande. Base : ton choix, que tu peux retirer à tout moment.\n- **Les réactions et les abonnements** : qui réagit ou suit quoi. Les autres ne voient que des nombres.\n- **Les commentaires et les mentions** : le texte, la date, qui est mentionné. Vus de ceux qui voient le projet ; la mention, de la personne mentionnée.\n- **Le fil et les suggestions** : la date de ta dernière lecture du fil, les suggestions que tu as écartées, ton choix « Ne pas me proposer aux autres ». Vus de toi seul.\n- **La recherche** : rien n’est gardé de ce que tu cherches.\n- **Les testeurs** : ton inscription comme testeur, tes retours, tes messages et leurs captures. Vus de l’auteur du projet et de toi ; dans les commentaires du projet, un badge « Testeur » s’affiche à côté de ton nom. Un message signalé, et sa capture, est lu par la modération, jamais le reste du fil.\n- **Les ruches** : les ruches dont tu fais partie, qui t’a invité, les invitations. Vues des membres de chaque ruche.\n- **Les notifications et les e‑mails** : ce qui t’est arrivé, tes choix d’e‑mails, les dates d’envoi. Vus de toi seul.\n- **Les signalements et la modération** : qui signale, le motif, une copie des textes signalés, les décisions et les suspensions. Vus des administrateurs ; la personne visée reçoit la décision, jamais le nom de qui a signalé. Base : l’intérêt légitime de protéger les membres, et la loi pour un contenu illicite.\n- **Les signalements sans compte** : la cible, le motif, la précision, l’adresse e‑mail si elle est donnée, pour l’accusé de réception et la décision, et l’adresse IP pour la limite de 5 par jour. Vus des administrateurs. Base : la loi (règlement sur les services numériques).\n- **Le blocage** : les membres que tu as bloqués. La personne bloquée n’est pas prévenue.\n- **La sécurité du compte** : tes sessions de connexion (avec l’adresse IP et le navigateur de leur création), les liens envoyés par e‑mail, des compteurs contre les abus. Vus de personne. Base : l’intérêt légitime de protéger les comptes.\n- **Les visites sans compte** : pour lire les pages publiques, un compteur par réseau (adresse IP), gardé en mémoire du serveur, jamais écrit ; pour un signalement, un compteur par adresse IP et un par empreinte de l’adresse e‑mail. Vus de personne. Base : l’intérêt légitime de protéger le service.\n- **Les règles acceptées** : la version, la date, et ta déclaration d’avoir 15 ans ou plus, jamais ta date de naissance. Pour prouver ton accord.\n- **La date de ta dernière visite** : pour supprimer un compte inactif depuis 3 ans.',
+            body: 'Sauf mention contraire, la base est le contrat : les règles que tu acceptes pour utiliser {{appName}}.\n\n- **Ton compte** : ton nom affiché, ton adresse e‑mail, ta langue, ton mot de passe (seulement son empreinte, jamais le mot de passe lui-même). Pour te connecter et t’écrire. Les membres connectés voient ton nom ; tout le monde, sur tes projets et ta page publics. Personne ne voit ton adresse.\n- **Ton profil** : ton pseudo, ta bio, ta photo et tes outils favoris. Vus des membres connectés. Ta page publique, de tout le monde, avec ce que tu y coches ; ton nom et ta photo accompagnent aussi tes projets publics. La photo est recadrée et nettoyée de ses informations cachées.\n- **Tes projets et leurs mises à jour** : textes, prompts, photos, liens des démos, catégories. Vus des personnes que tu choisis : tous les membres connectés, une ruche, toi seul, ou tout le monde quand il est public.\n- **Ce qui est public** : un projet ou une page publics sont lus et copiés par les moteurs de recherche, y compris ceux des assistants d’IA, qui peuvent les citer ou les résumer. Après un retour en arrière, ils les montrent jusqu’à leur prochain passage ; tu peux aussi leur demander de retirer leur copie. {{appName}} demande aux robots qui collectent pour entraîner des IA de ne pas lire le site ; certains ne respectent pas cette demande. Base : ton choix, que tu peux retirer à tout moment.\n- **Les réactions et les abonnements** : qui réagit ou suit quoi. Les autres ne voient que des nombres.\n- **Les commentaires et les mentions** : le texte, la date, qui est mentionné. Vus de ceux qui voient le projet ; la mention, de la personne mentionnée.\n- **Le fil et les suggestions** : la date de ta dernière lecture du fil, les suggestions que tu as écartées, ton choix « Ne pas me proposer aux autres ». Vus de toi seul.\n- **La recherche** : rien n’est gardé de ce que tu cherches.\n- **Les testeurs** : ton inscription comme testeur, tes retours, tes messages et leurs captures. Vus de l’auteur du projet et de toi ; dans les commentaires du projet, un badge « Testeur » s’affiche à côté de ton nom. Un message signalé, et sa capture, est lu par la modération, jamais le reste du fil.\n- **Les ruches** : les ruches dont tu fais partie, qui t’a invité, les invitations. Vues des membres de chaque ruche.\n- **Ta récolte** : le pollen de chacun de tes gestes (le geste, la date, la chose concernée), ton niveau, ton titre, tes sceaux, ton miel, tes défis et tes réglages. Pour compter tes encouragements et te les montrer. La ligne d’un geste reste quand tu le retires, pour ne pas le compter deux fois ; un contenu retiré par la modération perd son pollen. Ton niveau, ton titre, ton rayon et tes sceaux sont vus des membres connectés ; ton miel, tes défis et tes réglages, de toi seul. Ton pollen de la semaine est vu des membres qui te suivent et des membres de tes ruches, dans les classements, sauf si tu t’en retires dans Réglages, « Classements ». Base des classements : l’intérêt légitime d’encourager les échanges entre proches.\n- **Les notifications et les e‑mails** : ce qui t’est arrivé, tes choix d’e‑mails, les dates d’envoi. Vus de toi seul.\n- **Les signalements et la modération** : qui signale, le motif, une copie des textes signalés, les décisions et les suspensions. Vus des administrateurs ; la personne visée reçoit la décision, jamais le nom de qui a signalé. Base : l’intérêt légitime de protéger les membres, et la loi pour un contenu illicite.\n- **Les signalements sans compte** : la cible, le motif, la précision, l’adresse e‑mail si elle est donnée, pour l’accusé de réception et la décision, et l’adresse IP pour la limite de 5 par jour. Vus des administrateurs. Base : la loi (règlement sur les services numériques).\n- **Le blocage** : les membres que tu as bloqués. La personne bloquée n’est pas prévenue.\n- **La sécurité du compte** : tes sessions de connexion (avec l’adresse IP et le navigateur de leur création), les liens envoyés par e‑mail, des compteurs contre les abus. Vus de personne. Base : l’intérêt légitime de protéger les comptes.\n- **Les visites sans compte** : pour lire les pages publiques, un compteur par réseau (adresse IP), gardé en mémoire du serveur, jamais écrit ; pour un signalement, un compteur par adresse IP et un par empreinte de l’adresse e‑mail. Vus de personne. Base : l’intérêt légitime de protéger le service.\n- **Les règles acceptées** : la version, la date, et ta déclaration d’avoir 15 ans ou plus, jamais ta date de naissance. Pour prouver ton accord.\n- **La date de ta dernière visite** : pour supprimer un compte inactif depuis 3 ans.',
           },
           // Choix 9 du scénario : toutes les durées, en liste, telles que le code les applique.
           retention: {
             title: 'Combien de temps',
-            body: '- **Ton compte et ce que tu publies** : tant que ton compte existe, ou jusqu’à ce que tu les supprimes.\n- **Un compte sans visite** : supprimé après 3 ans, avec un e‑mail un mois avant.\n- **Une inscription dont l’adresse n’est jamais vérifiée** : 30 jours.\n- **Une session de connexion** : 7 jours après sa dernière utilisation, effacée sous 8 jours. Une session qui sert chaque jour garde l’adresse IP de sa création.\n- **Les liens envoyés par e‑mail** (vérification, mot de passe, adresse) : valables 1 heure, effacés sous 25 heures.\n- **Les compteurs contre les abus** : moins de 49 heures. Certains gardent une adresse IP. Ceux de la lecture des pages publiques, en mémoire seulement : 10 minutes.\n- **Ton ancien pseudo** : réservé 30 jours.\n- **Une photo ajoutée mais jamais publiée** : 24 heures, effacée sous 48 heures.\n- **Une invitation dans une ruche** : 30 jours, refusée ou non.\n- **Les avis de l’appli sur tes outils, tes ruches et la vitrine** : 90 jours.\n- **Un outil « Autre » écarté, et le journal du catalogue** : 1 an.\n- **Un signalement** : jusqu’à la décision ; 30 jours s’il est sans objet ; 1 an après la décision s’il est traité.\n- **L’adresse e‑mail donnée avec un signalement sans compte** : jusqu’à la clôture du signalement, décidé ou sans objet.\n- **La place d’un projet dans la vitrine** : tant que le projet reste public et que ni toi ni l’éditeur ne l’en retirez.\n- **Une décision de modération** : 1 an après la dernière décision sur le même contenu, et tant que le contenu reste retiré.\n- **Une suspension** : 1 an après sa fin ; sans fin, tant que le compte existe.\n- **Les sauvegardes du serveur** : 14 jours ; 30 jours au plus pour une sauvegarde faite avant une opération.\n- **La copie hebdomadaire de l’hébergeur** : [durée de la copie de l’hébergeur].\n- **Les journaux de l’appli et de la base** : 50 Mo au plus, les plus anciens effacés d’abord ; ceux de l’appli partent aussi à chaque mise à jour. Ils ne gardent ni adresse ni nom.\n- **Le journal du système du serveur** (connexions des administrateurs) : 6 mois.\n- **Un e‑mail envoyé à {{contactEmail}}** : 1 an après la réponse.\n- **Les extraits lus par l’assistant de code** : 30 jours chez Anthropic, sauf les exceptions de sa politique.',
+            body: '- **Ton compte et ce que tu publies** : tant que ton compte existe, ou jusqu’à ce que tu les supprimes.\n- **Ta récolte** : tant que ton compte existe ; le lien avec l’autre membre d’un geste, et les défis, jusqu’à la fin de la semaine qui suit.\n- **Un compte sans visite** : supprimé après 3 ans, avec un e‑mail un mois avant.\n- **Une inscription dont l’adresse n’est jamais vérifiée** : 30 jours.\n- **Une session de connexion** : 7 jours après sa dernière utilisation, effacée sous 8 jours. Une session qui sert chaque jour garde l’adresse IP de sa création.\n- **Les liens envoyés par e‑mail** (vérification, mot de passe, adresse) : valables 1 heure, effacés sous 25 heures.\n- **Les compteurs contre les abus** : moins de 49 heures. Certains gardent une adresse IP. Ceux de la lecture des pages publiques, en mémoire seulement : 10 minutes.\n- **Ton ancien pseudo** : réservé 30 jours.\n- **Une photo ajoutée mais jamais publiée** : 24 heures, effacée sous 48 heures.\n- **Une invitation dans une ruche** : 30 jours, refusée ou non.\n- **Les avis de l’appli sur tes outils, tes ruches, la vitrine et ta récolte** : 90 jours.\n- **Un outil « Autre » écarté, et le journal du catalogue** : 1 an.\n- **Un signalement** : jusqu’à la décision ; 30 jours s’il est sans objet ; 1 an après la décision s’il est traité.\n- **L’adresse e‑mail donnée avec un signalement sans compte** : jusqu’à la clôture du signalement, décidé ou sans objet.\n- **La place d’un projet dans la vitrine** : tant que le projet reste public et que ni toi ni l’éditeur ne l’en retirez.\n- **Une décision de modération** : 1 an après la dernière décision sur le même contenu, et tant que le contenu reste retiré.\n- **Une suspension** : 1 an après sa fin ; sans fin, tant que le compte existe.\n- **Les sauvegardes du serveur** : 14 jours ; 30 jours au plus pour une sauvegarde faite avant une opération.\n- **La copie hebdomadaire de l’hébergeur** : [durée de la copie de l’hébergeur].\n- **Les journaux de l’appli et de la base** : 50 Mo au plus, les plus anciens effacés d’abord ; ceux de l’appli partent aussi à chaque mise à jour. Ils ne gardent ni adresse ni nom.\n- **Le journal du système du serveur** (connexions des administrateurs) : 6 mois.\n- **Un e‑mail envoyé à {{contactEmail}}** : 1 an après la réponse.\n- **Les extraits lus par l’assistant de code** : 30 jours chez Anthropic, sauf les exceptions de sa politique.',
           },
           device: {
             title: 'Sur ton appareil',
@@ -249,7 +249,7 @@ export const fr = {
           },
           rights: {
             title: 'Tes droits',
-            body: 'Tu as le droit d’accéder à tes données, de les corriger, de les effacer, de t’opposer à un traitement, d’en demander la limitation, et de les emporter.\n\nDepuis l’appli :\n\n- **télécharger tes données** : Réglages, « Mes données » ;\n- **les corriger** : « Mon profil », et ton adresse dans Réglages, « Compte » ;\n- **les effacer** : chaque contenu depuis sa page, tes commentaires depuis « Mes commentaires », tes retours de testeur depuis « Mes retours envoyés », ou tout ton compte ;\n- **t’opposer** : « Ne pas me proposer aux autres », et le choix de tes e‑mails dans Réglages, « Notifications ».\n\nPar e‑mail, à {{contactEmail}} : écris depuis l’adresse de ton compte, pour que nous sachions que c’est bien toi. Sans compte, après un signalement : depuis l’adresse donnée. Nous répondons sous un mois ; si la demande est complexe, ce délai peut passer à trois mois, et nous te le disons.\n\nTu peux aussi saisir la CNIL : [cnil.fr](https://www.cnil.fr/fr/plaintes).',
+            body: 'Tu as le droit d’accéder à tes données, de les corriger, de les effacer, de t’opposer à un traitement, d’en demander la limitation, et de les emporter.\n\nDepuis l’appli :\n\n- **télécharger tes données** : Réglages, « Mes données » ;\n- **les corriger** : « Mon profil », et ton adresse dans Réglages, « Compte » ;\n- **les effacer** : chaque contenu depuis sa page, tes commentaires depuis « Mes commentaires », tes retours de testeur depuis « Mes retours envoyés », ou tout ton compte ;\n- **t’opposer** : « Ne pas me proposer aux autres », « Apparaître dans les classements », et le choix de tes e‑mails dans Réglages, « Notifications ».\n\nPar e‑mail, à {{contactEmail}} : écris depuis l’adresse de ton compte, pour que nous sachions que c’est bien toi. Sans compte, après un signalement : depuis l’adresse donnée. Nous répondons sous un mois ; si la demande est complexe, ce délai peut passer à trois mois, et nous te le disons.\n\nTu peux aussi saisir la CNIL : [cnil.fr](https://www.cnil.fr/fr/plaintes).',
           },
         },
       },
@@ -3808,6 +3808,283 @@ export const fr = {
         'La modération a annulé le retrait de ton nom. L’ancien ne peut pas revenir : tu gardes celui que tu as choisi, que tu peux changer dans ton profil.',
     },
     team: 'L’équipe de {{appName}}',
+    // R19 (planche R19-Activite) : les avis de la récolte, dans l'Activité seulement (jamais
+    // d'e-mail immédiat ni de notification poussée), coupés par le réglage « Ma récolte ».
+    gameLevel: 'Tu passes au niveau {{level}}',
+    gameSeal: 'Nouveau sceau : <b>{{seal}}</b>',
+    // Le nom de la ruche se lit à l'affichage (relecture juridique du plan, J2) : retiré par la
+    // modération, la ligne ne le nomme plus.
+    gameHiveChallenge: 'La ruche <b>{{hive}}</b> a réussi son défi',
+    gameHiveChallengeUnnamed: 'Une de tes ruches a réussi son défi',
+    // La seconde ligne, pour qui y a participé ; les autres lisent le défi seul, sans le dire.
+    gameHiveChallengeHoney: '{{challenge}} · +{{honey}} miel',
+    gameHoneyGift: '<b>{{name}}</b> t’a offert du miel pour <b>{{title}}</b>',
+    // Relecture juridique du plan (J1) : une fois par compte. « Les membres qui te suivent » : le
+    // classement des proches liste ceux qu'on suit (décision de Louis du 23/11/2026).
+    gameIntro:
+      'Nouveau : ta récolte. Tes gestes rapportent du pollen ; ton niveau, ton titre et tes sceaux se voient sur ton profil. Ton pollen de la semaine paraît dans les classements des membres qui te suivent et de tes ruches ; tu peux t’en retirer dans Réglages, « Classements ».',
+  },
+  // R19 (scénario « La gamification », planches R19-* validées par Louis le 23/11/2026) : la
+  // récolte d'un membre. Les titres ont deux formes en français (_f par défaut, _m au choix du
+  // réglage « Forme ») ; en anglais, les deux clés portent la même forme. Rien ne culpabilise :
+  // jamais « 0 », jamais « tu vas perdre », et aucune phrase ne promet que le pollen « ne baisse
+  // jamais » sans l'exception de la modération (relecture juridique du plan, J5). Le pollen et le
+  // miel ne prennent pas de « s » : « 85 pollen », « 35 miel ».
+  game: {
+    titles: {
+      forager_f: 'Butineuse',
+      forager_m: 'Butineur',
+      builder_f: 'Bâtisseuse',
+      builder_m: 'Bâtisseur',
+      keeper_f: 'Gardienne',
+      keeper_m: 'Gardien',
+      dancer_f: 'Danseuse',
+      dancer_m: 'Danseur',
+      // Réservé aux Éclaireuses (R20) : jamais attribué en R19.
+      scout_f: 'Éclaireuse',
+      scout_m: 'Éclaireur',
+    },
+    // Option a15 des planches : sur « Ma récolte », les familles se nomment par leurs gestes ; les
+    // titres restent au profil. Bâtisseuse compte aussi ce qui est reçu sur ses projets.
+    families: {
+      forager: 'Commentaires et réactions',
+      builder: 'Mes projets',
+      keeper: 'Tests et retours',
+      dancer: 'Ruches et invitations',
+    },
+    // Le panneau du niveau (HarvestPanel), sur le profil et « Ma récolte » ; « Niveau 5 » est aussi
+    // l'annonce polie du passage de niveau.
+    level: 'Niveau {{level}}',
+    toNext: '{{count}} pollen avant le niveau {{next}}',
+    honey: '{{amount}} miel',
+    // Option a10 : jusqu'à la visite suivante, sans félicitation.
+    new: 'Nouveau',
+    weeks_one: '{{count}} semaine butinée',
+    weeks_other: '{{count}} semaines butinées',
+    hibernating: 'La série hiverne',
+    // Option a11 : un nouveau membre, à la place de la série.
+    newcomer: 'Tester, commenter, encourager un proche : chaque geste rapporte du pollen.',
+    // Le rayon (HoneyComb), une barre de progression : son nom, et la valeur lue sur la page d'un
+    // proche, qui ne montre pas la phrase de pollen (option a5).
+    comb: {
+      mine: 'Mon rayon',
+      theirs: 'Son rayon',
+      cells_one: '{{count}} alvéole sur 10 vers le niveau {{next}}',
+      cells_other: '{{count}} alvéoles sur 10 vers le niveau {{next}}',
+    },
+    // La pastille près du bouton du geste (cachée au lecteur d'écran), puis son annonce polie.
+    gain: '+{{amount}} pollen',
+    gained_one: '{{count}} pollen gagné.',
+    gained_other: '{{count}} pollen gagnés.',
+    // La page « Ma récolte », rubriques dans l'ordre de la planche R19-Recolte.
+    harvest: {
+      title: 'Ma récolte',
+      loadError: 'Ta récolte n’a pas pu se charger.',
+      week: {
+        title: 'Cette semaine',
+        foraged: 'Semaine butinée',
+        total: '{{amount}} pollen',
+        // Le nom lu d'une barre de FamilyBars.
+        family: '{{family}}, {{amount}} pollen',
+        // J5 : un contenu retiré par la modération reprend son pollen, le niveau peut donc baisser.
+        help: 'Le pollen fait monter de niveau. Il ne se perd pas, sauf celui d’un contenu retiré par la modération.',
+      },
+      // Le défi perso : choisi toute la semaine (Louis, 23/11) ; la puce dit le miel, sans aide qui
+      // le redise (relecture d'interface du plan, UI-5).
+      challenge: {
+        title: 'Mon défi',
+        chooseTitle: 'Choisis ton défi',
+        price: '{{amount}} miel',
+        reward: '+{{amount}} miel',
+        confirm: 'Choisir ce défi',
+        skip: 'Pas cette semaine',
+        none: 'Pas de défi cette semaine.',
+        chooseAgain: 'Choisir un défi',
+        progress: '{{progress}} sur {{target}}',
+        done: 'Défi réussi',
+        error: 'Ce choix n’a pas pu s’enregistrer. Réessaie.',
+      },
+      hives: 'Défis de mes ruches',
+      rankings: {
+        title: 'Classement de la semaine',
+        open: 'Voir le classement',
+        // Option b6 : retiré, la phrase remplace la rubrique, et « Changer ce choix » mène aux réglages.
+        off: 'Tu as choisi de ne pas apparaître dans les classements : tu ne les vois pas non plus. Ton pollen et ton niveau restent.',
+        change: 'Changer ce choix',
+      },
+      honey: {
+        title: 'Mon miel',
+        help: '5 par semaine butinée, 10 par défi réussi.',
+        offer: 'Offrir du miel',
+        offerHint: '5 miel, au projet d’un proche',
+        decorate: 'Décorer mon rayon',
+        decorateHint: 'Une teinte, un motif de cire',
+      },
+      seals: {
+        mine: 'Mes sceaux · {{count}}',
+        theirs: 'Ses sceaux · {{count}}',
+        // Option a4 : pas de vitrine des sceaux manquants, une ligne sobre.
+        more: 'D’autres sceaux restent à découvrir.',
+        earned: 'Gagné le {{date}}',
+      },
+    },
+    // Les défis, par leur code (packages/contracts/src/game.ts).
+    challenges: {
+      personal: {
+        feedback: 'Fais un retour sur un projet',
+        update: 'Publie une mise à jour',
+        test: 'Teste le projet d’un proche',
+        comment_3: 'Commente 3 projets de tes proches',
+        react_5: 'Réagis à 5 projets',
+      },
+      hive: {
+        feedback_5: '5 retours entre vous',
+        updates_3: '3 mises à jour entre vous',
+        tested_3: '3 projets testés entre vous',
+        reactions_10: '10 réactions entre vous',
+        comments_5: '5 commentaires entre vous',
+      },
+      // La carte de la page d'une ruche (titre de niveau 2), qui ne dit jamais qui n'a rien fait.
+      hiveTitle: 'Défi de la semaine',
+    },
+    // Les sceaux, par leur code. Noms neutres (Louis, 23/11) : « Cuisine explorée », jamais
+    // « Exploratrice ». Un sceau de catégorie par catégorie de départ, « Autre » exclue ; une
+    // catégorie créée ensuite par un administrateur prend `categoryOther`.
+    seals: {
+      first_project: 'Premier envol',
+      first_update: 'Première mise à jour',
+      first_feedback: 'Premier retour',
+      first_settled: 'Premier retour réglé',
+      tested_10: '10 projets testés',
+      feedback_10: '10 retours',
+      first_hive: 'Première ruche',
+      hive_5: 'Ruche de 5',
+      invitations_5: '5 invitations acceptées',
+      weeks_10: '10 semaines butinées',
+      weeks_25: '25 semaines butinées',
+      category: {
+        'home-garden': 'Jardin exploré',
+        cooking: 'Cuisine explorée',
+        family: 'Familles explorées',
+        learning: 'Savoir exploré',
+        games: 'Jeux explorés',
+        art: 'Arts explorés',
+        music: 'Musique explorée',
+        'photo-video': 'Image explorée',
+        'health-sport': 'Sport et santé explorés',
+        travel: 'Voyages explorés',
+        money: 'Budgets explorés',
+        work: 'Travail exploré',
+        code: 'Code exploré',
+        animals: 'Animaux explorés',
+        science: 'Sciences explorées',
+      },
+      categoryOther: 'Catégorie explorée : {{category}}',
+    },
+    // La page du classement (planche R19-Classement).
+    rankings: {
+      title: 'Classement de la semaine',
+      // Le nom du menu quand il y a plus de 3 ruches.
+      scope: 'Classement',
+      close: 'Proches',
+      // Seuls les trois premiers ont leur rang (option b4), à l'œil comme au lecteur d'écran.
+      rank: { first: '1er', second: '2e', third: '3e' },
+      row: '{{name}}, {{amount}} pollen',
+      rowRanked: '{{rank}}, {{name}}, {{amount}} pollen',
+      // « toi » n'existe que pour le lecteur d'écran.
+      you: '{{name}}, toi',
+      pollen: '{{amount}} pollen',
+      footnote: 'Seuls ceux qui ont gagné du pollen cette semaine y figurent. Tout repart lundi.',
+      empty: 'La semaine commence. Le classement se remplit au premier pollen.',
+      loadError: 'Le classement n’a pas pu se charger.',
+    },
+    // La feuille « Décorer mon rayon » (planche R19-Miel) : un achat vaut pour toujours.
+    decoration: {
+      title: 'Décorer mon rayon',
+      preview: 'Aperçu',
+      tint: 'Teinte',
+      pattern: 'Motif',
+      tints: { honey: 'Miel', amber: 'Ambre', pollen: 'Pollen' },
+      patterns: { smooth: 'Lisse', waffle: 'Gaufré', striped: 'Rayé', dotted: 'Pointillé' },
+      owned: 'À toi',
+      price: '{{amount}} miel',
+      balance: 'Ton miel : {{amount}}',
+      buy: 'Décorer pour {{amount}} miel',
+      // Rien à acheter : le choix parmi ce qu'on a déjà.
+      apply: 'Décorer',
+      done: 'Rayon décoré.',
+      error: 'La décoration n’a pas pu s’enregistrer. Réessaie.',
+    },
+    // Offrir du miel au projet d'un autre membre, une fois par projet (Louis, 23/11).
+    offer: {
+      button: 'Offrir du miel',
+      given: 'Miel offert',
+      title: 'Offrir du miel à {{title}}',
+      notice: '{{author}} verra « {{name}} t’a offert du miel » dans son Activité.',
+      balance: 'Ton miel : {{balance}}. Il t’en restera {{after}}.',
+      confirm: 'Offrir {{amount}} miel',
+      toast: 'Miel offert. Il te reste {{amount}} miel.',
+      error: 'Le miel n’a pas pu être offert. Réessaie.',
+    },
+    // Option b9 : le solde court, à l'offre comme à la décoration, sans rouge ni reproche.
+    short: {
+      body: 'Il faut {{needed}} miel ; tu en as {{balance}}.',
+      how: 'Chaque semaine butinée en rapporte 5, chaque défi réussi 10.',
+    },
+    // Sur ordinateur, la ligne en tête de la colonne du Fil, lien vers « Ma récolte » (option b16).
+    side: {
+      title: 'Ta semaine',
+      active: '{{amount}} pollen · défi {{progress}} sur {{target}}',
+      done: '{{amount}} pollen · défi réussi',
+      pollen: '{{amount}} pollen',
+      challenge: 'Défi {{progress}} sur {{target}}',
+      // Le lundi avant le premier pollen : jamais « 0 pollen ».
+      monday: 'Nouveaux défis',
+      empty: 'Ma récolte',
+    },
+    // Réglages (planche R19-Reglages) : « Classements » sous Apparence, « Ma récolte » en tête des
+    // Notifications, « Mon titre » et « Forme » dans Mon profil (« Forme » absente en anglais).
+    settings: {
+      rankings: 'Classements',
+      inRankings: 'Apparaître dans les classements',
+      inRankingsHint:
+        'Coupé, tu ne vois plus les classements et tu n’y apparais plus. Ton pollen et ton niveau restent.',
+      notices: 'Ma récolte',
+      noticesHint: 'Niveaux, sceaux, défis et miel offert, dans l’Activité et le récap',
+      title: 'Mon titre',
+      titleAuto: 'Selon mes gestes',
+      titleHint: 'Celui des 4 dernières semaines : aujourd’hui, {{title}}.',
+      // Un membre sans famille encore : pas de titre à citer.
+      titleNone: 'Ton titre viendra avec tes premiers gestes.',
+      form: 'Forme',
+      saveError: 'Ce choix n’a pas pu s’enregistrer. Réessaie.',
+    },
+    // Le récap du dimanche (planche R19-Recap) : le bloc « Ta semaine » après « Tes projets »,
+    // seulement s'il y a quelque chose à dire, jamais « 0 pollen » ; les défis sous « Dans tes ruches ».
+    recap: {
+      lead: 'Ta semaine :',
+      pollen: '+{{amount}} pollen.',
+      pollenDone: '+{{amount}} pollen, défi réussi.',
+      newChallenges: 'Nouveaux défis lundi.',
+      button: 'Voir ma récolte',
+      hive: 'Défi de la semaine : {{challenge}}, {{progress}} sur {{target}}.',
+      // Un défi neuf, sans avancée : jamais « 0 sur 5 » (option a14).
+      hiveNew: 'Défi de la semaine : {{challenge}}.',
+      hiveDone: 'Défi de la semaine réussi : {{challenge}}.',
+      // J1 : une seule fois, dans le premier récap qui porte « Ta semaine ».
+      news: 'Nouveau : ta récolte. Tes gestes rapportent du pollen ; ton niveau, ton titre et tes sceaux se voient sur ton profil. Ton pollen de la semaine paraît dans les classements des membres qui te suivent et de tes ruches ; tu peux t’en retirer dans Réglages, « Classements ».',
+      reason: 'Ta semaine et les défis suivent ton réglage « Ma récolte ».',
+    },
+    // Relecture juridique du plan (B2) : les phrases « proches » de la colonne « Ce que tu reçois
+    // par e-mail » (notifications.summary), quand « Ma récolte » est allumé.
+    emailSummary: {
+      nothingFriends:
+        'Aucun e‑mail pour tes notifications ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches et ta récolte de la semaine.',
+      nowFriends:
+        '{{types}} tout de suite ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches et ta récolte de la semaine.',
+      nowFriendsHives:
+        '{{types}} tout de suite ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches, les nouveautés de tes ruches et ta récolte de la semaine.',
+    },
   },
   errors: {
     notFound: 'Cette page n’existe pas.',
@@ -3892,6 +4169,14 @@ export const fr = {
     // R12 (relecture juridique du plan) : la mise en avant d'un projet que son auteur a retiré de
     // l'accueil (`author_declined`).
     authorDeclined: 'L’auteur a retiré ce projet de l’accueil.',
+    // Tranche R19 (la récolte) : sans reproche, comme la feuille du solde court.
+    honeyShort: 'Il manque un peu de miel pour ça.',
+    honeyAlready: 'Tu as déjà offert du miel à ce projet.',
+    rankingsOff:
+      'Tu as choisi de ne pas apparaître dans les classements : tu ne les vois pas non plus.',
+    invalidChallenge: 'Ce défi ne peut pas être choisi cette semaine.',
+    invalidLevelSeen: 'Ce niveau n’est pas encore atteint.',
+    familyNotObtained: 'Ce titre n’est pas encore à toi : choisis-en un que tu as déjà obtenu.',
     rulesRequired: 'Accepte d’abord les règles de {{appName}} : cette action attend ton accord.',
   },
 } as const
