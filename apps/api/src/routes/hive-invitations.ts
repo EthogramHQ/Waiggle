@@ -31,6 +31,7 @@ import { sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { pollenResponseHeaders, setPollen } from '../game/award'
 import { loadInvitable } from '../hives/invitable'
 import { acceptInvitation, inviteToHive, refuseInvitation } from '../hives/invitations'
 import { hiveSummariesOf, membershipOf } from '../hives/load'
@@ -118,6 +119,8 @@ const acceptRoute = createRoute({
     200: {
       description: 'The hive joined.',
       content: { 'application/json': { schema: HiveSummary } },
+      // R19 : le pollen que l'invité vient de gagner (game/award.ts).
+      headers: pollenResponseHeaders,
     },
     401: errorResponse('Not signed in.'),
     404: noInvitation,
@@ -271,6 +274,8 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const [summary] = await hiveSummariesOf(db, viewer.id, [outcome.hiveId], publicApiUrl, now)
     // Parti juste après être entré (un autre appareil) : la ruche n'est plus la sienne.
     if (!summary) return notFound(c)
+    // Après la transaction : le pollen est écrit, l'en-tête peut le dire (R19).
+    setPollen(c, outcome.pollen)
     return c.json(HiveSummary.parse(summary), 200)
   })
 

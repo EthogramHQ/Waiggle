@@ -28,6 +28,7 @@ import { commentsOfAuthor } from '../comments/load'
 import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
 import { readFeedReadAt } from '../feed/state'
+import { award, pollenResponseHeaders, setPollen } from '../game/award'
 import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
 import { hiveExportOf } from '../hives/export'
@@ -78,6 +79,8 @@ const handleRule: RateRule = { windowMs: 24 * HOUR, max: HANDLE_CHANGES_PER_DAY 
 const exportRule: RateRule = { windowMs: HOUR, max: 30 }
 
 const meResponse = { description: 'The profile.', content: { 'application/json': { schema: Me } } }
+// R19 : une photo, une bio ou un premier outil rapportent du pollen, dit par l'en-tête du geste.
+const meWithPollen = { ...meResponse, headers: pollenResponseHeaders }
 
 const meRoute = createRoute({
   method: 'get',
@@ -97,7 +100,7 @@ const updateMeRoute = createRoute({
     body: { required: true, content: { 'application/json': { schema: ProfileUpdate } } },
   },
   responses: {
-    200: meResponse,
+    200: meWithPollen,
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
     403: errorResponse(
@@ -117,7 +120,7 @@ const avatarRoute = createRoute({
     'multipart/form-data with an "avatar" file (JPEG, PNG or WebP, 5 MB at most). ' +
     'The image is re-encoded to a 512 px WebP square without metadata.',
   responses: {
-    200: meResponse,
+    200: meWithPollen,
     400: errorResponse('No file.'),
     401: errorResponse('Not signed in.'),
     413: errorResponse('File too large.'),
@@ -300,6 +303,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const toolsRetry = await chargeOtherTools(limiter, user.id, counted)
     if (toolsRetry !== null) return tooMany(c, toolsRetry, 'too_many_other_tools')
     let createdHere = 0
+    let pollen = 0 // R19 : le pollen du profil gagné par cette demande, pour l'en-tête.
 
     // Tout le profil s'écrit dans une seule transaction : si le pseudo est pris, claimHandle lève
     // HandleTakenError, la transaction est annulée, et rien de la demande n'est enregistré.
@@ -346,6 +350,26 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           // R9 (P5) : une nouvelle bio ou de nouveaux outils, non vides, remplacent ceux que la
           // modération avait retirés ; leur marque s'efface (moderation/replaced.ts).
           await dropProfilePartRemovals(tx, user.id, replacedProfileParts({ bio, favoriteTools }))
+          // R19 : une bio non vide et un premier outil rapportent 10 pollen chacun, une seule fois
+          // (clés `bio` et `tool` du profil) : vider sa bio puis la réécrire ne paie plus.
+          const now = new Date()
+          const profilePollen = { sourceKind: 'profile', sourceId: user.id, now } as const
+          if (bio !== undefined && bio.trim() !== '') {
+            pollen += await award(tx, {
+              ...profilePollen,
+              memberId: user.id,
+              gesture: 'profile_bio',
+              sourceKey: 'bio',
+            })
+          }
+          if (resolved && resolved.tools.length > 0) {
+            pollen += await award(tx, {
+              ...profilePollen,
+              memberId: user.id,
+              gesture: 'profile_tool',
+              sourceKey: 'tool',
+            })
+          }
         }
       })
     } catch (error) {
@@ -364,6 +388,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
+    setPollen(c, pollen)
     return c.json(me, 200)
   })
 
@@ -442,6 +467,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // sans lui, deux envois liraient le même « ancien » avatar et l'un des nouveaux fichiers
     // resterait orphelin (jamais effacé, même à la suppression du compte).
     let previousKey: string | null
+    let pollen = 0
     try {
       previousKey = await db.transaction(async (tx) => {
         // La ligne du profil doit exister pour pouvoir être verrouillée.
@@ -457,6 +483,16 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           .where(eq(schema.profile.userId, user.id))
         // R9 (P5) : une photo retirée par la modération est remplacée : sa marque s'efface, et le
         // fichier à effacer est celui qu'elle gardait (moderation/replaced.ts).
+        // R19 : une photo rapporte 10 pollen, une seule fois (clé `photo` du profil) : la changer
+        // ensuite, ou la supprimer puis en remettre une, ne paie plus.
+        pollen = await award(tx, {
+          memberId: user.id,
+          gesture: 'profile_photo',
+          sourceKind: 'profile',
+          sourceId: user.id,
+          sourceKey: 'photo',
+          now: new Date(),
+        })
         return row?.avatarKey ? releaseAvatarKey(tx, user.id, row.avatarKey) : null
       })
     } catch (error) {
@@ -467,6 +503,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
+    setPollen(c, pollen)
     return c.json(me, 200)
   })
 

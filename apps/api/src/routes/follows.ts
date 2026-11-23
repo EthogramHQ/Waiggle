@@ -2,6 +2,8 @@
 // /v1/projects/{id}/follow. Réservé aux membres connectés. La personne ou l'auteur suivi en est
 // prévenu par ses notifications (tranche 6b), par un nombre, jamais par un nom : la liste des
 // abonnés n'est lue nulle part.
+// R19 : suivre un membre ou un projet rapporte 3 pollen, une fois par chose suivie (ne plus suivre,
+// puis suivre de nouveau, ne paie plus) ; l'en-tête `Waiggle-Pollen` le dit à l'appli.
 import { createRoute, z } from '@hono/zod-openapi'
 import { MemberId, ProjectId } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -11,6 +13,7 @@ import { requireUser } from '../auth/session'
 import { notBlockedWith } from '../blocks/visibility'
 import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
+import { type AwardInput, award, pollenResponseHeaders, setPollen } from '../game/award'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
@@ -22,6 +25,8 @@ const followRule: RateRule = { windowMs: 60 * 60 * 1000, max: 120 }
 
 const params = z.object({ id: z.string() })
 const done = { description: 'Done (no content).' }
+// R19 : la réponse d'un suivi peut porter le pollen gagné (game/award.ts).
+const followed = { ...done, headers: pollenResponseHeaders }
 
 const followMemberRoute = createRoute({
   method: 'post',
@@ -29,7 +34,7 @@ const followMemberRoute = createRoute({
   summary: 'Follow a member',
   request: { params },
   responses: {
-    204: done,
+    204: followed,
     400: errorResponse('One cannot follow oneself.'),
     401: errorResponse('Not signed in.'),
     404: errorResponse('No such member, or an account whose email was never verified.'),
@@ -58,7 +63,7 @@ const followProjectRoute = createRoute({
   summary: 'Follow a project',
   request: { params },
   responses: {
-    204: done,
+    204: followed,
     400: errorResponse('One cannot follow one’s own project.'),
     401: errorResponse('Not signed in.'),
     404: errorResponse('No such project, or a private project of another member.'),
@@ -125,21 +130,29 @@ export const followRoutes = ({ db, limiter }: Deps) => {
    * suivre deux fois revient à suivre une fois. `returning` dit si une ligne a été écrite. Sinon,
    * deux raisons possibles, que l'on départage par une dernière lecture, sous le même verrou :
    * déjà suivi (c'est fait : 204), ou bloqués (404).
+   *
+   * R19 : un abonnement écrit rapporte son pollen dans la même transaction (`award`, qui prend le
+   * verrou de jeu des deux membres APRÈS celui de la paire : relecture de sécurité S1). Rend le
+   * pollen gagné (0 : déjà suivi, plafond du jour, chose déjà payée), ou null s'il y a un blocage.
    */
   const followUnlessBlocked = ({
     viewerId,
     otherMemberId,
     insert,
+    pollen,
   }: {
     viewerId: string
     otherMemberId: string
     insert: (now: SQL) => SQL
-  }): Promise<boolean> =>
+    /** Ce que le suivi rapporte : la chose suivie (membre ou projet), sans le membre ni l'heure. */
+    pollen: Pick<AwardInput, 'sourceKind' | 'sourceId' | 'sourceKey' | 'projectId'>
+  }): Promise<number | null> =>
     db.transaction(async (tx) => {
       await lockPair(tx, viewerId, otherMemberId)
       // La date passe par la colonne (sql.param), comme dans cursor.ts : jamais écrite dans le
       // texte SQL, et toujours en heure UTC.
-      const now = sql`${sql.param(new Date(), schema.memberFollow.createdAt)}::timestamp`
+      const date = new Date()
+      const now = sql`${sql.param(date, schema.memberFollow.createdAt)}::timestamp`
       const result = await tx.execute(
         sql`${insert(now)} where ${notBlockedWith(viewerId, sql`${otherMemberId}`)}
           on conflict do nothing returning follower_id`,
@@ -148,8 +161,19 @@ export const followRoutes = ({ db, limiter }: Deps) => {
       const { rows } = z
         .object({ rows: z.array(z.object({ follower_id: z.string() })) })
         .parse(result)
-      if (rows.length > 0) return true
-      return !(await blockedPair(tx, viewerId, otherMemberId))
+      if (rows.length > 0) {
+        // L'autre membre du geste (le suivi, ou l'auteur du projet) : s'il est un compte
+        // d'exemple, le suivi ne rapporte rien. Il ne reçoit rien lui-même (aucun « reçu » du
+        // suivi dans le tableau du scénario).
+        return award(tx, {
+          ...pollen,
+          memberId: viewerId,
+          gesture: 'follow',
+          counterpartId: otherMemberId,
+          now: date,
+        })
+      }
+      return (await blockedPair(tx, viewerId, otherMemberId)) ? null : 0
     })
 
   app.openapi(followMemberRoute, async (c) => {
@@ -183,13 +207,17 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     // La date vient de l'horloge de JavaScript, pas de la valeur par défaut de la base (now() en
     // SQL) : elle date la notification « de nouveaux abonnés » (tranche 6b), et les tests la
     // maîtrisent ainsi.
-    const followed = await followUnlessBlocked({
+    const pollen = await followUnlessBlocked({
       viewerId: viewer.id,
       otherMemberId: id,
       insert: (now) => sql`insert into ${schema.memberFollow} (follower_id, member_id, created_at)
         select ${viewer.id}, ${id}, ${now}`,
+      // La clé `member:<id>` : un membre suivi ne paie qu'une fois, même suivi de nouveau.
+      pollen: { sourceKind: 'member', sourceId: id, sourceKey: `member:${id}` },
     })
-    return followed ? ok(c) : notFound(c)
+    if (pollen === null) return notFound(c)
+    setPollen(c, pollen)
+    return ok(c)
   })
 
   app.openapi(unfollowMemberRoute, async (c) => {
@@ -229,13 +257,18 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     if (project.authorId === viewer.id) return ownThing(c)
 
     // Le verrou et le blocage portent sur la paire « moi et l'auteur du projet ».
-    const followed = await followUnlessBlocked({
+    const pollen = await followUnlessBlocked({
       viewerId: viewer.id,
       otherMemberId: project.authorId,
       insert: (now) => sql`insert into ${schema.projectFollow} (follower_id, project_id, created_at)
         select ${viewer.id}, ${id}::uuid, ${now}`,
+      // Source « project » : retirer ce projet ne reprend pas ce pollen (seulement la publication
+      // et ce que son auteur y a reçu, game/award.ts) ; le suivi reste un geste de qui suit.
+      pollen: { sourceKind: 'project', sourceId: id, sourceKey: `project:${id}`, projectId: id },
     })
-    return followed ? ok(c) : notFound(c)
+    if (pollen === null) return notFound(c)
+    setPollen(c, pollen)
+    return ok(c)
   })
 
   app.openapi(unfollowProjectRoute, async (c) => {

@@ -21,6 +21,7 @@ import { HIVE_LIMITS } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import { blockedPair, lockPair } from '../blocks/write'
+import { award } from '../game/award'
 import { invitationValidSince, joinedCountOf, memberCountOf, pendingInvitationsOf } from './load'
 import { lockHive, lockMemberHives } from './write'
 
@@ -100,7 +101,8 @@ export const inviteToHive = (
 // ─── Accepter ─────────────────────────────────────────────────────────────────────────────────────
 
 export type AcceptOutcome =
-  | { hiveId: string }
+  // `pollen` : ce que l'invité vient de gagner (R19, 15 ; 0 sinon), que la route met dans l'en-tête.
+  | { hiveId: string; pollen: number }
   | 'not_found'
   | 'invitation_expired'
   | 'hives_joined_limit'
@@ -113,6 +115,13 @@ export type AcceptOutcome =
  * l'invitation (une seconde acceptation ne la trouve plus), la ruche (supprimée entre-temps : 404),
  * et ses 20 ruches. Les 50 places ont été réservées par l'invitation ; on revérifie quand même que
  * la ruche n'est pas pleine (une ligne écrite hors de l'API ne doit pas la faire déborder).
+ *
+ * R19 : l'entrée rapporte 15 pollen à l'invité (`invitation_joined`) et 20 à qui l'a invité
+ * (`invitation_accepted`), cinq par jour chacun, dans la même transaction et sous le verrou de jeu
+ * des deux (pris par `award` après ceux de la ruche et de l'invitation : relecture S1). La source
+ * est l'invitation ; la clé, la ruche (et l'invité, pour l'invitant) : quitter la ruche puis y être
+ * invité de nouveau ne paie plus ni l'un ni l'autre. Un invité suspendu ne gagne rien ; l'invitant,
+ * oui (sa suspension à lui seule compte, relecture S2).
  */
 export const acceptInvitation = (
   db: Database,
@@ -150,7 +159,25 @@ export const acceptInvitation = (
       })
       .onConflictDoNothing()
     await tx.delete(hi).where(eq(hi.id, invitationId))
-    return { hiveId: found.hiveId }
+    const source = { sourceKind: 'invitation', sourceId: invitationId, now } as const
+    const pollen = await award(tx, {
+      ...source,
+      memberId: inviteeId,
+      gesture: 'invitation_joined',
+      sourceKey: `hive:${found.hiveId}`,
+      counterpartId: invitation.inviterId,
+    })
+    // L'invitant a pu supprimer son compte depuis (`inviter_id` remis à nul) : rien à lui payer.
+    if (invitation.inviterId !== null) {
+      await award(tx, {
+        ...source,
+        memberId: invitation.inviterId,
+        gesture: 'invitation_accepted',
+        sourceKey: `hive:${found.hiveId}:${inviteeId}`,
+        counterpartId: inviteeId,
+      })
+    }
+    return { hiveId: found.hiveId, pollen }
   })
 
 // ─── Refuser ──────────────────────────────────────────────────────────────────────────────────────
