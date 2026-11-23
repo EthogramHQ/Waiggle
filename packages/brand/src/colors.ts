@@ -401,6 +401,8 @@ export const contrastPairs: readonly ContrastPair[] = [
   // R19 : l'icône d'un sceau crème (ui/WaxSeal) sur sa cire, et le bord ambre de ce sceau, qui le
   // détache du fond de page (une forme : 3:1). Le sceau de miel reprend le couple d'au-dessus.
   { text: 'onHoneyTile', on: 'wax', min: 3 },
+  // R19 : le chiffre du niveau (ui/LevelCell) sur l'opercule de cire de son alvéole.
+  { text: 'onHoney', on: 'wax', min: 4.5 },
   // La barre fixe des formulaires sur téléphone (fond « feuille »).
   { text: 'text', on: 'sheet', min: 4.5 },
   { text: 'onHoney', on: 'honey', min: 4.5 },
