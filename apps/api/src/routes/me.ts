@@ -28,7 +28,8 @@ import { commentsOfAuthor } from '../comments/load'
 import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
 import { readFeedReadAt } from '../feed/state'
-import { award, pollenResponseHeaders, setPollen } from '../game/award'
+import { award, setPollen } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
 import { hiveExportOf } from '../hives/export'
@@ -80,7 +81,7 @@ const exportRule: RateRule = { windowMs: HOUR, max: 30 }
 
 const meResponse = { description: 'The profile.', content: { 'application/json': { schema: Me } } }
 // R19 : une photo, une bio ou un premier outil rapportent du pollen, dit par l'en-tête du geste.
-const meWithPollen = { ...meResponse, headers: pollenResponseHeaders }
+const meWithPollen = { ...meResponse, headers: pollenHeaders }
 
 const meRoute = createRoute({
   method: 'get',

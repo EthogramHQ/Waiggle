@@ -13,7 +13,8 @@ import { requireUser } from '../auth/session'
 import { notBlockedWith } from '../blocks/visibility'
 import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
-import { type AwardInput, award, pollenResponseHeaders, setPollen } from '../game/award'
+import { type AwardInput, award, setPollen } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
@@ -26,7 +27,7 @@ const followRule: RateRule = { windowMs: 60 * 60 * 1000, max: 120 }
 const params = z.object({ id: z.string() })
 const done = { description: 'Done (no content).' }
 // R19 : la réponse d'un suivi peut porter le pollen gagné (game/award.ts).
-const followed = { ...done, headers: pollenResponseHeaders }
+const followed = { ...done, headers: pollenHeaders }
 
 const followMemberRoute = createRoute({
   method: 'post',

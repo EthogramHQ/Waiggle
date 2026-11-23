@@ -31,7 +31,8 @@ import { sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
-import { pollenResponseHeaders, setPollen } from '../game/award'
+import { setPollen } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import { loadInvitable } from '../hives/invitable'
 import { acceptInvitation, inviteToHive, refuseInvitation } from '../hives/invitations'
 import { hiveSummariesOf, membershipOf } from '../hives/load'
@@ -120,7 +121,7 @@ const acceptRoute = createRoute({
       description: 'The hive joined.',
       content: { 'application/json': { schema: HiveSummary } },
       // R19 : le pollen que l'invité vient de gagner (game/award.ts).
-      headers: pollenResponseHeaders,
+      headers: pollenHeaders,
     },
     401: errorResponse('Not signed in.'),
     404: noInvitation,

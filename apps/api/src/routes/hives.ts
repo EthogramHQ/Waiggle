@@ -30,7 +30,8 @@ import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
-import { pollenResponseHeaders, setPollen } from '../game/award'
+import { setPollen } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import {
   hiveSummariesOf,
   loadHiveActivity,
@@ -92,7 +93,7 @@ const createHiveRoute = createRoute({
   request: { body: { required: true, content: { 'application/json': { schema: HiveCreate } } } },
   responses: {
     // R19 : la création peut porter le pollen gagné (game/award.ts).
-    201: { ...json(HiveSummary, 'The new hive.'), headers: pollenResponseHeaders },
+    201: { ...json(HiveSummary, 'The new hive.'), headers: pollenHeaders },
     400: errorResponse('Invalid name or icon.'),
     401: errorResponse('Not signed in.'),
     403: errorResponse('A suspended account.'),

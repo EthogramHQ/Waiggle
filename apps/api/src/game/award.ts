@@ -219,20 +219,6 @@ export const setPollen = (c: Context, amount: number) => {
   if (Number.isInteger(amount) && amount > 0) c.header(POLLEN_HEADER, String(amount))
 }
 
-/**
- * La déclaration OpenAPI de l'en-tête, à mettre dans `headers` de la réponse réussie de chaque route
- * de geste (`responses: { 204: { description, headers: pollenResponseHeaders } }`) : la
- * documentation (`/openapi.json`) dit ainsi aux clients que la réponse peut le porter. Elle ne pose
- * rien : seul `setPollen` le fait.
- */
-export const pollenResponseHeaders = {
-  [POLLEN_HEADER]: {
-    description: 'The pollen this gesture just earned; absent when it earned nothing.',
-    schema: { type: 'integer', minimum: 1 },
-    required: false,
-  },
-} as const
-
 /** Les gestes du profil, un par partie que la modération peut retirer. */
 const PROFILE_GESTURES = {
   avatar: 'profile_photo',
