@@ -25,6 +25,7 @@ import { randomUUID } from 'node:crypto'
 import { HIVE_LIMITS, type HiveCreate, type HivePatch } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq, ne, sql } from 'drizzle-orm'
+import { award } from '../game/award'
 import { createdCountOf, hiveProjectFor, joinedCountOf } from './load'
 
 /** Une transaction de Drizzle : le même objet que `db`, mais dont tout se valide ou s'annule ensemble. */
@@ -131,12 +132,19 @@ const notice = (
 
 // ─── Créer ────────────────────────────────────────────────────────────────────────────────────────
 
-export type CreateOutcome = { id: string } | 'hives_created_limit' | 'hives_joined_limit'
+/** La ruche créée, et le pollen que sa création a rapporté (R19 : 15, une par jour ; 0 sinon). */
+export type CreateOutcome =
+  | { id: string; pollen: number }
+  | 'hives_created_limit'
+  | 'hives_joined_limit'
 
 /**
  * Crée une ruche : son créateur en est l'animateur, le seul membre, et l'auteur du nom. Sous le
  * verrou du membre, on recompte ses ruches créées (10) puis rejointes (20) : deux créations
  * simultanées ne passent pas toutes les deux la dernière place.
+ *
+ * R19 : la création rapporte son pollen dans la même transaction (`award`, dont le verrou de jeu se
+ * prend après celui des limites : relecture de sécurité S1). Source : la ruche, une fois.
  */
 export const createHive = (db: Database, creatorId: string, input: HiveCreate, now: Date) =>
   db.transaction(async (tx): Promise<CreateOutcome> => {
@@ -156,7 +164,15 @@ export const createHive = (db: Database, creatorId: string, input: HiveCreate, n
     })
     // Il vient de la créer : sa première visite est maintenant (rien de neuf à lui montrer).
     await tx.insert(hm).values({ hiveId: id, userId: creatorId, joinedAt: now, seenAt: now })
-    return { id }
+    const pollen = await award(tx, {
+      memberId: creatorId,
+      gesture: 'hive_created',
+      sourceKind: 'hive',
+      sourceId: id,
+      sourceKey: `hive:${id}`,
+      now,
+    })
+    return { id, pollen }
   })
 
 // ─── Changer ──────────────────────────────────────────────────────────────────────────────────────

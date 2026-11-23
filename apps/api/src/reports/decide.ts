@@ -21,6 +21,7 @@ import {
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
+import { type PollenSource, restoreFor, revokeFor } from '../game/award'
 import {
   isDecisionConflict,
   lockDecision,
@@ -149,6 +150,31 @@ const mark = async (
       // R10 : une ruche ne se retire jamais entière, seulement son nom (une partie, traitée par
       // moderation/parts.ts) : sans partie, il n'y a rien à marquer (« déjà décidé »).
       return 0
+  }
+}
+
+/**
+ * R19 : ce que le grand livre du pollen connaît du contenu visé (game/award.ts, `PollenSource`).
+ * Un projet : sa publication et ce que son auteur y a reçu, jamais le pollen des autres membres. Un
+ * commentaire, une mise à jour, un message d'un fil de retour : les entrées dont il est la source,
+ * celles de son auteur comme ce que l'auteur du projet a reçu à cause de lui. Un appel à tester,
+ * une note, un profil ou une ruche entière ne rapportent rien par eux-mêmes : null.
+ */
+const pollenSourceOf = (target: StoredReportTarget): PollenSource | null => {
+  switch (target.kind) {
+    case 'project':
+      return { kind: 'project', id: target.id }
+    case 'update':
+      return { kind: 'update', id: target.id }
+    case 'comment':
+      return { kind: 'comment', id: target.id }
+    case 'message':
+      return { kind: 'tester_message', id: target.id }
+    case 'call':
+    case 'note':
+    case 'member':
+    case 'hive':
+      return null
   }
 }
 
@@ -332,6 +358,13 @@ export const decide = async (
       } else if (input.action === 'remove' || input.action === 'restore') {
         const removal = input.action === 'remove' ? { at: now, id: decision.id } : null
         if ((await mark(tx, target, removal)) === 0) throw new AlreadyDecided()
+        // R19 (plan, choix 9) : le pollen rapporté par le contenu retiré est révoqué dans la même
+        // transaction, et rendu s'il est rétabli. Les entrées restent : seul `revoked_at` change.
+        const source = pollenSourceOf(target)
+        if (source) {
+          if (removal) await revokeFor(tx, source, now)
+          else await restoreFor(tx, source)
+        }
       }
       if (input.action !== 'restore') {
         // Retirer ou classer clôt les signalements ouverts qu'elle concerne (toClose, plus haut).
