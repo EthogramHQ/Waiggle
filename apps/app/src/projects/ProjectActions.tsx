@@ -561,6 +561,7 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
           problem={honeyProblem}
           onConfirm={(balance) => void confirmHoney(balance)}
           onClose={() => setHoneyOpen(false)}
+          returnFocusTo={() => honeyRef.current}
         />
       ) : null}
       {project.isMine ? null : (

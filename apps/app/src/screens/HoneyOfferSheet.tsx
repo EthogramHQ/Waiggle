@@ -12,10 +12,12 @@
 // Ce fichier n'écrit aucun style : il assemble des composants de `src/ui`.
 import { HONEY } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHarvest } from '../gamification/api'
 import { Button } from '../ui/Button'
 import { ButtonPair } from '../ui/ButtonPair'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Sheet } from '../ui/Sheet'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -38,6 +40,11 @@ type Props = {
   /** « Offrir 5 miel », avec le solde lu (pour le toast « Il te reste N miel. »). */
   onConfirm: (balance: number) => void
   onClose: () => void
+  /**
+   * Où le focus retourne à la fermeture : le bouton de la page (« Miel offert » une fois l'offre
+   * partie), que l'ouvreur, retrouvé par son nom, ne désigne plus.
+   */
+  returnFocusTo?: () => unknown
 }
 
 export function HoneyOfferSheet({
@@ -49,6 +56,7 @@ export function HoneyOfferSheet({
   problem,
   onConfirm,
   onClose,
+  returnFocusTo,
 }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -59,6 +67,16 @@ export function HoneyOfferSheet({
   const short = problem === 'short' || (balance !== undefined && balance < HONEY.gift)
   const failed = !harvest.data && harvest.isError
 
+  // Le refus « pas assez de miel » arrive après l'envoi : les boutons « Offrir » et « Annuler »
+  // disparaissent avec le focus, qui tomberait sur la page entière (rien d'annoncé, Tab repartirait
+  // du haut). On le pose sur le message qui les remplace. (Un solde déjà court à l'ouverture n'en a
+  // pas besoin : la feuille a posé le focus sur « Fermer ».)
+  const messageRef = useRef<Focusable>(null)
+  useEffect(() => {
+    if (!open || problem !== 'short') return
+    if (!focusWithoutScroll(messageRef.current)) moveReaderTo(messageRef.current)
+  }, [open, problem])
+
   // « Ma récolte » : la feuille se ferme d'abord, la page s'ouvre derrière.
   const openHarvest = () => {
     onClose()
@@ -67,7 +85,7 @@ export function HoneyOfferSheet({
 
   const body = short ? (
     <Stack gap="md">
-      <Text>
+      <Text focusRef={messageRef}>
         {problem === 'short' || balance === undefined
           ? t(($) => $.errors.honeyShort)
           : t(($) => $.game.short.body, { needed: HONEY.gift, balance })}
@@ -133,6 +151,7 @@ export function HoneyOfferSheet({
       compact
       busy={pending}
       onClose={onClose}
+      {...(returnFocusTo ? { returnFocusTo } : null)}
       footer={footer}
       notice={
         message
