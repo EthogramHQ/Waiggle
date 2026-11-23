@@ -192,6 +192,11 @@ export const personalChallenge = pgTable(
     // Un tableau de texte PostgreSQL (`text[]`), dans l'ordre du tirage.
     offered: text('offered').array().notNull(),
     chosen: text('chosen'),
+    // L'heure du choix d'un défi (pas de « Pas cette semaine », qui reste à null) : le défi ne
+    // compte que les gestes faits depuis (décision du 23/11, « depuis le choix »). Sans fuseau,
+    // comme `pollen_entry.created_at` avec qui elle se compare : les deux heures sont écrites par
+    // l'API dans le même format, la comparaison ne dépend pas du fuseau de la session PostgreSQL.
+    chosenAt: timestamp('chosen_at'),
     completedAt: timestamp('completed_at'),
     createdAt: timestamp('created_at').notNull(),
   },

@@ -228,6 +228,59 @@ describe('the personal challenge of the week', () => {
     expect(after.honey).toBe(done.honey)
   })
 
+  // Décision du 23/11, « depuis le choix » : un défi choisi jeudi ne compte pas les gestes de lundi.
+  it('counts only the gestures made after the personal challenge is chosen', async () => {
+    const code = (await offeredToLea())[0] as PersonalChallengeCode
+    const target = personalTarget(code)
+    // Un geste du défi avant de le choisir (le choix vient une seconde plus tard, `patchGame`).
+    await personalPrep(code)
+    await personalStep(code, 0)
+
+    expect((await game.patchGame(lea.cookie, { personalChallenge: code })).status).toBe(204)
+    expect((await game.harvest(lea.cookie)).personalChallenge).toEqual({
+      state: 'active',
+      code,
+      progress: 0,
+      target,
+    })
+
+    // Le même geste après le choix, sur un autre projet de Max : lui compte.
+    await personalPrep(code, 1)
+    await personalStep(code, 0, 1)
+    expect((await game.harvest(lea.cookie)).personalChallenge).toEqual(
+      target === 1 ? { state: 'done', code } : { state: 'active', code, progress: 1, target },
+    )
+  })
+
+  it('completes the personal challenge with gestures made after the choice, not before', async () => {
+    const code = (await offeredToLea())[0] as PersonalChallengeCode
+    const target = personalTarget(code)
+    await personalPrep(code)
+    await personalStep(code, 0)
+    const chosenAt = await game.harvest(lea.cookie)
+    expect((await game.patchGame(lea.cookie, { personalChallenge: code })).status).toBe(204)
+    // Le geste d'avant ne réussit pas le défi au moment du choix : ni miel, ni pollen du défi.
+    expect((await game.harvest(lea.cookie)).honey).toBe(chosenAt.honey)
+
+    // Tous les gestes du défi sauf un, après le choix, à partir du deuxième projet de Max.
+    await personalPrep(code, 1)
+    for (let i = 0; i < target - 1; i += 1) await personalStep(code, i, 1)
+    const before = await game.harvest(lea.cookie)
+    expect(before.personalChallenge).toEqual({
+      state: 'active',
+      code,
+      progress: target - 1,
+      target,
+    })
+
+    await personalStep(code, target - 1, 1)
+
+    const done = await game.harvest(lea.cookie)
+    expect(done.personalChallenge).toEqual({ state: 'done', code })
+    expect(done.honey).toBe(before.honey + HONEY.challenge)
+    expect(done.total).toBe(before.total + lastGesturePollen(code) + CHALLENGE_POLLEN)
+  })
+
   it('forgets an unfinished challenge the following Monday, without a trace', async () => {
     const code = (await offeredToLea())[0] as PersonalChallengeCode
     expect((await game.patchGame(lea.cookie, { personalChallenge: code })).status).toBe(204)
