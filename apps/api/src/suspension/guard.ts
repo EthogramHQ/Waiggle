@@ -4,7 +4,7 @@
 // - tout DELETE : supprimer ses contenus, retirer ses réactions, ne plus suivre, débloquer ;
 // - une courte liste de gestes permis (ALLOWED_WRITES) : signaler, bloquer, masquer un commentaire
 //   sur son projet, marquer ses notifications vues, accepter les règles (R11), régler ses
-//   e-mails, sa langue (PATCH /v1/me,
+//   e-mails, ses réglages du jeu (PATCH /v1/me/game, R19), sa langue (PATCH /v1/me,
 //   que la route restreint elle-même : S9 ; depuis R9, aussi vider sa bio ou ses outils, et choisir
 //   un nom ou un pseudo provisoire), passer son projet en privé (PATCH /v1/projects/:id, restreint
 //   par la route au seul `{ visibility: 'private' }`, R9 ; R12 : depuis « Public », aussi
@@ -69,6 +69,11 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   // cela, un membre suspendu qui n'a pas accepté la nouvelle version ne pourrait jamais passer
   // l'écran « Accepter ». Accepter ne lui rend pas l'écriture : cette garde refuse toujours le reste.
   'POST /v1/me/rules',
+  // R19 (décision D4) : ses réglages du jeu (forme du titre, apparaître dans les classements,
+  // « Ma récolte », défi de la semaine) ne publient rien et ne touchent qu'à lui. Se retirer des
+  // classements doit rester possible pendant une suspension, comme régler ses e-mails. Offrir du
+  // miel et décorer son rayon restent refusés (ce sont des gestes, vus des autres).
+  'PATCH /v1/me/game',
 ])
 
 /** Un objet JSON (pas un tableau, ni null) : le seul corps dont on puisse juger les clés. */

@@ -4,7 +4,7 @@
 
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import { appName } from '@ruche/brand'
-import { type ErrorCode, HealthResponse } from '@ruche/contracts'
+import { type ErrorCode, HealthResponse, POLLEN_HEADER } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import { parseAcceptLanguage, resolveLanguage } from '@ruche/i18n'
 import type { MiddlewareHandler } from 'hono'
@@ -239,8 +239,9 @@ export const createApp = ({
       // répéter sans effet de plus.
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       // En-têtes de réponse que l'appli web a le droit de lire (Retry-After : dans combien de
-      // secondes réessayer après un refus pour trop de demandes).
-      exposeHeaders: ['Content-Disposition', 'Content-Language', 'Retry-After'],
+      // secondes réessayer après un refus pour trop de demandes). R19 : Waiggle-Pollen, le pollen
+      // qu'un geste vient de rapporter (POLLEN_HEADER du contrat), que l'appli montre en « +2 ».
+      exposeHeaders: ['Content-Disposition', 'Content-Language', 'Retry-After', POLLEN_HEADER],
     }),
   )
 
