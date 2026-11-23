@@ -218,6 +218,8 @@ describe('Project with its visuals', () => {
     updateCount: 0,
     version: null,
     isTester: false,
+    // R19 : le miel offert à ce projet par le membre qui regarde.
+    honeyGiven: false,
     testerCount: null,
     testerJoinable: true,
     reactions: NO_REACTIONS,
