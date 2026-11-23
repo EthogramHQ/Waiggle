@@ -5,15 +5,68 @@
 // Qui n'y figure jamais : un membre qui s'est retiré des classements (`member_game.in_rankings`
 // faux), un compte d'exemples, un membre bloqué dans un sens ou dans l'autre avec le lecteur, et
 // tout membre sans pollen cette semaine (le classement ne montre personne à zéro).
-import { RANKING_MAX, type Ranking, type RankingScope, weekOf } from '@ruche/contracts'
+//
+// Ce qui n'y compte jamais : les réactions et les suivis, ni le pollen du défi « Réagis à 5
+// projets » (relecture de sécurité de R19, B1, décision du 23/11). Chaque geste a un montant qui le
+// signe (réaction 2, suivi 3) et le classement est relu à chaque demande : Léa verrait Max passer de
+// 2 à 4 juste après la première réaction sur son projet, et saurait que c'est lui, quand l'appli ne
+// dit jamais qui a réagi ni qui s'abonne. Ces lignes comptent toujours pour le niveau, les sceaux et
+// « Ma récolte » : seul le classement les laisse de côté. Les autres gestes ont un auteur que celui
+// qui les reçoit voit déjà (un commentaire, un retour, un testeur, une ruche, une invitation).
+import {
+  type Gesture,
+  PERSONAL_CHALLENGES,
+  RANKING_MAX,
+  type Ranking,
+  type RankingScope,
+  weekOf,
+} from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, desc, eq, isNull, not, or, type SQL, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, not, notInArray, or, type SQL, sql } from 'drizzle-orm'
 import { isExampleAccountSql } from '../accounts/example'
 import { notBlockedWith } from '../blocks/visibility'
 import { avatarUrlOf } from '../profile/me'
 
 const pe = schema.pollenEntry
 const mg = schema.memberGame
+const pc = schema.personalChallenge
+
+/** Les gestes dont l'appli tait l'auteur : le classement ne les compte pas (B1). */
+const SECRET_AUTHOR_GESTURES = ['reaction', 'follow'] as const satisfies readonly Gesture[]
+const isSecret = (gesture: Gesture) =>
+  (SECRET_AUTHOR_GESTURES as readonly Gesture[]).includes(gesture)
+
+/**
+ * Les défis perso qui comptent un de ces gestes (aujourd'hui `react_5`), tirés de la liste du
+ * contrat : un défi de ce genre ajouté plus tard est exclu lui aussi, sans toucher à ce fichier.
+ */
+const SECRET_AUTHOR_CHALLENGES = PERSONAL_CHALLENGES.filter((challenge) =>
+  isSecret(challenge.gesture),
+).map((challenge) => challenge.code)
+
+/**
+ * La condition « cette ligne compte dans le classement » :
+ * - ni une réaction, ni un suivi (`not in`, sur la colonne `gesture` de la ligne déjà lue) ;
+ * - ni le pollen d'un défi perso réussi qui comptait l'un d'eux. Ce pollen est une ligne `challenge`
+ *   écrite la semaine du défi ; on le reconnaît par le défi choisi cette semaine-là, lu par la clé
+ *   primaire de `personal_challenge` (member_id, week) dans une sous-requête « corrélée » : elle
+ *   reprend le membre et la semaine de la ligne en cours, et ne tourne que pour les lignes
+ *   `challenge` (une par membre et par semaine au plus). Les codes entrent en paramètres liés.
+ */
+const countsInRankings = (): SQL | undefined => {
+  const secretChallenge = sql`exists (select 1 from ${pc}
+    where ${pc.memberId} = ${pe.memberId} and ${pc.week} = ${pe.week}
+      and ${pc.chosen} in (${sql.join(
+        SECRET_AUTHOR_CHALLENGES.map((code) => sql`${code}`),
+        sql`, `,
+      )}))`
+  return and(
+    notInArray(pe.gesture, [...SECRET_AUTHOR_GESTURES]),
+    SECRET_AUTHOR_CHALLENGES.length === 0
+      ? undefined
+      : sql`not (${pe.gesture} = ${'challenge'} and ${secretChallenge})`,
+  )
+}
 
 /**
  * Faux si ce membre s'est retiré des classements (403 `rankings_off` : il ne les lit plus). Pas de
@@ -54,14 +107,20 @@ const inCircle = (viewerId: string, circle: RankingCircle): SQL | undefined => {
  *   select u.id, u.name, p.avatar_key, sum(e.amount), rank() over (order by sum(e.amount) desc)
  *   from pollen_entry e join "user" u on u.id = e.member_id left join profile p …
  *   left join member_game g on g.member_id = e.member_id
- *   where e.week = $lundi and e.revoked_at is null and e.member_id in (<le cercle>)
+ *   where e.week = $lundi and e.revoked_at is null
+ *     and e.gesture not in ('reaction', 'follow')
+ *     and not (e.gesture = 'challenge' and exists (select 1 from personal_challenge c
+ *              where c.member_id = e.member_id and c.week = e.week and c.chosen in ('react_5')))
+ *     and e.member_id in (<le cercle>)
  *     and coalesce(g.in_rankings, true) and not exists (compte d'exemples)
  *     and not (bloqué avec le lecteur)
  *   group by u.id, u.name, p.avatar_key order by 4 desc, u.name, u.id limit 50
  *
  * L'index `pollen_entry_member_week_idx` (member_id, week) sert chaque membre du cercle : PostgreSQL
- * ne lit que les entrées de cette semaine de ces membres-là, jamais tout le grand livre. Seuls les
- * membres qui ont une entrée apparaissent : personne à zéro, sans condition de plus.
+ * ne lit que les entrées de cette semaine de ces membres-là, jamais tout le grand livre ; les
+ * conditions sur le geste trient ensuite ces quelques dizaines de lignes. Seuls les membres qui ont
+ * une entrée comptée apparaissent : un membre qui n'a fait que réagir ou suivre cette semaine n'a
+ * aucune ligne gardée, il n'apparaît pas (personne à zéro, sans condition de plus).
  *
  * `rank() over (…)` est une « fonction de fenêtre » : calculée sur les lignes déjà groupées, elle
  * donne à chacune son rang dans l'ordre demandé ; deux sommes égales reçoivent le même rang, et le
@@ -93,6 +152,7 @@ export const loadRanking = async (
       and(
         eq(pe.week, week),
         isNull(pe.revokedAt),
+        countsInRankings(),
         inCircle(viewerId, circle),
         // Pas de ligne de réglages : dans les classements (la valeur par défaut).
         sql`coalesce(${mg.inRankings}, true)`,

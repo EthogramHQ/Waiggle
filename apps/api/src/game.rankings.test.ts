@@ -14,7 +14,8 @@
 // ensuite au lundi (`nextMonday`) : la semaine du classement ne compte que les commentaires.
 // Les autorisations communes (401 sans session, quota) sont dans game.harvest.test.ts.
 import { appName } from '@ruche/brand'
-import { POLLEN_GESTURES, type Ranking, weekOf } from '@ruche/contracts'
+import { CHALLENGE_POLLEN, POLLEN_GESTURES, type Ranking, weekOf } from '@ruche/contracts'
+import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -207,6 +208,84 @@ describe('the ranking of my close ones', () => {
     expect(namesOf(await game.ranking(lea.cookie, `scope=hive&hive=${hiveId}`))).toEqual(['Léa'])
   })
 
+  // Relecture de sécurité de R19 (B1) : chaque geste a un montant qui le signe (réaction 2, suivi 3) ;
+  // lu avant et après, le classement dirait qui a réagi ou qui s'abonne. Ces gestes n'y comptent pas.
+  it('does not tell through the close ranking who reacted to my project', async () => {
+    const leaProject = await game.testable(lea.cookie, 'Mon herbier')
+    nextMonday(vi)
+
+    // Max ne fait que réagir : il n'apparaît pas.
+    await game.react(leaProject, max.cookie)
+    expect(namesOf(await game.ranking(lea.cookie, 'scope=close'))).not.toContain('Max')
+
+    await earn(max)
+    const before = rowsOf(await game.ranking(lea.cookie, 'scope=close'))
+    expect(before).toContainEqual({ name: 'Max', pollen: COMMENT, rank: 1, self: false })
+    await game.react(leaProject, max.cookie, 'useful')
+
+    const after = rowsOf(await game.ranking(lea.cookie, 'scope=close'))
+    expect(after.find((row) => row.name === 'Max')).toEqual(
+      before.find((row) => row.name === 'Max'),
+    )
+    // Témoin : les réactions comptent toujours pour Max ailleurs (« Ma récolte »).
+    expect((await game.harvest(max.cookie)).week.total).toBe(
+      COMMENT + 2 * POLLEN_GESTURES.reaction.amount,
+    )
+  })
+
+  it('does not tell through the close ranking who started following me', async () => {
+    nextMonday(vi)
+    await earn(max)
+    const before = rowsOf(await game.ranking(lea.cookie, 'scope=close'))
+    expect(before).toContainEqual({ name: 'Max', pollen: COMMENT, rank: 1, self: false })
+
+    later()
+    await act.followMember(lea.id, max.cookie) // Max s'abonne à Léa
+
+    const after = rowsOf(await game.ranking(lea.cookie, 'scope=close'))
+    expect(after.find((row) => row.name === 'Max')).toEqual(
+      before.find((row) => row.name === 'Max'),
+    )
+    expect((await game.harvest(max.cookie)).week.total).toBe(
+      COMMENT + POLLEN_GESTURES.follow.amount,
+    )
+  })
+
+  it('leaves the pollen of the « react to 5 projects » challenge out of the rankings', async () => {
+    // Cinq projets d'autres membres que Max, publiés la semaine d'avant.
+    const projects = [roseProject]
+    for (const [member, title] of [
+      [rose, 'Le cahier de semis'],
+      [ines, 'Le métronome'],
+      [noe, 'La carte des sentiers'],
+      [lea, "L'herbier"],
+    ] as const) {
+      projects.push(await game.testable(member.cookie, title))
+    }
+    nextMonday(vi)
+    // Le défi « Réagis à 5 projets » est choisi directement en base : le tirage est au hasard.
+    await ctx.db.execute(sql`insert into personal_challenge
+        (member_id, week, offered, chosen, chosen_at, created_at)
+      values (${max.id}, ${weekOf(new Date())}, array['react_5', 'update', 'test']::text[],
+        'react_5', ${new Date().toISOString()}, ${new Date().toISOString()})`)
+    await earn(max)
+    for (const project of projects) await game.react(project, max.cookie)
+
+    // Témoin : le défi est réussi, et son pollen compte dans « Ma récolte ».
+    const harvest = await game.harvest(max.cookie)
+    expect(harvest.personalChallenge).toEqual({ state: 'done', code: 'react_5' })
+    expect(harvest.week.total).toBe(
+      COMMENT + 5 * POLLEN_GESTURES.reaction.amount + CHALLENGE_POLLEN,
+    )
+    // Dans le classement, seul le commentaire.
+    expect(rowsOf(await game.ranking(lea.cookie, 'scope=close'))).toContainEqual({
+      name: 'Max',
+      pollen: COMMENT,
+      rank: expect.any(Number),
+      self: false,
+    })
+  })
+
   it('leaves a blocked member out of the close ranking', async () => {
     nextMonday(vi)
     await earn(max, 2)
@@ -239,6 +318,28 @@ describe('the ranking of a hive', () => {
       { name: 'Noé', pollen: 3 * COMMENT, rank: 1, self: false },
       { name: 'Léa', pollen: COMMENT, rank: 2, self: true },
     ])
+  })
+
+  it('does not tell through a hive ranking who reacted to a project of the hive', async () => {
+    const leaProject = await game.testable(lea.cookie, 'Mon herbier')
+    const hiveId = await leaHive()
+    const query = `scope=hive&hive=${hiveId}`
+    nextMonday(vi)
+
+    // Inès, dans la ruche, ne fait que réagir : elle n'apparaît pas.
+    await game.react(leaProject, ines.cookie)
+    expect(namesOf(await game.ranking(lea.cookie, query))).not.toContain('Inès')
+
+    // Noé, que Léa ne suit pas, commente, puis réagit au projet de Léa : sa ligne ne bouge pas.
+    await earn(noe)
+    const before = rowsOf(await game.ranking(lea.cookie, query))
+    expect(before).toContainEqual({ name: 'Noé', pollen: COMMENT, rank: 1, self: false })
+    await game.react(leaProject, noe.cookie)
+
+    const after = rowsOf(await game.ranking(lea.cookie, query))
+    expect(after.find((row) => row.name === 'Noé')).toEqual(
+      before.find((row) => row.name === 'Noé'),
+    )
   })
 
   it('answers the same 404 to a member who is not in the hive as to an unknown hive', async () => {
