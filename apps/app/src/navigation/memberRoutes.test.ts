@@ -13,7 +13,7 @@ import { dirname, join, relative, sep } from 'node:path'
 const APP = join(__dirname, '../..')
 const read = (path: string) => readFileSync(join(APP, path), 'utf8')
 
-type Route = { file: string; screen: string; chunk: 'explore' | 'hives' }
+type Route = { file: string; screen: string; chunk: 'explore' | 'hives' | 'settings' }
 
 // Les pages du choix 7 et l'écran que chacune montre ; deux morceaux, pour ne pas en créer un
 // troisième, commun, que chaque page chargerait d'emblée (leçon de R13).
@@ -24,6 +24,10 @@ const PAGES: Route[] = [
   { file: 'app/notifications.tsx', screen: 'NotificationsScreen', chunk: 'explore' },
   { file: 'app/hives.tsx', screen: 'HivesScreen', chunk: 'hives' },
   { file: 'app/hives/[id].tsx', screen: 'HiveScreen', chunk: 'hives' },
+  // R19 : « Ma récolte » et le classement de la semaine, dans le morceau des réglages (pas de
+  // morceau neuf, leçon de R13) : on les ouvre depuis son profil, comme les réglages.
+  { file: 'app/harvest/index.tsx', screen: 'HarvestScreen', chunk: 'settings' },
+  { file: 'app/harvest/rankings.tsx', screen: 'RankingsScreen', chunk: 'settings' },
 ]
 // La feuille « Créer une ruche », posée sur la page d'avant (`navigation/sheetRoutes.ts`).
 const SHEET: Route = { file: 'app/hives/new.tsx', screen: 'HiveCreateSheet', chunk: 'hives' }
@@ -130,6 +134,15 @@ describe('member routes loaded on demand', () => {
       expect.arrayContaining(['HiveCreateSheet', 'HiveScreen', 'HivesScreen']),
     )
     expect(exported('hives')).not.toEqual(expect.arrayContaining(['ExploreScreen']))
+  })
+
+  it('gathers « Ma récolte » and the ranking of the week in the settings chunk', () => {
+    const exported = staticImports(read('src/navigation/chunks/settings.ts')).map(
+      (specifier) => specifier.split('/').pop() ?? '',
+    )
+    expect(exported).toEqual(expect.arrayContaining(['HarvestScreen', 'RankingsScreen']))
+    // Témoin : les réglages y sont toujours.
+    expect(exported).toContain('SettingsScreen')
   })
 
   // R18 (relecture de design) : l'attente propre d'un écran (`loading`, screens/HivesLoading.tsx…)
