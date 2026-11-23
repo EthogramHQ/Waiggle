@@ -161,4 +161,11 @@ export const layout = {
     pickerCheck: 20,
     pickerColumns: 6,
   },
+  // R19 : le rayon (HoneyComb, planche R19-Recolte) : dix alvéoles pointe en haut, de `cell` de
+  // large, à `gap` l'une de l'autre (318 points en tout) ; la jauge d'un défi les dessine à
+  // `smallCell`. Le rayon se resserre si la colonne est plus étroite, jamais il ne s'élargit.
+  comb: { cell: 30, smallCell: 22, gap: 2 },
+  // R19 : le sceau de cire (WaxSeal, planche R19-Sceaux) : 40 dans un avis de l'Activité (small),
+  // 60 dans une tuile de « Mes sceaux » (regular) ; son icône prend `iconRatio` de sa taille.
+  seal: { small: 40, regular: 60, iconRatio: 0.38 },
 } as const
