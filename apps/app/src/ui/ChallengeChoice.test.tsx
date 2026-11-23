@@ -206,7 +206,7 @@ describe('ChallengeChoice', () => {
     await renderWithProviders(<Choice start="feedback" onConfirm={onConfirm} busy />)
 
     const confirm = screen.getByRole('button', { name: CONFIRM })
-    expect(confirm.props['aria-busy']).toBe(true)
+    expect(confirm).toBeBusy()
     await fireEvent.press(confirm)
     expect(onConfirm).not.toHaveBeenCalled()
   })
