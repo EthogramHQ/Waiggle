@@ -136,6 +136,29 @@ export const myHives: MyHives = {
 /** GET /v1/hives, Léa animatrice de Famille (page `ruche-reglages`). */
 export const myHivesAnimator: MyHives = { ...myHives, hives: [familleAnimated, amis] }
 
+/** « Les jardiniers » : 3 membres, animée par Hugo ; la quatrième ruche de Léa (R19, classements). */
+export const jardiniersId = '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c06'
+export const jardiniers: HiveSummary = {
+  id: jardiniersId,
+  name: 'Les jardiniers',
+  icon: 'leaf',
+  memberCount: 3,
+  animator: { id: hugo.id, name: hugo.name },
+  faces: [hugo, lea, odile].map(faceOf),
+  news: 0,
+  role: 'member',
+}
+
+/**
+ * GET /v1/hives, Léa dans quatre ruches (R19) : le classement passe du choix segmenté (Proches et
+ * trois ruches au plus) au menu « Classement ».
+ */
+export const myFourHives: MyHives = {
+  hives: [famille, amis, atelier, jardiniers],
+  invitations: [],
+  createdCount: 1,
+}
+
 /** GET /v1/hives : aucune ruche, aucune invitation (l'onglet vide). */
 export const noHives: MyHives = { hives: [], invitations: [], createdCount: 0 }
 
