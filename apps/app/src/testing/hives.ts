@@ -324,6 +324,8 @@ export const projectsPage: HiveProjectsPage = { items: familleProjects, nextCurs
 
 /** GET /v1/hives/{id}, Léa simple membre : elle peut inviter ; Le plan de table épinglé. */
 export const memberPage: HivePage = {
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: famille,
   invite: 'allowed',
   invitePolicy: 'members',
@@ -343,6 +345,8 @@ export const animatorPage: HivePage = {
 
 /** La page d'« Amis du jeudi » (Léa simple membre ; seul l'animateur invite). */
 export const amisPage: HivePage = {
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: amis,
   invite: 'animatorOnly',
   invitePolicy: 'animator',
@@ -355,6 +359,8 @@ export const amisPage: HivePage = {
 
 /** La page de la ruche que Léa vient de créer : elle seule (« Ta ruche est prête »). */
 export const readyPage = (name: string | null, icon: HiveSummary['icon']): HivePage => ({
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: createdHive(name, icon),
   invite: 'allowed',
   invitePolicy: 'members',
@@ -522,6 +528,8 @@ export const hiveNotifications: Notification[] = [
  * pas : l'API ne donne les projets privés qu'à leur auteur.
  */
 export const odileMemberPage: Member = {
+  // R19 : la récolte, absente de ces fausses données.
+  game: null,
   id: odile.id,
   name: odile.name,
   handle: 'odile',
