@@ -29,6 +29,8 @@ const final: readonly ApiErrorKey[] = [
   'payloadTooLarge',
   'unsupportedMediaType',
   'rateLimited',
+  // R19 : les classements d'un membre qui s'en est retiré (403 `rankings_off`), comme « interdit ».
+  'rankingsOff',
 ]
 
 /** Faut-il retenter une lecture ratée ? Au plus deux fois, et jamais pour un refus définitif. */

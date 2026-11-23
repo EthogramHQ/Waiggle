@@ -1,6 +1,8 @@
 // Le « facteur » de l'appli : toutes les requêtes vers l'API de Waiggle (/v1/…) passent par ici.
 // Il ajoute la session du membre, puis traduit la réponse en résultat simple pour les écrans :
 // { ok: true, data } quand tout va bien, { ok: false, error } avec la clé du message sinon.
+// R19 : une réussite porte aussi `pollen` quand le geste en a rapporté (en-tête `Waiggle-Pollen`).
+import { POLLEN_HEADER } from '@ruche/contracts'
 import { Platform } from 'react-native'
 import { authClient } from '../accounts/auth-client'
 import { apiUrl } from '../config'
@@ -63,7 +65,7 @@ export const request = async <T>(
   const sent = await send(path, init, fetcher)
   if (!sent.ok) return sent
   const parsed = schema.safeParse(await sent.data.json().catch(() => null))
-  if (parsed.success) return { ok: true, data: parsed.data }
+  if (parsed.success) return withPollen({ ok: true, data: parsed.data }, sent.data)
   // Un onglet d'avant un déploiement : la page se recharge sur la nouvelle appli (api/newVersion.ts).
   void reloadIfNewVersion()
   return { ok: false, error: 'internal' }
@@ -85,7 +87,29 @@ export const requestWithoutBody = async (
   init: RequestInit,
 ): Promise<ApiResult<null>> => {
   const sent = await send(path, init)
-  return sent.ok ? { ok: true, data: null } : sent
+  return sent.ok ? withPollen({ ok: true, data: null }, sent.data) : sent
+}
+
+/**
+ * R19 : le pollen qu'un geste a rapporté au membre, que l'API dit dans l'en-tête `Waiggle-Pollen`
+ * (« 2 ») ; aucun corps de réponse ne change. `Headers.get` ne tient pas compte de la casse (un relais
+ * peut écrire « waiggle-pollen »). Seul un entier positif écrit en chiffres compte : « 0 », « -3 »,
+ * « 2.5 », « abc » ou un en-tête vide ne donnent rien, jamais une pastille « +0 » ni « +NaN ».
+ */
+const pollenOf = (res: Response): number | undefined => {
+  const value = res.headers.get(POLLEN_HEADER)?.trim() ?? ''
+  if (!/^\d+$/.test(value)) return undefined
+  const amount = Number(value)
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : undefined
+}
+
+/**
+ * Ajoute `pollen` au résultat d'une réussite, seulement si la réponse en porte : sans gain, la clé
+ * est absente (pas `pollen: undefined`), pour qu'un `toEqual` des anciens tests reste juste.
+ */
+const withPollen = <T>(result: { ok: true; data: T }, res: Response): ApiResult<T> => {
+  const pollen = pollenOf(res)
+  return pollen === undefined ? result : { ...result, pollen }
 }
 
 // Partie commune : envoyer, et traduire un échec (réseau ou refus de l'API) en clé de message.

@@ -173,6 +173,22 @@ const rules = [
       !from.startsWith('apps/app/src/catalogue/') &&
       /^apps\/(app|api)\/src\/testing\//.test(to),
   },
+  // R19, la récolte (domaine `gamification`). Le pollen d'un geste va de la réponse de l'API à la
+  // pastille « +2 pollen » en deux temps : le client lit l'en-tête et le rend (`pollen`), le hook du
+  // geste le confie au magasin (`gamification/pollen.ts`). Ces deux règles gardent ce chemin à sens
+  // unique, sans boucle d'imports.
+  {
+    why: 'le client de l’API (src/api) ne connaît pas la récolte : il rend le pollen, le hook du geste le montre',
+    breaks: (from, to) =>
+      layerOf(from) === 'app/client API' &&
+      !isTest(from) &&
+      layerOf(to) === 'app/domaines/gamification',
+  },
+  {
+    why: 'le magasin du pollen (gamification/pollen.ts), importé par chaque domaine de geste, n’importe aucun fichier de l’appli',
+    breaks: (from, to) =>
+      from === 'apps/app/src/gamification/pollen.ts' && to.startsWith('apps/app/'),
+  },
 ]
 // Exceptions acceptées, chacune avec sa raison.
 const allowed = new Set([
