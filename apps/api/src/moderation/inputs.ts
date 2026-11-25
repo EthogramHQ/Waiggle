@@ -579,6 +579,82 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     email_hives: 'un choix dans une liste fermée par Zod (now, digest, never), jamais montré',
     // R11 : le réglage « Découvertes » (les parties du récap qui font découvrir).
     discoveries: 'un choix dans une liste fermée par Zod (digest, never), jamais montré',
+    // R19 : la date de l'envoi du récap « Ta récolte », écrite par la tâche.
+    recap_harvest_at: 'date',
+  },
+  // R19 : « La récolte » (le jeu). Rien n'y est tapé par un membre : tout est écrit par l'API à partir
+  // de ses gestes, ou choisi dans une liste fermée par Zod et par un `check` de la table. Les
+  // colonnes texte viennent de listes fermées (gestes, familles, sceaux, défis) ou de sources
+  // déjà au registre (le projet, la ruche), jamais d'une saisie libre.
+  pollen_entry: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    gesture:
+      "le geste qui rapporte, une liste fermée dans le code de l'API (GESTURES), jamais libre",
+    family: 'la famille du geste, une liste fermée dans le code de l’API, jamais libre',
+    amount: 'nombre',
+    source_kind: 'la sorte de ligne source du geste, une liste fermée écrite par l’API',
+    source_id: 'identifiant de la ligne source du geste, écrit par l’API',
+    source_key: 'la clé de dédoublonnage du geste, fabriquée par l’API à partir d’identifiants',
+    counterpart_id: 'identifiant',
+    project_id: 'identifiant',
+    day: 'date',
+    week: 'date',
+    created_at: 'date',
+    revoked_at: 'date',
+    backfill: 'booléen',
+  },
+  seal: {
+    member_id: 'identifiant',
+    code: 'le code du sceau, une liste fermée vérifiée par la base (check) et par Zod (SealCode)',
+    earned_at: 'date',
+  },
+  honey_entry: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    amount: 'nombre',
+    reason: 'le motif du miel, une liste fermée vérifiée par la base (check), écrite par l’API',
+    source_key: 'la clé de dédoublonnage du miel, fabriquée par l’API à partir d’identifiants',
+    created_at: 'date',
+  },
+  personal_challenge: {
+    member_id: 'identifiant',
+    week: 'date',
+    offered: 'les trois défis tirés par l’API dans une liste fermée (vérifiée par un check)',
+    chosen: 'le défi choisi parmi ceux proposés, une liste fermée par Zod et par la base',
+    chosen_at: 'date',
+    completed_at: 'date',
+    created_at: 'date',
+  },
+  hive_challenge: {
+    hive_id: 'identifiant',
+    week: 'date',
+    code: 'le code du défi de la ruche, une liste fermée vérifiée par la base (check)',
+    target: 'nombre',
+    completed_at: 'date',
+    created_at: 'date',
+  },
+  member_game: {
+    member_id: 'identifiant',
+    title_form: 'féminin ou masculin du titre (f, m), une liste fermée par Zod et par un check',
+    pinned_family: 'la famille épinglée comme titre, une liste fermée par Zod et par un check',
+    in_rankings: 'booléen',
+    harvest_notices: 'booléen',
+    decoration_tint: 'la teinte de la décoration, une liste fermée par Zod et par un check',
+    decoration_pattern: 'le motif de la décoration, une liste fermée par Zod et par un check',
+    level_seen: 'nombre',
+  },
+  game_notice: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    kind: 'la sorte d’avis du jeu, une liste fermée vérifiée par la base (check), écrite par l’API',
+    level: 'nombre',
+    code: 'le code du sceau ou du défi concerné, une liste fermée écrite par l’API',
+    honey: 'nombre',
+    actor_id: 'identifiant',
+    project_id: 'identifiant',
+    hive_id: 'identifiant',
+    created_at: 'date',
   },
   // R10 : les ruches. Le nom est au registre (MEMBER_INPUTS) ; le reste est écrit par l'API ou
   // choisi dans une liste fermée par Zod et par le `check` de la table.

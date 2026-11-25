@@ -79,6 +79,9 @@ beforeEach(async () => {
   })
   inesId = (await me(ines)).id
   malikId = (await me(malik)).id
+  // Ces tests comptent la liste et la cloche exactement : sans « Ma récolte », les avis du jeu
+  // (introduction, niveau, sceau, R19) n'y entrent pas.
+  for (const cookie of [ines, malik, zoe, sam]) await activity(ctx).muteHarvest(cookie)
 })
 
 afterEach(async () => {
@@ -748,6 +751,11 @@ describe('keeping notifications 90 days', () => {
 })
 
 describe('the handle', () => {
+  // Ces deux tests comptent aussi l'avis d'introduction du jeu : Inès rallume « Ma récolte ».
+  beforeEach(async () => {
+    await activity(ctx).muteHarvest(ines, true)
+  })
+
   it('is the first notification of a new member, dated from the verification of her address', async () => {
     // R19 : l'avis d'introduction de la récolte, reçu à la création du compte, a son propre test
     // (game.notices.test.ts) ; ici on ne lit que celui du pseudo, et la cloche en compte deux.
