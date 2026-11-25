@@ -81,9 +81,9 @@ describe('LegalPageScreen (R11)', () => {
     await renderWithProviders(<LegalPageScreen page="rules" />)
 
     expect(screen.getByRole('header', { name: titles.rules })).toBeTruthy()
-    // La version en vigueur des règles (RULES_VERSION, 2026-11-17 depuis R12), écrite en date courte.
-    expect(RULES_VERSION).toBe('2026-11-17')
-    expect(screen.getByText(/^Version du 17 nov\.? 2026$/)).toBeTruthy()
+    // La version en vigueur des règles (RULES_VERSION, 2026-11-23 depuis R19), écrite en date courte.
+    expect(RULES_VERSION).toBe('2026-11-23')
+    expect(screen.getByText(/^Version du 23 nov\.? 2026$/)).toBeTruthy()
     expect(screen.getByRole('header', { name: summaryTitle })).toBeTruthy()
     expect(screen.getByText(fr.t(($) => $.legal.pages.rules.summary.respect))).toBeTruthy()
     expect(screen.getByRole('header', { name: fullTextTitle })).toBeTruthy()

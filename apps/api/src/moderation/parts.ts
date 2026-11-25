@@ -14,6 +14,7 @@ import type { ReportPartField, StoredReportTarget } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { type Language, resources } from '@ruche/i18n'
 import { and, desc, eq, inArray, isNotNull, isNull, ne, type SQL, sql } from 'drizzle-orm'
+import { type PollenSource, restoreFor, revokeFor } from '../game/award'
 import { provisionalHandle, restoreHandle } from '../handles/provisional'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
@@ -177,6 +178,10 @@ export const hidePart = async (tx: Tx, args: HideArgs): Promise<ReplacedValue> =
     .onConflictDoNothing()
     .returning({ id: cpr.id })
   if (inserted.length === 0) throw new PartAlreadyDecided()
+  // R19 (relecture de sécurité S5) : la photo, la bio ou les outils retirés perdent le pollen qu'ils
+  // ont rapporté, dans la même transaction (par game/award.ts, seul à écrire le grand livre).
+  const profilePart = profilePartOf(target, part.field)
+  if (profilePart) await revokeFor(tx, profilePart, now)
   return null
 }
 
@@ -477,8 +482,21 @@ export const restorePart = async (
   if (!row) return false
   await putBack(tx, target, row)
   await tx.delete(cpr).where(eq(cpr.id, row.id))
+  // R19 : la partie rétablie rend son pollen (révoqué par hidePart).
+  const profilePart = profilePartOf(target, part.field)
+  if (profilePart) await restoreFor(tx, profilePart)
   return true
 }
+
+/**
+ * R19 : la partie d'un profil qui a rapporté du pollen (photo, bio, outils favoris), dans la forme
+ * qu'attendent `revokeFor` et `restoreFor` ; null pour toute autre partie (le nom, le pseudo, une
+ * partie de projet ou de ruche ne rapportent rien par elles-mêmes).
+ */
+const profilePartOf = (target: StoredReportTarget, field: ReportPartField): PollenSource | null =>
+  target.kind === 'member' && (field === 'avatar' || field === 'bio' || field === 'favoriteTools')
+    ? { kind: 'profile', memberId: target.id, part: field }
+    : null
 
 const putBack = async (
   tx: Tx,

@@ -56,6 +56,17 @@ export const activity = (ctx: TestContext) => {
     me: async (cookie: string) =>
       Me.parse(await (await expectStatus(200, 'GET', '/v1/me', cookie)).json()),
 
+    /**
+     * Coupe « Ma récolte » (PATCH /v1/me/game) : les avis du jeu (l'introduction, le niveau, les
+     * sceaux) quittent l'Activité et la cloche. Les tests des listes d'avant R19 comptent ces
+     * listes exactement ; ils coupent la récolte de leurs membres pour ne lire que ce qu'ils
+     * vérifient (`on` à vrai la rallume). Les avis du jeu ont leurs propres tests
+     * (game.notices.test.ts).
+     */
+    muteHarvest: async (cookie: string, on = false) => {
+      await expectStatus(204, 'PATCH', '/v1/me/game', cookie, { harvestNotices: on })
+    },
+
     /** Change son nom, sa langue ou son pseudo (PATCH /v1/me). */
     updateProfile: async (cookie: string, body: object) => {
       await expectStatus(200, 'PATCH', '/v1/me', cookie, body)

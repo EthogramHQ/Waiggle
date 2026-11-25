@@ -4505,3 +4505,172 @@ colonne latérale du Fil vient après son contenu. La tranche le vérifie au cla
 
 Les passages de page (R17), les squelettes (R16) et les feuilles gardent leur mouvement. Les pages
 publiques rendues dans le HTML viennent avec R22.
+
+## R19 — La gamification
+
+Statut : **validé par Louis** le 23/11/2026 (décisions du 17/11 : pollen, miel, rayon, titres,
+séries qui hivernent, défis, classement, sceaux ; « rien qui culpabilise »).
+
+Chaque geste qui aide un proche (tester, faire un retour, commenter, encourager) ou qui fait avancer
+son propre projet rapporte du **pollen**. Le pollen fait monter de **niveau** et ne baisse jamais.
+Certains moments (une semaine butinée, un défi réussi) rapportent aussi du **miel**, qui se dépense.
+Rien ne se perd et rien ne presse : pas de compte à rebours, pas de « tu vas perdre », pas de
+chiffre rouge. Aucun geste n'est bloqué par la gamification.
+
+### Le pollen
+
+- Étant donné un membre qui fait un geste de la liste ci-dessous
+  Quand le geste réussit
+  Alors il gagne son pollen, et un petit « +10 pollen » doré s'affiche un instant près du bouton
+  (un fondu avec « Réduire les animations ») ;
+  Et le lecteur d'écran l'annonce poliment, sans couper.
+- Le même geste sur la même chose ne paie qu'une fois : retirer puis reposer une réaction, ne plus
+  suivre puis suivre à nouveau, ne rapporte rien de plus.
+- Défaire un geste (supprimer un commentaire, retirer une réaction) ne retire pas son pollen.
+  Seule exception : un contenu retiré par la modération retire le pollen qu'il a rapporté ; une
+  suspension n'efface rien du passé.
+- Chaque sorte de geste a un plafond par jour : au-delà, le geste marche, sans pollen, et rien ne
+  l'affiche comme une faute.
+- Rien ne se gagne sur ses propres projets (réagir, suivre, tester y sont déjà refusés ; commenter
+  son projet ne rapporte rien).
+- Un compte suspendu ne gagne rien. Un compte d'exemple (WaiggleBot) ne gagne rien, n'apparaît
+  dans aucun classement et ne fait gagner personne.
+
+| Geste | Pollen | Compté par jour, au plus |
+| --- | --- | --- |
+| Faire un retour de testeur (premier message d'un fil, puis un par jour et par fil) | 25 | 4 |
+| Son retour marqué « réglé » par l'auteur | 25 | — |
+| Devenir testeur d'un projet | 10 | 5 |
+| Commenter ou répondre sur le projet d'un autre | 10 | 10 |
+| Publier un projet (premier passage hors privé) | 50 | 2 |
+| Publier une mise à jour | 20 | 3 |
+| Réagir (chaque sorte, une fois par projet) | 2 | 25 |
+| Suivre un projet ou un membre | 3 | 10 |
+| Recevoir sur son projet un retour, un testeur, un commentaire, une réaction | 5, 5, 3, 1 | 50 au total |
+| Créer une ruche | 15 | 1 |
+| Une invitation dans une ruche acceptée (l'invitant ; l'invité gagne 15) | 20 | 5 |
+| Compléter son profil (photo, bio, un outil : chacun une fois) | 10 | — |
+
+Ne rapportent rien : ouvrir l'appli ; « Tester la démo » (aucune trace aujourd'hui, et un clic se
+triche) ; le parrainage à l'inscription (le code d'invitation est commun : il viendra avec le code
+des Éclaireuses, R20).
+
+### Le niveau et « ton rayon »
+
+- Le niveau n commence à 50 × n × (n − 1) pollen : niveau 2 à 100, 3 à 300, 5 à 1 000, 10 à 4 500 ;
+  pas de plafond.
+- Étant donné un membre
+  Quand il ouvre son profil
+  Alors il voit son niveau (« Niveau 4 »), son titre (« Butineuse »), et **son rayon** : une
+  rangée d'alvéoles qui se remplissent de pollen jusqu'au niveau suivant ;
+  Et « 120 pollen avant le niveau 5 » se lit en toutes lettres (le lecteur d'écran aussi).
+- Quand il passe un niveau
+  Alors une alvéole se scelle (la cire coule) à sa prochaine visite du profil, une seule fois.
+
+### Les titres
+
+- Le titre dit **comment** on butine, pas combien :
+  - **Butineuse** : réagit et commente ;
+  - **Bâtisseuse** : publie et met à jour ses projets ;
+  - **Gardienne** : teste et fait des retours ;
+  - **Danseuse** : fait venir du monde (invitations acceptées, ruches créées) ;
+  - **Éclaireuse** : réservé aux testeuses de Waiggle (R20).
+- Le titre affiché est celui de la famille de gestes qui a rapporté le plus de pollen sur les 4
+  dernières semaines ; le membre peut en épingler un autre qu'il a déjà obtenu.
+- **La forme se choisit** dans le profil : au féminin par défaut (les ouvrières sont des
+  abeilles), au masculin d'un geste (Butineur, Bâtisseur, Gardien, Danseur, Éclaireur). En anglais,
+  une seule forme : Forager, Builder, Keeper, Dancer, Scout.
+
+### Les sceaux de cire
+
+- Une douzaine de sceaux pour des premières fois et des paliers : premier projet, première mise à
+  jour, premier retour, premier retour réglé, 10 projets testés, 10 retours, première ruche créée,
+  une ruche de 5 proches, 5 invitations acceptées, 10 et 25 semaines butinées, et un sceau par
+  catégorie de projet (avoir testé ou commenté 3 projets de la catégorie, « Explorateur du
+  jardin »). La liste exacte au plan.
+- Un sceau gagné reste ; il s'affiche sur le profil, les plus récents d'abord. Un sceau non gagné
+  ne s'affiche pas sur le profil : pas de vitrine de manques.
+
+### Les semaines butinées (les séries qui hivernent)
+
+- Une semaine (du lundi au dimanche, heure de Paris) est **butinée** si le membre y a fait au moins
+  un geste qui aide ou qui crée : publier, mettre à jour, commenter, faire un retour, devenir
+  testeur. Réagir ou suivre seuls ne suffisent pas ; ouvrir l'appli non plus.
+- Étant donné une série de 6 semaines butinées
+  Quand une semaine passe sans geste
+  Alors la série **hiverne** : elle garde ses 6 semaines, une abeille endormie la montre, et rien
+  ne le reproche ;
+  Quand le membre butine de nouveau
+  Alors la série reprend à 7.
+- Le profil montre « 7 semaines butinées » ; jamais « tu vas perdre ta série ».
+- Chaque semaine butinée rapporte 5 miel.
+
+### Les défis
+
+- **Le défi perso** : chaque lundi, trois défis sont proposés (« Fais un retour sur un projet »,
+  « Publie une mise à jour », « Teste un projet d'un proche »…) ; le membre en choisit un, ou
+  aucun. Réussi, il rapporte 10 miel et du pollen ; manqué, il disparaît le lundi suivant sans
+  trace.
+- **Le défi de ruche** : chaque lundi, chaque ruche de 3 membres au moins reçoit un défi commun
+  (« 5 retours entre vous cette semaine »), tiré d'une liste fixe ; ses membres voient l'avancée
+  (« 3 sur 5 ») dans la ruche, sans dire qui n'a rien fait. Réussi, chacun de ceux qui y ont
+  participé reçoit 10 miel.
+
+### Le classement de la semaine
+
+- Les **proches** d'un membre, pour le classement : les membres qu'il suit (comme partout
+  ailleurs). Un suivi réciproque dirait qui le suit, que l'appli garde secret (décision du 23/11).
+- Étant donné un membre
+  Quand il ouvre le classement
+  Alors il voit, pour la semaine en cours, le pollen gagné par lui et ses proches, du plus au moins ;
+  Et un onglet par ruche pour le classement de ses membres ;
+  Et tout repart à zéro chaque lundi.
+- Seuls apparaissent ceux qui ont gagné du pollen cette semaine : personne n'est montré à zéro, et
+  le bas du classement ne se distingue pas.
+- Chacun apparaît d'office. **Le retrait** : un réglage « Apparaître dans les classements ».
+  Retiré, on ne voit plus les classements et on n'y apparaît plus ; le pollen et le niveau restent.
+
+### Le miel
+
+- Le solde de miel se voit à côté du niveau, sur son profil seulement.
+- Il se gagne : 5 par semaine butinée, 10 par défi perso, 10 par défi de ruche. Il ne s'achète pas.
+- Il se dépense :
+  - **offrir du miel** au projet d'un proche (5 miel) : un grand encouragement, l'auteur voit
+    « Léa t'a offert du miel » dans son activité ;
+  - **décorer son rayon** (une teinte, un motif de cire).
+- Plus tard, des fonctions gagnées pour un temps (hors de cette tranche).
+
+### Où on le voit
+
+- Sur **son profil** : niveau, titre, rayon, semaines butinées, miel, sceaux.
+- Sur **la page d'un membre** (connecté) : niveau, titre, rayon et sceaux ; jamais le miel.
+- Sur **la page publique** (R12) : rien dans cette tranche.
+- Une page **« Ma récolte »**, ouverte depuis le rayon du profil (et, sur ordinateur, depuis une
+  ligne « Ta semaine » de la colonne du Fil) : le pollen de la semaine et d'où il vient, le défi
+  perso, les défis de ruche, le classement, le miel et ce qu'il achète, tous les sceaux. Pas de
+  nouvel onglet.
+
+### Ce qui fait revenir, sans insister
+
+- Dans **l'Activité** de l'appli (jamais d'e-mail immédiat ni de notification poussée) : un niveau
+  passé, un sceau gagné, un défi de ruche réussi, « Léa t'a offert du miel ».
+- Le **récap du dimanche** gagne, seulement s'il y a quelque chose à dire : « Ta semaine : +85
+  pollen, défi réussi », l'avancée du défi de ta ruche (« 4 sur 5 »), et « Nouveaux défis lundi ».
+- Toujours en positif : jamais « tu vas perdre », jamais de compte à rebours. Un réglage des
+  notifications, « Ma récolte », coupe ces lignes et ces annonces.
+
+### Au lancement
+
+- Les membres existants reçoivent une fois, au déploiement, le pollen et les sceaux de ce qu'ils
+  ont déjà fait, sans plafond par jour pour le passé ; les séries et le miel partent de zéro.
+
+### Les données
+
+- Le pollen, les sceaux, les séries, les défis et le miel sont dans l'export du compte, et partent
+  avec lui.
+- La Confidentialité et le registre disent ce qui est compté, et qui voit le classement.
+
+### Le reste ne change pas
+
+Les réactions, commentaires, retours et ruches marchent comme avant. Les Éclaireuses (R20)
+viennent ensuite, avec leur sceau de fondatrice et le parrainage.

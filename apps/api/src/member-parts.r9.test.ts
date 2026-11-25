@@ -212,3 +212,40 @@ describe('a removed bio and removed favorite tools in the export', () => {
     expect(AccountExport.parse(await res.json()).profileRemovedParts).toEqual([])
   })
 })
+
+// R19 (« La gamification ») : la bio et les outils rapportent chacun 10 pollen ; un contenu retiré
+// par la modération retire le pollen qu'il a rapporté (le retrait d'une partie du profil passe par
+// moderation/parts.ts). Le rayon de sa page (`Member.game.cells`, une alvéole par dizaine de pollen)
+// le montre, pour elle comme pour les autres.
+describe('a removed bio or removed favorite tools in the comb of her page (R19)', () => {
+  const cellsOfLea = async (cookie: string) => {
+    const { game } = (await pageOfLea(cookie)).member
+    if (!game) throw new Error('no game on the page of Léa')
+    return game.cells
+  }
+
+  it('takes back the pollen of a removed bio and of removed favorite tools', async () => {
+    later()
+    await act.updateProfile(lea, { bio: 'Mes pronostics gagnants.', favoriteTools: ['Claude'] })
+    expect(await cellsOfLea(max)).toBe(2)
+
+    await removeFromLea({ field: 'bio' })
+    expect(await cellsOfLea(max)).toBe(1)
+
+    await removeFromLea({ field: 'favoriteTools' })
+    expect(await cellsOfLea(max)).toBe(0)
+    expect(await cellsOfLea(lea)).toBe(0)
+  })
+
+  it('pays nothing again for a bio written after the removal', async () => {
+    later()
+    await act.updateProfile(lea, { bio: 'Mes pronostics gagnants.' })
+    await removeFromLea({ field: 'bio' })
+
+    later()
+    await act.updateProfile(lea, { bio: 'Je cuisine le dimanche.' })
+
+    // La bio a déjà payé une fois : la nouvelle ne rapporte rien.
+    expect(await cellsOfLea(max)).toBe(0)
+  })
+})

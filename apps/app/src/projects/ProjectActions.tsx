@@ -28,14 +28,21 @@
 // aux testeurs par `testers/api`), et `ProjectActionsView`, le dessin seul, sans lecture ni
 // écriture, que le catalogue montre.
 // Ce fichier n'écrit aucun style (règle Biome de `src/projects/**`) : il assemble des composants.
-import type { Project } from '@ruche/contracts'
+import { HONEY, type Project } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type Ref, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useMemberSession } from '../accounts/session'
+import { errorKey } from '../api/errors'
 import { useFollow } from '../follows/api'
+import { useOfferHoney } from '../gamification/api'
+import { usePollenGain } from '../gamification/pollen'
 import { useSuspension } from '../moderation/suspension'
+import { loadSettingsChunk } from '../navigation/chunkLoaders'
+import { lazyModule } from '../navigation/lazyModule'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
+import type { HoneyOfferProblem } from '../screens/HoneyOfferSheet'
 import { TesterSheet } from '../screens/TesterSheet'
 import { useBecomeTester } from '../testers/api'
 import { Button } from '../ui/Button'
@@ -46,6 +53,7 @@ import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll, moveReaderTo, revealWithoutJump } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import type { NoticeAction } from '../ui/Notice'
+import { type PlacedGain, PollenGainSpot } from '../ui/PollenGainSpot'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useTapGuard } from '../ui/tapGuard'
@@ -70,6 +78,8 @@ export type ActionsProject = Pick<
   | 'testerCount'
   | 'testerJoinable'
 > & {
+  /** R19 : du miel déjà offert à ce projet (« Miel offert ») ; absent au catalogue. */
+  honeyGiven?: Project['honeyGiven']
   /** Retiré par la modération (tranche 7a) : il ne se modifie plus (l'API refuserait, 409). */
   removal?: Project['removal']
 }
@@ -107,6 +117,13 @@ type ViewProps = {
   testersRef?: Ref<Focusable>
   /** « Suivre ce projet », où va le focus quand « Rejoindre les testeurs » n'est plus là (R7b). */
   followRef?: Ref<Focusable>
+  /** R19 : le pollen de l'inscription aux testeurs, à droite du « Coin des testeurs ». */
+  testersGain?: PlacedGain | null
+  /**
+   * R19 : « Offrir du miel », à côté du bouton des testeurs ; `given` : « Miel offert », inactif
+   * (une offre par projet). Absent : pas de bouton (l'auteur, un projet d'exemple, le catalogue).
+   */
+  honey?: { given: boolean; onOffer: () => void; ref?: Ref<Focusable> } | null
 }
 
 /** Le projet cherche-t-il des testeurs ? « Testable », avec une démo à essayer (scénario R7a). */
@@ -126,6 +143,8 @@ export function ProjectActionsView({
   onOpenCorner,
   testersRef,
   followRef,
+  testersGain,
+  honey,
 }: ViewProps) {
   const { t } = useTranslation()
   const followers = t(($) => $.follow.followers, { count: project.followerCount })
@@ -171,26 +190,54 @@ export function ProjectActionsView({
   // ce projet » au-dessus). Un seul élément pour ses deux libellés : le focus y reste quand il
   // passe de « Rejoindre les testeurs » à « Le coin des testeurs ». En blanc : « Tester la démo »
   // est l'action miel de la page. Les trois personnes de `users-three` dans les deux cas (planche).
+  // R19 (options b7, b10) : « Offrir du miel », en blanc, à côté du bouton des testeurs. Un seul
+  // élément pour ses deux libellés : après l'offre, « Miel offert » (coche) garde le focus que la
+  // feuille lui rend, inactif mais toujours atteint au clavier (relecture d'interface UI-5).
+  const honeyButton = honey ? (
+    <Button
+      key="honey"
+      ref={honey.ref}
+      label={honey.given ? t(($) => $.game.offer.given) : t(($) => $.game.offer.button)}
+      icon={honey.given ? 'check' : 'hexagon'}
+      variant="secondary"
+      size="compact"
+      onPress={honey.onOffer}
+      disabled={honey.given}
+      focusableWhenDisabled
+    />
+  ) : null
+
   const testers =
     showTesters && testersAction ? (
+      <Row wrap gap="md" key="testers">
+        {/* R19 : la pastille de gain de l'inscription, à droite du bouton. */}
+        <PollenGainSpot gain={testersGain} placement="end">
+          <Button
+            ref={testersRef}
+            label={
+              project.isTester
+                ? t(($) => $.project.testers.corner)
+                : t(($) => $.project.testers.join)
+            }
+            icon="users-three"
+            variant="secondary"
+            size="compact"
+            // « Le coin des testeurs » mène à une autre page : il se lit « lien » (interface A10) ;
+            // « Rejoindre les testeurs » ouvre une feuille sur la page : un bouton. Le même élément
+            // pour les deux (voir le rôle dans Button) : le focus ne se perd pas au changement.
+            role={project.isTester ? 'link' : 'button'}
+            onPress={testersAction}
+            disabled={!project.isTester && !canJoin}
+            // Inactif après un départ : toujours atteint au clavier, le focus ne retombe pas en haut.
+            focusableWhenDisabled
+          />
+        </PollenGainSpot>
+        {honeyButton}
+      </Row>
+    ) : honeyButton ? (
+      // Sans bouton des testeurs, « Offrir du miel » prend seul sa place, sous « Suivre ce projet ».
       <Row wrap key="testers">
-        <Button
-          ref={testersRef}
-          label={
-            project.isTester ? t(($) => $.project.testers.corner) : t(($) => $.project.testers.join)
-          }
-          icon="users-three"
-          variant="secondary"
-          size="compact"
-          // « Le coin des testeurs » mène à une autre page : il se lit « lien » (interface A10) ;
-          // « Rejoindre les testeurs » ouvre une feuille sur la page : un bouton. Le même élément
-          // pour les deux (voir le rôle dans Button) : le focus ne se perd pas au changement.
-          role={project.isTester ? 'link' : 'button'}
-          onPress={testersAction}
-          disabled={!project.isTester && !canJoin}
-          // Inactif après un départ : toujours atteint au clavier, le focus ne retombe pas en haut.
-          focusableWhenDisabled
-        />
+        {honeyButton}
       </Row>
     ) : null
 
@@ -308,6 +355,9 @@ type Props = Pick<ViewProps, 'project' | 'onOpenDemo' | 'onEdit'>
  * l'aide répond « rien ». Même raisonnement que navigation/TopNav.tsx : l'issue du try est la même
  * à chaque rendu, React compte donc toujours les mêmes hooks.
  */
+// Le morceau de la feuille « Offrir du miel » (voir `useHoneyParts` plus bas, dans `ProjectActions`).
+const useHoneyParts = lazyModule(loadSettingsChunk)
+
 const useFocusParam = (): string | undefined => {
   try {
     // biome-ignore lint/correctness/useHookAtTopLevel: l'issue du try est la même à chaque rendu (voir ci-dessus)
@@ -333,6 +383,8 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
   const signInAgain = useSignInAgain()
 
   const become = useBecomeTester(project.id)
+  // R19 : le pollen de l'inscription, montré à droite du « Coin des testeurs ».
+  const testerPollen = usePollenGain('tester')
   // La feuille d'inscription : ouverte ou non. Elle reste montée pendant son fondu de sortie.
   const [sheetOpen, setSheetOpen] = useState(false)
   // Le refus de la dernière demande se montre après un envoi seulement, et disparaît à la
@@ -417,6 +469,58 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
     else moveReaderTo(target)
   }, [hydrated, focusParam, router, calm])
 
+  // R19 : « Offrir du miel », sur le projet d'un autre membre, jamais sur un projet d'exemple. Un
+  // compte suspendu n'offre plus (l'API refuserait) ; « Miel offert » reste lisible.
+  const viewerName = useMemberSession().session?.user.name ?? ''
+  const offer = useOfferHoney(project.id)
+  const offersHoney =
+    !project.isMine &&
+    project.author.example !== true &&
+    (project.honeyGiven === true || !suspended)
+  // La feuille est dans le morceau des réglages (hors du script de départ de l'accueil, garde de
+  // poids de R18) ; demandée dès que le bouton « Offrir du miel » est là, elle est arrivée avant la
+  // tape. Tant qu'elle manque, rien ne la remplace : elle est fermée de toute façon.
+  const honeyParts = useHoneyParts(offersHoney)
+  const [honeyOpen, setHoneyOpen] = useState(false)
+  const [honeyProblem, setHoneyProblem] = useState<HoneyOfferProblem | null>(null)
+  const honeyRef = useRef<Focusable>(null)
+  // Une offre en route : lu tout de suite, une seconde tape ne la renvoie pas.
+  const offering = useRef(false)
+  const openHoney = () => {
+    offering.current = false
+    setHoneyProblem(null)
+    setHoneyOpen(true)
+  }
+  const confirmHoney = async (balance: number) => {
+    if (offering.current) return
+    offering.current = true
+    setHoneyProblem(null)
+    const failure = await offer.mutateAsync().then(
+      () => null,
+      (error: unknown) => errorKey(error),
+    )
+    if (failure !== null) {
+      offering.current = false
+      setHoneyProblem(
+        failure === 'honeyShort'
+          ? 'short'
+          : failure === 'honeyAlready'
+            ? 'already'
+            : failure === 'unauthorized'
+              ? 'expired'
+              : 'failed',
+      )
+      return
+    }
+    // Offert : la feuille se ferme (le bouton, devenu « Miel offert », reprend le focus), puis la
+    // bulle dit le solde qui reste. `offering` reste levé jusqu'à la prochaine ouverture.
+    setHoneyOpen(false)
+    toast.show(
+      t(($) => $.game.offer.toast, { amount: balance - HONEY.gift }),
+      { icon: 'check-circle' },
+    )
+  }
+
   // Ne plus suivre un projet qu'on teste ne fait pas quitter les testeurs : la bulle le dit
   // (juridique T5). `shown` est l'état affiché au toucher : vrai, on cesse de suivre.
   const toggleFollow = (shown: boolean) => {
@@ -447,7 +551,28 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
         onOpenCorner={openCorner}
         testersRef={testersRef}
         followRef={followRef}
+        testersGain={
+          testerPollen ? { amount: testerPollen.amount, trigger: testerPollen.key } : null
+        }
+        honey={
+          offersHoney
+            ? { given: project.honeyGiven === true, onOffer: openHoney, ref: honeyRef }
+            : null
+        }
       />
+      {offersHoney && honeyParts ? (
+        <honeyParts.HoneyOfferSheet
+          open={honeyOpen}
+          title={project.title}
+          authorName={project.author.name}
+          viewerName={viewerName}
+          pending={offer.isPending}
+          problem={honeyProblem}
+          onConfirm={(balance) => void confirmHoney(balance)}
+          onClose={() => setHoneyOpen(false)}
+          returnFocusTo={() => honeyRef.current}
+        />
+      ) : null}
       {project.isMine ? null : (
         <TesterSheet
           open={sheetOpen}

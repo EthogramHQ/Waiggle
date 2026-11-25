@@ -15,6 +15,7 @@ import { reachableBy } from '../blocks/write'
 import { viewerHivesOf, viewerOf } from '../comments/load'
 import { errorBody, languageOf } from '../errors'
 import { memberFollowState } from '../follows/load'
+import { loadMemberGame } from '../game/member'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { searchMentionable } from '../mentions/search'
@@ -264,6 +265,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           // Un administrateur qui l'a bloqué lit encore sa suspension et ses décisions, mais ne
           // peut pas le suspendre (canSuspend faux, S4).
           moderation: await moderationOf(db, viewer.id, row.id, true),
+          // R19 : rien de sa récolte pour un membre bloqué.
+          game: null,
         }),
         200,
       )
@@ -302,6 +305,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         projects,
         removedParts: removedParts.get(partOwnerKey('member', row.id)) ?? [],
         moderation: await moderationOf(db, viewer.id, row.id, false),
+        // R19 : son jeu (niveau, rayon, titre, sceaux, décoration), jamais son miel ni ses
+        // réglages ; null pour un compte d'exemples (game/member.ts, trois requêtes).
+        game: await loadMemberGame(db, viewer.id, row.id),
       }),
       200,
     )

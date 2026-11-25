@@ -72,6 +72,18 @@ const samAccount = { name: 'Sam', email: 'sam@example.com', password: 'sam-long-
 
 const fr = resources.fr.translation.email
 const en = resources.en.translation.email
+/** R19 : les textes du bloc « Ta semaine » du récap. */
+const harvestTexts = resources.fr.translation.game.recap
+
+/**
+ * R19 : coupe « Ma récolte » (PATCH /v1/me/game) : le pollen seul n'envoie plus de récap. Les tests
+ * « rien ne part » d'avant R19 s'en servent pour un membre qui a gagné du pollen dans la semaine
+ * (une publication, un commentaire reçu), sans quoi le récap partirait pour « Ta semaine ».
+ */
+const harvestNoticesOff = async (cookie: string) => {
+  const res = await act.send('PATCH', '/v1/me/game', cookie, { harvestNotices: false })
+  expect(res.status).toBe(204)
+}
 
 beforeEach(async () => {
   // La fausse horloge avant l'API : la limite de débit garde la fonction Date.now qu'elle trouve.
@@ -171,9 +183,26 @@ const frameOf = (name: string) => [
   fill(fr.privacy, { url: '' }),
   fill(fr.greeting, { name }),
   appName,
+  // R19 : le bloc « Ta semaine », qu'un membre qui a gagné du pollen reçoit en plus (ses lignes
+  // de pollen, au nombre variable, sont retirées par `expectOnly`) ; game.recap.test.ts le teste.
+  fill(harvestTexts.lead),
+  fill(harvestTexts.newChallenges),
+  fill(harvestTexts.button),
+  fill(harvestTexts.news),
+  fill(harvestTexts.reason),
 ]
+/** « +{{amount}} pollen. » devenu une expression : le nombre, quel qu'il soit. */
+const amountPattern = (template: string) =>
+  new RegExp(
+    fill(template, { amount: '§' })
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace('§', '\\d+'),
+    'g',
+  )
+const pollenLines = [amountPattern(harvestTexts.pollenDone), amountPattern(harvestTexts.pollen)]
 const expectOnly = (text: string, expected: string[]) => {
   let rest = text.replace(/https?:\/\/\S+/g, ' ')
+  for (const line of pollenLines) rest = rest.replace(line, ' ')
   for (const part of [...expected].sort((a, b) => b.length - a.length)) {
     rest = rest.replaceAll(part, ' ')
   }
@@ -326,7 +355,9 @@ describe('the content of the recap', () => {
   })
 
   it('sends nothing when there is nothing new', async () => {
-    await act.publish(ines, 'Météo')
+    // R19 : un projet privé, qui ne rapporte pas de pollen (publier, c'est le premier passage hors
+    // privé) : sans quoi « Ta semaine » ferait partir le récap.
+    await act.publish(ines, 'Météo', { visibility: 'private' })
     const recettes = await act.publish(malik, 'Recettes')
     later()
     // Témoin : Malik, lui, a du nouveau.
@@ -340,6 +371,9 @@ describe('the content of the recap', () => {
   })
 
   it('sends nothing for what the member already saw in the app, and only what came after', async () => {
+    // R19 : Sam gagne du pollen (sa publication, le commentaire reçu) ; « Ma récolte » coupé, le
+    // pollen seul ne fait pas partir son récap.
+    await harvestNoticesOff(sam)
     const meteo = await act.publish(ines, 'Météo')
     const jardin = await act.publish(sam, 'Jardin')
     later()
@@ -1497,6 +1531,8 @@ describe('the dressed recap (R8)', () => {
   it('leaves out of the recap a type set to never, and sends nothing when only that type has news', async () => {
     await act.setPreferences(ines, { comments: 'never' })
     await act.setPreferences(sam, { comments: 'never' })
+    // R19 : comme plus haut, le pollen de Sam (publication, commentaire reçu) ne compte pas ici.
+    await harvestNoticesOff(sam)
     const meteo = await publish(ines, 'Météo')
     const jardin = await publish(sam, 'Jardin')
     later()

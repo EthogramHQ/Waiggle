@@ -41,6 +41,8 @@ import { hiddenFrame } from './HiddenHeading'
 import { Icon, type IconName } from './Icon'
 import { bee, beeViewBox } from './logo.generated'
 import { Notice, type NoticeAction } from './Notice'
+import { PollenGain } from './PollenGain'
+import type { PlacedGain } from './PollenGainSpot'
 import { BeeDance, ReactionBurst, RollingCount, useBounce } from './reactionMotion'
 import { Surface } from './Surface'
 import { useScreenFocused } from './screenFocus'
@@ -88,7 +90,16 @@ type Props = {
   error?: string | undefined
   /** Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré). */
   errorAction?: NoticeAction | undefined
+  /**
+   * R19 : le pollen qu'une réaction posée vient de rapporter. La pastille « +2 pollen » naît
+   * au-dessus de cette réaction : `kind` (le `target` du gain, son type), sinon la dernière posée
+   * dans la capsule. Absent ou `null` : rien.
+   */
+  gain?: ReactionGain | null | undefined
 }
+
+/** Le gain d'une réaction : celui de `usePollenGain`, avec le type de la réaction qui l'a rapporté. */
+export type ReactionGain = PlacedGain & { kind?: string | undefined }
 
 /** L'appui long qui ouvre l'éventail, en millisecondes (scénario R5a). */
 export const FAN_LONG_PRESS_MS = 430
@@ -160,7 +171,14 @@ export function ReactionIcon({
   )
 }
 
-export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAction }: Props) {
+export function ReactionCapsule({
+  reactions,
+  onToggle,
+  onOpenFan,
+  error,
+  errorAction,
+  gain,
+}: Props) {
   const { t } = useTranslation()
   const calm = useCalmMotion()
   const hintId = useId()
@@ -184,10 +202,14 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
   // Chaque réaction posée reçoit un numéro qui avance : la goutte, l'anneau, le rebond et la danse
   // partent quand il change. Au montage, aucun : rien ne bouge sans geste du membre.
   const [bursts, setBursts] = useState<Partial<Record<ReactionKind, number>>>({})
-  // Le centre de chaque bouton, mesuré dans la rangée : la goutte y tombe.
-  const [centers, setCenters] = useState<Partial<Record<ReactionKind, { x: number; y: number }>>>(
-    {},
-  )
+  // Le centre de chaque bouton, mesuré dans la rangée : la goutte y tombe. Et son bord du haut
+  // (`top`) : la pastille de gain naît au-dessus.
+  const [centers, setCenters] = useState<
+    Partial<Record<ReactionKind, { x: number; y: number; top: number }>>
+  >({})
+  // R19 : la dernière réaction posée dans la capsule, où va la pastille d'un gain qui ne dit pas
+  // de quelle réaction il vient.
+  const [lastPosed, setLastPosed] = useState<ReactionKind | null>(null)
   const lastOpen = useRef<number | null>(null)
   // RF (relecture de sécurité, A2) : sur le web, la capsule flotte hors du fondu du contenu
   // (ui/ScreenFade.tsx), qui coupe les tapes tant que la page n'est pas pleine. Elle prenait donc
@@ -211,20 +233,30 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
   const press = (item: Item) => {
     if (!tapsAllowed) return
     // Poser (et non retirer) fait partir le mouvement.
-    if (!item.mine) setBursts((all) => ({ ...all, [item.kind]: (all[item.kind] ?? 0) + 1 }))
+    if (!item.mine) {
+      setBursts((all) => ({ ...all, [item.kind]: (all[item.kind] ?? 0) + 1 }))
+      setLastPosed(item.kind)
+    }
     onToggle(item.kind)
   }
 
   const measure = (kind: ReactionKind) => (event: LayoutChangeEvent) => {
     const { x, y, width, height } = event.nativeEvent.layout
-    const center = { x: x + width / 2, y: y + height / 2 }
+    const center = { x: x + width / 2, y: y + height / 2, top: y }
     setCenters((all) => {
       const known = all[kind]
-      return known && known.x === center.x && known.y === center.y
+      return known && known.x === center.x && known.y === center.y && known.top === center.top
         ? all
         : { ...all, [kind]: center }
     })
   }
+
+  // La réaction qui porte la pastille : celle que nomme le gain, sinon la dernière posée ici.
+  const gainItem = gain
+    ? (items.find((item) => item.kind === gain.kind) ??
+      items.find((item) => item.kind === lastPosed))
+    : undefined
+  const gainCenter = gainItem ? centers[gainItem.kind] : undefined
 
   // Des réactions verrouillées parmi les autres (compte suspendu) : la rangée devient une liste,
   // chaque réaction un élément ; les verrouillées montrent leur nombre, les autres gardent leur
@@ -289,6 +321,26 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
               />
             ) : null
           })}
+          {/* R19 : la pastille de gain, dans la même couche que la goutte, pour la même raison (le
+              verre la rognerait). Ancrée au milieu du haut de la réaction qui l'a rapportée ; tant
+              que la rangée n'est pas mesurée, au-dessus de la capsule. */}
+          {gain && gainItem ? (
+            <View
+              key={`gain-${gainItem.kind}`}
+              testID={`pollen-gain-${gainItem.kind}`}
+              pointerEvents="none"
+              style={styles.motionLayer}
+            >
+              <PollenGain
+                amount={gain.amount}
+                trigger={gain.trigger}
+                placement="above"
+                {...(gainCenter
+                  ? { at: { x: gainCenter.x + LAYER_OFFSET, y: gainCenter.top + LAYER_OFFSET } }
+                  : null)}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
       {/* L'indice lu sur chaque bouton, sur le web (aria-describedby) : « Voir les réactions et

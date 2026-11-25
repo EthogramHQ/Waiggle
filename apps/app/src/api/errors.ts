@@ -68,6 +68,15 @@ export type ApiErrorKey =
   // que son auteur a retiré de l'accueil n'y revient pas.
   | 'visitorReportQuota'
   | 'authorDeclined'
+  // Tranche R19 : la récolte. Le miel qui manque pour offrir ou décorer (409), du miel déjà offert
+  // à ce projet (409), les classements lus par un membre qui s'en est retiré (403), un défi perso
+  // qu'on ne peut pas choisir, un niveau vu pas encore atteint, un titre pas encore obtenu (422).
+  | 'honeyShort'
+  | 'honeyAlready'
+  | 'rankingsOff'
+  | 'invalidChallenge'
+  | 'invalidLevelSeen'
+  | 'familyNotObtained'
   | 'internal'
   | 'network'
 
@@ -75,8 +84,12 @@ export type ApiErrorKey =
 // jour). Son message reste « rateLimited » (même texte d'erreur que partout) : l'indicateur est à
 // part, pour ne pas ajouter une clé qui n'a pas de texte `errors.*` aux ~15 écrans qui lisent
 // `$.errors[error]`. Absent partout ailleurs.
+//
+// `pollen` (R19) : le pollen que la réponse d'un geste a rapporté au membre (en-tête
+// `Waiggle-Pollen`), un entier positif. Absent (la clé elle-même, jamais `undefined`) quand le geste
+// ne rapporte rien : le hook du geste n'a qu'à tester sa présence pour montrer « +2 pollen ».
 export type ApiResult<T> =
-  | { ok: true; data: T }
+  | { ok: true; data: T; pollen?: number }
   | { ok: false; error: ApiErrorKey; projectLimit?: true }
 
 /** Le code d'API d'une écriture refusée faute d'accord aux règles (R11, 403). */
@@ -183,6 +196,17 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   // son auteur a retiré de l'accueil (409).
   visitor_report_quota: 'visitorReportQuota',
   author_declined: 'authorDeclined',
+  // Tranche R19 : deux 409 (le solde de miel trop court, du miel déjà offert), un 403 (les
+  // classements d'un membre qui s'en est retiré : sans ce code, « action non autorisée » mentirait)
+  // et trois 422 (un défi, un niveau vu, un titre épinglé que l'API refuse). Le corps d'un
+  // `honey_short` porte aussi le prix et le solde (`HoneyShortError`) : l'écran les connaît déjà
+  // par la récolte, seul le code est lu ici.
+  honey_short: 'honeyShort',
+  honey_already: 'honeyAlready',
+  rankings_off: 'rankingsOff',
+  invalid_challenge: 'invalidChallenge',
+  invalid_level_seen: 'invalidLevelSeen',
+  family_not_obtained: 'familyNotObtained',
 }
 
 /**

@@ -136,6 +136,29 @@ export const myHives: MyHives = {
 /** GET /v1/hives, Léa animatrice de Famille (page `ruche-reglages`). */
 export const myHivesAnimator: MyHives = { ...myHives, hives: [familleAnimated, amis] }
 
+/** « Les jardiniers » : 3 membres, animée par Hugo ; la quatrième ruche de Léa (R19, classements). */
+export const jardiniersId = '1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c06'
+export const jardiniers: HiveSummary = {
+  id: jardiniersId,
+  name: 'Les jardiniers',
+  icon: 'leaf',
+  memberCount: 3,
+  animator: { id: hugo.id, name: hugo.name },
+  faces: [hugo, lea, odile].map(faceOf),
+  news: 0,
+  role: 'member',
+}
+
+/**
+ * GET /v1/hives, Léa dans quatre ruches (R19) : le classement passe du choix segmenté (Proches et
+ * trois ruches au plus) au menu « Classement ».
+ */
+export const myFourHives: MyHives = {
+  hives: [famille, amis, atelier, jardiniers],
+  invitations: [],
+  createdCount: 1,
+}
+
 /** GET /v1/hives : aucune ruche, aucune invitation (l'onglet vide). */
 export const noHives: MyHives = { hives: [], invitations: [], createdCount: 0 }
 
@@ -324,6 +347,8 @@ export const projectsPage: HiveProjectsPage = { items: familleProjects, nextCurs
 
 /** GET /v1/hives/{id}, Léa simple membre : elle peut inviter ; Le plan de table épinglé. */
 export const memberPage: HivePage = {
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: famille,
   invite: 'allowed',
   invitePolicy: 'members',
@@ -343,6 +368,8 @@ export const animatorPage: HivePage = {
 
 /** La page d'« Amis du jeudi » (Léa simple membre ; seul l'animateur invite). */
 export const amisPage: HivePage = {
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: amis,
   invite: 'animatorOnly',
   invitePolicy: 'animator',
@@ -355,6 +382,8 @@ export const amisPage: HivePage = {
 
 /** La page de la ruche que Léa vient de créer : elle seule (« Ta ruche est prête »). */
 export const readyPage = (name: string | null, icon: HiveSummary['icon']): HivePage => ({
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: createdHive(name, icon),
   invite: 'allowed',
   invitePolicy: 'members',
@@ -522,6 +551,8 @@ export const hiveNotifications: Notification[] = [
  * pas : l'API ne donne les projets privés qu'à leur auteur.
  */
 export const odileMemberPage: Member = {
+  // R19 : la récolte, absente de ces fausses données.
+  game: null,
   id: odile.id,
   name: odile.name,
   handle: 'odile',

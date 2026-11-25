@@ -36,6 +36,7 @@ import { useCallback } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError } from '../api/errors'
 import { feedQueryKey } from '../feed/api'
+import { earnPollen } from '../gamification/earn'
 import { getMe, updateProfile } from '../profile/api'
 import { meQueryKey } from '../profile/hooks'
 import { suggestionsQueryKey } from '../suggestions/api'
@@ -259,12 +260,15 @@ export const useHiveFeed = (id: string, enabled = true) => {
  */
 const useHiveWrite = <Variables, Data>(
   scope: string,
-  send: (variables: Variables) => Promise<Data>,
+  send: (variables: Variables, earn: (pollen: number | undefined) => void) => Promise<Data>,
 ) => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationKey: ['hives-write', scope],
-    mutationFn: send,
+    // `earn` : le pollen gagné (en-tête de la réponse, R19) devient la pastille de l'hôte global ;
+    // chaque écriture l'appelle une fois l'API acceptée.
+    mutationFn: (variables: Variables) =>
+      send(variables, (pollen) => earnPollen(queryClient, pollen, 'global')),
     scope: { id: `hives-write:${scope}` },
     // `onSettled` : après la réponse, bonne ou mauvaise. Relire quand la dernière écriture de la
     // portée se termine seulement (`isMutating` compte encore celle qui finit, d'où « 1 ») : relire
@@ -285,9 +289,10 @@ const send204 = async (path: string, init: RequestInit): Promise<void> => {
 
 /** POST /v1/hives : crée la ruche (201) ; `mutateAsync({ name, icon })` rend sa `HiveSummary`. */
 export const useCreateHive = () =>
-  useHiveWrite('all', async (body: HiveCreate): Promise<HiveSummary> => {
+  useHiveWrite('all', async (body: HiveCreate, earn): Promise<HiveSummary> => {
     const result = await request('/v1/hives', jsonInit('POST', body), HiveSummary)
     if (!result.ok) throw new ApiError(result.error)
+    earn(result.pollen)
     return result.data
   })
 
@@ -310,13 +315,14 @@ export const useInvite = (id: string) =>
 
 /** POST /v1/hive-invitations/{id}/accept : `mutateAsync(invitationId)` rend la `HiveSummary`. */
 export const useAcceptInvitation = () =>
-  useHiveWrite('all', async (invitationId: string): Promise<HiveSummary> => {
+  useHiveWrite('all', async (invitationId: string, earn): Promise<HiveSummary> => {
     const result = await request(
       `/v1/hive-invitations/${encodeURIComponent(invitationId)}/accept`,
       { method: 'POST' },
       HiveSummary,
     )
     if (!result.ok) throw new ApiError(result.error)
+    earn(result.pollen)
     return result.data
   })
 

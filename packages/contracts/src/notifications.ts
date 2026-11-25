@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { CategoryCode } from './categories'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
+import { HiveChallengeCode, HONEY, SealCode } from './game'
 import { HiveIcon, HiveId, HiveInvitationId } from './hives'
 import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
@@ -411,6 +412,57 @@ export const HiveRemovedNotification = hiveNotice('hive_removed')
 export const HiveAnimatorNotification = hiveNotice('hive_animator')
 export const HiveDeletedNotification = hiveNotice('hive_deleted')
 
+// R19 : les avis du jeu (game.ts), une ligne gardée par avis (table `game_notice`, effacée au bout
+// de 90 jours). Jamais d'e-mail ni de notification poussée ; coupés, avec les lignes du récap, par
+// le réglage « Ma récolte » (`harvestNotices`) : on n'en écrit plus, et la lecture les filtre.
+
+/** Un niveau passé (« Niveau 5 »), avec l'alvéole numérotée. */
+export const GameLevelNotification = z.object({
+  ...Common,
+  kind: z.literal('game_level'),
+  level: z.int().min(2),
+})
+
+/** Un sceau gagné (« Nouveau sceau : Premier retour réglé »), avec le petit sceau. */
+export const GameSealNotification = z.object({
+  ...Common,
+  kind: z.literal('game_seal'),
+  code: SealCode,
+})
+
+/**
+ * Le défi d'une de ses ruches réussi, annoncé à tous ses membres : `honey` vaut 10 pour qui y a
+ * participé, 0 pour les autres (la ligne ne dit jamais qui n'a rien fait). La ruche garde son
+ * identifiant et se lit à l'affichage ; la ligne disparaît pour qui a quitté la ruche.
+ */
+export const GameHiveChallengeNotification = z.object({
+  ...Common,
+  kind: z.literal('game_hive_challenge'),
+  hive: NotifiedHive,
+  code: HiveChallengeCode,
+  honey: z.union([z.literal(0), z.literal(HONEY.hiveChallenge)]),
+})
+
+/**
+ * « Léa t'a offert du miel » : un membre a offert du miel à un de ses projets. Cachée dès que l'un
+ * a bloqué l'autre ; partie avec le compte de qui l'a offert. L'auteur ne reçoit pas de miel.
+ */
+export const GameHoneyGiftNotification = z.object({
+  ...Common,
+  kind: z.literal('game_honey_gift'),
+  actor: ProjectAuthor,
+  project: NotifiedProject,
+})
+
+/**
+ * Une fois par compte d'avant R19 (écrite par la migration du rattrapage) : « Nouveau : ta
+ * récolte… », et comment s'en retirer (Réglages, « Classements »).
+ */
+export const GameIntroNotification = z.object({
+  ...Common,
+  kind: z.literal('game_intro'),
+})
+
 /** La première notification : le pseudo qu'il a reçu, tiré de son nom, qu'il peut changer. */
 export const HandleNotification = z.object({
   ...Common,
@@ -446,6 +498,11 @@ export const Notification = z
     HiveAnimatorNotification,
     HiveDeletedNotification,
     ShowcaseAddedNotification,
+    GameLevelNotification,
+    GameSealNotification,
+    GameHiveChallengeNotification,
+    GameHoneyGiftNotification,
+    GameIntroNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

@@ -77,6 +77,8 @@ beforeEach(async () => {
   malikId = (await act.me(malik)).id
   zoeId = (await act.me(zoe)).id
   await act.makeAdmin((await act.me(louis)).id)
+  // Sans « Ma récolte » : les avis du jeu (R19) n'entrent pas dans les listes comptées ici.
+  for (const cookie of [ines, malik, zoe, louis]) await act.muteHarvest(cookie)
   meteo = await act.publish(ines, 'Météo', { tools: ['Mistral'] })
   later()
 })

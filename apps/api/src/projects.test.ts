@@ -237,6 +237,50 @@ describe('reading a project', () => {
   })
 })
 
+// R19 : offrir du miel à un projet (POST /v1/projects/{id}/honey, une fois par projet). La page du
+// projet dit au visiteur s'il en a déjà offert (`honeyGiven`, « Miel offert ») ; c'est son geste à
+// lui : l'auteur et les autres membres n'y lisent rien. Scénario R19, « Le miel ».
+describe('the honey given to a project (R19)', () => {
+  const honeyGivenBy = async (id: string, cookie: string) => {
+    const res = await read(id, cookie)
+    expect(res.status).toBe(200)
+    return Project.parse(await res.json()).honeyGiven
+  }
+
+  it('tells the member who offered honey to a project, and nobody else', async () => {
+    const ines = await ctx.verifiedMember({
+      name: 'Inès',
+      email: 'ines@example.com',
+      password: 'ines-long-password',
+    })
+    const { id } = await publish()
+    // Max publie son propre projet : sa première semaine butinée lui rapporte 5 miel.
+    await publish({ ...recipes, title: 'Projet de Max' }, max)
+    // Témoin : avant l'offre, personne n'a rien offert.
+    expect(await honeyGivenBy(id, max)).toBe(false)
+
+    expect((await send('POST', `/v1/projects/${id}/honey`, max)).status).toBe(204)
+
+    expect(await honeyGivenBy(id, max)).toBe(true)
+    // L'autrice ne lit pas qui lui a offert du miel sur sa page (l'avis de l'Activité le dit) ;
+    // un autre membre non plus.
+    expect(await honeyGivenBy(id, lea)).toBe(false)
+    expect(await honeyGivenBy(id, ines)).toBe(false)
+  })
+
+  it('says « honey given » to the giver on every later reading, even after the project changes', async () => {
+    const { id } = await publish()
+    await publish({ ...recipes, title: 'Projet de Max' }, max)
+    expect((await send('POST', `/v1/projects/${id}/honey`, max)).status).toBe(204)
+
+    expect((await send('PATCH', `/v1/projects/${id}`, lea, { title: 'Recettes v2' })).status).toBe(
+      200,
+    )
+
+    expect(await honeyGivenBy(id, max)).toBe(true)
+  })
+})
+
 // Audit de sécurité du 7/11/2026, N5 (avis de Hono sur les chemins décodés), rejoué aux montées
 // du 12/11/2026 : un retour à la ligne encodé dans l'adresse ne contourne ni la session ni la
 // garde des autres sites.

@@ -35,6 +35,7 @@ import {
 import { useCallback, useRef } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError, errorKey } from '../api/errors'
+import { earnPollen } from '../gamification/earn'
 import { appendImage } from '../media/pick'
 import { notificationsQueryKey } from '../notifications/api'
 import { projectQueryKey } from '../projects/hooks'
@@ -119,6 +120,13 @@ const json = (method: string, body: unknown): RequestInit => ({
 const writeEmpty = async (path: string, method: string): Promise<void> => {
   const result = await requestWithoutBody(path, { method })
   if (!result.ok) throw new ApiError(result.error)
+}
+
+// Comme `writeEmpty`, mais rend le pollen gagné (en-tête de la réponse, R19) pour la pastille.
+const writeEmptyPollen = async (path: string, method: string): Promise<number | undefined> => {
+  const result = await requestWithoutBody(path, { method })
+  if (!result.ok) throw new ApiError(result.error)
+  return result.pollen
 }
 
 type Pages<P> = InfiniteData<P, string | undefined>
@@ -400,7 +408,10 @@ export const useDeleteCall = (projectId: string) => {
  * extrait et sa date changent).
  */
 export const useSendMessage = (projectId: string, testerId: string) => {
-  const { run, ...state } = useCornerWrite<NewTesterMessage, TesterMessage>({
+  const { run, ...state } = useCornerWrite<
+    NewTesterMessage,
+    { created: TesterMessage; pollen?: number }
+  >({
     name: `send-message:${testerId}`,
     projectId,
     send: async (message) => {
@@ -410,10 +421,13 @@ export const useSendMessage = (projectId: string, testerId: string) => {
         TesterMessage,
       )
       if (!result.ok) throw new ApiError(result.error)
-      return result.data
+      return { created: result.data, ...(result.pollen !== undefined && { pollen: result.pollen }) }
     },
-    onSuccess: (queryClient, created) =>
-      prepend<TesterMessagePage>(queryClient, messagesKey(projectId, testerId), created),
+    onSuccess: (queryClient, { created, pollen }) => {
+      prepend<TesterMessagePage>(queryClient, messagesKey(projectId, testerId), created)
+      // Le pollen gagné : la pastille se pose au-dessus d'« Envoyer » du fil de retour.
+      earnPollen(queryClient, pollen, 'feedback')
+    },
     stale: [messagesKey(projectId, testerId)],
     refresh: [threadsKeyOf(projectId)],
   })
@@ -460,10 +474,13 @@ export const useSettleFeedback = (projectId: string) => {
   const settleWrite = (settled: boolean) => ({
     projectId,
     send: (messageId: string) =>
-      writeEmpty(
+      writeEmptyPollen(
         `${cornerPath(projectId)}/messages/${encodeURIComponent(messageId)}/settled`,
         settled ? 'POST' : 'DELETE',
       ),
+    // Régler un retour peut rapporter du pollen (R19) : la pastille du fil de retour.
+    onSuccess: (queryClient: QueryClient, pollen: number | undefined) =>
+      earnPollen(queryClient, pollen, 'feedback'),
     touched: [messagesPrefix] as QueryKey[],
     touch: (queryClient: QueryClient, messageId: string) =>
       setSettled(queryClient, messageId, settled),
@@ -471,8 +488,14 @@ export const useSettleFeedback = (projectId: string) => {
     refresh: [messagesPrefix, threadsKeyOf(projectId), openFeedbackKey(projectId)] as QueryKey[],
   })
   // Un seul nom de file pour les deux gestes : « régler » puis « remettre à traiter » partent dans l'ordre.
-  const settle = useCornerWrite<string, void>({ name: 'settle', ...settleWrite(true) })
-  const unsettle = useCornerWrite<string, void>({ name: 'settle', ...settleWrite(false) })
+  const settle = useCornerWrite<string, number | undefined>({
+    name: 'settle',
+    ...settleWrite(true),
+  })
+  const unsettle = useCornerWrite<string, number | undefined>({
+    name: 'settle',
+    ...settleWrite(false),
+  })
   return {
     settle: settle.run,
     unsettle: unsettle.run,

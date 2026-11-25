@@ -4,7 +4,7 @@
 
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import { appName } from '@ruche/brand'
-import { type ErrorCode, HealthResponse } from '@ruche/contracts'
+import { type ErrorCode, HealthResponse, POLLEN_HEADER } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import { parseAcceptLanguage, resolveLanguage } from '@ruche/i18n'
 import type { MiddlewareHandler } from 'hono'
@@ -25,6 +25,7 @@ import { commentRoutes } from './routes/comments'
 import { emailRoutes, UNSUBSCRIBE_PATH } from './routes/email'
 import { feedRoutes } from './routes/feed'
 import { followRoutes } from './routes/follows'
+import { gameRoutes } from './routes/game'
 import { hiveInvitationRoutes } from './routes/hive-invitations'
 import { hiveRoutes } from './routes/hives'
 import { meRoutes } from './routes/me'
@@ -40,6 +41,7 @@ import { publicRoutes } from './routes/public'
 import { publicHeadRoutes } from './routes/public-head'
 import { publicReportRoutes } from './routes/public-reports'
 import { publicSitemapRoutes } from './routes/public-sitemap'
+import { rankingRoutes } from './routes/rankings'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { rulesRoutes } from './routes/rules'
@@ -239,8 +241,9 @@ export const createApp = ({
       // répéter sans effet de plus.
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       // En-têtes de réponse que l'appli web a le droit de lire (Retry-After : dans combien de
-      // secondes réessayer après un refus pour trop de demandes).
-      exposeHeaders: ['Content-Disposition', 'Content-Language', 'Retry-After'],
+      // secondes réessayer après un refus pour trop de demandes). R19 : Waiggle-Pollen, le pollen
+      // qu'un geste vient de rapporter (POLLEN_HEADER du contrat), que l'appli montre en « +2 ».
+      exposeHeaders: ['Content-Disposition', 'Content-Language', 'Retry-After', POLLEN_HEADER],
     }),
   )
 
@@ -268,9 +271,10 @@ export const createApp = ({
     // Une mise à jour (16 Ko : cinq lignes, un titre, quatre photos citées) ou un commentaire pèse
     // peu, une réaction ou une inscription de testeur n'a pas de corps : la petite limite suffit.
     // R7b : les appels (500 caractères), les fils, les messages (1 000 caractères), les retours
-    // réglés, la lecture d'un fil et la liste des retours ouverts n'ont pas plus de corps.
+    // réglés, la lecture d'un fil et la liste des retours ouverts n'ont pas plus de corps. R19 :
+    // l'offre de miel n'a pas de corps du tout.
     if (
-      /^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions|calls|threads|messages|feedback)(\/|$)/.test(
+      /^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions|calls|threads|messages|feedback|honey)(\/|$)/.test(
         c.req.path,
       )
     ) {
@@ -422,7 +426,11 @@ export const createApp = ({
   app.route('/', hiveRoutes({ db, limiter, publicApiUrl }))
   // Les invitations : la recherche « Inviter », inviter, rejoindre, refuser (R10).
   app.route('/', hiveInvitationRoutes({ db, limiter, publicApiUrl }))
+  // Les classements de la semaine : les proches, ou une ruche (R19).
+  app.route('/', rankingRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
+  // Le jeu (R19) : « Ma récolte », les réglages du jeu, la décoration du rayon, l'offre de miel.
+  app.route('/', gameRoutes({ db, limiter }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))

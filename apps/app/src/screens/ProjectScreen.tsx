@@ -46,6 +46,7 @@ import { SessionGate } from '../accounts/SessionGate'
 import type { SessionData } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { usePollenGain } from '../gamification/pollen'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
 import { firstParam } from '../navigation/params'
@@ -275,6 +276,11 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   // L'éventail des réactions (appui long sur la capsule), la feuille « Partager », la fenêtre qui
   // confirme la suppression (ouverte depuis le menu « … », dont `menuRef` est le bouton).
   const [fanOpen, setFanOpen] = useState(false)
+  // R19 : le pollen d'une réaction posée, montré sur la réaction (capsule, ou éventail ouvert).
+  const reactionPollen = usePollenGain('reaction')
+  const reactionGain = reactionPollen
+    ? { amount: reactionPollen.amount, trigger: reactionPollen.key, kind: reactionPollen.target }
+    : null
   const [sharing, setSharing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const menuRef = useRef<Focusable>(null)
@@ -517,6 +523,7 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
             : undefined
       }
       errorAction={reaction.expired ? signInAgain() : undefined}
+      gain={fanOpen ? null : reactionGain}
     />
   )
   const ownReactions =
@@ -805,6 +812,7 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
           reactions={reactions.map(({ kind, count, mine }) => ({ kind, count, mine }))}
           onToggle={reaction.toggle}
           onClose={() => setFanOpen(false)}
+          gain={fanOpen ? reactionGain : null}
         />
       ) : null}
       {shareable ? (

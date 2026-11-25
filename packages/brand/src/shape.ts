@@ -161,4 +161,18 @@ export const layout = {
     pickerCheck: 20,
     pickerColumns: 6,
   },
+  // R19 : le rayon (HoneyComb, planche R19-Recolte) : dix alvéoles pointe en haut, de `cell` de
+  // large, à `gap` l'une de l'autre (318 points en tout) ; la jauge d'un défi les dessine à
+  // `smallCell`. Le rayon se resserre si la colonne est plus étroite, jamais il ne s'élargit.
+  comb: { cell: 30, smallCell: 22, gap: 2 },
+  // R19 : le sceau de cire (WaxSeal, planche R19-Sceaux) : 40 dans un avis de l'Activité (small),
+  // 60 dans une tuile de « Mes sceaux » (regular) ; son icône prend `iconRatio` de sa taille.
+  seal: { small: 40, regular: 60, iconRatio: 0.38 },
+  // R19 : l'alvéole du niveau (LevelCell, planches R19-Profil et R19-Niveau), par sa largeur ; sa
+  // hauteur suit la forme de l'hexagone (× 1,1547). 40 dans un avis de l'Activité ou un rang
+  // (small), 46 dans le panneau de la récolte (regular), 150 en gros plan (large).
+  levelCell: { small: 40, regular: 46, large: 150 },
+  // R19 : la pastille de gain (PollenGain, planche R19-Gain) : sa montée en deux temps, en points,
+  // puis la largeur de la boîte qui la porte sur téléphone (voir PollenGain.tsx).
+  pollenGain: { rise: 12, leave: 24, box: 240 },
 } as const

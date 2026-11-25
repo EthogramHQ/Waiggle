@@ -41,6 +41,8 @@ const lea = {
   // R9 : les parties retirées de son profil, vides pour tout autre visiteur.
   removedParts: [],
   moderation: null,
+  // R19 : sa récolte (niveau, titre, sceaux), absente ici comme pour un compte d'exemple.
+  game: null,
 }
 
 describe('Member', () => {

@@ -12,12 +12,15 @@
 // d'une mise à jour.
 import {
   EXCERPT_MAX,
+  HiveChallengeCode,
   HiveIcon,
+  HONEY,
   NOTIFICATION_DAYS,
   NOTIFICATION_PAGE_SIZE,
   type Notification,
   RemovalGround,
   ReportPartField,
+  SealCode,
   StoredReportTargetKind,
   UNREAD_COUNT_MAX,
 } from '@ruche/contracts'
@@ -464,9 +467,39 @@ const sources = (me: string, since: Date, now: Date, until?: Date, keepOnShowcas
 
     ${hiveSources(me, during, now)}
 
-    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during, keepOnShowcase)}`}
+    ${upTo ? sql`` : sql`union all ${catalogueSources(me, during, keepOnShowcase)} union all ${gameSources(me, during)}`}
   `
 }
+
+/**
+ * La source 21 (R19) : les avis du jeu (`game_notice`, écrits par game/notices.ts, et l'avis
+ * d'introduction du rattrapage), avec les vingt et une colonnes. Comme celles du catalogue, ils ne
+ * vont qu'à l'écran et à la cloche, jamais dans un e-mail : `sources` ne les ajoute que sans borne
+ * `until` (relecture de sécurité S3). item_id porte l'avis ; loadDetailedRows le relit par sa clé
+ * primaire. Ce qui reste montré se décide ici, à la lecture :
+ * - « Ma récolte » coupée (`member_game.harvest_notices` faux) les cache tous ; rallumée, ils
+ *   reviennent. Pas de ligne de réglages : allumée (valeur par défaut). Clé primaire de member_game.
+ * - Du miel offert : caché si l'un a bloqué l'autre, dans un sens ou dans l'autre (relecture
+ *   juridique B1, `notBlockedWith` par les index de member_block) ; parti avec le compte de qui l'a
+ *   offert (clé étrangère en cascade) ; seulement sur un de ses projets.
+ * - Le défi d'une ruche : seulement tant qu'il est membre de cette ruche (clé primaire de
+ *   hive_member, comme `hive_joined`) ; le nom se lit à l'affichage.
+ * Index : game_notice_member_idx (member_id, created_at desc), qui donne ses avis dans la fenêtre.
+ * author_id : qui a offert ; project_id : le projet du miel.
+ */
+const gameSources = (me: string, during: (column: string) => SQL): SQL => sql`
+    select 'game_' || gn.kind, 'game_notice:' || gn.id, gn.created_at,
+      gn.project_id, null, null, gn.actor_id, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, gn.id
+    from game_notice gn
+    where gn.member_id = ${me} and ${during('gn.created_at')}
+      and coalesce((select mg.harvest_notices from member_game mg where mg.member_id = ${me}), true)
+      and (gn.actor_id is null or ${notBlockedWith(me, sql.raw('gn.actor_id'))})
+      and (gn.project_id is null
+        or (select 1 from project gp where gp.id = gn.project_id and gp.author_id = ${me} limit 1) is not null)
+      and (gn.hive_id is null
+        or (select 1 from hive_member ghm
+            where ghm.hive_id = gn.hive_id and ghm.user_id = ${me} limit 1) is not null)`
 
 /**
  * Les sources 17 à 19 (R10) : les ruches, avec les vingt et une colonnes. Ce qu'elles nomment (la
@@ -949,6 +982,12 @@ const ListRow = z.object({
     'hive_deleted',
     // R12 : un projet mis sur l'accueil (source 20).
     'showcase_added',
+    // R19 : les avis du jeu (source 21).
+    'game_intro',
+    'game_level',
+    'game_seal',
+    'game_hive_challenge',
+    'game_honey_gift',
   ]),
   key: z.string(),
   at: z.string(),
@@ -1029,6 +1068,12 @@ const ListRow = z.object({
   // R12 : le projet d'une notification `showcase_added` est-il encore dans la vitrine ? Null pour
   // toute autre sorte.
   on_showcase: z.boolean().nullable(),
+  // R19 : l'avis du jeu (null : il a disparu entre-temps), et ce qu'il porte selon sa sorte : le
+  // niveau atteint, le code du sceau ou du défi, le miel crédité par un défi de ruche.
+  game_notice_id: z.string().nullable(),
+  game_level: z.number().int().nullable(),
+  game_code: z.string().nullable(),
+  game_honey: z.number().int().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -1449,6 +1494,36 @@ export const present = (
         kind: row.kind,
         hive: { id: row.hive_id, name: row.hive_name, icon: row.hive_icon },
       }
+    // R19 : les avis du jeu. Un avis disparu entre-temps (purgé), ou dont la valeur n'est plus
+    // dans les listes du contrat, n'est pas montré.
+    case 'game_intro':
+      if (row.game_notice_id === null) return null
+      return { ...common, kind: 'game_intro' }
+    case 'game_level':
+      if (row.game_level === null || row.game_level < 2) return null
+      return { ...common, kind: 'game_level', level: row.game_level }
+    case 'game_seal': {
+      const code = SealCode.safeParse(row.game_code)
+      if (!code.success) return null
+      return { ...common, kind: 'game_seal', code: code.data }
+    }
+    case 'game_hive_challenge': {
+      // Le miel : 10 pour qui y a participé, 0 pour les autres ; la ruche et son nom actuel.
+      const code = HiveChallengeCode.safeParse(row.game_code)
+      const honey = row.game_honey === HONEY.hiveChallenge ? HONEY.hiveChallenge : 0
+      if (!code.success || row.hive_id === null) return null
+      return {
+        ...common,
+        kind: 'game_hive_challenge',
+        hive: { id: row.hive_id, name: row.hive_name, icon: row.hive_icon },
+        code: code.data,
+        honey,
+      }
+    }
+    case 'game_honey_gift':
+      // Qui a offert (son nom et sa photo, comme dans le coin des testeurs) et le projet.
+      if (!project || row.author_id === null || row.author_name === null) return null
+      return { ...common, kind: 'game_honey_gift', actor: authorOf(row, publicApiUrl), project }
   }
 }
 
@@ -1558,7 +1633,9 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       -- toute la table (charte de l'API, 7b). Seule cette sorte lance la sous-requête.
       case when n.kind = 'showcase_added' then (
         select 1 from showcase s where s.project_id = n.project_id limit 1
-      ) is not null end as on_showcase
+      ) is not null end as on_showcase,
+      -- R19 : l'avis du jeu (alias gn, plus bas) et ce qu'il porte.
+      gn.id as game_notice_id, gn.level as game_level, gn.code as game_code, gn.honey as game_honey
     from (${chosen}) n
     left join hive hv on hv.id = n.item_id and n.target_kind = 'hive'
     left join project on project.id = n.project_id
@@ -1633,11 +1710,19 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       where n.kind in ('hive_removed', 'hive_animator', 'hive_deleted') and hn.id = n.item_id
       limit 1
     ) hn on true
+    -- R19 : l'avis du jeu de item_id, par la clé primaire de game_notice, pour ses seules lignes
+    -- (« lateral … limit 1 », pour la même raison que les deux jointures du dessus).
+    left join lateral (
+      select gn.id, gn.level, gn.code, gn.honey, gn.hive_id from game_notice gn
+      where left(n.kind, 5) = 'game_' and gn.id = n.item_id
+      limit 1
+    ) gn on true
     left join lateral (
       select hive.id, hive.name, hive.name_removal_id, hive.icon from hive
       where hive.id = case
         when n.kind = 'hive_joined' then n.item_id
         when n.kind = 'hive_invited' then hi.hive_id
+        when n.kind = 'game_hive_challenge' then gn.hive_id
         else hn.hive_id
       end
       limit 1

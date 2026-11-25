@@ -11,6 +11,8 @@ const noReactions: Project['reactions'] = {
 }
 
 export const recipesProject: Project = {
+  // R19 : la récolte, absente de ces fausses données.
+  honeyGiven: false,
   id: '6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
   author: { id: 'u1', name: 'Léa', avatarUrl: null },
   title: 'Mon agent de recettes',
@@ -131,6 +133,8 @@ export const draftProject: Project = {
 
 /** La page de Léa, vue par un autre membre. */
 export const leaPage: Member = {
+  // R19 : la récolte, absente de ces fausses données.
+  game: null,
   id: 'u1',
   name: 'Léa',
   handle: 'lea',

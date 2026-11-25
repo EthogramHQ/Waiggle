@@ -5,6 +5,7 @@
 import { appName } from '@ruche/brand'
 import {
   AccountExport,
+  dayOf,
   ErrorResponse,
   Me,
   Project,
@@ -14,6 +15,7 @@ import {
   type TesterMediaKind,
   TesterMessage,
   TesterThreadPage,
+  weekOf,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
@@ -318,6 +320,60 @@ describe('exporting my data', () => {
     expect(res.status).toBe(401)
   })
 
+  // R19 : le jeu dans l'export (`game`, choix 18 du plan) : les entrées de son pollen, datées par le
+  // jour et la semaine de Paris, ses sceaux, les mouvements de son miel et ses défis perso ; jamais
+  // l'autre membre d'une entrée (scénario R19, « Les données »).
+  it('exports my pollen, seals, honey and challenge of the week, never who gave me pollen', async () => {
+    const cookies = await signUpAndVerify()
+    const ines = await ctx.verifiedMember({
+      name: 'Inès Morel',
+      email: 'ines@example.com',
+      password: 'ines-long-password',
+    })
+    const inesId = Me.parse(
+      await (await ctx.request('/v1/me', { headers: { cookie: ines } })).json(),
+    ).id
+    const created = await ctx.request('/v1/projects', {
+      method: 'POST',
+      headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Météo', primaryCategory: 'other', pitch: 'La pluie.' }),
+    })
+    expect(created.status).toBe(201)
+    const { id: projectId } = Project.parse(await created.json())
+    // Inès réagit au projet de Léa : Léa reçoit 1 pollen.
+    const reacted = await ctx.request(`/v1/projects/${projectId}/reactions/bravo`, {
+      method: 'PUT',
+      headers: { cookie: ines },
+    })
+    expect(reacted.status).toBe(204)
+    // Léa ouvre sa récolte : son défi perso de la semaine est tiré à cette lecture.
+    expect((await ctx.request('/v1/me/harvest', { headers: { cookie: cookies } })).status).toBe(200)
+
+    const raw = await (await ctx.request('/v1/me/export', { headers: { cookie: cookies } })).text()
+    const { game } = AccountExport.parse(JSON.parse(raw))
+
+    expect(
+      game.pollen
+        .map((entry) => `${entry.gesture} ${entry.family} ${entry.amount} ${entry.sourceKind}`)
+        .sort(),
+    ).toEqual(['publish builder 50 project', 'receive_reaction builder 1 reaction'])
+    for (const entry of game.pollen) {
+      expect(entry.revokedAt).toBeNull()
+      expect(entry.day).toBe(dayOf(new Date(entry.createdAt)))
+      expect(entry.week).toBe(weekOf(new Date(entry.createdAt)))
+    }
+    expect(game.seals.map((seal) => seal.code)).toEqual(['first_project'])
+    // Sa première semaine butinée (la publication) : 5 miel.
+    expect(game.honey).toEqual([{ amount: 5, reason: 'week', createdAt: expect.any(String) }])
+    expect(game.challenges).toEqual([
+      { week: weekOf(new Date()), offered: expect.any(Array), chosen: null, completedAt: null },
+    ])
+    expect(game.challenges[0]?.offered).toHaveLength(3)
+    // Ni l'identifiant d'Inès, ni son nom : la réaction reçue lui appartient.
+    expect(JSON.stringify(game)).not.toContain(inesId)
+    expect(JSON.stringify(game)).not.toContain('Inès')
+  })
+
   // L'export lit toutes les données du membre : une lecture lourde, limitée à 30 par heure.
   it('blocks a 31st export within an hour', async () => {
     const cookies = await signUpAndVerify()
@@ -516,6 +572,84 @@ describe('deleting my account', () => {
     ).id
     const states = await ctx.db.select().from(schema.notificationState)
     expect(states.map((s) => s.userId)).toEqual([inesId])
+  })
+
+  // R19 : le jeu part avec le compte (choix 18 du plan, tables liées au membre en cascade) ; ce que
+  // les autres ont gagné reste à eux, sans plus nommer le compte supprimé.
+  it('erases my whole game with the account, and keeps what the others earned', async () => {
+    const cookies = await signUpAndVerify()
+    const json = (cookie: string) => ({ cookie, 'content-type': 'application/json' })
+    const ines = await ctx.verifiedMember({
+      name: 'Inès Morel',
+      email: 'ines@example.com',
+      password: 'ines-long-password',
+    })
+    const idOf = async (cookie: string) =>
+      Me.parse(await (await ctx.request('/v1/me', { headers: { cookie } })).json()).id
+    const leaId = await idOf(cookies)
+    const inesId = await idOf(ines)
+    const created = await ctx.request('/v1/projects', {
+      method: 'POST',
+      headers: json(ines),
+      body: JSON.stringify({ title: 'Météo', primaryCategory: 'other', pitch: 'La pluie.' }),
+    })
+    const { id: projectId } = Project.parse(await created.json())
+    // Léa publie (pollen, sceau, miel), réagit au projet d'Inès, ouvre sa récolte (défi tiré) et
+    // règle son jeu.
+    const mine = await ctx.request('/v1/projects', {
+      method: 'POST',
+      headers: json(cookies),
+      body: JSON.stringify({ title: 'Potager', primaryCategory: 'other', pitch: 'Les semis.' }),
+    })
+    expect(mine.status).toBe(201)
+    const reacted = await ctx.request(`/v1/projects/${projectId}/reactions/bravo`, {
+      method: 'PUT',
+      headers: { cookie: cookies },
+    })
+    expect(reacted.status).toBe(204)
+    expect((await ctx.request('/v1/me/harvest', { headers: { cookie: cookies } })).status).toBe(200)
+    const settings = await ctx.request('/v1/me/game', {
+      method: 'PATCH',
+      headers: json(cookies),
+      body: JSON.stringify({ titleForm: 'm' }),
+    })
+    expect(settings.status).toBe(204)
+
+    const gameOf = async (memberId: string) => {
+      const result = (await ctx.db.execute(sql`
+        select (select count(*) from pollen_entry where member_id = ${memberId})::int as pollen,
+          (select count(*) from seal where member_id = ${memberId})::int as seals,
+          (select count(*) from honey_entry where member_id = ${memberId})::int as honey,
+          (select count(*) from personal_challenge where member_id = ${memberId})::int as challenges,
+          (select count(*) from game_notice where member_id = ${memberId})::int as notices,
+          (select count(*) from member_game where member_id = ${memberId})::int as settings,
+          (select count(*) from pollen_entry where counterpart_id = ${memberId})::int as counterpart
+      `)) as unknown as { rows: Record<string, number>[] }
+      return result.rows[0]
+    }
+    // Témoin : avant la suppression, le jeu de Léa existe, et Inès a reçu de Léa.
+    expect(await gameOf(leaId)).toMatchObject({ seals: 1, honey: 1, challenges: 1, settings: 1 })
+    expect((await gameOf(leaId))?.pollen).toBeGreaterThan(0)
+    expect((await gameOf(leaId))?.counterpart).toBeGreaterThan(0)
+
+    const res = await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: json(cookies),
+      body: JSON.stringify({ password: lea.password }),
+    })
+    expect(res.status).toBe(200)
+
+    expect(await gameOf(leaId)).toEqual({
+      pollen: 0,
+      seals: 0,
+      honey: 0,
+      challenges: 0,
+      notices: 0,
+      settings: 0,
+      counterpart: 0,
+    })
+    // Inès garde le pollen de sa publication et ce qu'elle a reçu de la réaction de Léa.
+    expect((await gameOf(inesId))?.pollen).toBeGreaterThan(1)
   })
 
   it('refuses a deletion request sent from another website (CSRF)', async () => {

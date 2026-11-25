@@ -95,6 +95,16 @@ export const ErrorCode = z.enum([
   // l'accueil d'un projet que son auteur en a retiré (409).
   'visitor_report_quota',
   'author_declined',
+  // Tranche R19 (la gamification) : le solde de miel ne couvre pas l'offre ou la décoration (409,
+  // corps `HoneyShortError`) ; du miel déjà offert à ce projet (409) ; les classements lus par un
+  // membre qui s'en est retiré (403) ; un défi perso hors des trois proposés, ou un second choix
+  // (422) ; un niveau vu au-delà du niveau atteint (422) ; épingler une famille non obtenue (422).
+  'honey_short',
+  'honey_already',
+  'rankings_off',
+  'invalid_challenge',
+  'invalid_level_seen',
+  'family_not_obtained',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

@@ -7,6 +7,7 @@ import { useCallback } from 'react'
 import { requestWithoutBody } from '../api/client'
 import { ApiError, errorKey } from '../api/errors'
 import { feedQueryKey } from '../feed/api'
+import { earnPollen } from '../gamification/earn'
 import { projectQueryKey } from '../projects/hooks'
 
 type Target = { kind: 'member' | 'project'; id: string }
@@ -21,10 +22,14 @@ const cacheKeyOf = ({ kind, id }: Target) =>
 const pathOf = ({ kind, id }: Target) =>
   `/v1/${kind === 'member' ? 'members' : 'projects'}/${encodeURIComponent(id)}/follow`
 
-/** POST pour suivre, DELETE pour ne plus suivre. L'API répond 204, sans contenu. */
-export const setFollow = async (target: Target, follow: boolean): Promise<void> => {
+/**
+ * POST pour suivre, DELETE pour ne plus suivre. L'API répond 204, sans contenu ; elle peut ajouter
+ * le pollen gagné (en-tête), rendu ici (R19).
+ */
+export const setFollow = async (target: Target, follow: boolean): Promise<number | undefined> => {
   const result = await requestWithoutBody(pathOf(target), { method: follow ? 'POST' : 'DELETE' })
   if (!result.ok) throw new ApiError(result.error)
+  return result.pollen
 }
 
 /**
@@ -42,6 +47,8 @@ export const useFollow = (target: Target) => {
     // même temps. Deux touchers rapides font donc bien « suivre » puis « ne plus suivre », dans
     // cet ordre, côté serveur aussi.
     scope: { id: mutationKey.join(':') },
+    // Le pollen gagné (premier suivi) : la pastille de l'hôte global, comme pour tout geste sans porteur.
+    onSuccess: (pollen) => earnPollen(queryClient, pollen, 'global'),
     // cancelQueries : une lecture de la page déjà en route ne doit pas écraser notre changement.
     onMutate: () => queryClient.cancelQueries({ queryKey: cacheKeyOf(target) }),
     // Refusé : la page revient à ce qu'elle était avant ce toucher.

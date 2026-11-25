@@ -5,6 +5,16 @@
 export { ChangeEmailScreen } from '../../screens/ChangeEmailScreen'
 export { ChangePasswordScreen } from '../../screens/ChangePasswordScreen'
 export { DeleteAccountScreen } from '../../screens/DeleteAccountScreen'
+// R19 : « Ma récolte » et le classement de la semaine, ouverts depuis sa propre page comme les
+// réglages : ils partent dans ce morceau plutôt que dans un neuf.
+export { HarvestScreen } from '../../screens/HarvestScreen'
+// Le rayon de la page d'un membre et la feuille « Offrir du miel » (navigation/lazyModule.ts) : des
+// parties de page, demandées par leur page, qui partagent avec « Ma récolte » ses composants.
+export { HoneyOfferSheet } from '../../screens/HoneyOfferSheet'
+export { MyHarvest, TheirHarvest } from '../../screens/MemberHarvest'
 export { ProfileScreen } from '../../screens/ProfileScreen'
 export { PublicPageSettingsScreen } from '../../screens/PublicPageSettingsScreen'
+export { RankingsScreen } from '../../screens/RankingsScreen'
+// La feuille « Signaler » (route /report) : posée sur la page d'avant, ouverte au toucher.
+export { ReportSheet } from '../../screens/ReportSheet'
 export { SettingsScreen } from '../../screens/SettingsScreen'

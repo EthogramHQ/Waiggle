@@ -82,6 +82,10 @@ const fr = {
   gestureOffered: 'Un geste sous la ligne (R12)',
   gestureFailed: 'Le geste a échoué, il reste, l’erreur dessous',
   gestureDone: 'Le geste a réussi, le message à sa place',
+  harvestTitle: 'La récolte : un niveau passé, un sceau gagné',
+  levelUp: 'Tu passes au niveau 4',
+  newSeal: 'Nouveau sceau : ',
+  sealName: 'Première mise à jour',
 }
 
 const en: typeof fr = {
@@ -139,6 +143,10 @@ const en: typeof fr = {
   gestureOffered: 'A gesture under the row (R12)',
   gestureFailed: 'The gesture failed: it stays, the error below',
   gestureDone: 'The gesture worked: the message in its place',
+  harvestTitle: 'The harvest: a level reached, a seal earned',
+  levelUp: 'You reach level 4',
+  newSeal: 'New seal: ',
+  sealName: 'First update',
 }
 
 type Labels = typeof fr
@@ -323,6 +331,28 @@ function PlusRows({ l }: { l: Labels }) {
   )
 }
 
+/** La récolte (R19) : l'avis d'un niveau passé (alvéole numérotée) et d'un sceau gagné (sceau de cire). */
+function HarvestRows({ l }: { l: Labels }) {
+  return (
+    <Stack gap="xs" accessibilityRole="list">
+      <NotificationCard
+        leading={{ kind: 'level', level: 4 }}
+        parts={[strong(l.levelUp)]}
+        when={minutesAgo(30)}
+        isNew
+        onPress={noop}
+      />
+      <NotificationCard
+        leading={{ kind: 'seal', icon: 'arrows-clockwise', matter: 'honey' }}
+        parts={[plain(l.newSeal), strong(l.sealName)]}
+        when={daysAgo(1)}
+        isNew={false}
+        onPress={noop}
+      />
+    </Stack>
+  )
+}
+
 /** Les bords : une nouvelle sans destination, un projet sans photo, un titre sans espace. */
 function EdgeRows({ l, scheme }: { l: Labels; scheme: Scheme }) {
   const rocket = cover(sample('text', 'textSecondary', 'honey'), l.rocket)
@@ -420,6 +450,10 @@ export function NotificationsCatalogue() {
               {`${l.plusTitle} — ${l[scheme]}`}
             </Text>
             <PlusRows l={l} />
+            <Text variant="headline" heading={3}>
+              {`${l.harvestTitle} — ${l[scheme]}`}
+            </Text>
+            <HarvestRows l={l} />
             <Text variant="headline" heading={3}>
               {`${l.edgesTitle} — ${l[scheme]}`}
             </Text>

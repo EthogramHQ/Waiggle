@@ -51,6 +51,7 @@ import {
 import { alias } from 'drizzle-orm/pg-core'
 import { type Blocks, blocksOf, notBlockedWith } from '../blocks/visibility'
 import { CursorDate } from '../cursor'
+import { hiveChallengesOf } from '../game/challenges'
 import { currentHandleOf } from '../handles/load'
 import { avatarUrlOf } from '../profile/me'
 import { rowsToSummaries, selectProjects } from '../projects/load'
@@ -555,7 +556,7 @@ export const loadHivePage = async (
   const { hiveId } = membership
   const pinner = alias(schema.user, 'pinner')
   const visible = hiveProjectFor(hiveId, viewerId)
-  const [[summary], pending, [hiveRow], testerRows, [projects], [successor], blocks] =
+  const [[summary], pending, [hiveRow], testerRows, [projects], [successor], blocks, challenges] =
     await Promise.all([
       hiveSummariesOf(db, viewerId, [hiveId], publicApiUrl, now),
       pendingInvitationsOf(db, hiveId, now),
@@ -590,6 +591,9 @@ export const loadHivePage = async (
             .limit(1)
         : Promise.resolve([]),
       blocksOf(db, viewerId),
+      // R19 : le défi de la semaine, pour une ruche de 3 membres au moins, né à cette lecture
+      // (game/challenges.ts). La route a vérifié que le lecteur est membre : un autre a le 404.
+      hiveChallengesOf(db, [hiveId], now),
     ])
   if (!summary || !hiveRow) return null
 
@@ -611,6 +615,7 @@ export const loadHivePage = async (
       : null
   return {
     summary,
+    challenge: challenges.get(hiveId) ?? null,
     invite: inviteStateOf(membership, summary.memberCount, pending),
     invitePolicy: membership.invitePolicy,
     pendingInvitations: Math.min(pending, HIVE_LIMITS.members),

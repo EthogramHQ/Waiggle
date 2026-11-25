@@ -93,6 +93,8 @@ beforeEach(async () => {
   inesId = (await act.me(ines)).id
   malikId = (await act.me(malik)).id
   await act.makeAdmin(louisId)
+  // Sans « Ma récolte » : les avis du jeu (R19) n'entrent pas dans les listes comptées ici.
+  for (const cookie of [louis, ines, malik, zoe, sam]) await act.muteHarvest(cookie)
   await clearCatalogue(ctx.db)
   glideApps = await addCatalogueTool(ctx.db, { name: 'Glide Apps', family: 'creation' })
   later()
@@ -161,9 +163,12 @@ const readPage = async (cookie: string) => {
   return { page: NotificationPage.parse(JSON.parse(raw)), raw }
 }
 
-/** Les notifications de ce membre, sans celle du pseudo que chacun reçoit en s'inscrivant. */
+/**
+ * Les notifications de ce membre, sans celle du pseudo que chacun reçoit en s'inscrivant, ni
+ * l'avis d'introduction de la récolte (R19 : tout compte le reçoit à sa création).
+ */
 const notifications = async (cookie: string) =>
-  (await readPage(cookie)).page.items.filter((n) => n.kind !== 'handle')
+  (await readPage(cookie)).page.items.filter((n) => n.kind !== 'handle' && n.kind !== 'game_intro')
 
 /** Les seules notifications du catalogue de ce membre, dans l'ordre de la liste. */
 const catalogueOf = async (cookie: string) =>

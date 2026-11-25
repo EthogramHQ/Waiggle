@@ -1009,6 +1009,10 @@ try {
   // Le nom lu de chaque réaction dit son nombre, et « réagi » une fois posée.
   await byRole(sam.page, 'button', 'Waggle\u202f!, 0').click()
   await byRole(sam.page, 'button', 'Waggle\u202f!, 1, ta réaction').waitFor()
+  // R19 : une réaction rapporte 2 pollen ; la pastille « +2 pollen » monte de la capsule, puis
+  // s'efface (elle est seulement dessinée : le lecteur d'écran l'entend par une région polie).
+  await sam.page.getByText('+2 pollen', { exact: true }).first().waitFor()
+  console.log('  ok : la pastille « +2 pollen » monte de la réaction de Sam')
   await waitFor(
     'réaction enregistrée',
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
@@ -1126,6 +1130,44 @@ try {
     await statusFor(visitor, `${apiUrl}/v1/projects/${projectId}/comments`),
     401,
   )
+
+  // Tranche R19 (« La récolte ») : Léa ouvre « Ma récolte » et choisit son défi de la semaine ; Sam,
+  // qui a butiné cette semaine (devenir testeur, son retour, son commentaire : 5 miel), offre du
+  // miel au projet de Léa, qui le lit dans son Activité. La feuille d'offre ignore les touchers de
+  // ses 600 premières millisecondes (contre un double toucher) : on attend avant de confirmer.
+  step('Léa ouvre « Ma récolte » et choisit son défi de la semaine')
+  await asDesktop(lea.page)
+  await open(lea.page, `${appUrl}/harvest`)
+  await byRole(lea.page, 'heading', 'Ma récolte').waitFor()
+  await lea.page
+    .getByRole('radiogroup', { name: 'Choisis ton défi' })
+    .getByRole('radio')
+    .first()
+    .click()
+  await byRole(lea.page, 'button', 'Choisir ce défi').click()
+  await waitFor('défi de Léa choisi', async () => {
+    const res = await lea.request.get(`${apiUrl}/v1/me/harvest`)
+    return res.ok() && (await res.json()).personalChallenge.state === 'active'
+  })
+  // La jauge porte le nom du défi ; son avancée, « 0 sur 5 », s'écrit à côté d'elle.
+  await lea.page
+    .getByText(/^\d+ sur \d+$/)
+    .first()
+    .waitFor()
+  console.log('  ok : le défi de Léa est en cours, sa jauge à l’écran')
+
+  step('Sam offre du miel au projet de Léa ; Léa le lit dans son Activité')
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await byRole(sam.page, 'button', 'Offrir du miel').click()
+  await byRole(sam.page, 'heading', /^Offrir du miel à /).waitFor()
+  await sam.page.waitForTimeout(700)
+  await byRole(sam.page, 'button', 'Offrir 5 miel').click()
+  await byRole(sam.page, 'button', 'Miel offert').waitFor()
+  expectEqual('miel offert, relu', (await readProject(sam, projectId)).honeyGiven, true)
+  console.log('  ok : le bouton devient « Miel offert », et le projet le sait')
+  await open(lea.page, `${appUrl}/notifications`)
+  await byRole(lea.page, 'link', /^Sam t’a offert du miel pour Mon agent de recettes/).waitFor()
+  console.log('  ok : Léa lit « Sam t’a offert du miel » dans son Activité')
 
   // Tranche 7b : Sam publie à son tour un projet, pour qu'on voie plus bas le blocage le cacher.
   // Un nouveau membre, Malik, le trouve d'abord dans Explorer (le témoin d'avant le blocage). R3 :

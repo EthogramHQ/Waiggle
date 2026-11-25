@@ -30,8 +30,17 @@ const joinList = (items: readonly string[], language: string): string =>
 const capitalize = (text: string, language: string): string =>
   text.slice(0, 1).toLocaleUpperCase(language) + text.slice(1)
 
-/** La phrase de la colonne, dans la langue de `t` ; `language` lie la liste des types. */
-export const emailSummary = (preferences: EmailPreferences, t: T, language: string): string => {
+/**
+ * La phrase de la colonne, dans la langue de `t` ; `language` lie la liste des types. `harvest` :
+ * « Ma récolte » est allumé (R19, relecture juridique du plan, B2) ; le récap du dimanche porte
+ * alors aussi « Ta semaine », et les phrases « proches », qui disent « seulement », la nomment.
+ */
+export const emailSummary = (
+  preferences: EmailPreferences,
+  t: T,
+  language: string,
+  harvest = false,
+): string => {
   // Les types dans l'ordre de l'écran des réglages (celui du contrat), quel que soit l'ordre des
   // réglages reçus.
   const types = EmailType.options
@@ -56,7 +65,10 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
   const hivesNewsInRecap = friendsOnly && preferences.hives === 'now'
 
   if (now.length === 0) {
-    if (friendsOnly) return t(($) => $.notifications.summary.nothingFriends)
+    if (friendsOnly)
+      return harvest
+        ? t(($) => $.game.emailSummary.nothingFriends)
+        : t(($) => $.notifications.summary.nothingFriends)
     if (inRecap.length === 0) return t(($) => $.notifications.summary.nothing)
     return someLeftOut
       ? t(($) => $.notifications.summary.recapSome)
@@ -65,8 +77,14 @@ export const emailSummary = (preferences: EmailPreferences, t: T, language: stri
 
   const names = now.map((type) => t(($) => $.notifications.summary.types[type]))
   const list = capitalize(joinList(names, language), language)
-  if (hivesNewsInRecap) return t(($) => $.notifications.summary.nowFriendsHives, { types: list })
-  if (friendsOnly) return t(($) => $.notifications.summary.nowFriends, { types: list })
+  if (hivesNewsInRecap)
+    return harvest
+      ? t(($) => $.game.emailSummary.nowFriendsHives, { types: list })
+      : t(($) => $.notifications.summary.nowFriendsHives, { types: list })
+  if (friendsOnly)
+    return harvest
+      ? t(($) => $.game.emailSummary.nowFriends, { types: list })
+      : t(($) => $.notifications.summary.nowFriends, { types: list })
   if (inRecap.length === 0) return t(($) => $.notifications.summary.nowOnly, { types: list })
   return someLeftOut
     ? t(($) => $.notifications.summary.nowAndSome, { types: list })

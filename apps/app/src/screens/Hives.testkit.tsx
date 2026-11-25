@@ -173,6 +173,8 @@ export const memo = projectOf(3, 'Le jeu de mémoire', papiJean, false, {
 
 /** La page de Famille vue par Léa, simple membre : on peut inviter ; Le plan de table épinglé. */
 export const memberPage: HivePage = {
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: famille,
   invite: 'allowed',
   invitePolicy: 'members',
@@ -200,6 +202,8 @@ export const fullPage: HivePage = {
 
 /** La ruche que Léa vient de créer : elle seule, aucune invitation (« Ta ruche est prête »). */
 export const readyPage: HivePage = {
+  // R19 : la récolte, absente de ces fausses données.
+  challenge: null,
   summary: {
     id: createdId,
     name: 'Famille',

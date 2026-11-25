@@ -146,6 +146,12 @@ const icons = [
   'crown',
   'hexagon',
   'user-minus',
+  // R19 : les icônes des sceaux qui manquaient (MILESTONE_SEALS de @ruche/contracts ; les autres y
+  // sont déjà) : premier retour, 10 retours, 5 invitations acceptées, 25 semaines butinées.
+  'chat-centered-text',
+  'chats-circle',
+  'handshake',
+  'flower-lotus',
   // Versions pleines (onglet actif, réaction choisie)
   'house-fill',
   'compass-fill',

@@ -17,17 +17,20 @@ export const RulesVersion = z.iso.date()
  * lien) ne la change pas. Elle vaut le jour du déploiement de la version.
  * R12 (les projets publics) : la deuxième version. La première (R11) valait 2026-11-16, déjà
  * acceptée par les membres : la nouvelle doit en différer pour que l'écran « Accepter » revienne.
+ * R19 (la récolte) : la troisième. Les Règles décrivent le classement de la semaine et disent que le
+ * pollen et le miel n'ont aucune valeur (relecture juridique de la branche, point 2 ; Louis, 23/11).
  */
-export const RULES_VERSION = '2026-11-17'
+export const RULES_VERSION = '2026-11-23'
 
 /**
  * « Ce qui change » dans la version en vigueur : des clés de texte (`rules.changes.<clé>` dans
  * packages/i18n), affichées au-dessus de l'écran « Accepter » à qui ne l'a pas encore acceptée.
  * R12 : les projets publics (`public`), ce que peut faire un visiteur sans compte, signalement
- * compris (`visitors`), et la vitrine de l'accueil (`showcase`). `readonly string[]` : le type
+ * compris (`visitors`), et la vitrine de l'accueil (`showcase`). R19 : le classement de la semaine
+ * et la valeur du pollen et du miel (`harvest`). `readonly string[]` : le type
  * écrit permet une liste vide à la prochaine version sans changer la forme.
  */
-export const RULES_CHANGES: readonly string[] = ['public', 'visitors', 'showcase']
+export const RULES_CHANGES: readonly string[] = ['harvest']
 
 /**
  * Un accord donné par un membre, tel que l'export le montre (une ligne par version acceptée,

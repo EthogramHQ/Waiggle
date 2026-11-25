@@ -6,6 +6,7 @@
 // leur identifiant et les rattache. La dernière mise à jour se lit avec le projet (projects/load.ts).
 import { createRoute, z } from '@hono/zod-openapi'
 import {
+  dayOf,
   NewProjectUpdate,
   ProjectUpdate,
   ProjectUpdatePage,
@@ -20,6 +21,8 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { after, encodeCursor, readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { award, lockMembers, setPollen } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import type { FileStorage } from '../media/storage'
 import { projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -49,6 +52,7 @@ const postUpdateRoute = createRoute({
   responses: {
     201: {
       description: 'The new update.',
+      headers: pollenHeaders,
       content: { 'application/json': { schema: ProjectUpdate } },
     },
     400: errorResponse('Invalid data, or a photo that is not a pending photo of this project.'),
@@ -172,7 +176,7 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       | { kind: 'gone' }
       | { kind: 'removed' }
       | { kind: 'invalid_photos' }
-      | { kind: 'ok'; photos: (typeof schema.projectMedia.$inferSelect)[] }
+      | { kind: 'ok'; photos: (typeof schema.projectMedia.$inferSelect)[]; pollen: number }
     try {
       outcome = await db.transaction(async (tx) => {
         const [locked] = await tx
@@ -192,9 +196,10 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // toute la publication est annulée (400 `invalid_feedback`, la même réponse dans tous ces
         // cas). Le règlement porte la date de la mise à jour : « Réglé dans la mise à jour du … ».
         // L'index partiel tester_message_open_feedback_idx (project_id) donne les retours ouverts.
+        let settled: { id: string; testerId: string; createdAt: Date }[] = []
         if (body.settledFeedbackIds.length > 0) {
           const k = schema.testerMessage
-          const settled = await tx
+          settled = await tx
             .update(k)
             .set({ settledAt: update.createdAt, settledUpdateId: update.id })
             .where(
@@ -206,10 +211,39 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
                 isNull(k.removedAt),
               ),
             )
-            .returning({ id: k.id })
+            .returning({ id: k.id, testerId: k.testerId, createdAt: k.createdAt })
           if (settled.length !== body.settledFeedbackIds.length) throw new InvalidFeedback()
         }
-        if (body.photos.length === 0) return { kind: 'ok' as const, photos: [] }
+        // R19 : la mise à jour rapporte du pollen à son auteur (la source est la mise à jour :
+        // retirée par la modération, elle le révoque), et chaque retour qu'elle règle paie son
+        // testeur, comme « Marquer comme réglé » (routes/tester-threads.ts, même clé : celle du
+        // retour payé, payée une fois quelle que soit la façon de le régler). Les verrous de jeu de l'auteur et de
+        // ses testeurs sont pris ensemble, triés, avant les paiements : un `award` après l'autre les
+        // prendrait dans un ordre qui pourrait croiser celui d'une autre transaction (S1).
+        await lockMembers(tx, [user.id, ...settled.map((one) => one.testerId)])
+        const pollen = await award(tx, {
+          memberId: user.id,
+          gesture: 'update',
+          sourceKind: 'update',
+          sourceId: update.id,
+          sourceKey: update.id,
+          projectId: id,
+          now: update.createdAt,
+        })
+        for (const one of settled) {
+          await award(tx, {
+            memberId: one.testerId,
+            gesture: 'feedback_settled',
+            sourceKind: 'tester_message',
+            sourceId: one.id,
+            // La clé du retour payé : le fil et le jour de Paris du message, pas son identifiant.
+            sourceKey: `${id}:${one.testerId}:${dayOf(one.createdAt)}`,
+            counterpartId: user.id,
+            projectId: id,
+            now: update.createdAt,
+          })
+        }
+        if (body.photos.length === 0) return { kind: 'ok' as const, photos: [], pollen }
 
         // Le rattachement des photos : UNE seule écriture conditionnelle (relecture A1). La
         // condition « de ce projet, slot update, pas encore rattachée » est dans l'UPDATE lui-même,
@@ -248,7 +282,11 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           )
           .returning()
         if (attached.length !== body.photos.length) throw new InvalidPhotos()
-        return { kind: 'ok' as const, photos: attached.sort((a, b) => a.position - b.position) }
+        return {
+          kind: 'ok' as const,
+          photos: attached.sort((a, b) => a.position - b.position),
+          pollen,
+        }
       })
     } catch (error) {
       if (error instanceof InvalidFeedback) {
@@ -262,6 +300,7 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (outcome.kind === 'invalid_photos') {
       return c.json(errorBody(languageOf(c), 'invalid_photos'), 400)
     }
+    setPollen(c, outcome.pollen)
     return c.json(toUpdate(update, outcome.photos, publicApiUrl), 201)
   })
 

@@ -49,6 +49,13 @@
 // chacune cite dans VISITOR_PROOFS le test qui prouve qu'un projet ou une page qui n'est pas public
 // y répond comme un identifiant inconnu. Leurs lectures entrent aussi dans les preuves des parties
 // retirées et des ruches, comme celles des membres.
+//
+// R19 (la gamification ; relecture de sécurité du plan, B2) : cinq routes neuves. « Ma récolte » et
+// les réglages du jeu ne touchent qu'à soi ; régler son jeu reste permis pendant une suspension
+// (ALLOWED_WRITES, comme régler ses e-mails), donc aussi sans l'accord aux règles (décision D4).
+// Décorer son rayon et offrir du miel sont refusés à un suspendu. Offrir du miel au projet d'un
+// membre bloqué, dans un sens ou dans l'autre, répond le même 404 qu'un projet inconnu ; le
+// classement ne montre jamais un membre bloqué, ni la photo retirée d'un membre classé.
 import { existsSync, readFileSync } from 'node:fs'
 import { ErrorResponse } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -262,6 +269,15 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'GET /v1/moderation/showcase': ['admin', 'allowed', 'allowed'],
   'PUT /v1/moderation/showcase': ['admin', 'refused', 'refused'],
   'DELETE /v1/projects/:id/showcase': ['own', 'allowed', 'allowed'],
+  // R19 : la récolte (routes/game.ts). Lire « Ma récolte » et régler son jeu ne touchent qu'à soi ;
+  // décorer son rayon dépense son miel, refusé à un suspendu comme toute écriture neuve. Offrir du
+  // miel est un geste vers le projet d'un autre (404 en cas de blocage, comme réagir) ; le
+  // classement montre d'autres membres, jamais un membre bloqué.
+  'GET /v1/me/harvest': ['own', 'allowed', 'allowed'],
+  'PATCH /v1/me/game': ['own', 'allowed', 'allowed'],
+  'PUT /v1/me/game/decoration': ['own', 'refused', 'refused'],
+  'POST /v1/projects/:id/honey': ['hidesBlocked', 'refused', 'refused'],
+  'GET /v1/rankings': ['hidesBlocked', 'allowed', 'allowed'],
 }
 
 /** Les routes lues sans compte (R12) : tout `/v1/public/*`, et rien d'autre. */
@@ -460,6 +476,15 @@ const PROOFS: Record<string, { file: string; test: string }> = {
     file: 'showcase.test.ts',
     test: 'leaves out of « À la une » a showcase project of a member blocked either way',
   },
+  // R19 : titres recopiés du plan (relecture de sécurité B2, relecture juridique B1).
+  'POST /v1/projects/:id/honey': {
+    file: 'game.honey.test.ts',
+    test: 'answers the same 404 to a honey gift on an unknown, private, removed, blocked or example project',
+  },
+  'GET /v1/rankings': {
+    file: 'game.rankings.test.ts',
+    test: 'leaves a member blocked either way out of the hive ranking',
+  },
 }
 
 /**
@@ -641,6 +666,11 @@ const PART_PROOFS: Record<string, { file: string; test: string } | { none: strin
   'GET /v1/public/sitemap': {
     none: 'des adresses et des dates de modification, sans texte ni image d’un membre',
   },
+  // R19 : le classement montre le nom et la photo des membres classés.
+  'GET /v1/rankings': {
+    file: 'game.moderation.test.ts',
+    test: 'never shows a removed avatar in a ranking',
+  },
 }
 
 /**
@@ -738,6 +768,8 @@ const HIVE_PROOFS: Record<string, { file: string; test: string } | { none: strin
   'GET /v1/moderation/showcase': {
     none: 'des projets publics (web) seulement, en vitrine ou candidats ; jamais un projet réservé',
   },
+  // R19 : des membres et leur pollen de la semaine, sans projet.
+  'GET /v1/rankings': { none: 'des membres et leur pollen de la semaine, sans projet' },
   // Les lectures sans compte : l'état « ruche » de la table état × surface.
   'GET /v1/public/projects/:id': VISITOR_MATRIX,
   'GET /v1/public/projects/:id/updates': VISITOR_MATRIX,
@@ -987,8 +1019,10 @@ describe('the inventory of routes', () => {
     expect([...RULES_ALLOWED_WRITES].sort()).toEqual(exits)
     // Témoin : les trois sorties du plan (accepter, régler ses e-mails, se désinscrire), et selon D4
     // les écritures entièrement permises pendant une suspension.
+    // R19 : régler son jeu (PATCH /v1/me/game), permis pendant une suspension, l'est aussi ici.
     expect(exits).toEqual([
       'PATCH /v1/me/email-preferences',
+      'PATCH /v1/me/game',
       'POST /v1/email/unsubscribe',
       'POST /v1/hive-invitations/:id/accept',
       'POST /v1/me/rules',

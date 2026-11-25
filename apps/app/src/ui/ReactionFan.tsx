@@ -30,7 +30,8 @@ import { Button } from './Button'
 import { focusWithoutScroll } from './focus'
 import { Icon } from './Icon'
 import { hasSeen, noteSeen } from './oncePerDevice'
-import { ReactionIcon } from './ReactionCapsule'
+import { PollenGain } from './PollenGain'
+import { type ReactionGain, ReactionIcon } from './ReactionCapsule'
 import { Surface } from './Surface'
 import { shortCount } from './shortCount'
 import { Text } from './Text'
@@ -49,6 +50,11 @@ type Props = {
   onToggle: (kind: ReactionKind) => void
   /** Ferme l'éventail : toucher à côté, Échap, Retour d'Android. */
   onClose: () => void
+  /**
+   * R19 : le pollen qu'une réaction posée vient de rapporter. La pastille naît au-dessus de sa
+   * ligne : `kind`, sinon la dernière posée dans l'éventail. Absent ou `null` : rien.
+   */
+  gain?: ReactionGain | null | undefined
 }
 
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
@@ -69,7 +75,7 @@ const CAPSULE_ROOM = layout.touchTarget + space.huge
 /** Le rond qui porte l'icône d'une ligne. */
 const DISK = 36
 
-export function ReactionFan({ open, reactions, onToggle, onClose }: Props) {
+export function ReactionFan({ open, reactions, onToggle, onClose, gain }: Props) {
   const { t } = useTranslation()
   const { sizeClass } = useLayout()
   const insets = useSafeAreaInsets()
@@ -255,6 +261,7 @@ export function ReactionFan({ open, reactions, onToggle, onClose }: Props) {
             gesturesFor={choose}
             firstRef={firstRef}
             helpOkRef={helpOkRef}
+            gain={gain}
           />
         </View>
         {/* Toucher le voile ferme l'éventail. Caché aux lecteurs d'écran (ils ont Échap et Retour)
@@ -288,6 +295,8 @@ type PanelProps = {
   /** Pour ReactionFan : le premier contrôle et « J'ai compris », où le focus se pose. */
   firstRef?: Ref<View>
   helpOkRef?: Ref<View>
+  /** R19 : le gain d'une réaction posée, sa pastille au-dessus de sa ligne (voir ReactionFan). */
+  gain?: ReactionGain | null | undefined
 }
 
 /**
@@ -303,7 +312,14 @@ export function ReactionFanPanel({
   gesturesFor,
   firstRef,
   helpOkRef,
+  gain,
 }: PanelProps) {
+  // R19 : la dernière réaction posée dans l'éventail, où va la pastille d'un gain qui ne dit pas
+  // de quelle réaction il vient.
+  const [lastPosed, setLastPosed] = useState<ReactionKind | null>(null)
+  const gainKind = gain
+    ? (reactions.find((reaction) => reaction.kind === gain.kind)?.kind ?? lastPosed)
+    : null
   // Poser une réaction remplace sa ligne-bouton par une vue avec « Retirer », et retirer fait
   // l'inverse : le contrôle qui avait le focus disparaît (relecture R5a, C1). On garde donc le
   // contrôle de chaque réaction (`controls`) et la réaction que le membre vient de choisir
@@ -330,6 +346,7 @@ export function ReactionFanPanel({
       ...base,
       onPress: () => {
         chosen.current = { kind, mine }
+        if (!mine) setLastPosed(kind)
         base.onPress()
       },
     }
@@ -359,6 +376,17 @@ export function ReactionFanPanel({
                 if (index === 0 && firstRef) setRef(firstRef, node)
               }}
             />
+            {/* R19 : la pastille de gain, au-dessus de la ligne de la réaction qui l'a rapportée.
+                Posée par-dessus la ligne, hors du flux : les lignes ne bougent pas. */}
+            {gain && gainKind === reaction.kind ? (
+              <View
+                testID={`pollen-gain-${reaction.kind}`}
+                pointerEvents="none"
+                style={StyleSheet.absoluteFill}
+              >
+                <PollenGain amount={gain.amount} trigger={gain.trigger} placement="above" />
+              </View>
+            ) : null}
           </View>
         ))}
       </View>

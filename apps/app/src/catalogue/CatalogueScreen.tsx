@@ -97,6 +97,12 @@ import { FormSamples } from './formulaire'
 import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
 import { CardGridCatalogue } from './grille-cartes'
+import { HarvestCatalogue } from './harvest'
+import { HarvestChoicesCatalogue } from './harvestChoices'
+import { HarvestFiguresCatalogue } from './harvestFigures'
+import { HarvestGainsCatalogue } from './harvestGains'
+import { HarvestMotionCatalogue } from './harvestMotion'
+import { HarvestPanelsCatalogue } from './harvestPanels'
 import { TokensCatalogue } from './jetons'
 import { LazySection } from './LazySection'
 import { labels } from './labels'
@@ -157,6 +163,7 @@ import { HiveNewsCatalogue } from './ruches-actualite'
 import { HiveCellsCatalogue } from './ruches-alveoles'
 import { HiveRowsCatalogue } from './ruches-lignes'
 import { ProjectTilesCatalogue } from './ruches-tuiles'
+import { SealShelfCatalogue } from './sealShelf'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
 import { TesterBricksCatalogue } from './testeurs-briques'
@@ -1011,6 +1018,22 @@ export function CatalogueScreen() {
         <ToolsWideCatalogue />
         <FeedEndCatalogue />
         <MascotCatalogue />
+      </LazySection>
+      {/* Tranche R19, la gamification : le rayon, les sceaux et leurs tuiles (harvest.tsx), puis ce
+          qui bouge, l'alvéole du niveau et la pastille de pollen (harvestMotion.tsx). */}
+      <LazySection title={l.lazy.harvest}>
+        <HarvestCatalogue />
+        <HarvestMotionCatalogue />
+        {/* La pastille posée sur le geste et le rayon qui se vide (harvestGains.tsx). */}
+        <HarvestGainsCatalogue />
+        {/* Le panneau du niveau, la carte d'un défi et le classement (harvestPanels.tsx). */}
+        <HarvestPanelsCatalogue />
+        {/* Le choix du défi, la décoration du rayon et le pollen par famille (harvestChoices.tsx). */}
+        <HarvestChoicesCatalogue />
+        {/* Les sceaux d'un membre sur sa page (sealShelf.tsx). */}
+        <SealShelfCatalogue />
+        {/* Le montant en grand de « Ma récolte » (harvestFigures.tsx). */}
+        <HarvestFiguresCatalogue />
       </LazySection>
     </Screen>
   )

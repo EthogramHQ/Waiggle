@@ -263,9 +263,13 @@ const variants: [string, (language: Language) => EmailContent][] = [
                 },
               ],
               more: 1,
+              // R19 : le défi de la semaine sous le nom de la ruche, en cours.
+              challenge: { code: 'feedback_5', progress: 3, target: 5, done: false, isNew: false },
             },
             {
               name: `Amisdujeudi${'i'.repeat(29)}`,
+              // R19 : un défi neuf (« Défi de la semaine : … », jamais « 0 sur 3 »).
+              challenge: { code: 'tested_3', progress: 0, target: 3, done: false, isNew: true },
               items: [
                 {
                   kind: 'updated',
@@ -288,10 +292,19 @@ const variants: [string, (language: Language) => EmailContent][] = [
               ],
               more: 0,
             },
+            // R19 : une ruche sans nouveauté, avec son défi réussi seul.
+            {
+              name: 'Voisins',
+              items: [],
+              more: 0,
+              challenge: { code: 'comments_5', progress: 5, target: 5, done: true, isNew: false },
+            },
           ],
           hiveInvitations: [{ inviter: 'Nora Benali' }, { inviter: null }],
           hiveInvitationsMore: 1,
           hivesUrl: `${APP_URL}/hives`,
+          // R19 : « Ta semaine », défi réussi, avec la note unique « Nouveau : ta récolte ».
+          harvest: { pollen: 1285, challengeDone: true, news: true, url: `${APP_URL}/harvest` },
         }),
         APP_URL,
       ),

@@ -964,7 +964,7 @@ export function PageHeading({
     // toujours). Il passe en premier dans l'ordre de lecture, comme le titre affiché.
     const hidden = (
       <View style={hiddenFrame} pointerEvents="none">
-        <Text variant="title2" heading={level} focusRef={titleRef}>
+        <Text variant="title2" heading={level} wholeWords={title} focusRef={titleRef}>
           {title}
         </Text>
       </View>
@@ -1026,7 +1026,7 @@ export function PageHeading({
           {/* Le titre peut rétrécir et passer à la ligne (sur le web, une vue ne rétrécit pas
               d'elle-même : flexShrink 0 par défaut). */}
           <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-            <Text variant="title2" heading={level} focusRef={titleRef}>
+            <Text variant="title2" heading={level} wholeWords={title} focusRef={titleRef}>
               {title}
             </Text>
           </View>
@@ -1044,7 +1044,7 @@ export function PageHeading({
           ) : null}
         </View>
       ) : title ? (
-        <Text variant="title2" heading={level} focusRef={titleRef}>
+        <Text variant="title2" heading={level} wholeWords={title} focusRef={titleRef}>
           {title}
         </Text>
       ) : null}

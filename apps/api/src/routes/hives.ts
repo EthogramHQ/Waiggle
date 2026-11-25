@@ -30,6 +30,8 @@ import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { setPollen } from '../game/award'
+import { pollenHeaders } from '../game/gesture'
 import {
   hiveSummariesOf,
   loadHiveActivity,
@@ -90,7 +92,8 @@ const createHiveRoute = createRoute({
     'The creator becomes its animator and only member. 10 created and 20 joined at most.',
   request: { body: { required: true, content: { 'application/json': { schema: HiveCreate } } } },
   responses: {
-    201: json(HiveSummary, 'The new hive.'),
+    // R19 : la création peut porter le pollen gagné (game/award.ts).
+    201: { ...json(HiveSummary, 'The new hive.'), headers: pollenHeaders },
     400: errorResponse('Invalid name or icon.'),
     401: errorResponse('Not signed in.'),
     403: errorResponse('A suspended account.'),
@@ -291,6 +294,7 @@ export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const [summary] = await hiveSummariesOf(db, viewer.id, [outcome.id], publicApiUrl, now)
     // Elle vient d'être créée, avec son créateur pour membre : son absence serait une erreur du code.
     if (!summary) throw new Error('The hive just created has no summary')
+    setPollen(c, outcome.pollen)
     return c.json(HiveSummary.parse(summary), 201)
   })
 

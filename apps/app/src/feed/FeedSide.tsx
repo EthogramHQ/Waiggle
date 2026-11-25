@@ -9,13 +9,15 @@ import type { HiveSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Platform } from 'react-native'
 import { useMediaSources } from '../api/media'
+import { useHarvest } from '../gamification/api'
 import { useMyHives } from '../hives/api'
 import { useOpenDemo } from '../navigation/links'
 import { useSuggestions } from '../suggestions/api'
 import { PeopleToFollow } from '../suggestions/PeopleToFollow'
 import { HiveRow, HiveRowSkeleton } from '../ui/HiveRow'
-import { ListGroup, ListRowSkeleton } from '../ui/ListGroup'
+import { ListGroup, ListRow, ListRowSkeleton, type PressEvent } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Reveal } from '../ui/Reveal'
 import { Loading } from '../ui/Skeleton'
@@ -66,6 +68,8 @@ export function FeedSide({ withSuggestions, shownProjectIds, skeletonShown = fal
   // titre ni cadre vide.
   return (
     <Stack gap="xxl" align="stretch">
+      {/* R19 (option b16) : « Ta semaine » en tête, lien vers « Ma récolte ». */}
+      <YourWeek shown={skeletonShown} />
       {/* R10 (F-Fil11) : ses ruches d'abord, puis les proches à suivre et les testeurs. */}
       {mine.isPending || hives.length > 0 ? (
         <Reveal
@@ -89,6 +93,7 @@ export function FeedSide({ withSuggestions, shownProjectIds, skeletonShown = fal
 export function FeedSideSkeleton() {
   return (
     <Stack gap="xxl" align="stretch">
+      <WeekSkeleton />
       <SideSkeleton section="hives" />
       <SideSkeleton section="suggestions" />
       <SideSkeleton section="testers" />
@@ -154,6 +159,73 @@ function SideSkeleton({
         </ListGroup>
       </Loading>
     </Stack>
+  )
+}
+
+/** R19 : la ligne vide de « Ta semaine », de la hauteur de la vraie (une ligne de liste). */
+function WeekSkeleton({ shown = false }: { shown?: boolean }) {
+  return (
+    <Loading shown={shown}>
+      <ListGroup>
+        <ListRowSkeleton leading="round" trailing="none" />
+      </ListGroup>
+    </Loading>
+  )
+}
+
+/**
+ * « Ta semaine » (R19, planche R19-Fil, option b16) : une ligne en tête de la colonne, qui mène à
+ * « Ma récolte » et dit la semaine en quelques mots : le pollen et le défi (« 85 pollen · défi 2 sur
+ * 3 », « défi réussi »), le pollen seul, « Nouveaux défis » le lundi avant le premier pollen, ou
+ * « Ma récolte » sans rien à dire. Jamais « 0 pollen » : rien qui culpabilise. Le compte d'exemple
+ * (pas de récolte) ou une lecture ratée : rien, la récolte se retrouve sur sa page « Moi ».
+ */
+function YourWeek({ shown }: { shown: boolean }) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const harvest = useHarvest()
+  if (harvest.isError && !harvest.data) return null
+  const data = harvest.data
+  const say = (): string => {
+    if (!data) return ''
+    const amount = data.week.total
+    const challenge = data.personalChallenge
+    if (amount > 0) {
+      if (challenge.state === 'active')
+        return t(($) => $.game.side.active, {
+          amount,
+          progress: challenge.progress,
+          target: challenge.target,
+        })
+      if (challenge.state === 'done') return t(($) => $.game.side.done, { amount })
+      return t(($) => $.game.side.pollen, { amount })
+    }
+    if (challenge.state === 'active')
+      return t(($) => $.game.side.challenge, {
+        progress: challenge.progress,
+        target: challenge.target,
+      })
+    if (challenge.state === 'choose') return t(($) => $.game.side.monday)
+    return t(($) => $.game.side.empty)
+  }
+  const href = '/harvest'
+  return (
+    <Reveal loading={!data} skeleton={<WeekSkeleton shown={shown} />}>
+      <ListGroup>
+        <ListRow
+          label={t(($) => $.game.side.title)}
+          detail={say()}
+          icon="hexagon"
+          trailing="chevron"
+          href={href}
+          onPress={(event?: PressEvent) => {
+            // Sur le web, la ligne est un vrai lien : le routeur change de page sans recharger.
+            if (Platform.OS === 'web') event?.preventDefault?.()
+            router.push(href)
+          }}
+        />
+      </ListGroup>
+    </Reveal>
   )
 }
 

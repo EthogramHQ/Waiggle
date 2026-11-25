@@ -1,8 +1,15 @@
 // Tests d'intégration de la tranche 3b-2 : la page d'un membre et la page d'une étiquette.
 // Scénarios : docs/scenarios/phase-1.md, « Précisions (tranche 3b-2) ». Deux membres : Léa et Max.
-import { ErrorResponse, Me, Member, PROJECT_LIST_MAX, Project } from '@ruche/contracts'
+import {
+  DEFAULT_DECORATION,
+  ErrorResponse,
+  Me,
+  Member,
+  PROJECT_LIST_MAX,
+  Project,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
 import { jpegImage, visualForm } from './testing/images'
@@ -152,6 +159,7 @@ describe('the page of a member', () => {
         'bio',
         'favoriteTools',
         'followerCount',
+        'game', // R19 : sa récolte (niveau, sceaux), null tant qu'elle n'existe pas
         'handle',
         'id',
         'isBlocked', // tranche 7b : si le visiteur l'a bloquée
@@ -222,5 +230,91 @@ describe('the page of a member', () => {
     for (const id of ["x' or '1'='1", '../me', 'a'.repeat(65), 'é']) {
       await expectNotFound(await memberPage(id, max))
     }
+  })
+})
+
+// R19 (« La gamification », « Où on le voit ») : la page d'un membre, pour tout membre connecté,
+// montre son jeu (`Member.game`) : niveau, alvéoles du rayon, titre, sceaux, décoration. Jamais son
+// miel, ses réglages ni ses semaines butinées ; rien pour un compte d'exemples, pour un membre
+// bloqué, ni sur la page publique.
+describe('the game on the page of a member (R19)', () => {
+  /** Marque un compte d'exemples, comme `infra/mark-example.sh`, directement en base (R12b). */
+  const markExample = (userId: string) =>
+    ctx.db.execute(
+      sql`insert into example_account (user_id, marked_at)
+          values (${userId}, ${new Date().toISOString()}::timestamptz at time zone 'UTC')`,
+    )
+
+  it('shows her level, comb, title and seals to another member, never her honey nor her settings', async () => {
+    // Publier son premier projet : 50 pollen (la moitié du niveau 1), le titre de Bâtisseuse et le
+    // sceau du premier projet.
+    await publish(lea, { title: 'Mon herbier' })
+
+    const res = await memberPage(leaId, max)
+    expect(res.status).toBe(200)
+    const raw = (await res.json()) as { game: Record<string, unknown> | null }
+
+    expect(Object.keys(raw.game ?? {}).sort()).toEqual([
+      'cells',
+      'decoration',
+      'level',
+      'seals',
+      'title',
+    ])
+    expect(Member.parse(raw).game).toEqual({
+      level: 1,
+      cells: 5,
+      title: { family: 'builder', form: 'f', pinned: false },
+      seals: [{ code: 'first_project', earnedAt: expect.any(String) }],
+      decoration: DEFAULT_DECORATION,
+    })
+  })
+
+  it('shows a new member a level-1 comb without title nor seals', async () => {
+    expect((await readMember(leaId, max)).game).toEqual({
+      level: 1,
+      cells: 0,
+      title: null,
+      seals: [],
+      decoration: DEFAULT_DECORATION,
+    })
+  })
+
+  it('shows her the same game on her own page', async () => {
+    await publish(lea, { title: 'Mon herbier' })
+
+    const own = (await readMember(leaId, lea)).game
+    expect(own).not.toBeNull()
+    expect(own).toEqual((await readMember(leaId, max)).game)
+  })
+
+  it('shows no game for an example account', async () => {
+    const maxId = (await me(max)).id
+    // Témoin : avant d'être marqué, son jeu se lit.
+    expect((await readMember(maxId, lea)).game).not.toBeNull()
+
+    await markExample(maxId)
+
+    expect((await readMember(maxId, lea)).game).toBeNull()
+  })
+
+  it('shows no game on the page of a member she blocked', async () => {
+    const maxId = (await me(max)).id
+    expect((await readMember(maxId, lea)).game).not.toBeNull()
+
+    expect((await send('PUT', `/v1/members/${maxId}/block`, lea)).status).toBe(204)
+
+    expect((await readMember(maxId, lea)).game).toBeNull()
+  })
+
+  it('never shows the game on her public page', async () => {
+    await ctx.openPublicPage(lea)
+    // Témoin : la page des membres connectés porte son jeu.
+    expect((await readMember(leaId, max)).game).not.toBeNull()
+
+    const res = await ctx.visitor(`/v1/public/members/${encodeURIComponent(leaId)}`)
+
+    expect(res.status).toBe(200)
+    expect(Object.keys((await res.json()) as object)).not.toContain('game')
   })
 })

@@ -190,6 +190,7 @@ const fr = {
     brand: 'Marque, contrôles et matières',
     light: 'Jetons, lumière et chargement',
     grids: 'Grilles, fin du fil et mascotte',
+    harvest: 'La récolte : rayon, sceaux, niveau et pollen',
   },
 }
 
@@ -377,6 +378,7 @@ const en: typeof fr = {
     brand: 'Brand, controls and materials',
     light: 'Tokens, light and loading',
     grids: 'Grids, feed end and mascot',
+    harvest: 'The harvest: comb, seals, level and pollen',
   },
 }
 

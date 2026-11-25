@@ -39,6 +39,17 @@ jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
 // Bloquer et débloquer (tranche 7b) : de faux hooks, dont le test lit les appels.
 jest.mock('../blocks/api', () => ({ useBlock: jest.fn(), useUnblock: jest.fn() }))
+// R19 : la récolte (`gamification/api`), que l'écran lit pour soi ; ces tests ne la regardent
+// pas : une lecture qui n'arrive jamais, une écriture qui ne fait rien. `virtual` : le module
+// n'existe pas encore quand ces lignes sont écrites (tests avant le code), Jest ne le cherche pas.
+jest.mock(
+  '../gamification/api',
+  () => ({
+    useHarvest: () => ({ data: undefined, isPending: true, isError: false, refetch: jest.fn() }),
+    useGameSettings: () => ({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false }),
+  }),
+  { virtual: true },
+)
 jest.mock('../members/api', () => {
   const { useQuery } = jest.requireActual('@tanstack/react-query')
   const getMember = jest.fn()
