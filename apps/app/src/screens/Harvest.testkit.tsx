@@ -24,6 +24,7 @@
 //   la page d'un membre `/members/<id>`, les réglages de l'apparence `/settings/appearance` (le
 //   groupe « Classements » y est, sous Apparence).
 import {
+  type CategoryList,
   DECORATIONS,
   type Decoration,
   type DecorationChoice,
@@ -38,6 +39,7 @@ import {
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import type { ReactElement } from 'react'
 import type { ApiResult } from '../api/errors'
+import { categoryList } from '../testing/categories'
 import { leaHarvest } from '../testing/harvest'
 import { myHives } from '../testing/hives'
 import { pathOf } from '../testing/navigation'
@@ -68,8 +70,7 @@ export const T = {
   rankingsChange: fr.t(($) => $.game.harvest.rankings.change),
   honeyTitle: fr.t(($) => $.game.harvest.honey.title),
   honeyHelp: fr.t(($) => $.game.harvest.honey.help),
-  offer: fr.t(($) => $.game.harvest.honey.offer),
-  offerHint: fr.t(($) => $.game.harvest.honey.offerHint),
+  offerWhere: fr.t(($) => $.game.harvest.honey.offerWhere),
   decorate: fr.t(($) => $.game.harvest.honey.decorate),
   decorateHint: fr.t(($) => $.game.harvest.honey.decorateHint),
   sealsMore: fr.t(($) => $.game.harvest.seals.more),
@@ -136,6 +137,8 @@ export const mockServer = {
   harvest: leaHarvest as Harvest,
   harvestError: null as string | null,
   hives: myHives as MyHives,
+  /** Les catégories lues (GET /v1/categories) : les seize de départ, plus celles qu'un test crée. */
+  categories: categoryList() as CategoryList,
   /** Les classements, par `close` ou par identifiant de ruche. */
   rankings: new Map<string, Ranking>(),
   rankingsError: null as string | null,
@@ -145,6 +148,7 @@ export const mockServer = {
     this.harvest = leaHarvest
     this.harvestError = null
     this.hives = myHives
+    this.categories = categoryList()
     this.rankings = new Map()
     this.rankingsError = null
     this.overrides = []
@@ -175,9 +179,17 @@ export const mockServer = {
         ? { ok: true, data: RankingSchema.parse(ranking) }
         : { ok: false, error: 'notFound' as never }
     }
+    if (method === 'GET' && url.pathname === '/v1/categories')
+      return { ok: true, data: this.categories }
     if (method === 'GET' && url.pathname === '/v1/hives') return { ok: true, data: this.hives }
     if (method === 'PATCH' && url.pathname === '/v1/me/game') {
-      const patch = body as { personalChallenge?: PersonalChallengeCode | 'none' }
+      const patch = body as {
+        personalChallenge?: PersonalChallengeCode | 'none'
+        levelSeen?: number
+      }
+      // Le niveau vu s'écrit comme l'API : la relecture qui suit le dit.
+      if (patch.levelSeen !== undefined)
+        this.harvest = { ...this.harvest, levelSeen: patch.levelSeen }
       const current = this.harvest.personalChallenge
       if (patch.personalChallenge && 'offered' in current) {
         this.harvest = {

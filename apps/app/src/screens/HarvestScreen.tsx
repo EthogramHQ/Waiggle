@@ -21,14 +21,9 @@
 import {
   type Harvest,
   HONEY,
-  MilestoneSealCode,
-  type OTHER_CATEGORY,
   PERSONAL_CHALLENGES,
   type PersonalChallengeCode,
   type PersonalChallengeState,
-  type PROJECT_CATEGORIES,
-  SEALS,
-  type SealCode,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
@@ -36,6 +31,8 @@ import { useTranslation } from 'react-i18next'
 import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useGameSettings, useHarvest } from '../gamification/api'
+import { useLevelRise } from '../gamification/levelRise'
+import { useSealOf } from '../gamification/sealOf'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { AmountFigure } from '../ui/AmountFigure'
@@ -47,7 +44,6 @@ import { Columns } from '../ui/Columns'
 import { FamilyBars } from '../ui/FamilyBars'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { HarvestPanel } from '../ui/HarvestPanel'
-import type { IconName } from '../ui/Icon'
 import { LevelCell } from '../ui/LevelCell'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { shortDate } from '../ui/relativeDate'
@@ -161,7 +157,14 @@ function HarvestContent({ harvest }: { harvest: Harvest }) {
           rows={[
             { main: week, side: panel },
             {
-              main: hives ? <Columns sideWidth="panel" main={challenge} side={hives} /> : challenge,
+              // `regular` (la base des colonnes de côté) : la colonne principale (916 px à
+              // 1440) ne peut donner place à `panel` (340) à côté d'un défi qui garde de la
+              // largeur ; `regular` tient, et les deux défis restent côte à côte.
+              main: hives ? (
+                <Columns sideWidth="regular" main={challenge} side={hives} />
+              ) : (
+                challenge
+              ),
               side: (
                 <Stack gap="xxl">
                   {honey}
@@ -197,8 +200,10 @@ function HarvestContent({ harvest }: { harvest: Harvest }) {
  */
 function LevelPanel({ harvest }: { harvest: Harvest }) {
   const { t } = useTranslation()
-  const settings = useGameSettings()
-  const isNew = harvest.levelSeen < harvest.level
+  // Le passage vu à l'arrivée, figé pour la visite : l'écriture du niveau vu ne retire pas
+  // « Nouveau » (option a10).
+  const { risen, markSeen } = useLevelRise(harvest)
+  const isNew = risen !== null
   const title = harvest.title
     ? t(($) => $.game.titles[`${harvest.title?.family ?? 'forager'}_${harvest.title?.form ?? 'f'}`])
     : undefined
@@ -218,12 +223,7 @@ function LevelPanel({ harvest }: { harvest: Harvest }) {
         <LevelCell
           level={harvest.level}
           size="regular"
-          {...(isNew
-            ? {
-                rise: { from: harvest.levelSeen },
-                onRisen: () => settings.mutate({ levelSeen: harvest.level }),
-              }
-            : null)}
+          {...(risen ? { rise: { from: risen.from }, onRisen: markSeen } : null)}
         />
       }
     />
@@ -450,9 +450,8 @@ function RankingsSection({ inRankings }: { inRankings: boolean }) {
 }
 
 /**
- * « Mon miel » : le solde en grand, d'où il vient, puis ce qu'il permet. « Offrir du miel » se fait
- * depuis la page d'un projet : la ligne dit où, sans mener nulle part ; « Décorer mon rayon » ouvre
- * la feuille.
+ * « Mon miel » : le solde en grand, d'où il vient, où l'offrir (la phrase sous le solde : cela se
+ * fait depuis la page d'un projet), puis « Décorer mon rayon », qui ouvre la feuille.
  */
 function HoneySection({ honey, onDecorate }: { honey: number; onDecorate: () => void }) {
   const { t } = useTranslation()
@@ -464,13 +463,12 @@ function HoneySection({ honey, onDecorate }: { honey: number; onDecorate: () => 
           <Text variant="caption" tone="muted">
             {t(($) => $.game.harvest.honey.help)}
           </Text>
+          {/* Offrir du miel se fait depuis la page d'un projet : la phrase dit où, sans fausse ligne. */}
+          <Text variant="caption" tone="muted">
+            {t(($) => $.game.harvest.honey.offerWhere)}
+          </Text>
         </Surface>
         <ListGroup>
-          <ListRow
-            icon="heart"
-            label={t(($) => $.game.harvest.honey.offer)}
-            detail={t(($) => $.game.harvest.honey.offerHint)}
-          />
           <ListRow
             icon="paint-brush"
             label={t(($) => $.game.harvest.honey.decorate)}
@@ -482,35 +480,6 @@ function HoneySection({ honey, onDecorate }: { honey: number; onDecorate: () => 
       </Stack>
     </Section>
   )
-}
-
-/** Le nom et le dessin d'un sceau gagné, d'après son code (contrat, `SEALS`). */
-const useSealOf = () => {
-  const { t } = useTranslation()
-  return (code: SealCode): { name: string; icon: IconName; matter: 'honey' | 'cream' } => {
-    const known = SEALS.find((seal) => seal.code === code)
-    if (!known) {
-      // Une catégorie créée après R19 par un administrateur : son nom n'est pas dans nos textes.
-      return {
-        name: t(($) => $.game.seals.categoryOther, { category: code }),
-        icon: 'shapes',
-        matter: 'cream',
-      }
-    }
-    const milestone = MilestoneSealCode.safeParse(code)
-    const name = milestone.success
-      ? t(($) => $.game.seals[milestone.data])
-      : // Un sceau de catégorie de départ (`SEALS` n'en connaît pas d'autre) : son code est celui
-        // de la catégorie, qui nomme son texte (« Cuisine explorée »).
-        t(
-          ($) =>
-            $.game.seals.category[
-              code as Exclude<(typeof PROJECT_CATEGORIES)[number], typeof OTHER_CATEGORY>
-            ],
-        )
-    // L'icône du contrat est une icône de l'appli : un test (WaxSeal.icons.test.ts) le vérifie.
-    return { name, icon: known.icon as IconName, matter: known.matter }
-  }
 }
 
 /** « Mes sceaux · N » : chaque sceau gagné, avec sa date ; une ligne pour ceux qui restent. */
