@@ -161,8 +161,8 @@ Sur GitHub :
 
 - `louis` : `sudo /usr/local/sbin/waiggle-deployer <commit complet>`. Codes : `0` déployé, `2`
   refusé, `3` trop tôt (un déploiement en cours, 10 minutes depuis le dernier essai, ou 6 essais
-  dans le jour UTC), `4` échec ou délai dépassé du côté de la production, `5` notification de début
-  impossible.
+  dans le jour UTC), `4` échec ou délai dépassé du côté de la production. Si ntfy ne répond pas,
+  le déploiement continue et le dit dans le terminal.
 - `admin` : `ssh admin@vps-dev`, puis `/usr/bin/sudo /usr/local/sbin/waiggle-retour <commit>`. Il
   attend jusqu'à 15 minutes un déploiement en cours, et demande la phrase de passe de la clé de
   retour.

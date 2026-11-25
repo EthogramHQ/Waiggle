@@ -7,7 +7,7 @@
 #   0. root, then the lock (one run at a time);
 #   1. exactly one argument, a full commit (40 lowercase hexadecimal characters);
 #   2. the pace: 10 minutes between two attempts, 6 attempts per UTC day;
-#   3. a log line and a start notification (no notification, no deployment);
+#   3. a log line and a start notification (if ntfy fails, the run goes on and says so);
 #   4. the commit is on main of GitHub (root's own bare repository, fetched now);
 #   5. it descends from the version in production, and differs from it;
 #   6. each first-parent commit since that version was merged by Louis through a pull request;
@@ -20,7 +20,7 @@
 # `-p` (privileged mode) stops bash from reading BASH_ENV, SHELLOPTS and BASHOPTS, and from
 # importing functions: nothing of the caller's environment runs before the first line.
 # Exit codes: 0 deployed, 2 refused, 3 too early (lock or pace), 4 production failed or
-# interrupted, 5 start notification impossible.
+# interrupted.
 set -euo pipefail
 IFS=$' \t\n'
 umask 077
@@ -178,7 +178,6 @@ finir() {
     verrou) message="un déploiement est déjà en cours ; rien n'est fait." ;;
     ecart) message="le dernier essai date de moins de 10 minutes ; réessaie plus tard." ;;
     plafond) message="six essais aujourd'hui (jour UTC) ; réessaie demain." ;;
-    notification) message="la notification de début n'est pas partie ; rien n'est déployé." ;;
     pas-sur-main) message="ce commit n'est pas sur main du dépôt GitHub." ;;
     version-illisible) message="la production n'a pas rendu une version lisible ; rien n'est déployé." ;;
     deja-en-service) message="ce commit est déjà en service." ;;
@@ -204,7 +203,7 @@ finir() {
     texte="refusé ($raison) : ${commit:0:7}, demandé par $appelant, étape $etape"
   fi
   case $raison in
-    verrou | notification) ;;
+    verrou) ;;
     argument | ecart | plafond)
       if alerte_permise; then
         printf '%s\n' "$now" >"$ETAT/derniere-alerte"
@@ -268,14 +267,17 @@ lire_argument() {
   commit=$1
 }
 
-# The `debut` line, then the start notification: without it, nothing is examined (A4 step 3).
+# The `debut` line, then the start notification (A4 step 3). A notification that does not leave
+# (ntfy down, or its daily limit reached: 429) no longer stops the run (decision of 25/11/2026):
+# the log keeps the attempt, the caller is told on the terminal, and every check that follows
+# still applies. Before, an ntfy outage was enough to block every deployment.
 commencer() {
   annoncer 3 "le début, noté et notifié"
   maintenant
   horodatage "$now"
   printf '%s debut script=%s appelant=%s commit=%s\n' "$horo" "$SCRIPT" "$appelant" "$commit" >>"$JOURNAL"
   if ! notifier "début : ${commit:0:7}, demandé par $appelant"; then
-    finir 5 notification
+    printf '%s : %s\n' "$SCRIPT" "la notification de début n'est pas partie (ntfy) ; on continue sans elle, le journal garde l'essai." >&2 || true
   fi
 }
 

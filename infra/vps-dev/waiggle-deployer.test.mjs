@@ -669,13 +669,16 @@ describe('waiggle-deployer', { skip: !linux && raisonDuSaut }, () => {
     assert.equal(copies.includes('MARQUEUR'), false)
   })
 
-  it('refuses to deploy when the start notification cannot be sent', async () => {
+  // Décision du 25/11/2026 : ntfy en panne (ou sa limite par jour atteinte, 429) ne bloque plus un
+  // déploiement. Avant, ce test vérifiait le refus ; il vérifie maintenant qu'on continue, qu'on le
+  // dit à l'appelant, et que le journal garde l'essai.
+  it('deploys even when the start notification cannot be sent, and says so', async () => {
     const a = preparer()
-    a.banc.configurer({ curl: [22] })
-    refuse(a.banc, await lancer(a.banc, [a.C]), 'notification', 5)
+    a.banc.configurer({ curl: [22, 22] })
+    const r = await lancer(a.banc, [a.C])
+    deploye(a.banc, r, a.C)
     assert.equal(debuts(a.banc).length, 1)
-    assert.deepEqual(a.banc.appels('gh'), [])
-    assert.deepEqual(a.banc.appels('ssh'), [])
+    assert.match(r.stderr, /la notification de début n'est pas partie/)
 
     // The end notification failing does not change the exit code.
     const b = preparer()
