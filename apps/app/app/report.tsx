@@ -4,9 +4,18 @@
 // l'identifiant de la cible dans l'adresse.
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
+import { lazyScreen } from '../src/navigation/lazyScreen'
 import { firstParam } from '../src/navigation/params'
-import { ReportSheet } from '../src/screens/ReportSheet'
 import { ShowcaseScreen } from '../src/screens/ShowcaseScreen'
+
+// La feuille « Signaler » ne s'ouvre qu'au toucher d'un « Signaler » : elle se charge à ce moment-là,
+// pas avec l'accueil (garde de poids de R18, navigation/lazyScreen.tsx), dans le morceau des
+// réglages, le seul que tout membre connecté peut déjà demander. Pendant son morceau, rien ne
+// s'affiche à sa place et la page d'avant reste visible (`sheet`), comme pour « Suspendre ».
+const ReportSheet = lazyScreen(
+  () => import('../src/navigation/chunks/settings').then((m) => m.ReportSheet),
+  { sheet: true },
+)
 
 export default function ReportPage() {
   const { kind, id } = useLocalSearchParams<{ kind?: string | string[]; id?: string | string[] }>()

@@ -38,9 +38,11 @@ import { useFollow } from '../follows/api'
 import { useOfferHoney } from '../gamification/api'
 import { usePollenGain } from '../gamification/pollen'
 import { useSuspension } from '../moderation/suspension'
+import { loadSettingsChunk } from '../navigation/chunkLoaders'
+import { lazyModule } from '../navigation/lazyModule'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
-import { type HoneyOfferProblem, HoneyOfferSheet } from '../screens/HoneyOfferSheet'
+import type { HoneyOfferProblem } from '../screens/HoneyOfferSheet'
 import { TesterSheet } from '../screens/TesterSheet'
 import { useBecomeTester } from '../testers/api'
 import { Button } from '../ui/Button'
@@ -353,6 +355,9 @@ type Props = Pick<ViewProps, 'project' | 'onOpenDemo' | 'onEdit'>
  * l'aide répond « rien ». Même raisonnement que navigation/TopNav.tsx : l'issue du try est la même
  * à chaque rendu, React compte donc toujours les mêmes hooks.
  */
+// Le morceau de la feuille « Offrir du miel » (voir `useHoneyParts` plus bas, dans `ProjectActions`).
+const useHoneyParts = lazyModule(loadSettingsChunk)
+
 const useFocusParam = (): string | undefined => {
   try {
     // biome-ignore lint/correctness/useHookAtTopLevel: l'issue du try est la même à chaque rendu (voir ci-dessus)
@@ -472,6 +477,10 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
     !project.isMine &&
     project.author.example !== true &&
     (project.honeyGiven === true || !suspended)
+  // La feuille est dans le morceau des réglages (hors du script de départ de l'accueil, garde de
+  // poids de R18) ; demandée dès que le bouton « Offrir du miel » est là, elle est arrivée avant la
+  // tape. Tant qu'elle manque, rien ne la remplace : elle est fermée de toute façon.
+  const honeyParts = useHoneyParts(offersHoney)
   const [honeyOpen, setHoneyOpen] = useState(false)
   const [honeyProblem, setHoneyProblem] = useState<HoneyOfferProblem | null>(null)
   const honeyRef = useRef<Focusable>(null)
@@ -551,8 +560,8 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
             : null
         }
       />
-      {offersHoney ? (
-        <HoneyOfferSheet
+      {offersHoney && honeyParts ? (
+        <honeyParts.HoneyOfferSheet
           open={honeyOpen}
           title={project.title}
           authorName={project.author.name}

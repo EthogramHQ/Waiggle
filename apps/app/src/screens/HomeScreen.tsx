@@ -51,6 +51,8 @@ import {
   useMyHives,
   useRefuseInvitation,
 } from '../hives/api'
+import { loadProjectEditorChunk } from '../navigation/chunkLoaders'
+import { lazyModule } from '../navigation/lazyModule'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { NotificationBell } from '../notifications/NotificationBell'
@@ -64,7 +66,6 @@ import { HiveInvitation } from '../ui/HiveInvitation'
 import { ALL_HIVES, HivePills } from '../ui/HivePills'
 import { Logo } from '../ui/Logo'
 import { Notice } from '../ui/Notice'
-import { PublishDance } from '../ui/PublishDance'
 import { Reveal } from '../ui/Reveal'
 import { Screen } from '../ui/Screen'
 import { LoadingShownContext } from '../ui/Skeleton'
@@ -577,18 +578,26 @@ const usePublishedParam = (): string | undefined => {
  * danse couvre tout l'écran, dont le coin haut gauche est celui de la fenêtre (ui/Screen.tsx,
  * `overlay`), et l'abeille se pose sur le coin haut gauche de la carte, là où est sa catégorie.
  */
+const useDanceParts = lazyModule(loadProjectEditorChunk)
+
 function PublishedDance({ id, cover, onDone }: DanceProps) {
   const scroll = useContext(ScreenScrollContext)
   const [playing, setPlaying] = useState(false)
+  // La danse vit dans le morceau de l'éditeur (hors du script de départ de l'accueil, garde de poids
+  // de R18) : elle ne joue qu'à la suite de « Publier », quand ce morceau est déjà arrivé. Sinon
+  // (un lien direct), elle attend son arrivée pour commencer : remonter le fil, puis danser.
+  const parts = useDanceParts()
 
   // Une danse par projet : remonter, puis danser. La clé `id` la relance pour une autre publication.
   useEffect(() => {
-    if (!id) return
+    if (!id || !parts) return
     scroll?.toTop()
     setPlaying(true)
-  }, [id, scroll])
+  }, [id, scroll, parts])
 
-  return <PublishDance playing={playing} target={null} aim={cover} onDone={onDone} />
+  return parts ? (
+    <parts.PublishDance playing={playing} target={null} aim={cover} onDone={onDone} />
+  ) : null
 }
 
 /**
