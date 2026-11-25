@@ -18,6 +18,13 @@ require('react-native-reanimated').setUpTests()
 // ordinateur) reçoit une erreur réseau, comme hors ligne, au lieu d'appeler un serveur. Les tests
 // qui en ont besoin posent leurs propres faux (api/client.test.ts, accounts/api.test.ts).
 jest.mock('./src/accounts/auth-client', () => ({ authClient: { getCookie: () => null } }))
+// Les parties de page chargées à la demande (`lazyModule`) demandent leur morceau par un `import()`,
+// que Jest ne sait pas lancer : on lui donne le même morceau par `require`, rendu par une promesse
+// comme le ferait le vrai (une page de test l'a donc après un tour, comme le navigateur).
+jest.mock('./src/navigation/chunkLoaders', () => ({
+  loadSettingsChunk: () => Promise.resolve(require('./src/navigation/chunks/settings')),
+  loadProjectEditorChunk: () => Promise.resolve(require('./src/navigation/chunks/projectEditor')),
+}))
 globalThis.fetch = jest.fn(() => Promise.reject(new Error('No network in tests')))
 
 // La fenêtre des tests est celle d'un téléphone (390 × 844 points), comme les captures « téléphone ».

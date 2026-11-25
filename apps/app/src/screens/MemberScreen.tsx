@@ -54,6 +54,8 @@ import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { useFollow } from '../follows/api'
 import { useMember } from '../members/api'
 import { useSuspension } from '../moderation/suspension'
+import { loadSettingsChunk } from '../navigation/chunkLoaders'
+import { lazyModule } from '../navigation/lazyModule'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -85,8 +87,13 @@ import { Loading, SkeletonPage } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
-import { MyHarvest, TheirHarvest } from './MemberHarvest'
 import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
+
+// R19 : le rayon (MemberHarvest : niveau, sceaux, alvéoles) vit dans le morceau des réglages, avec
+// « Ma récolte » dont il partage presque tout. La page d'un membre le demande dès qu'elle s'ouvre, en
+// même temps que le membre lui-même ; hors du script de départ de l'accueil (garde de poids, R18).
+const useHarvestParts = lazyModule(loadSettingsChunk)
+type HarvestParts = NonNullable<ReturnType<typeof useHarvestParts>>
 
 /** Les parties d'un profil que la modération peut retirer (les autres sont celles d'un projet). */
 const PROFILE_FIELDS = ['name', 'handle', 'bio', 'favoriteTools', 'avatar'] as const
@@ -201,6 +208,7 @@ function MemberContent({ id, session }: { id: string; session: SessionData }) {
   // R16 (plan, choix 10) : ce qu'une liste déjà lue sait du membre (son nom, sa photo : l'auteur
   // d'une carte touchée), montré tant que l'API n'a pas répondu ; null si aucune ne le connaît.
   const preview = useMemberPreview(id)
+  const harvest = useHarvestParts()
 
   if (member.error) {
     // Introuvable : un membre inconnu, ou qui m'a bloqué. La même page, le même texte : rien ne
@@ -222,9 +230,22 @@ function MemberContent({ id, session }: { id: string; session: SessionData }) {
   // l'aperçu passent par le **même** `MemberPage`, à la même place : quand la réponse arrive, React
   // garde la page (sa barre, son « Retour », le défilement) et l'aperçu fond vers le contenu. Un 404,
   // plus haut, remplace l'aperçu par « Introuvable ».
-  if (member.data)
-    return <MemberPage member={member.data} preview={preview} viewerId={session.user.id} />
-  if (preview) return <MemberPage member={null} preview={preview} viewerId={session.user.id} />
+  // Le rayon d'un membre qui en a un est attendu avec sa réponse : la page complète n'apparaît pas
+  // sans lui (le rayon arrivant après, tout ce qui est dessous descendrait sous les yeux). Pendant ce
+  // court temps, l'aperçu ou la page d'attente, comme avant la réponse de l'API.
+  if (member.data && (harvest || !member.data.game))
+    return (
+      <MemberPage
+        member={member.data}
+        preview={preview}
+        viewerId={session.user.id}
+        harvest={harvest}
+      />
+    )
+  if (preview)
+    return (
+      <MemberPage member={null} preview={preview} viewerId={session.user.id} harvest={harvest} />
+    )
   return <LoadingScreen shape="member" />
 }
 
@@ -240,10 +261,12 @@ function MemberPage({
   member,
   preview,
   viewerId,
+  harvest,
 }: {
   member: Member | null
   preview: MemberPreview | null
   viewerId: string
+  harvest: HarvestParts | null
 }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -307,7 +330,7 @@ function MemberPage({
           ) : null
         }
       >
-        {member ? <MemberView member={member} column={column} /> : null}
+        {member ? <MemberView member={member} column={column} harvest={harvest} /> : null}
       </Reveal>
       {/* La feuille « Partager » (R5a) : l'adresse de la page, par l'identifiant du membre, sans
           rien d'autre ; à la fermeture, le focus revient au bouton Partager. */}
@@ -375,7 +398,15 @@ function MemberPreviewShapes({
 }
 
 /** Le contenu de la page, une fois la réponse arrivée : le profil, ses actions et ses projets. */
-function MemberView({ member, column }: { member: Member; column: boolean }) {
+function MemberView({
+  member,
+  column,
+  harvest,
+}: {
+  member: Member
+  column: boolean
+  harvest: HarvestParts | null
+}) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
@@ -639,11 +670,11 @@ function MemberView({ member, column }: { member: Member; column: boolean }) {
       {/* R19 : le rayon sous l'en-tête. Le sien, avec « Ma récolte » (lue pour soi seulement) ;
           celui d'un proche, réduit à ce que sa page dit (`member.game`). Le compte d'exemples et un
           membre bloqué n'en ont pas (`game` vaut null). */}
-      {member.game && !blocked ? (
+      {member.game && harvest && !blocked ? (
         member.isMe ? (
-          <MyHarvest game={member.game} column={column} />
+          <harvest.MyHarvest game={member.game} column={column} />
         ) : (
-          <TheirHarvest game={member.game} column={column} />
+          <harvest.TheirHarvest game={member.game} column={column} />
         )
       ) : null}
       {/* R9 : sur « Moi », les parties de son profil retirées par la modération (l'API ne les
