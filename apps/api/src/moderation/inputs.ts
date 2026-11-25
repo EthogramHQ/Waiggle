@@ -589,7 +589,8 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
   pollen_entry: {
     id: 'identifiant',
     member_id: 'identifiant',
-    gesture: "le geste qui rapporte, une liste fermée dans le code de l'API (GESTURES), jamais libre",
+    gesture:
+      "le geste qui rapporte, une liste fermée dans le code de l'API (GESTURES), jamais libre",
     family: 'la famille du geste, une liste fermée dans le code de l’API, jamais libre',
     amount: 'nombre',
     source_kind: 'la sorte de ligne source du geste, une liste fermée écrite par l’API',

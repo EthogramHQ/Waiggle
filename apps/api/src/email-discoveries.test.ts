@@ -214,6 +214,10 @@ describe('the recap without the discoveries', () => {
   it('sends no recap when the discoveries are its only news', async () => {
     await malikPublishes()
     await act.setPreferences(ines, { discoveries: 'never' })
+    // Suivre Malik rapporte du pollen à Inès (3), et une semaine avec du pollen suffit à envoyer le
+    // récap (R19, choix 16 : « inciter un peu »). Ce test vérifie les découvertes seules : « Ma
+    // récolte » coupée, la récolte ne dit rien et ne fait rien partir.
+    await act.muteHarvest(ines)
     later(HOUR)
 
     await runRecap()

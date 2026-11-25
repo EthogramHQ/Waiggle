@@ -152,11 +152,26 @@ describe('a hive-reserved project', () => {
       ),
       ['/v1/suggestions/members', paul],
     ]
+    // Le bloc `game` de la page d'un membre (niveau, alvéoles, titre, sceaux, décoration) est la seule
+    // chose qu'on retire de la page : « tout compter » (24/11/2026), un geste fait dans une ruche ou
+    // sur un projet réservé rapporte du pollen comme les autres, donc le niveau d'Inès peut monter.
+    // Ce bloc ne nomme aucun projet : il n'a que des codes et des nombres (EarnedSeal, GameTitle).
+    // On le retire du texte lu, et on vérifie qu'il ne porte rien du projet réservé.
+    const gameBlocks: string[] = []
+    const withoutGame = (text: string) => {
+      const status = text.slice(0, text.indexOf(' '))
+      const body: unknown = JSON.parse(text.slice(status.length + 1))
+      if (typeof body !== 'object' || body === null || !('game' in body)) return text
+      const { game, ...rest } = body
+      gameBlocks.push(JSON.stringify(game))
+      return `${status} ${JSON.stringify(rest)}`
+    }
     // L'heure de la lecture (`asOf` des notifications) n'est pas un contenu : on la retire.
     const snapshot = async () => {
       const texts: string[] = []
       for (const [path, member] of reads) {
-        texts.push((await answer(path, member.cookie)).replace(/"asOf":"[^"]*"/g, ''))
+        const text = (await answer(path, member.cookie)).replace(/"asOf":"[^"]*"/g, '')
+        texts.push(path.startsWith('/v1/members/') ? withoutGame(text) : text)
       }
       return texts
     }
@@ -178,6 +193,11 @@ describe('a hive-reserved project', () => {
     await act.comment(plan.id, lea.cookie, 'Je viens avec les cousins.')
     const reserved = await snapshot()
     expect(differing(before, reserved).join('\n')).toBe('')
+    // Le bloc du jeu n'a ni l'identifiant, ni le titre du projet réservé, ni celui de la ruche.
+    expect(gameBlocks.length).toBeGreaterThan(0)
+    for (const block of gameBlocks) {
+      for (const secret of [plan.id, 'Zygomatique', familleId]) expect(block).not.toContain(secret)
+    }
 
     // Témoin : le même projet en « Membres », et une mise à jour du projet qu'ils suivent, changent
     // chacune de ces lectures.
