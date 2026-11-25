@@ -166,7 +166,10 @@ Codes de sortie : `0` déployé ; `2` refusé (la production n'a reçu, au plus,
    et l'essai continue : toutes les vérifications suivantes s'appliquent, et le journal garde la ligne `debut`.
    Décision du 25/11/2026 : le 25/11, la limite de ntfy.sh atteinte par vps-dev (429) a bloqué tout déploiement ;
    un service de notification extérieur ne doit pas pouvoir empêcher de déployer. Avant, l'essai s'arrêtait
-   (raison `notification`, code 5, m3).
+   (raison `notification`, code 5, m3). Risque accepté : la limite de ntfy.sh étant par adresse, quelqu'un qui
+   agit sous `louis` peut l'épuiser puis déployer sans qu'aucune notification parte ; il ne peut déployer qu'un
+   commit de main fusionné par Louis, plus récent que la production, attesté, dans la cadence, et le journal de
+   root garde l'essai. Seule l'heure du déploiement lui appartient, et on ne fusionne que ce qui peut partir.
 4. **Sur `main`** : le `fetch` ; `rev-parse --verify --quiet "<commit>^{commit}"` doit rendre le commit ; puis
    `merge-base --is-ancestor <commit> refs/remotes/origin/main`. Sinon : raison `pas-sur-main`, code 2.
 5. **La version en service** : `ssh … version`, délai de 60 s. La réponse est une seule ligne conforme à
@@ -405,7 +408,7 @@ De la relecture v1 :
 - has no default taken from the environment and no test switch
 - records the calling user given by sudo before clearing the environment
 - logs and notifies a malformed argument without copying it
-- refuses to deploy when the start notification cannot be sent
+- deploys even when the start notification cannot be sent, and says so
 - runs the legal check in a transient unit without network, /home or /root, stopped after its time limit
 - refuses a commit pushed on main without a pull request
 - refuses a merge commit whose pull request was merged by another account, compared by numeric id
