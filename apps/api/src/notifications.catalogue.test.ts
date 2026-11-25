@@ -93,6 +93,8 @@ beforeEach(async () => {
   inesId = (await act.me(ines)).id
   malikId = (await act.me(malik)).id
   await act.makeAdmin(louisId)
+  // Sans « Ma récolte » : les avis du jeu (R19) n'entrent pas dans les listes comptées ici.
+  for (const cookie of [louis, ines, malik, zoe, sam]) await act.muteHarvest(cookie)
   await clearCatalogue(ctx.db)
   glideApps = await addCatalogueTool(ctx.db, { name: 'Glide Apps', family: 'creation' })
   later()

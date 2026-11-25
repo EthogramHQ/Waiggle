@@ -19,6 +19,7 @@ import { schema } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backfillHandles } from './handles/claim'
+import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -653,7 +654,9 @@ describe('the notification of the handle', () => {
 
     expect(await chosenOf(maxId)).toBe(now())
     expect(await chosenOf(inesId)).toBeNull()
-    // Pour Max, aucune notification « Ton pseudo est @… » : elle ne serait pas vraie.
+    // Pour Max, aucune notification « Ton pseudo est @… » : elle ne serait pas vraie. L'avis
+    // d'introduction du jeu (R19) n'est pas celui du pseudo : « Ma récolte » coupée, il n'y est pas.
+    await activity(ctx).muteHarvest(max)
     const res = await send('GET', '/v1/notifications', max)
     expect(res.status).toBe(200)
     expect(NotificationPage.parse(await res.json()).items).toEqual([])
