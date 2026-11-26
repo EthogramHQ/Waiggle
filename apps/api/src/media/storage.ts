@@ -1,5 +1,6 @@
 // Le stockage des fichiers envoyés par les membres : les avatars, les visuels des projets et les
-// images du coin des testeurs (« testers/ »).
+// images du coin des testeurs (« testers/ »), et depuis R20 les captures des retours d'Éclaireuses
+// (« scouts/ »).
 // Comme pour les e-mails, le reste du code ne connaît que l'interface `FileStorage` :
 // - sur le disque en développement et sur le VPS (un dossier, monté en volume Docker) ;
 // - en mémoire dans les tests ;
@@ -20,7 +21,7 @@ export interface FileStorage {
  * dossier et de lire n'importe quel fichier du serveur (attaque par « path traversal »).
  */
 export const isValidKey = (key: string) =>
-  /^(avatars|visuals|testers)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/.test(
+  /^(avatars|visuals|testers|scouts)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/.test(
     key,
   )
 

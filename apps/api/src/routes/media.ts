@@ -18,6 +18,9 @@
 // couverture verticale, photo d'une mise à jour publiée), jamais en attente, retirée ou d'une mise
 // à jour retirée ; l'avatar d'un membre à page publique ou de l'auteur d'un projet `web`. Jamais
 // une image du coin des testeurs, ni une photo de profil retirée. Tout le reste : le même 404.
+//
+// R20 : /media/scouts/<id>.webp, la capture d'un retour d'Éclaireuse, pour son autrice et un
+// administrateur actif seulement (voir canSeeScoutMedia), jamais gardée par le navigateur.
 import { type Database, schema } from '@ruche/db'
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
@@ -110,6 +113,30 @@ const canSeeTesterMedia = async (db: Database, storageKey: string, viewerId: str
   // La modération : seulement tant qu'un signalement ouvert vise ce message ou cet appel, et pour
   // un administrateur en fonction (le rôle se relit à chaque fois, suspension comprise).
   return (await hasOpenReport(db, target.kind, target.id)) && (await isActiveAdmin(db, viewerId))
+}
+
+/** Le nom d'un fichier de `/media/scouts/` : l'id du retour, puis `.webp` (scouts/reports.ts). */
+const SCOUT_FILE = /^scouts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.webp$/
+
+/**
+ * R20 (plan, choix 10) : ce membre peut-il ouvrir cette capture d'un retour d'Éclaireuse ? Son
+ * autrice, ou un administrateur en fonction (relu à chaque fois : un rôle révoqué ou suspendu ne
+ * l'ouvre plus). Une autre Éclaireuse, un membre, un visiteur : faux, donc le même 404 qu'un fichier
+ * inconnu.
+ *
+ * Le fichier porte le nom de son retour : une lecture par la clé primaire de `scout_report`, qui
+ * vérifie aussi que la ligne cite bien ce fichier (`media_key`). Sans ce choix, il faudrait un index
+ * sur `media_key` pour ne pas lire toute la table.
+ */
+const canSeeScoutMedia = async (db: Database, storageKey: string, viewerId: string) => {
+  const reportId = SCOUT_FILE.exec(storageKey)?.[1]
+  if (!reportId) return false
+  const [row] = await db
+    .select({ memberId: schema.scoutReport.memberId })
+    .from(schema.scoutReport)
+    .where(and(eq(schema.scoutReport.id, reportId), eq(schema.scoutReport.mediaKey, storageKey)))
+  if (!row) return false
+  return row.memberId === viewerId || (await isActiveAdmin(db, viewerId))
 }
 
 const cpr = schema.contentPartRemoval
@@ -240,13 +267,17 @@ export const mediaRoutes = ({ db, storage }: Deps) => {
     if (folder === 'withheld' && withheld === null) return notFound()
     const key = withheld ?? `${folder}/${c.req.param('file')}`
     // Dossier inconnu, ou nom invalide (« ../ », mauvaise extension…) : 404, sans regarder la base.
-    if (!['avatars', 'visuals', 'testers', 'withheld'].includes(folder) || !isValidKey(key)) {
+    if (
+      !['avatars', 'visuals', 'testers', 'withheld', 'scouts'].includes(folder) ||
+      !isValidKey(key)
+    ) {
       return notFound()
     }
     // Un contrôle par dossier ; un avatar se montre à tout membre connecté, sauf retiré (R9).
     if (folder === 'avatars' && (await isWithheldAvatar(db, key, user.id))) return notFound()
     if (folder === 'visuals' && !(await isVisualVisibleTo(db, key, user.id))) return notFound()
     if (folder === 'testers' && !(await canSeeTesterMedia(db, key, user.id))) return notFound()
+    if (folder === 'scouts' && !(await canSeeScoutMedia(db, key, user.id))) return notFound()
     const data = await storage.get(key)
     if (!data) return notFound()
 
@@ -259,8 +290,9 @@ export const mediaRoutes = ({ db, storage }: Deps) => {
       // testeurs : « no-store », car le droit de la voir se retire (message retiré, testeur
       // parti) : rien ne la garde au-delà de l'affichage.
       // Une photo de profil retirée (R9) non plus : rétablie, elle reprend son ancienne adresse.
+      // Une capture d'Éclaireuse (R20) non plus : elle part avec son retour, à sa demande.
       'Cache-Control':
-        folder === 'testers' || folder === 'withheld'
+        folder === 'testers' || folder === 'withheld' || folder === 'scouts'
           ? 'private, no-store'
           : 'private, max-age=31536000, immutable',
       // Si un navigateur ouvrait ce fichier comme une page, il n'y exécuterait rien (défense en

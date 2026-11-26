@@ -1,13 +1,15 @@
 // Le profil du membre tel que l'appli le voit (contrat `Me`), lu dans la base.
 // Il rassemble trois tables : `user` (géré par Better Auth), `profile` (bio, outils, avatar) et
-// `member_handle` (le pseudo, tranche 6a).
-import type { Me } from '@ruche/contracts'
+// `member_handle` (le pseudo, tranche 6a). Depuis R20, il dit aussi sa place chez les Éclaireuses
+// (`scout`, lue dans `scout` et `scout_program`).
+import { type Me, type MeScout, weekOf } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { rulesStateOf } from '../rules/acceptance'
+import { activeScout } from '../scouts/join'
 import { loadActiveSuspension } from '../suspension/load'
 import { provisionalOf } from './provisional'
 import { favoriteToolsOf } from './tools'
@@ -94,5 +96,45 @@ export const loadMe = async (
     // R11 : la version des règles en vigueur acceptée ou non, et « Ce qui change » sinon ; une
     // requête de plus, par la clé primaire de rules_acceptance (rules/acceptance.ts).
     ...(await rulesStateOf(db, user.id)),
+    // R20 : sa place chez les Éclaireuses, ou null s'il ne l'a jamais été.
+    scout: await meScoutOf(db, user.id, new Date()),
+  }
+}
+
+/**
+ * R20 (plan, choix 4 ; relecture juridique J1) : `Me.scout`. Null pour qui n'a jamais été
+ * Éclaireuse ; une retirée garde son état, avec sa date de retrait (ses réglages disent « Retirée
+ * le … » et mènent à « Mes retours »). `active` : ni retirée, ni mois fini. `missionsLeft` : les
+ * missions de la semaine auxquelles elle n'a pas encore répondu, 0 si elle n'est pas active.
+ *
+ * Une requête pour l'état (activeScout : la ligne par sa clé primaire, jointe au mois), et une de
+ * plus pour une Éclaireuse active seulement : les missions de la semaine (index unique
+ * scout_mission_week_position_idx, `week` en tête), chacune cherchée dans scout_mission_done par sa
+ * clé primaire (member_id, mission_id). « left join … is null » garde celles qui n'y sont pas.
+ */
+const meScoutOf = async (db: Database, userId: string, now: Date): Promise<MeScout | null> => {
+  const state = await activeScout(db, userId, now)
+  if (state.kind === 'none') return null
+  const done = schema.scoutMissionDone
+  const missionsLeft =
+    state.kind !== 'active'
+      ? 0
+      : ((
+          await db
+            .select({ left: count() })
+            .from(schema.scoutMission)
+            .leftJoin(
+              done,
+              and(eq(done.missionId, schema.scoutMission.id), eq(done.memberId, userId)),
+            )
+            .where(and(eq(schema.scoutMission.week, weekOf(now)), isNull(done.memberId)))
+        )[0]?.left ?? 0)
+  return {
+    active: state.kind === 'active',
+    joinedAt: state.scout.joinedAt.toISOString(),
+    removedAt: state.scout.removedAt?.toISOString() ?? null,
+    showDrop: state.scout.showDrop,
+    programEndsAt: state.program?.endsAt.toISOString() ?? null,
+    missionsLeft,
   }
 }
