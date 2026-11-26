@@ -43,6 +43,8 @@ jest.mock('../rules/RulesGate', () => ({ RulesGate: () => null }))
 jest.mock('../accounts/memberMarker', () => ({ useMemberMarkerSync: () => {} }))
 jest.mock('../navigation/chunks/preload', () => ({ EditorPreload: () => null }))
 jest.mock('../ui/AmbientLight', () => ({ AmbientLight: () => null }))
+// R20 : la Goutte des Éclaireuses a ses propres tests (scout/ScoutDrop.test.tsx).
+jest.mock('../scout/ScoutDrop', () => ({ ScoutDrop: () => null }))
 
 type Options = Record<string, unknown>
 
