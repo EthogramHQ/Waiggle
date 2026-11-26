@@ -224,7 +224,7 @@ describe('the month, the places and the missions', () => {
     await fireEvent.press(screen.getByRole('button', { name: containing(T.editMissions) }))
     await fireEvent.press(await screen.findByRole('button', { name: containing(T.add) }))
     const fields = screen.getAllByLabelText(containing(T.fr))
-    fireEvent.changeText(fields.at(-1) as (typeof fields)[number], 'Essaie le mode nuit')
+    await fireEvent.changeText(fields.at(-1) as (typeof fields)[number], 'Essaie le mode nuit')
     await fireEvent.press(screen.getByRole('button', { name: T.publish }))
     await act(async () => {})
 
@@ -352,7 +352,7 @@ describe('the reports', () => {
     await pickChoice(T.status('fixed'))
     expect(await screen.findByText(containing(T.fixTitle))).toBeTruthy()
     expect(scoutServer.patch).not.toHaveBeenCalled()
-    fireEvent.changeText(screen.getByLabelText(containing(T.fixNote)), 'Corrigé le 28/11, merci !')
+    await fireEvent.changeText(screen.getByLabelText(containing(T.fixNote)), 'Corrigé le 28/11, merci !')
     await passTapGuard()
     await fireEvent.press(lastButton(T.fixConfirm))
     await act(async () => {})
@@ -434,7 +434,7 @@ describe('the scouts tab', () => {
     await fireEvent.press(removes[0] as (typeof removes)[number])
     await screen.findByText(containing(T.removeTitle))
 
-    fireEvent.changeText(
+    await fireEvent.changeText(
       screen.getByLabelText(containing(T.reason)),
       'Des retours d’insultes à répétition.',
     )
