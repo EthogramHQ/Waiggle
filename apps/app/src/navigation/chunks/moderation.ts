@@ -7,3 +7,5 @@ export { SuspendSheet } from '../../moderation/SuspendSheet'
 export { ModerationCategoriesScreen } from '../../screens/ModerationCategoriesScreen'
 export { ModerationScreen } from '../../screens/ModerationScreen'
 export { ModerationToolsScreen } from '../../screens/ModerationToolsScreen'
+// R20 : la page de tri des Éclaireuses.
+export { ScoutTriageScreen } from '../../screens/ScoutTriageScreen'
