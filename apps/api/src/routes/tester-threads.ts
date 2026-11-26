@@ -34,6 +34,7 @@ import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { award, setPollen } from '../game/award'
 import { awardOnProject, pollenHeaders } from '../game/gesture'
+import { type Live, toOwnDevices } from '../live/emit'
 import type { FileStorage } from '../media/storage'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { type CornerAccess, cornerAccess, isMissingMember } from '../testers/access'
@@ -225,7 +226,14 @@ const openFeedbackRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+type Deps = {
+  db: Database
+  storage: FileStorage
+  limiter: RateLimiter
+  publicApiUrl: string
+  live: Live
+}
 
 /** Levée dans la transaction d'un message pour l'annuler : la capture citée n'est pas rattachable. */
 class InvalidCapture extends Error {}
@@ -244,7 +252,7 @@ const actorOf = (access: CornerAccess, viewerId: string, testerId: string): Thre
   return access === 'tester' ? 'tester' : 'former'
 }
 
-export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
+export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste.
@@ -393,7 +401,13 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     // 3. enfin, tout l'accès est relu : l'état a pu changer depuis le garde.
     let outcome:
       | { kind: 'refused'; reply: 'not_found' | 'closed' | 'thread_closed' | 'forbidden' }
-      | { kind: 'ok'; capture: typeof schema.testerMedia.$inferSelect | undefined; pollen: number }
+      | {
+          kind: 'ok'
+          capture: typeof schema.testerMedia.$inferSelect | undefined
+          pollen: number
+          // R21 : l'auteur du projet, l'autre personne du fil quand le testeur écrit.
+          authorId: string
+        }
     try {
       outcome = await db.transaction(async (tx) => {
         const [known] = await tx
@@ -452,7 +466,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
               })
             : 0
         if (body.kind !== 'feedback' || body.captureId === null) {
-          return { kind: 'ok' as const, capture: undefined, pollen }
+          return { kind: 'ok' as const, capture: undefined, pollen, authorId: known.authorId }
         }
 
         // Le rattachement de la capture : UNE écriture conditionnelle, comme la photo d'un appel
@@ -476,7 +490,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
           )
           .returning()
         if (!attached) throw new InvalidCapture()
-        return { kind: 'ok' as const, capture: attached, pollen }
+        return { kind: 'ok' as const, capture: attached, pollen, authorId: known.authorId }
       })
     } catch (error) {
       if (error instanceof InvalidCapture) {
@@ -493,6 +507,15 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
       if (outcome.reply === 'forbidden') return forbidden(c)
       return threadClosed(c)
     }
+    // R21 (relecture B1) : un message ne part qu'au `me` des deux personnes du fil, jamais sur
+    // `corner:<projet>`, que les autres testeurs écoutent (ils ne savent pas qui écrit à l'auteur).
+    // Les deux, chacun de leurs appareils : le fil (`corner`) ; l'autre personne, son Activité (« un
+    // message dans ton fil ») ; un retour de testeur paie les deux en pollen. Sans filtre : la route
+    // vient de vérifier sous verrou que ces deux-là se parlent (coin ouvert, aucun blocage).
+    const pair = [outcome.authorId, testerId]
+    toOwnDevices(live, pair, 'corner')
+    toOwnDevices(live, [user.id === testerId ? outcome.authorId : testerId], 'notifications')
+    if (body.kind === 'feedback') toOwnDevices(live, pair, 'pollen')
     setPollen(c, outcome.pollen)
     return c.json(
       toTesterMessage(row, {
@@ -524,6 +547,8 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
       .update(t)
       .set(isAuthor ? { authorReadAt: new Date() } : { testerReadAt: new Date() })
       .where(and(eq(t.projectId, id), eq(t.testerId, testerId)))
+    // R21 : « lu » ne regarde que lui : ses autres appareils (l'autre partie ne lit jamais cette date).
+    toOwnDevices(live, [user.id], 'corner')
     return c.body(null, 204)
   })
 
@@ -549,8 +574,23 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
       .from(schema.testerMedia)
       .innerJoin(k, eq(k.id, schema.testerMedia.messageId))
       .where(mine)
-    const deleted = await db.delete(k).where(mine).returning({ id: k.id })
-    if (deleted.length === 0) return notFound(c)
+    const deleted = await db.delete(k).where(mine).returning({ id: k.id, testerId: k.testerId })
+    const [gone] = deleted
+    if (!gone) return notFound(c)
+    // R21 : le message quitte le fil des deux personnes, et son avis l'Activité de l'autre. L'autre
+    // est le testeur du fil, ou, si c'est lui qui a écrit, l'auteur du projet (clé primaire de
+    // project ; un projet supprimé entre-temps emporte ses fils, plus personne à prévenir).
+    const other =
+      gone.testerId === user.id
+        ? ((
+            await db
+              .select({ authorId: schema.project.authorId })
+              .from(schema.project)
+              .where(eq(schema.project.id, id))
+          )[0]?.authorId ?? null)
+        : gone.testerId
+    toOwnDevices(live, other === null ? [user.id] : [user.id, other], 'corner')
+    if (other !== null) toOwnDevices(live, [other], 'notifications')
     for (const file of files) await storage.delete(file.storageKey)
     return c.body(null, 204)
   })
@@ -589,7 +629,7 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
       /** R19 : régler paie le testeur (une fois par retour) ; défaire « réglé » ne retire rien. */
       pays: boolean
     },
-  ): Promise<'closed' | 'unknown' | 'done'> =>
+  ): Promise<'closed' | 'unknown' | 'done' | { testerId: string }> =>
     db.transaction(async (tx) => {
       await tx
         .select({ id: schema.project.id })
@@ -631,7 +671,8 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
             now: new Date(),
           })
         }
-        return 'done' as const
+        // R21 : le retour a changé, la route le signale à son testeur.
+        return { testerId: settled.testerId }
       }
       // Aucune ligne écrite : soit le retour est déjà réglé (rejouer garde la première date : 204),
       // soit il n'existe pas, ou n'est pas un retour de ce projet (404).
@@ -665,6 +706,14 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     })
     if (outcome === 'closed') return cornerClosed(c)
     if (outcome === 'unknown') return notFound(c)
+    // R21 : « Réglé » paraît dans le fil, chez le testeur et sur les autres appareils de l'auteur ;
+    // le testeur reçoit l'avis du retour réglé (son Activité) et le pollen du retour. Rejoué sur un
+    // retour déjà réglé (`'done'`), rien n'a changé : aucun signal.
+    if (typeof outcome === 'object') {
+      toOwnDevices(live, [outcome.testerId, user.id], 'corner')
+      toOwnDevices(live, [outcome.testerId], 'notifications')
+      toOwnDevices(live, [outcome.testerId], 'pollen')
+    }
     return c.body(null, 204)
   })
 
@@ -682,6 +731,12 @@ export const testerThreadRoutes = ({ db, storage, limiter, publicApiUrl }: Deps)
     })
     if (outcome === 'closed') return cornerClosed(c)
     if (outcome === 'unknown') return notFound(c)
+    // R21 : le retour revient « à traiter », dans le fil des deux, et l'avis du retour réglé quitte
+    // l'Activité du testeur.
+    if (typeof outcome === 'object') {
+      toOwnDevices(live, [outcome.testerId, user.id], 'corner')
+      toOwnDevices(live, [outcome.testerId], 'notifications')
+    }
     return c.body(null, 204)
   })
 

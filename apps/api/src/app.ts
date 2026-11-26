@@ -435,14 +435,14 @@ export const createApp = ({
   app.route('/', followRoutes({ db, limiter, live }))
   // Bloquer, débloquer, la liste « Membres bloqués » (tranche 7b).
   app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', updateRoutes({ db, storage, limiter, publicApiUrl }))
+  app.route('/', updateRoutes({ db, storage, limiter, publicApiUrl, live }))
   // Rejoindre et quitter les testeurs d'un projet (tranche R7a).
   app.route('/', testerRoutes({ db, limiter, publicApiUrl }))
   // Le coin des testeurs (tranche R7b) : les appels à tester et l'envoi de leurs images.
   app.route('/', testerCallRoutes({ db, storage, limiter, publicApiUrl, live }))
   app.route('/', testerMediaRoutes({ db, storage, limiter, publicApiUrl }))
   // Les fils de retours entre l'auteur et chaque testeur, « réglé » et les retours à traiter.
-  app.route('/', testerThreadRoutes({ db, storage, limiter, publicApiUrl }))
+  app.route('/', testerThreadRoutes({ db, storage, limiter, publicApiUrl, live }))
   app.route('/', reactionRoutes({ db, limiter, live }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl, live }))
   // « Mes commentaires » (R11) : la liste, et la suppression depuis les réglages.
@@ -455,17 +455,17 @@ export const createApp = ({
   // Les ruches (R10) : mes ruches, créer, la page, l'actualité, les membres, l'animateur, quitter.
   app.route('/', hiveRoutes({ db, limiter, publicApiUrl }))
   // Les invitations : la recherche « Inviter », inviter, rejoindre, refuser (R10).
-  app.route('/', hiveInvitationRoutes({ db, limiter, publicApiUrl }))
+  app.route('/', hiveInvitationRoutes({ db, limiter, publicApiUrl, live }))
   // Les classements de la semaine : les proches, ou une ruche (R19).
   app.route('/', rankingRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   // Le jeu (R19) : « Ma récolte », les réglages du jeu, la décoration du rayon, l'offre de miel.
-  app.route('/', gameRoutes({ db, limiter }))
+  app.route('/', gameRoutes({ db, limiter, live }))
   // Les Éclaireuses (R20) : l'entrée, « Afficher la Goutte » et les missions ; les retours ; la
   // page de tri de l'administrateur.
-  app.route('/', scoutRoutes({ db, limiter, publicApiUrl, scoutCode }))
-  app.route('/', scoutReportRoutes({ db, storage, limiter, publicApiUrl }))
-  app.route('/', scoutTriageRoutes({ db, storage, limiter, publicApiUrl }))
+  app.route('/', scoutRoutes({ db, limiter, publicApiUrl, scoutCode, live }))
+  app.route('/', scoutReportRoutes({ db, storage, limiter, publicApiUrl, live }))
+  app.route('/', scoutTriageRoutes({ db, storage, limiter, publicApiUrl, live }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
@@ -475,7 +475,7 @@ export const createApp = ({
   app.route('/', liveRoutes({ db, limiter, hub }))
   app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl, appUrl }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
-  app.route('/', moderationCatalogueRoutes({ db, limiter }))
+  app.route('/', moderationCatalogueRoutes({ db, limiter, live }))
   // La vitrine de l'accueil (R12) : « À la une », l'onglet de la modération, « Retirer de l'accueil ».
   app.route('/', showcaseRoutes({ db, limiter, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))

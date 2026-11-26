@@ -326,12 +326,18 @@ const noteOf = (note: string | null) => (note === null || note === '' ? null : n
  * a été entendue ». Le tout dans une transaction ; la ligne du retour est d'abord verrouillée
  * (« select … for update ») pour lire son statut sans qu'un autre changement passe entre-temps.
  */
+/**
+ * Ce que rend un changement fait (R21) : l'Éclaireuse du retour, et si sa danse vient d'être
+ * entendue (« Corrigé » : l'avis, le pollen et le miel sont écrits), pour lui signaler les deux.
+ */
+export type PatchOutcome = { memberId: string; heard: boolean }
+
 export const patchReport = (
   db: Database,
   id: string,
   patch: ScoutReportPatch,
   now: Date,
-): Promise<'ok' | 'not_found' | 'scout_report_fixed' | 'not_fixed'> =>
+): Promise<PatchOutcome | 'not_found' | 'scout_report_fixed' | 'not_fixed'> =>
   db.transaction(async (tx) => {
     const [current] = await tx
       .select({ status: r.status, memberId: r.memberId })
@@ -354,7 +360,7 @@ export const patchReport = (
       })
       .where(fixing ? and(eq(r.id, id), ne(r.status, 'fixed')) : eq(r.id, id))
       .returning({ id: r.id })
-    if (!fixing || changed.length === 0) return 'ok'
+    if (!fixing || changed.length === 0) return { memberId: current.memberId, heard: false }
 
     const pollen = await award(tx, {
       memberId: current.memberId,
@@ -383,7 +389,7 @@ export const patchReport = (
     // versé : une Éclaireuse suspendue ne lit pas « +50 pollen · +10 miel » (relecture juridique L1).
     const honey = pollen > 0 ? SCOUT_HEARD_HONEY : null
     await writeNotice(tx, current.memberId, { kind: 'scout_heard', reportId: id, honey }, now)
-    return 'ok'
+    return { memberId: current.memberId, heard: true }
   })
 
 // ─── « Retirer » ─────────────────────────────────────────────────────────────────────────────────

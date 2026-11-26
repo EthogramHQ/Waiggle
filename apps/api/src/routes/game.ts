@@ -23,6 +23,7 @@ import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { loadHarvest, updateGameSettings } from '../game/harvest'
 import { decorate, type HoneyShort, offerHoney } from '../game/honey'
+import { type Live, projectChanged, toOwnDevices } from '../live/emit'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -114,9 +115,10 @@ const honeyRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter }
+/** R21 : `live`, la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; live: Live }
 
-export const gameRoutes = ({ db, limiter }: Deps) => {
+export const gameRoutes = ({ db, limiter, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (même avant la lecture du corps).
   app.use('/v1/me/harvest', requireUser)
@@ -170,6 +172,10 @@ export const gameRoutes = ({ db, limiter }: Deps) => {
     if (!user) return unauthorized(c)
     const refused = await updateGameSettings(db, user.id, c.req.valid('json'), new Date())
     if (refused) return c.json(errorBody(languageOf(c), refused), 422)
+    // R21 : ses autres appareils relisent « Ma récolte » (`pollen`) et l'Activité, dont les avis du
+    // jeu se cachent ou reviennent avec le réglage.
+    toOwnDevices(live, [user.id], 'pollen')
+    toOwnDevices(live, [user.id], 'notifications')
     return c.body(null, 204)
   })
 
@@ -178,6 +184,8 @@ export const gameRoutes = ({ db, limiter }: Deps) => {
     if (!user) return unauthorized(c)
     const refused = await decorate(db, user.id, c.req.valid('json'), new Date())
     if (refused) return honeyShort(c, refused)
+    // R21 : le rayon et le solde de miel, sur ses autres appareils.
+    toOwnDevices(live, [user.id], 'pollen')
     return c.body(null, 204)
   })
 
@@ -190,6 +198,12 @@ export const gameRoutes = ({ db, limiter }: Deps) => {
     const outcome = await offerHoney(db, user.id, id, new Date())
     switch (outcome.kind) {
       case 'done':
+        // R21 : l'avis du miel offert, au `me` de l'auteur du projet seul (s'il n'a pas coupé « Ma
+        // récolte », l'avis existe ; sinon un recomptage pour rien). `projectChanged` garde l'avis
+        // pour qui voit le projet, sans blocage avec le donneur (gameSources, notifications/load.ts).
+        // Les autres appareils du donneur : son solde de miel (« Ma récolte »).
+        await projectChanged(live, { projectId: id, actorId: user.id, notify: [outcome.authorId] })
+        toOwnDevices(live, [user.id], 'pollen')
         return c.body(null, 204)
       case 'not_found':
         return notFound(c)

@@ -100,6 +100,8 @@ const journal = (
  *    `project_tool_tool_idx` (tool_id) donne les projets de l'outil, puis la clé primaire de
  *    `project` chaque projet. `coalesce` : le nom de l'« Autre » si la ligne n'a pas de nom tapé.
  * 2. une seule insertion de toutes les lignes (aucune si personne n'est à prévenir).
+ *
+ * Rend les auteurs prévenus (R21) : la route leur signale l'avis, après la transaction.
  */
 const noticeToolAuthors = async (
   tx: Tx,
@@ -125,7 +127,7 @@ const noticeToolAuthors = async (
       and(eq(pt.toolId, notice.otherId), listedVerifiedProject(), ne(p.authorId, notice.adminId)),
     )
     .orderBy(p.authorId, asc(p.createdAt))
-  if (authors.length === 0) return
+  if (authors.length === 0) return []
   await tx.insert(schema.catalogueNotice).values(
     authors.map((author) => ({
       id: crypto.randomUUID(),
@@ -136,6 +138,7 @@ const noticeToolAuthors = async (
       createdAt: notice.now,
     })),
   )
+  return authors.map((author) => author.memberId)
 }
 
 // ─── Les noms et les adresses des outils ─────────────────────────────────────────────────────────
@@ -283,7 +286,9 @@ export const admitTool = async (
   slug: string,
   input: ToolAdmit,
   now: Date,
-): Promise<Result<string, 'not_found' | 'already_decided' | 'tool_name_taken'>> =>
+): Promise<
+  Result<{ toolId: string; noticed: string[] }, 'not_found' | 'already_decided' | 'tool_name_taken'>
+> =>
   db.transaction(async (tx) => {
     await lock(tx, 'catalogue-names')
     // `for update` : la ligne reste à nous jusqu'à la fin ; un rattachement simultané attend.
@@ -308,7 +313,7 @@ export const admitTool = async (
       await tx.insert(schema.toolAlias).values({ folded: tool.folded, toolId: tool.id })
     }
     // R8 : les auteurs sont prévenus avant que le nom tapé ne s'efface (juste en dessous).
-    await noticeToolAuthors(tx, {
+    const noticed = await noticeToolAuthors(tx, {
       otherId: tool.id,
       noticeToolId: tool.id,
       kind: 'tool_added',
@@ -324,7 +329,7 @@ export const admitTool = async (
       .set({ label: null })
       .where(eq(schema.profileTool.toolId, tool.id))
     await journal(tx, { action: 'tool_admit', adminId, now, toolId: tool.id })
-    return { ok: true, value: tool.id }
+    return { ok: true, value: { toolId: tool.id, noticed } }
   })
 
 /**
@@ -408,7 +413,7 @@ export const mergeTool = async (
   slug: string,
   into: string,
   now: Date,
-): Promise<Result<null, 'not_found'>> =>
+): Promise<Result<string[], 'not_found'>> =>
   db.transaction(async (tx) => {
     const [source] = await tx
       .select()
@@ -423,7 +428,7 @@ export const mergeTool = async (
     if (!source || !target) return { ok: false, error: 'not_found' }
     // R8 : les auteurs sont prévenus d'abord, tant que les projets citent encore l'« Autre » avec le
     // nom tapé ; la notification nomme l'outil cible, qui reste.
-    await noticeToolAuthors(tx, {
+    const noticed = await noticeToolAuthors(tx, {
       otherId: source.id,
       noticeToolId: target.id,
       kind: 'tool_merged',
@@ -473,7 +478,7 @@ export const mergeTool = async (
       mergedName: source.name,
     })
     await tx.delete(t).where(eq(t.id, source.id))
-    return { ok: true, value: null }
+    return { ok: true, value: noticed }
   })
 
 /**
@@ -538,7 +543,9 @@ export const recategorize = async (
   projectId: string,
   category: string,
   now: Date,
-): Promise<Result<null, 'not_found' | 'own_project' | 'unknown_category' | 'already_decided'>> =>
+): Promise<
+  Result<{ authorId: string }, 'not_found' | 'own_project' | 'unknown_category' | 'already_decided'>
+> =>
   db.transaction(async (tx) => {
     const p = schema.project
     const [project] = await tx
@@ -586,7 +593,7 @@ export const recategorize = async (
         createdAt: now,
       })
     }
-    return { ok: true, value: null }
+    return { ok: true, value: { authorId: project.authorId } }
   })
 
 // ─── Créer une catégorie ─────────────────────────────────────────────────────────────────────────
