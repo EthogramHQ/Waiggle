@@ -49,6 +49,8 @@ import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { hiveRows } from './testing/hive-records'
 import { avatarForm, jpegImage, visualForm } from './testing/images'
+import { launchProgram, sendReport } from './testing/scout-seeds'
+import { makeScout } from './testing/scout-world'
 import { addCatalogueTool, clearCatalogue } from './testing/tool-catalogue'
 
 // ─── L'inventaire du schéma ──────────────────────────────────────────────────────────────────────
@@ -587,6 +589,7 @@ describe('the register of member inputs', () => {
     const parts = new Set<string>(ReportPartField.options)
     const expected = (input: MemberInput) =>
       input.object !== 'report' &&
+      input.object !== 'scoutReport' &&
       input.field !== null &&
       parts.has(input.field) &&
       isRemovablePart(input.object, input.field as ReportPartField)
@@ -770,6 +773,8 @@ const WITNESSES: Record<string, string> = {
   'message.tester_message.text': 'Retour de testeur témoin, unique.',
   // R10 : le nom d'une ruche (40 signes au plus), écrit par Inès.
   'hive.hive.name': 'Ruche témoin, unique',
+  // R20 : le texte d'un retour d'Éclaireuse, envoyé par Inès.
+  'scoutReport.scout_report.text': 'Retour d’Éclaireuse témoin, unique.',
 }
 const keyOf = (input: MemberInput) => `${input.object}.${input.table}.${input.column}`
 const witnessOf = (input: MemberInput) => {
@@ -975,6 +980,16 @@ describe('every field of the register', () => {
       animatorId: inesId,
       members: [{ id: (await act.me(zoe)).id }],
     })
+
+    // R20 : Inès est Éclaireuse pendant le mois, et envoie un retour sur l'appli.
+    await launchProgram(ctx, new Date())
+    await makeScout(ctx, inesId)
+    later()
+    const scoutReport = await sendReport(ctx, ines, {
+      kind: 'idea',
+      text: WITNESSES['scoutReport.scout_report.text'],
+    })
+    expect(scoutReport.status).toBe(201)
   })
 
   /** Rejoint les testeurs d'un projet. */
@@ -1056,7 +1071,10 @@ describe('every field of the register', () => {
   it('has a witness for every field, and an object that can be reported or is a report', () => {
     for (const input of MEMBER_INPUTS) {
       if (input.kind !== 'image') expect(() => witnessOf(input)).not.toThrow()
-      expect(input.object === 'report' || REPORTED_AS[input.object] !== undefined).toBe(true)
+      // R20 : un retour d'Éclaireuse n'est jamais signalable (choix 15) : vu de son autrice et de
+      // l'administrateur seuls, il n'a pas de sorte de cible.
+      const unreportable = input.object === 'report' || input.object === 'scoutReport'
+      expect(unreportable || REPORTED_AS[input.object] !== undefined).toBe(true)
     }
   })
 
@@ -1187,6 +1205,9 @@ describe('every field of the register', () => {
       message: [`/v1/projects/${zoeProjectId}/threads/${inesId}/messages`],
       // R10 : Malik n'est pas de la ruche d'Inès : ni sa liste ni la page de la ruche ne la montrent.
       hive: ['/v1/hives', `/v1/hives/${hiveId}`],
+      // R20 : un retour d'Éclaireuse ne se lit que de son autrice (et de l'administrateur) : Malik,
+      // qui n'est pas Éclaireuse, ne lit que sa propre liste, refusée.
+      scoutReport: ['/v1/me/scout/reports'],
     }
     for (const object of new Set(MEMBER_INPUTS.map((i) => i.object))) {
       if (object === 'report') continue
