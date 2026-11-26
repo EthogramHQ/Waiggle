@@ -13,7 +13,7 @@ import { dirname, join, relative, sep } from 'node:path'
 const APP = join(__dirname, '../..')
 const read = (path: string) => readFileSync(join(APP, path), 'utf8')
 
-type Route = { file: string; screen: string; chunk: 'explore' | 'hives' | 'settings' }
+type Route = { file: string; screen: string; chunk: 'explore' | 'hives' | 'settings' | 'scout' }
 
 // Les pages du choix 7 et l'écran que chacune montre ; deux morceaux, pour ne pas en créer un
 // troisième, commun, que chaque page chargerait d'emblée (leçon de R13).
@@ -160,4 +160,59 @@ describe('member routes loaded on demand', () => {
     const screens = MEMBER_SCREENS.map((screen) => `src/screens/${screen}.tsx`)
     expect(screens.filter((screen) => reached.has(screen))).toEqual([])
   })
+})
+
+// R20 (plan, « Appli ») : les Éclaireuses. Seuls le bouton de la Goutte (`ui/HoneyDrop`) et son
+// branchement (`scout/ScoutDrop`) partent dans le script de départ, avec `app/_layout.tsx` ; la
+// feuille « Ton retour » et la page des missions se chargent à la demande, dans un morceau neuf
+// (`navigation/chunks/scout.ts`) ; les réglages et la page de tri, dans les morceaux existants.
+const SCOUT_SHEET: Route = {
+  file: 'app/scout-report.tsx',
+  screen: 'ScoutReportSheet',
+  chunk: 'scout',
+}
+const SCOUT_MISSIONS: Route = {
+  file: 'app/scout/missions.tsx',
+  screen: 'ScoutMissionsScreen',
+  chunk: 'scout',
+}
+const SCOUT_FILES = [
+  'src/scout/ScoutReportSheet.tsx',
+  'src/screens/ScoutMissionsScreen.tsx',
+  'src/screens/ScoutSettingsScreen.tsx',
+  'src/screens/ScoutTriageScreen.tsx',
+]
+
+describe('the scouts pages loaded on demand (R20)', () => {
+  it('loads the sheet « Ton retour » on demand as a sheet, from the scout chunk', () => {
+    const call = lazyCallOf(SCOUT_SHEET)
+    expect(call).toMatch(/navigation\/chunks\/scout'/)
+    expect(call).toMatch(/\bsheet\s*:\s*true\b/)
+  })
+
+  it('loads the missions of the week on demand with the page skeleton', () => {
+    const call = lazyCallOf(SCOUT_MISSIONS)
+    expect(call).toMatch(/navigation\/chunks\/scout'/)
+    expect(call).toMatch(/\bshape\s*:\s*'[a-z]+'|\bloading\s*:\s*[A-Z]\w+/)
+  })
+
+  it('declares the sheet « Ton retour » among the sheets', () => {
+    expect(read('src/navigation/sheetRoutes.ts')).toMatch(/'scout-report'/)
+  })
+
+  it('sends only the drop to the start script, never the scouts screens', () => {
+    const reached = reachedFrom(['app/index.tsx', 'app/_layout.tsx'])
+    // Témoin : la Goutte est bien montée par la mise en page de l'appli.
+    expect(reached).toContain('src/scout/ScoutDrop.tsx')
+    expect(reached).toContain('src/ui/HoneyDrop.tsx')
+    expect(SCOUT_FILES.filter((file) => reached.has(file))).toEqual([])
+  })
+
+  it.each([SCOUT_SHEET, SCOUT_MISSIONS])(
+    'reaches no scouts screen through the imports of $file',
+    (route) => {
+      const reached = reachedFrom([route.file])
+      expect(SCOUT_FILES.filter((file) => reached.has(file))).toEqual([])
+    },
+  )
 })
