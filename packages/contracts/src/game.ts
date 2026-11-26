@@ -24,11 +24,22 @@ import { PROJECT_CATEGORIES } from './projects'
  * Les quatre familles de gestes, qui donnent les titres : Butineuse (`forager` : réagir, commenter,
  * suivre), Bâtisseuse (`builder` : publier, mettre à jour, compléter son profil, et tout ce qui est
  * reçu sur ses projets), Gardienne (`keeper` : tester, faire des retours), Danseuse (`dancer` : faire
- * venir du monde). L'Éclaireuse (R20) n'est pas une famille de gestes : jamais attribuée en R19.
+ * venir du monde). L'Éclaireuse (R20) n'est pas une famille de gestes : c'est un titre à part
+ * (`TITLE_FAMILIES`), et ses gestes comptent chez les Gardiennes.
  */
 export const FAMILIES = ['forager', 'builder', 'keeper', 'dancer'] as const
 export const Family = z.enum(FAMILIES)
 export type Family = z.infer<typeof Family>
+
+/**
+ * Les titres qu'on peut porter : les quatre familles, et `scout` (R20, Éclaireuse, Scout en
+ * anglais), qui ne se gagne pas au pollen mais en devenant Éclaireuse. Une Éclaireuse non retirée,
+ * sans épingle, le porte ; elle peut aussi l'épingler. Un autre membre qui l'épingle est refusé
+ * comme pour une famille non obtenue (422 `family_not_obtained`, règle de l'API).
+ */
+export const TITLE_FAMILIES = [...FAMILIES, 'scout'] as const
+export const TitleFamily = z.enum(TITLE_FAMILIES)
+export type TitleFamily = z.infer<typeof TitleFamily>
 
 /**
  * Les gestes qui rapportent du pollen, un par ligne du tableau du scénario. Les `receive_*` sont ce
@@ -55,6 +66,10 @@ export const GESTURES = [
   'profile_photo',
   'profile_bio',
   'profile_tool',
+  // R20 : un retour des Éclaireuses, une mission faite, une danse entendue (un retour corrigé).
+  'scout_report',
+  'scout_mission',
+  'scout_heard',
 ] as const
 export const Gesture = z.enum(GESTURES)
 export type Gesture = z.infer<typeof Gesture>
@@ -102,6 +117,11 @@ export const POLLEN_GESTURES: Readonly<Record<Gesture, GestureRule>> = {
   profile_photo: { amount: 10, dailyCap: null, family: 'builder', receive: false },
   profile_bio: { amount: 10, dailyCap: null, family: 'builder', receive: false },
   profile_tool: { amount: 10, dailyCap: null, family: 'builder', receive: false },
+  // R20 : les Éclaireuses. Le retour a le plafond d'un retour de testeur (4 par jour) ; la mission
+  // se paie une fois par mission, la danse entendue une fois par retour corrigé (la clé de la chose).
+  scout_report: { amount: 25, dailyCap: 4, family: 'keeper', receive: false },
+  scout_mission: { amount: 30, dailyCap: null, family: 'keeper', receive: false },
+  scout_heard: { amount: 50, dailyCap: null, family: 'keeper', receive: false },
 }
 
 /** Le plafond commun de tout ce qu'un membre reçoit sur ses projets en un jour de Paris. */
@@ -112,7 +132,7 @@ export const familyOf = (gesture: Gesture): Family => POLLEN_GESTURES[gesture].f
 
 /**
  * Les gestes « qui aident ou qui créent » : un seul dans la semaine la rend butinée. Réagir ou
- * suivre seuls ne suffisent pas, recevoir non plus.
+ * suivre seuls ne suffisent pas, recevoir non plus. R20 : un retour d'Éclaireuse aide aussi.
  */
 export const FORAGING_GESTURES = [
   'publish',
@@ -120,13 +140,15 @@ export const FORAGING_GESTURES = [
   'comment',
   'feedback',
   'tester',
+  'scout_report',
 ] as const satisfies readonly Gesture[]
 
 /**
  * Ce qui a rapporté une entrée du grand livre : une réaction, un commentaire, une inscription de
  * testeur, un message d'un fil de retour (un retour, ou un retour réglé), un projet (publié, ou
  * suivi), une mise à jour, un membre suivi, une ruche créée, une invitation acceptée, son profil,
- * ou un défi perso réussi. La modération révoque les entrées dont la source est le contenu retiré.
+ * ou un défi perso réussi. R20 : un retour d'Éclaireuse (envoyé, ou corrigé : la danse entendue)
+ * ou une mission faite. La modération révoque les entrées dont la source est le contenu retiré.
  */
 export const PollenSourceKind = z.enum([
   'reaction',
@@ -140,6 +162,8 @@ export const PollenSourceKind = z.enum([
   'invitation',
   'profile',
   'personal_challenge',
+  'scout_report',
+  'scout_mission',
 ])
 export type PollenSourceKind = z.infer<typeof PollenSourceKind>
 
@@ -211,9 +235,12 @@ export const TITLE_WINDOW_DAYS = 28
 export const TitleForm = z.enum(['f', 'm'])
 export type TitleForm = z.infer<typeof TitleForm>
 
-/** Le titre d'un membre : sa famille, sa forme, et s'il l'a épinglé (sinon : selon ses gestes). */
+/**
+ * Le titre d'un membre : sa famille (ou `scout`, R20), sa forme, et s'il l'a épinglé (sinon : selon
+ * ses gestes, ou Éclaireuse pour une Éclaireuse non retirée).
+ */
 export const GameTitle = z
-  .object({ family: Family, form: TitleForm, pinned: z.boolean() })
+  .object({ family: TitleFamily, form: TitleForm, pinned: z.boolean() })
   .meta({ id: 'GameTitle' })
 export type GameTitle = z.infer<typeof GameTitle>
 
@@ -263,14 +290,24 @@ export const GameWeek = z.iso.date()
  */
 export const HONEY = { week: 5, challenge: 10, hiveChallenge: 10, gift: 5 } as const
 
+/** R20 : le miel d'un retour d'Éclaireuse corrigé (« Ta danse a été entendue »), une fois par retour. */
+export const SCOUT_HEARD_HONEY = 10
+
 /** Le pollen d'un défi perso réussi, hors plafonds, dans la famille du geste du défi. */
 export const CHALLENGE_POLLEN = 20
 
 /**
- * Pourquoi le solde bouge : une semaine butinée, un défi perso, un défi de ruche (crédits), une
- * offre de miel, une décoration achetée (débits).
+ * Pourquoi le solde bouge : une semaine butinée, un défi perso, un défi de ruche, une danse
+ * entendue (R20) (crédits), une offre de miel, une décoration achetée (débits).
  */
-export const HoneyReason = z.enum(['week', 'challenge', 'hive_challenge', 'gift', 'decoration'])
+export const HoneyReason = z.enum([
+  'week',
+  'challenge',
+  'hive_challenge',
+  'scout_heard',
+  'gift',
+  'decoration',
+])
 export type HoneyReason = z.infer<typeof HoneyReason>
 
 /**
@@ -571,13 +608,15 @@ export type SealMatter = z.infer<typeof SealMatter>
  * Ce qui fait gagner un sceau : un nombre d'entrées non révoquées d'un geste (`count`), un nombre de
  * semaines butinées (`weeks`, une série ou plusieurs), une ruche créée par le membre qui atteint un
  * nombre de membres (`hiveSize`, lui compris), ou des projets différents d'une catégorie (sa
- * principale) testés ou commentés (`category`).
+ * principale) testés ou commentés (`category`). R20 : `scout`, devenir Éclaireuse ; ce sceau est
+ * donné une fois, à l'entrée, et le calcul des sceaux (`evaluateSeals` de l'API) l'ignore.
  */
 export type SealRule =
   | { kind: 'count'; gesture: Gesture; target: number }
   | { kind: 'weeks'; target: number }
   | { kind: 'hiveSize'; target: number }
   | { kind: 'category'; category: string; target: number }
+  | { kind: 'scout' }
 
 /**
  * Un sceau : son code (la clé de son texte), sa matière, son icône (Phosphor, générée par
@@ -690,33 +729,51 @@ const CATEGORY_SEALS = PROJECT_CATEGORIES.filter(
 type MilestoneSealCode = (typeof MILESTONE_SEALS)[number]['code']
 
 /**
- * Tous les sceaux connus d'avance : les onze, puis les quinze catégories de départ. Une catégorie
- * créée plus tard par un administrateur a aussi son sceau, à la même règle (`sealCategory`) : son
- * icône est celle de la catégorie (GET /v1/categories), son nom le texte `categoryOther`.
+ * R20 : « Éclaireuse fondatrice » (miel, une goutte), donné en devenant Éclaireuse pendant le mois
+ * des Éclaireuses ; personne ne pourra plus le gagner ensuite. Hors des sceaux de palier : il ne se
+ * calcule pas, il se donne.
  */
-export const SEALS: readonly (SealDefinition & { code: MilestoneSealCode | SealCategory })[] = [
-  ...MILESTONE_SEALS,
-  ...CATEGORY_SEALS,
-]
+export const SCOUT_SEAL = {
+  code: 'scout_founder',
+  matter: 'honey',
+  icon: 'drop',
+  rule: { kind: 'scout' },
+} as const satisfies SealDefinition
+
+/**
+ * Tous les sceaux connus d'avance : les onze, celui des Éclaireuses, puis les quinze catégories de
+ * départ. Une catégorie créée plus tard par un administrateur a aussi son sceau, à la même règle
+ * (`sealCategory`) : son icône est celle de la catégorie (GET /v1/categories), son nom le texte
+ * `categoryOther`.
+ */
+export const SEALS: readonly (SealDefinition & {
+  code: MilestoneSealCode | typeof SCOUT_SEAL.code | SealCategory
+})[] = [...MILESTONE_SEALS, SCOUT_SEAL, ...CATEGORY_SEALS]
 
 /** Le code d'un sceau de palier ; `as` dit à TypeScript que la liste n'est pas vide (elle en a 11). */
 export const MilestoneSealCode = z.enum(
   MILESTONE_SEALS.map((seal) => seal.code) as [MilestoneSealCode, ...MilestoneSealCode[]],
 )
 
+/** Le code du sceau des Éclaireuses : `z.literal` n'accepte que cette valeur exacte. */
+export const ScoutSealCode = z.literal(SCOUT_SEAL.code)
+
 /**
- * Le code d'un sceau : un palier, ou le code d'une catégorie (de départ ou créée ensuite), jamais
- * « Autre ». `z.union` essaie chaque forme dans l'ordre et garde la première qui convient.
+ * Le code d'un sceau : un palier, celui des Éclaireuses, ou le code d'une catégorie (de départ ou
+ * créée ensuite), jamais « Autre ». `z.union` essaie chaque forme dans l'ordre et garde la première
+ * qui convient. Comme un palier, « scout_founder » a un « _ » : il ne se confond pas avec une
+ * catégorie.
  */
 export const SealCode = z.union([
   MilestoneSealCode,
+  ScoutSealCode,
   CategoryCode.refine((code) => code !== OTHER_CATEGORY, { message: 'no seal for « other »' }),
 ])
 export type SealCode = z.infer<typeof SealCode>
 
-/** La catégorie d'un sceau de catégorie, ou null pour un sceau de palier. */
+/** La catégorie d'un sceau de catégorie, ou null pour un sceau de palier ou celui des Éclaireuses. */
 export const sealCategory = (code: SealCode): string | null =>
-  MilestoneSealCode.safeParse(code).success ? null : code
+  MilestoneSealCode.safeParse(code).success || code === SCOUT_SEAL.code ? null : code
 
 /** Un sceau gagné et sa date : il reste, même si le contenu qui l'a fait gagner est retiré. */
 export const EarnedSeal = z
@@ -751,7 +808,8 @@ export type MemberGame = z.infer<typeof MemberGame>
 export const GameSettings = z
   .object({
     titleForm: TitleForm,
-    pinnedFamily: Family.nullable(),
+    // R20 : `scout` s'épingle aussi (une Éclaireuse non retirée seulement, règle de l'API).
+    pinnedFamily: TitleFamily.nullable(),
     inRankings: z.boolean(),
     harvestNotices: z.boolean(),
   })
@@ -800,15 +858,15 @@ export type Harvest = z.infer<typeof Harvest>
 /**
  * PATCH /v1/me/game : un ou plusieurs réglages, et le choix du défi perso de la semaine (un des trois
  * proposés, ou `none` : « Pas cette semaine »). `levelSeen` : le niveau dont la cire a coulé (pas
- * au-delà du niveau atteint : 422 `invalid_level_seen`). Épingler une famille non obtenue : 422
- * `family_not_obtained` ; un défi hors des trois, ou un second choix : 422 `invalid_challenge`. Ces
+ * au-delà du niveau atteint : 422 `invalid_level_seen`). Épingler une famille non obtenue, ou
+ * `scout` sans être Éclaireuse (non retirée) : 422 `family_not_obtained` ; un défi hors des trois, ou un second choix : 422 `invalid_challenge`. Ces
  * trois règles sont celles de l'API, pas de la forme. strictObject refuse tout autre champ ; un corps
  * vide ne changerait rien et répond 400.
  */
 export const GameSettingsUpdate = z
   .strictObject({
     titleForm: TitleForm,
-    pinnedFamily: Family.nullable(),
+    pinnedFamily: TitleFamily.nullable(),
     inRankings: z.boolean(),
     harvestNotices: z.boolean(),
     levelSeen: z.int().positive(),

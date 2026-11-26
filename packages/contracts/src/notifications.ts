@@ -13,6 +13,12 @@ import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
 import { RemovalGround, ReportPartField } from './removal'
 import { StoredReportTargetKind } from './reports'
+import {
+  SCOUT_EXCERPT_MAX,
+  SCOUT_MISSIONS_MAX,
+  SCOUT_REMOVAL_REASON_MAX,
+  ScoutReportId,
+} from './scouts'
 import { SettledUpdate, TESTER_EXCERPT_MAX, TesterMessageKind, TesterRole } from './testers'
 import { TOOL_NAME_MAX, ToolSlug } from './tools'
 import { UpdateId, UpdateLineOut } from './updates'
@@ -463,6 +469,35 @@ export const GameIntroNotification = z.object({
   kind: z.literal('game_intro'),
 })
 
+/**
+ * R20 : « Ta danse a été entendue : <début du retour> est corrigé » (50 pollen, 10 miel). La ligne
+ * gardée ne porte que `reportId` ; l'extrait (80 caractères, plus « … ») est lu dans le retour au
+ * moment de la lecture, pour qu'un retour supprimé n'y laisse pas son texte (la ligne part alors).
+ */
+export const GameScoutHeardNotification = z.object({
+  ...Common,
+  kind: z.literal('game_scout_heard'),
+  reportId: ScoutReportId,
+  excerpt: z.string().max(SCOUT_EXCERPT_MAX + 1),
+})
+
+/** R20 : « 3 missions cette semaine », le lundi où l'administrateur les publie (Éclaireuses actives). */
+export const GameScoutMissionsNotification = z.object({
+  ...Common,
+  kind: z.literal('game_scout_missions'),
+  count: z.int().min(1).max(SCOUT_MISSIONS_MAX),
+})
+
+/**
+ * R20 : l'administrateur l'a retirée des Éclaireuses (un abus), avec sa raison. Elle garde son
+ * pollen, son sceau et « Mes retours » ; la Goutte, le titre et les missions s'en vont.
+ */
+export const GameScoutRemovedNotification = z.object({
+  ...Common,
+  kind: z.literal('game_scout_removed'),
+  reason: z.string().min(1).max(SCOUT_REMOVAL_REASON_MAX),
+})
+
 /** La première notification : le pseudo qu'il a reçu, tiré de son nom, qu'il peut changer. */
 export const HandleNotification = z.object({
   ...Common,
@@ -503,6 +538,9 @@ export const Notification = z
     GameHiveChallengeNotification,
     GameHoneyGiftNotification,
     GameIntroNotification,
+    GameScoutHeardNotification,
+    GameScoutMissionsNotification,
+    GameScoutRemovedNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

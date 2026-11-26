@@ -13,6 +13,7 @@ import { ReactionKind } from './reactions'
 import { Removal, RemovedPart } from './removal'
 import { ModerationDecisionExport, ReportExport } from './reports'
 import { RulesAcceptance } from './rules'
+import { ScoutExport } from './scouts'
 import { ShowcaseExport } from './showcase'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
@@ -198,6 +199,12 @@ export const AccountExport = z
      * mouvements de son miel, ses défis perso et ses réglages.
      */
     game: GameExport,
+    /**
+     * R20 : sa place chez les Éclaireuses (entrée, retrait et sa raison), ses retours avec l'adresse
+     * de leur capture et la note de l'administrateur, et ses missions faites ; null s'il n'a jamais
+     * été Éclaireuse.
+     */
+    scout: ScoutExport.nullable(),
     /**
      * R11 : sa dernière visite connue (au plus une mise à jour par jour), celle qui compte pour la
      * suppression d'un compte inactif depuis 3 ans (`INACTIVE_ACCOUNT_YEARS`, email.ts).
