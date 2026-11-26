@@ -127,8 +127,11 @@ function AdminScoutTriage() {
   const all = { value: 'all' as const, label: t(($) => $.scout.triage.filterAll) }
 
   const head = (
-    <Stack direction="row" wrap gap="md" align="stretch">
-      <Stack grow>
+    // Les trois tuiles côte à côte quand la page a ses colonnes ; sur téléphone, l'une sous l'autre :
+    // en rangée, chacune n'avait plus qu'un tiers de 390 points, et « Lancer le mois » s'écrivait
+    // une lettre par ligne (capture tri-avant, 26/11/2026).
+    <Stack direction={columns ? 'row' : 'column'} wrap={columns} gap="md" align="stretch">
+      <Stack grow={columns}>
         <MonthTile
           program={triage.program}
           onLaunch={() => {
@@ -136,7 +139,7 @@ function AdminScoutTriage() {
           }}
         />
       </Stack>
-      <Stack grow>
+      <Stack grow={columns}>
         <GaugeTile
           label={t(($) => $.scout.triage.places)}
           value={t(($) => $.scout.triage.placesValue, {
@@ -146,7 +149,7 @@ function AdminScoutTriage() {
           ratio={triage.places.taken / SCOUT_PLACES}
         />
       </Stack>
-      <Stack grow>
+      <Stack grow={columns}>
         <GaugeTile
           label={t(($) => $.scout.triage.missions)}
           trailing={
