@@ -225,7 +225,8 @@ describe('the seals', () => {
   it('has eleven milestones and one seal per category, « other » left out', () => {
     expect(MILESTONE_SEALS).toHaveLength(11)
     const categories = PROJECT_CATEGORIES.filter((category) => category !== 'other')
-    expect(SEALS).toHaveLength(11 + categories.length)
+    // R20 : « Éclaireuse fondatrice » s'ajoute, hors des paliers.
+    expect(SEALS).toHaveLength(11 + 1 + categories.length)
     for (const category of categories) {
       const seal = SEALS.find((s) => s.code === category)
       expect(seal?.rule).toEqual({ kind: 'category', category, target: CATEGORY_SEAL_TARGET })
@@ -255,6 +256,8 @@ describe('GameSettingsUpdate', () => {
       { titleForm: 'm' },
       { pinnedFamily: null },
       { pinnedFamily: 'keeper' },
+      // R20 : la forme accepte `scout` ; l'API le refuse à qui n'est pas Éclaireuse.
+      { pinnedFamily: 'scout' },
       { inRankings: false },
       { harvestNotices: false },
       { levelSeen: 4 },
@@ -269,7 +272,7 @@ describe('GameSettingsUpdate', () => {
     for (const body of [
       {},
       { honey: 100 },
-      { pinnedFamily: 'scout' },
+      { pinnedFamily: 'queen' },
       { personalChallenge: 'feedback_5' },
       { levelSeen: 0 },
       { titleForm: 'x' },

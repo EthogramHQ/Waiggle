@@ -88,6 +88,8 @@ describe('Me', () => {
     hideFromSuggestions: false,
     rulesAccepted: true,
     rulesChanges: [],
+    // R20 : jamais Éclaireuse.
+    scout: null,
   }
 
   it('says whether the current rules are accepted, and what changed', () => {

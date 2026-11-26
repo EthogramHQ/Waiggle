@@ -159,6 +159,27 @@ export const ChangeUnverifiedEmailResponse = z
   .meta({ id: 'ChangeUnverifiedEmailResponse' })
 export type ChangeUnverifiedEmailResponse = z.infer<typeof ChangeUnverifiedEmailResponse>
 
+/**
+ * R20 : `Me.scout`, ce que l'appli sait des Éclaireuses pour le membre connecté (null : jamais
+ * Éclaireuse). `active` : non retirée et mois pas fini ; c'est lui qui montre la Goutte. `removedAt` :
+ * le retrait par l'administrateur (null sinon) ; une Éclaireuse retirée garde l'objet, inactive, pour
+ * relire « Mes retours ». `showDrop` : « Afficher la Goutte ». `programEndsAt` : la fin du mois
+ * (null tant qu'il n'est pas lancé). `missionsLeft` : les missions de la semaine pas encore faites,
+ * la pastille de la Goutte (0 si inactive ; 3 au plus, `SCOUT_MISSIONS_MAX` de scouts.ts). Défini
+ * ici, et non dans scouts.ts : ce fichier lit accounts.ts, et l'inverse ferait une boucle d'imports.
+ */
+export const MeScout = z
+  .object({
+    active: z.boolean(),
+    joinedAt: z.iso.datetime(),
+    removedAt: z.iso.datetime().nullable(),
+    showDrop: z.boolean(),
+    programEndsAt: z.iso.datetime().nullable(),
+    missionsLeft: z.int().min(0).max(3),
+  })
+  .meta({ id: 'MeScout' })
+export type MeScout = z.infer<typeof MeScout>
+
 /** Le profil du membre connecté, tel que renvoyé par GET /v1/me. */
 export const Me = z
   .object({
@@ -207,6 +228,8 @@ export const Me = z
      * en a accepté une plus ancienne ; vide sinon (déjà acceptée, ou jamais aucune).
      */
     rulesChanges: z.array(z.string()),
+    /** R20 : sa place chez les Éclaireuses (`MeScout`) ; null s'il ne l'a jamais été. */
+    scout: MeScout.nullable(),
   })
   .meta({ id: 'Me' })
 export type Me = z.infer<typeof Me>
