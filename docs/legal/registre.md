@@ -15,7 +15,7 @@ données (relecture juridique complète du 15/11/2026, tranche R11), et suit le 
   même pull request. La page « Confidentialité » de l'appli (`packages/i18n`) dit la même chose aux
   membres : les deux changent ensemble.
 
-Dernière mise à jour : 23/11/2026 (tranche R19, la récolte).
+Dernière mise à jour : 26/11/2026 (tranche R20, les Éclaireuses).
 
 ## 1. Le responsable du traitement
 
@@ -263,6 +263,10 @@ selon les règles de visibilité de l'appli.
   - `member_game` : la forme du titre, le titre épinglé, les classements, les avis, la
     décoration, le niveau vu ;
   - `email_preference.recap_harvest_at` : la date du premier récap qui a porté « Ta semaine ».
+  - R20 : les gestes `scout_report`, `scout_mission`, `scout_heard`, le miel `scout_heard`, les
+    avis `game_scout_heard` (son extrait est lu dans le retour, et part avec lui),
+    `game_scout_missions` et `game_scout_removed` (§ 2.16). Les classements ne comptent pas le
+    pollen d'Éclaireuse, que les autres membres ne peuvent pas gagner.
   - Le passé est rattrapé au lancement (`0030_game_backfill.sql`) ; les contenus déjà retirés y
     entrent révoqués.
 - **Destinataires** :
@@ -288,6 +292,36 @@ selon les règles de visibilité de l'appli.
   - les avis : 90 jours (`nightly-purge.ts`).
 - **Sécurité** : une seule fonction écrit le grand livre (`apps/api/src/game/award.ts`, vérifié
   par un test statique), avec un verrou par membre. L'export ne nomme pas l'autre membre.
+
+### 2.16 Les Éclaireuses (R20)
+
+- **Finalité** : faire essayer Waiggle avant son ouverture par 30 membres au plus, pendant un mois :
+  recevoir leurs retours, les trier, leur répondre, proposer des missions, les remercier (pollen,
+  miel, titre, sceau : § 2.15). Les retours ne sont jamais publiés ni réutilisés (ni témoignage, ni
+  marketing).
+- **Base** : la participation, à laquelle le membre entre de lui-même par un code, et ses
+  remerciements : 6.1.b ; les informations jointes et la capture : 6.1.f (reproduire un défaut),
+  retirables avant l'envoi par une case cochée par défaut, qui n'est pas un consentement ; la note
+  de l'administrateur et le retrait : 6.1.f. À vérifier.
+- **Personnes** : les Éclaireuses ; les membres qui paraissent sur une capture.
+- **Données** : `scout` (date d'entrée, voie, retrait et son motif, réglage de la Goutte),
+  `scout_program` (dates du mois), `scout_mission` (textes de l'administrateur), `scout_report`
+  (sorte, gravité, texte, mission, informations jointes : écran sans ses paramètres, plateforme,
+  largeur, version, langue, thème ; capture ré-encodée sans métadonnées ; statut, note pour
+  l'Éclaireuse, note de l'administrateur, dates), `scout_mission_done`. Le pollen, le miel, le
+  sceau et les avis : § 2.15.
+- **Destinataires** : l'administrateur et l'autrice ; aucun autre membre, aucun e-mail ni
+  notification poussée. L'assistant de code peut lire un texte de retour lors d'un dépannage, comme
+  tout texte de la base (§ 4) ; jamais une capture.
+- **Durées** (`apps/api/src/jobs/nightly-purge.ts`) : un retour et sa capture, 6 mois après la fin
+  du mois (7 mois après le retour si le mois n'est jamais lancé), ou jusqu'à leur suppression par
+  l'autrice ; une mission et ce qui en a été fait, 8 jours après sa semaine ; l'entrée, la vie du
+  compte. Le compte supprimé emporte tout (cascade, fichiers effacés). Sauvegardes : § 5.
+- **Droits** : l'export (`AccountExport.scout` : entrée, retrait et motif, retours, informations
+  jointes, captures par leur adresse, notes de l'administrateur, missions faites) ; chaque retour
+  se supprime depuis « Mes retours ».
+- **Sécurité** : dossier `scouts` lisible de l'autrice et d'un administrateur actif,
+  `Cache-Control: no-store` ; texte affiché en brut ; 20 retours par 24 heures.
 
 ## 3. Les sous-traitants
 
