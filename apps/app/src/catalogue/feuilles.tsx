@@ -10,6 +10,7 @@
 import { type ColorName, layout, palettes, radii, space } from '@ruche/brand'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
+import { ActionMenu } from '../ui/ActionMenu'
 import { AvatarCover } from '../ui/AvatarCover'
 import { Button } from '../ui/Button'
 import type { ImageSource } from '../ui/image'
@@ -27,6 +28,10 @@ const fr = {
   stack: 'Pile de photos : le membre et trois projets, puis le membre seul',
   aside: 'Feuille d’ordinateur avec un décor et une colonne à côté (l’aperçu de sa page)',
   busy: 'Feuille pendant son action (busy) : « Fermer » inactif, rien ne la ferme',
+  menu: 'Feuille avec un menu « ⋯ » dans sa tête (headerMenu, R20), à gauche de la croix',
+  more: 'Plus d’options',
+  fold: 'Replier la Goutte',
+  settings: 'Réglages des Éclaireuses',
   photo: 'Photo de profil',
   change: 'Changer la photo',
   close: 'Fermer',
@@ -57,6 +62,10 @@ const en: typeof fr = {
   stack: 'Photo stack: the member and three projects, then the member alone',
   aside: 'Computer sheet with a decoration and a column beside it (the preview of the page)',
   busy: 'Sheet during its action (busy): “Close” disabled, nothing closes it',
+  menu: 'Sheet with a “⋯” menu in its head (headerMenu, R20), left of the cross',
+  more: 'More options',
+  fold: 'Fold the Drop',
+  settings: 'Scouts settings',
   photo: 'Profile photo',
   change: 'Change the photo',
   close: 'Close',
@@ -202,6 +211,37 @@ export function SheetsCatalogue() {
           closeLabel={l.close}
           onClose={noop}
           footer={<Button label={l.save} loading onPress={noop} />}
+        >
+          <Text>{l.body}</Text>
+        </SheetPanel>
+      </View>
+
+      {/* R20 : un menu « ⋯ » dans la tête (headerMenu), posé à gauche de la croix. */}
+      <Text tone="secondary">{l.menu}</Text>
+      <View
+        style={{
+          backgroundColor: colors.scrim,
+          borderRadius: radii.tile,
+          paddingVertical: space.xxxl,
+        }}
+      >
+        <SheetPanel
+          layout="desktop"
+          title={l.sheetTitle}
+          closeLabel={l.close}
+          onClose={noop}
+          headerMenu={
+            <ActionMenu
+              label={l.more}
+              variant="plain"
+              align="end"
+              items={[
+                { label: l.fold, icon: 'drop', onPress: noop },
+                { label: l.settings, icon: 'gear-six', onPress: noop },
+              ]}
+            />
+          }
+          footer={<Button label={l.save} onPress={noop} />}
         >
           <Text>{l.body}</Text>
         </SheetPanel>
