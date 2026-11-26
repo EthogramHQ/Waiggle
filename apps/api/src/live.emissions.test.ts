@@ -172,6 +172,9 @@ describe('the other gestures on a project', () => {
   })
 
   it('signals a new update of the project to its Journal', async () => {
+    // Léa écoute aussi le projet témoin : sans lui, le signal témoin qui borne la lecture ne lui
+    // arriverait jamais.
+    await declareTopics(ctx, cast.lea.cookie, lea, [page(), topic.project(cast.witness)])
     later()
     const res = await act.send('POST', `/v1/projects/${projectId}/updates`, cast.nora.cookie, {
       title: null,
