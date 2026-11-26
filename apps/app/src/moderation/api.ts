@@ -22,7 +22,7 @@ import { ApiError, type ApiResult } from '../api/errors'
 
 /** Toutes les clés de cache de la modération commencent par « moderation ». */
 export const moderationQueryKey = ['moderation'] as const
-const queueKey = ['moderation', 'queue'] as const
+export const queueKey = ['moderation', 'queue'] as const
 const removedKey = ['moderation', 'removed'] as const
 /** L'historique : une liste par filtre (`null` : toutes les décisions). */
 const historyKey = ['moderation', 'history'] as const

@@ -9,8 +9,8 @@ import { ApiError } from '../api/errors'
 
 /** Toutes les clés de cache des notifications commencent par « notifications ». */
 export const notificationsQueryKey = ['notifications'] as const
-const unreadKey = ['notifications', 'unread'] as const
-const listKey = ['notifications', 'list'] as const
+export const unreadKey = ['notifications', 'unread'] as const
+export const listKey = ['notifications', 'list'] as const
 
 /** Toutes les minutes, la cloche redemande son nombre (comme le bandeau des nouveautés du fil). */
 const UNREAD_INTERVAL_MS = 60_000

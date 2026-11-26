@@ -80,7 +80,7 @@ const reasonOf = (error: unknown): CornerFailure | undefined => {
 
 // --- Clés de cache et adresses ---
 
-const cornerKey = (projectId: string) => ['tester-corner', projectId] as const
+export const cornerKey = (projectId: string) => ['tester-corner', projectId] as const
 const callsKey = (projectId: string) => ['tester-calls', projectId] as const
 // Sans le filtre : « tous les fils de ce projet », pour changer « À traiter » et « Réglés » ensemble.
 const threadsKeyOf = (projectId: string) => ['tester-threads', projectId] as const
