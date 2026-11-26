@@ -18,6 +18,7 @@ import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { type Live, toAdmins } from '../live/emit'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { findPart, loadReportable, sameSnapshot } from '../reports/target'
 import type { AppEnv } from '../types'
@@ -79,9 +80,11 @@ type Deps = {
   limiter: RateLimiter
   /** R9 : pour l'adresse des miniatures de la feuille (photos, photo de profil). */
   publicApiUrl: string
+  /** R21 : la base et le bus du temps réel (live/emit.ts) : la file de modération change. */
+  live: Live
 }
 
-export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const reportRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste (401).
@@ -236,6 +239,9 @@ export const reportRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       .onConflictDoNothing()
       .returning({ id: schema.contentReport.id })
     if (inserted.length === 0) return alreadyReported(c)
+    // R21 : la file de modération des administrateurs en fonction a changé (un signal sans
+    // contenu : ni la cible, ni qui a signalé).
+    toAdmins(live, 'moderation')
     // Aucun journal ne note qui a signalé (règle 14) : rien n'est écrit dans les logs ici.
     return c.json(CreatedReport.parse({ id }), 201)
   })

@@ -17,6 +17,7 @@ import { commentChangeRule, deleteComment } from '../comments/delete'
 import { myCommentsPage } from '../comments/load'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { type Live, projectChanged } from '../live/emit'
 import { memberCounterKeys, type RateLimiter } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -58,9 +59,10 @@ const deleteRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string; live: Live }
 
-export const meCommentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const meCommentRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste.
@@ -101,7 +103,12 @@ export const meCommentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // d'un autre, public ou privé, ou un inconnu, ne se distinguent pas : même 404. Lu par la clé
     // primaire. Une racine gardée en « Commentaire supprimé » n'a plus d'auteur : introuvable.
     const [comment] = await db
-      .select({ rootId: schema.projectComment.rootId })
+      .select({
+        rootId: schema.projectComment.rootId,
+        // R21 : le projet et la ruche du commentaire, pour le signal de sa page.
+        projectId: schema.projectComment.projectId,
+        hiveId: schema.projectComment.hiveId,
+      })
       .from(schema.projectComment)
       .where(
         and(
@@ -112,6 +119,13 @@ export const meCommentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       )
     if (!comment) return notFound()
     await deleteComment(db, commentId, comment.rootId)
+    // R21 : la page du projet change pour qui la regarde (filtre des destinataires, live/emit.ts).
+    await projectChanged(live, {
+      projectId: comment.projectId,
+      actorId: user.id,
+      page: 'comments',
+      readersHiveId: comment.hiveId,
+    })
     return ctx.body(null, 204)
   })
 

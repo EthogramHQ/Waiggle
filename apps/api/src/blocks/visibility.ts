@@ -2,7 +2,7 @@
 // quand Malik bloque Inès, ni l'un ni l'autre ne voit plus les contenus de l'autre. Chaque lecture
 // qui montre le geste d'un autre membre appelle l'une de ces aides, et aucune ne réécrit la règle.
 import { type Database, schema } from '@ruche/db'
-import { type Column, eq, or, type SQL, sql } from 'drizzle-orm'
+import { type Column, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 
 const b = schema.memberBlock
 
@@ -36,6 +36,29 @@ export const blocksOf = async (db: Pick<Database, 'select'>, viewerId: string): 
     byMe: new Set(rows.filter((r) => r.blockerId === viewerId).map((r) => r.blockedId)),
     ofMe: new Set(rows.filter((r) => r.blockedId === viewerId).map((r) => r.blockerId)),
   }
+}
+
+/**
+ * R21 (le temps réel, live/emit.ts) : pour quelques membres à la fois (l'auteur d'un geste, l'auteur
+ * du projet), tous ceux avec qui chacun est bloqué, dans un sens ou dans l'autre, sans distinguer le
+ * sens. Une seule requête : « blocker_id in (…) or blocked_id in (…) », par la clé primaire
+ * (blocker_id, blocked_id) et member_block_blocked_idx. Les identifiants entrent comme valeurs liées.
+ */
+export const blockPartnersOf = async (
+  db: Pick<Database, 'select'>,
+  memberIds: readonly string[],
+): Promise<Map<string, Set<string>>> => {
+  const partners = new Map<string, Set<string>>(memberIds.map((id) => [id, new Set<string>()]))
+  if (memberIds.length === 0) return partners
+  const rows = await db
+    .select({ blockerId: b.blockerId, blockedId: b.blockedId })
+    .from(b)
+    .where(or(inArray(b.blockerId, [...memberIds]), inArray(b.blockedId, [...memberIds])))
+  for (const row of rows) {
+    partners.get(row.blockerId)?.add(row.blockedId)
+    partners.get(row.blockedId)?.add(row.blockerId)
+  }
+  return partners
 }
 
 /** Aucun blocage : pour un visiteur anonyme, ou une lecture qui n'en dépend pas. */

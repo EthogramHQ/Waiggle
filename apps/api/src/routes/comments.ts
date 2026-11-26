@@ -39,6 +39,7 @@ import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { setPollen } from '../game/award'
 import { awardOnProject, pollenHeaders } from '../game/gesture'
+import { type Live, projectChanged } from '../live/emit'
 import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
 import { inViewerHiveColumn, projectReachableBy } from '../projects/visibility'
@@ -202,11 +203,12 @@ const contextRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string; live: Live }
 
 const c = schema.projectComment
 
-export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const commentRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste.
@@ -443,6 +445,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // réponse, on vérifie la racine puis on écrit, sans que la racine change entre les deux :
     // « for share » la verrouille contre une suppression jusqu'à la fin de la transaction (la
     // suppression, elle, la verrouille « for update » : l'une attend l'autre).
+    let rootAuthorId: string | null = null
     const written = await db.transaction(async (tx) => {
       // D'abord le projet, relu sous verrou (règle 30 : rien ne s'ajoute à un projet retiré).
       const state = await lockedProjectState(tx, id, user.id)
@@ -487,6 +490,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         // Seuls les membres de cette ruche et l'auteur du projet lisent la racine (sees, plus
         // haut), donc peuvent y répondre.
         if (root.hiveId !== null) row.hiveId = root.hiveId
+        // R21 : l'auteur de la racine, dont l'Activité gagne « une réponse » (signal plus bas).
+        rootAuthorId = root.authorId
       }
       // Les membres que mentionne le texte (« @ines_morel »), lus AVANT d'écrire : un membre que
       // l'auteur a bloqué refuse le texte entier (règle 2b, 422), et rien n'est alors écrit.
@@ -516,6 +521,20 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (written === 'gone') return notFound(ctx)
     if (written === 'removed') return removed(ctx)
     if (written === 'blocked_mention') return blockedMention(ctx)
+
+    // R21 : la transaction est finie (rien n'est annoncé d'une écriture annulée) ; le signal part
+    // avant la réponse. La page du projet change pour qui la regarde ; l'Activité, pour l'auteur du
+    // projet, celui de la racine et les membres mentionnés (notifications/load.ts, source 4).
+    // `readersHiveId` : un commentaire écrit pour une ruche ne se lit que dans cette ruche.
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      page: 'comments',
+      notify: [project.authorId, rootAuthorId, ...written.mentions.map((m) => m.memberId)].filter(
+        (member): member is string => member !== null && member !== user.id,
+      ),
+      readersHiveId: row.hiveId,
+    })
 
     const authors = await authorsOf(db, [user.id], publicApiUrl, id)
     const shown = presentComment(row, viewer, authors, false, written.mentions)
@@ -580,12 +599,23 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         })
       if (!row) return 'gone' as const
       await saveMentions(tx, row.id, mentions, editedAt)
-      return { row, mentions }
+      return { row, mentions, kept }
     })
     if (edited === 'gone') return notFound(ctx)
     if (edited === 'removed') return removed(ctx)
     if (edited === 'blocked_mention') return blockedMention(ctx)
     const { row, mentions } = edited
+    // R21 : le texte a changé sur la page ; l'Activité des mentionnés aussi, avant comme après (une
+    // mention ajoutée prévient, une mention retirée ne prévient plus).
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      page: 'comments',
+      notify: [...mentions, ...edited.kept]
+        .map((m) => m.memberId)
+        .filter((member) => member !== user.id),
+      readersHiveId: row.hiveId,
+    })
     const [authors, blocks] = await Promise.all([
       authorsOf(db, [user.id], publicApiUrl, id),
       blocksOf(db, user.id),
@@ -625,6 +655,14 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
 
     // La liste d'étapes est commune avec « Mes commentaires » (comments/delete.ts).
     await deleteComment(db, commentId, comment.rootId)
+    // R21 : le commentaire disparaît de la page, et de l'Activité de l'auteur du projet.
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      page: 'comments',
+      notify: project.authorId === user.id ? [] : [project.authorId],
+      readersHiveId: comment.hiveId,
+    })
     return ctx.body(null, 204)
   })
 
@@ -648,6 +686,25 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     return null
   }
 
+  /**
+   * R21 : masquer ou démasquer change la page du projet, et l'Activité de l'auteur du commentaire
+   * (« Ton commentaire a été masqué », notifications/load.ts, source 5). Son auteur est relu ici,
+   * par la clé primaire, une fois le geste fait.
+   */
+  const hideChanged = async (userId: string, projectId: string, commentId: string) => {
+    const [comment] = await db
+      .select({ authorId: c.authorId, hiveId: c.hiveId })
+      .from(c)
+      .where(eq(c.id, commentId))
+    await projectChanged(live, {
+      projectId,
+      actorId: userId,
+      page: 'comments',
+      notify: comment?.authorId ? [comment.authorId] : [],
+      readersHiveId: comment?.hiveId ?? null,
+    })
+  }
+
   app.openapi(hideRoute, async (ctx) => {
     const user = ctx.get('user')
     if (!user) return unauthorized(ctx)
@@ -659,6 +716,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       .update(c)
       .set({ hiddenAt: new Date() })
       .where(and(eq(c.id, commentId), isNull(c.hiddenAt)))
+    await hideChanged(user.id, id, commentId)
     return ctx.body(null, 204)
   })
 
@@ -669,6 +727,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const refusal = await checkHide(ctx, user.id, id, commentId)
     if (refusal) return refusal
     await db.update(c).set({ hiddenAt: null }).where(eq(c.id, commentId))
+    await hideChanged(user.id, id, commentId)
     return ctx.body(null, 204)
   })
 

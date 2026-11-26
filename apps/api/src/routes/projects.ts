@@ -12,6 +12,7 @@ import { award, setPollen, type Tx } from '../game/award'
 import { pollenHeaders } from '../game/gesture'
 import { isHiveMember } from '../hives/load'
 import { isForeignKeyViolation, lockMembershipForShare } from '../hives/write'
+import { type Live, projectChanged } from '../live/emit'
 import type { FileStorage } from '../media/storage'
 import { dropProjectPartRemovals, replacedProjectParts } from '../moderation/replaced'
 import { categoriesExist } from '../projects/categories'
@@ -155,9 +156,16 @@ const hiveGone = (error: unknown): typeof HIVE_GONE => {
   throw error
 }
 
-type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = {
+  db: Database
+  storage: FileStorage
+  limiter: RateLimiter
+  publicApiUrl: string
+  live: Live
+}
 
-export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
+export const projectRoutes = ({ db, storage, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, vérifié avant même de lire le contenu de la requête.
@@ -304,6 +312,18 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (created === HIVE_GONE) return notFound(c)
     // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
     if (created > counted) await chargeOtherTools(limiter, user.id, created - counted)
+
+    // R21 : la publication, après la transaction et avant la réponse. Le filtre des destinataires
+    // (live/emit.ts) choisit selon la visibilité : visible de tous, `feed` (le bouton des
+    // nouveautés) et la page de l'auteur ; réservé à une ruche, `hive:<ruche>` et le `me` / `feed`
+    // de ses seuls membres ; privé, rien pour personne d'autre que lui.
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      member: 'project',
+      hive: 'hive',
+      feed: true,
+    })
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) throw new Error('project not found right after its creation')

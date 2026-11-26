@@ -74,6 +74,10 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   // classements doit rester possible pendant une suspension, comme régler ses e-mails. Offrir du
   // miel et décorer son rayon restent refusés (ce sont des gestes, vus des autres).
   'PATCH /v1/me/game',
+  // R21 (plan, choix 7, tranché par la session) : un compte suspendu garde son flux du temps réel
+  // et déclare les pages qu'il lit ; la déclaration n'écrit rien en base, elle ne fait que choisir
+  // des signaux sans contenu.
+  'PUT /v1/live/:connectionId/topics',
 ])
 
 /** Un objet JSON (pas un tableau, ni null) : le seul corps dont on puisse juger les clés. */

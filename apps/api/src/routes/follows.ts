@@ -15,6 +15,7 @@ import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
 import { type AwardInput, award, setPollen } from '../game/award'
 import { pollenHeaders } from '../game/gesture'
+import { type Live, memberChanged, projectChanged } from '../live/emit'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
@@ -88,9 +89,10 @@ const unfollowProjectRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; live: Live }
 
-export const followRoutes = ({ db, limiter }: Deps) => {
+export const followRoutes = ({ db, limiter, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste.
   app.use('/v1/members/:id/follow', requireUser)
@@ -217,6 +219,9 @@ export const followRoutes = ({ db, limiter }: Deps) => {
       pollen: { sourceKind: 'member', sourceId: id, sourceKey: `member:${id}` },
     })
     if (pollen === null) return notFound(c)
+    // R21 : après la transaction, avant la réponse : sa page (« 13 abonnés ») et son Activité
+    // (« de nouveaux abonnés », notifications/load.ts, source 3).
+    await memberChanged(live, { memberId: id, actorId: viewer.id, page: 'followers', notify: [id] })
     setPollen(c, pollen)
     return ok(c)
   })
@@ -231,11 +236,22 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     if (!MemberId.safeParse(id).success) return notFound(c)
     // Efface seulement l'abonnement du membre qui demande, s'il existe ; sinon, rien à faire. On ne
     // cherche rien d'autre : la réponse est la même que le membre existe ou non.
-    await db
+    const gone = await db
       .delete(schema.memberFollow)
       .where(
         and(eq(schema.memberFollow.followerId, viewer.id), eq(schema.memberFollow.memberId, id)),
       )
+      .returning({ memberId: schema.memberFollow.memberId })
+    // R21 : un signal seulement si un abonnement a vraiment disparu (`returning` rend la ligne
+    // effacée) : sinon rien n'a changé, et rien ne part.
+    if (gone.length > 0) {
+      await memberChanged(live, {
+        memberId: id,
+        actorId: viewer.id,
+        page: 'followers',
+        notify: [id],
+      })
+    }
     return ok(c)
   })
 
@@ -268,6 +284,13 @@ export const followRoutes = ({ db, limiter }: Deps) => {
       pollen: { sourceKind: 'project', sourceId: id, sourceKey: `project:${id}`, projectId: id },
     })
     if (pollen === null) return notFound(c)
+    // R21 : le nombre d'abonnés de la page du projet, et l'Activité de son auteur (source 2).
+    await projectChanged(live, {
+      projectId: id,
+      actorId: viewer.id,
+      page: 'followers',
+      notify: [project.authorId],
+    })
     setPollen(c, pollen)
     return ok(c)
   })
@@ -282,11 +305,17 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     if (!ProjectId.safeParse(id).success) return notFound(c)
     // Même principe que pour un membre : on peut toujours se désabonner, même d'un projet devenu
     // privé, et la réponse ne dit rien du projet.
-    await db
+    const gone = await db
       .delete(schema.projectFollow)
       .where(
         and(eq(schema.projectFollow.followerId, viewer.id), eq(schema.projectFollow.projectId, id)),
       )
+      .returning({ projectId: schema.projectFollow.projectId })
+    // R21 : seulement si un abonnement a disparu. L'aide relit le projet et son audience : un
+    // projet devenu privé ne signale qu'à son auteur.
+    if (gone.length > 0) {
+      await projectChanged(live, { projectId: id, actorId: viewer.id, page: 'followers' })
+    }
     return ok(c)
   })
 

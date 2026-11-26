@@ -12,6 +12,7 @@ import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { setPollen } from '../game/award'
 import { awardOnProject, pollenHeaders } from '../game/gesture'
+import { type Live, projectChanged } from '../live/emit'
 import { visibleTo } from '../projects/load'
 import { hiveMemberOf, projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -60,9 +61,10 @@ const unreactRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; live: Live }
 
-export const reactionRoutes = ({ db, limiter }: Deps) => {
+export const reactionRoutes = ({ db, limiter, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste.
   app.use('/v1/projects/:id/reactions/*', requireUser)
@@ -132,6 +134,10 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     return { kind: kind.data, authorId: project.authorId }
   }
 
+  /** R21 : le signal d'une réaction posée ou retirée (filtre des destinataires, live/emit.ts). */
+  const reactionChanged = (actorId: string, projectId: string, authorId: string) =>
+    projectChanged(live, { projectId, actorId, page: 'reactions', notify: [authorId] })
+
   app.openapi(reactRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
@@ -167,6 +173,9 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
         now,
       })
     })
+    // R21 : après la transaction, avant la réponse : le nombre change sur la page du projet, et
+    // l'Activité de son auteur (« 3 réactions », notifications/load.ts, source 1).
+    await reactionChanged(user.id, id, checked.authorId)
     // 204 : « c'est fait », sans corps : rien à lire, donc rien qui puisse fuiter. L'en-tête du
     // pollen, s'il y en a, se pose une fois la transaction validée.
     setPollen(c, pollen)
@@ -186,6 +195,9 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     await db
       .delete(r)
       .where(and(eq(r.projectId, id), eq(r.memberId, user.id), eq(r.kind, checked.kind)))
+    // R21 : le nombre baisse, pour qui regarde la page et pour l'auteur (une réaction retirée
+    // disparaît de son Activité).
+    await reactionChanged(user.id, id, checked.authorId)
     return c.body(null, 204)
   })
 

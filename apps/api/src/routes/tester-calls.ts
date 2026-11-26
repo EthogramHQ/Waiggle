@@ -19,6 +19,7 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { after, encodeCursor, readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { type Live, projectChanged } from '../live/emit'
 import type { FileStorage } from '../media/storage'
 import { visibleMedia } from '../projects/media-visibility'
 import { memberCounterKeys, projectCallKey, type RateLimiter, type RateRule } from '../rate-limit'
@@ -101,12 +102,19 @@ const deleteCallRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = {
+  db: Database
+  storage: FileStorage
+  limiter: RateLimiter
+  publicApiUrl: string
+  live: Live
+}
 
 /** Levée dans la transaction de l'appel pour l'annuler : la photo citée n'est pas rattachable. */
 class InvalidPhoto extends Error {}
 
-export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
+export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste.
@@ -220,6 +228,9 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
       return c.json(errorBody(languageOf(c), 'invalid_photo'), 400)
     }
     if (outcome.kind === 'closed') return cornerClosed(c)
+    // R21 : le coin change pour ses testeurs et son auteur qui le regardent (seuls à pouvoir
+    // déclarer `corner:<id>`, live/access.ts), après la transaction et avant la réponse.
+    await projectChanged(live, { projectId: id, actorId: user.id, corner: 'corner' })
     return c.json(
       {
         id: call.id,
