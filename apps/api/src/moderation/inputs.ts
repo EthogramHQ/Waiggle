@@ -17,6 +17,8 @@ export type InputObject =
   | 'message'
   // R10 : une ruche, signalée par l'un de ses membres ou de ses invités (son nom).
   | 'hive'
+  // R20 : un retour d'Éclaireuse, vu de son autrice et de l'administrateur seuls.
+  | 'scoutReport'
 
 /** La sorte de champ : un texte, une liste de textes, un lien, ou une image (une clé de stockage). */
 export type InputKind = 'text' | 'list' | 'link' | 'image'
@@ -52,7 +54,9 @@ type WrittenInput = Omit<MemberInput, 'removable'>
  * signalement (objet `report`) n'en est jamais une.
  */
 const removableOf = (input: WrittenInput): boolean => {
-  if (input.object === 'report' || input.field === null) return false
+  if (input.object === 'report' || input.object === 'scoutReport' || input.field === null) {
+    return false
+  }
   const field = ReportPartField.safeParse(input.field)
   return field.success && isRemovablePart(input.object, field.data)
 }
@@ -333,6 +337,27 @@ const WRITTEN_INPUTS: readonly WrittenInput[] = [
     kind: 'text',
     snapshot: true,
     export: true,
+  },
+  // R20 : un retour d'Éclaireuse. Son texte est écrit par la membre, vu d'elle et de l'administrateur
+  // seul, jamais publié : ni signalable (un retour n'est pas un contenu signalable, choix 15), ni
+  // copié dans un signalement, mais dans son export. Sa capture : la clé seulement, jamais le fichier.
+  {
+    field: null,
+    object: 'scoutReport',
+    table: 'scout_report',
+    column: 'text',
+    kind: 'text',
+    snapshot: false,
+    export: true,
+  },
+  {
+    field: null,
+    object: 'scoutReport',
+    table: 'scout_report',
+    column: 'media_key',
+    kind: 'image',
+    snapshot: false,
+    export: false,
   },
   // La précision d'un signalement : saisie par un membre, montrée à la modération seule.
   {
@@ -655,7 +680,53 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     project_id: 'identifiant',
     hive_id: 'identifiant',
     created_at: 'date',
+    // R20.
+    report_id: "identifiant du retour d'Éclaireuse (l'avis part avec lui, cascade)",
+    count: 'nombre',
+    reason:
+      "le motif du retrait d'une Éclaireuse, saisi par l'administrateur dans son rôle de modération (copie de scout.removal_reason) : pas une saisie de membre",
   },
+  // R20 : les Éclaireuses. Le texte d'un retour et sa capture sont au registre (MEMBER_INPUTS) ; le
+  // reste est écrit par l'API, choisi dans une liste fermée, ou saisi par l'administrateur.
+  scout: {
+    member_id: 'identifiant',
+    joined_at: 'date',
+    via: "comment elle est entrée (inscription ou réglages), une liste fermée par la base (check), écrite par l'API",
+    removed_at: 'date',
+    removal_reason:
+      "le motif du retrait, saisi par l'administrateur dans son rôle de modération et dit à l'Éclaireuse : pas une publication de membre",
+    show_drop: 'booléen',
+  },
+  scout_program: '*', // une seule ligne : deux dates écrites par l'API
+  scout_mission: {
+    id: 'identifiant',
+    week: 'date',
+    position: 'nombre',
+    text_fr: "le texte de la mission, saisi par l'administrateur : pas une saisie de membre",
+    text_en: "sa traduction, saisie par l'administrateur : pas une saisie de membre",
+    created_at: 'date',
+  },
+  scout_report: {
+    id: 'identifiant',
+    member_id: 'identifiant',
+    kind: 'la sorte de retour, une liste fermée par Zod (ScoutReportKind) et par la base',
+    severity: 'la gravité, une liste fermée par Zod (ScoutSeverity) et par la base',
+    mission_id: 'identifiant',
+    screen:
+      "l'écran, mis en forme par l'appli et recoupé par l'API (une adresse sans paramètres, 200 caractères au plus, ScoutScreen) : pas un texte tapé",
+    platform: 'la plateforme, une liste fermée par Zod et par la base',
+    width: 'nombre',
+    app_version: "la version de l'appli, de l'hexadécimal seulement (regex du contrat)",
+    language: 'la langue, fr ou en, une liste fermée par Zod et par la base',
+    scheme: 'le thème, jour ou nuit, une liste fermée par Zod et par la base',
+    status: "l'état du retour, une liste fermée par Zod (ScoutStatus) et par la base",
+    fixed_note: "le mot « Corrigé » de l'administrateur à l'Éclaireuse : pas une saisie de membre",
+    admin_note: "la note privée de l'administrateur : pas une saisie de membre",
+    fixed_at: 'date',
+    created_at: 'date',
+    updated_at: 'date',
+  },
+  scout_mission_done: '*', // deux identifiants, l'identifiant du retour et une date
   // R10 : les ruches. Le nom est au registre (MEMBER_INPUTS) ; le reste est écrit par l'API ou
   // choisi dans une liste fermée par Zod et par le `check` de la table.
   hive: {

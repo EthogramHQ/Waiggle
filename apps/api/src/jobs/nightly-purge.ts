@@ -21,6 +21,8 @@
 // - R19 (relecture juridique du plan, J2 et J3) : les avis du jeu de plus de 90 jours, les défis
 //   (perso et de ruche) d'une semaine passée une fois la semaine suivante finie, et l'autre membre
 //   des gestes du grand livre au même moment (la ligne du geste reste, avec son pollen).
+// - R20 (relecture juridique J4) : les retours des Éclaireuses et leurs captures, 6 mois après la fin
+//   de leur mois, et les missions, 8 jours après leur semaine.
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
@@ -40,6 +42,7 @@ import { notificationCutoff, utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
 import type { VisitorMail } from '../reports/visitor'
+import { purgeScouts } from '../scouts/purge'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { DISMISSED_TOOL_KEEP_DAYS, dropDismissedOthers, dropOrphanOthers } from '../tools/write'
 
@@ -254,6 +257,10 @@ export const nightlyPurge = async (
     }
   }
 
+  // R20 (relecture juridique J4) : les retours des Éclaireuses et leurs captures, 6 mois après la fin
+  // de leur mois ; les missions, 8 jours après leur semaine (scouts/purge.ts).
+  const scouts = await purgeScouts(db, now, storage)
+
   const purged = {
     pendingPhotos: pendingPhotos.length,
     pendingTesterImages: pendingTesterImages.length,
@@ -274,6 +281,7 @@ export const nightlyPurge = async (
     personalChallenges: personalChallenges.length,
     hiveChallenges: hiveChallenges.length,
     counterparts,
+    ...scouts,
     ...moderation,
   }
   console.log('Nightly purge', purged)
