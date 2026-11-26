@@ -352,7 +352,10 @@ describe('the reports', () => {
     await pickChoice(T.status('fixed'))
     expect(await screen.findByText(containing(T.fixTitle))).toBeTruthy()
     expect(scoutServer.patch).not.toHaveBeenCalled()
-    await fireEvent.changeText(screen.getByLabelText(containing(T.fixNote)), 'Corrigé le 28/11, merci !')
+    await fireEvent.changeText(
+      screen.getByLabelText(containing(T.fixNote)),
+      'Corrigé le 28/11, merci !',
+    )
     await passTapGuard()
     await fireEvent.press(lastButton(T.fixConfirm))
     await act(async () => {})
