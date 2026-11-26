@@ -232,6 +232,16 @@ type PanelProps = {
    * « Annuler » remplace la croix (`cancelLabel`).
    */
   closeInFooter?: boolean
+  /**
+   * R20 (planche R20-Retour) : un menu « ⋯ » dans la tête de la feuille (`ActionMenu`). Sur
+   * téléphone avec une action, juste avant elle ; sinon, à gauche de la croix.
+   */
+  headerMenu?: ReactNode
+  /**
+   * R20 (planche R20-Retour-Desktop) : sur ordinateur, la fenêtre s'ancre en bas à droite (là où
+   * était la Goutte) au lieu d'être centrée. Sans effet sur téléphone.
+   */
+  corner?: boolean
 }
 
 /**
@@ -1067,7 +1077,8 @@ export function Sheet({
         style={{
           flex: 1,
           backgroundColor: colors.scrim,
-          justifyContent: 'center',
+          // R20 : la fenêtre ancrée en bas à droite (`corner`), sur ordinateur.
+          justifyContent: panel.corner && !phone ? 'flex-end' : 'center',
           // Clavier à l'écran sur le web : la couche prend la zone visible (pas de `flex: 0`, dont
           // la base web est nulle) ; son pied reste au-dessus du clavier.
           ...(visible
@@ -1186,6 +1197,8 @@ export function SheetPanel({
   footerNote,
   back,
   closeInFooter = false,
+  headerMenu,
+  corner = false,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -1322,6 +1335,7 @@ export function SheetPanel({
           heading={heading}
           titleId={titleId}
           {...(dragHandlers ? { dragHandlers } : null)}
+          {...(headerMenu ? { extra: headerMenu } : null)}
           {...(cancelLabel
             ? {
                 cancel: {
@@ -1389,6 +1403,17 @@ export function SheetPanel({
         >
           {backLink}
           {phone ? handle : null}
+          {/* R20 : le menu « ⋯ », à gauche de la croix (ou au bord droit, sans croix). */}
+          {headerMenu ? (
+            <View
+              style={{
+                position: 'absolute',
+                right: crossless ? 0 : layout.touchTarget + space.xs,
+              }}
+            >
+              {headerMenu}
+            </View>
+          ) : null}
           {/* « Fermer », à côté de la poignée, au bord droit : le premier élément atteignable de la
             feuille, où le focus arrive à l'ouverture. Sur téléphone, « Annuler » (R6a) le
             remplace, au bord gauche ; sur ordinateur, « Annuler » est au pied, et la croix reste. */}
@@ -1691,7 +1716,10 @@ export function SheetPanel({
               { flexShrink: 1, marginTop: insets.top + SHEET_TOP_GAP }
             : { flex: 1, marginTop: insets.top + SHEET_TOP_GAP, ...partialHeight }
           : {
-              alignSelf: 'center',
+              // R20 : ancrée en bas à droite (`corner`), à la marge du bord, comme la Goutte.
+              ...(corner
+                ? { alignSelf: 'flex-end' as const, marginBottom: PANEL_MARGIN }
+                : { alignSelf: 'center' as const }),
               width: '100%',
               // Avec la colonne, la feuille s'élargit jusqu'à la largeur de la planche ; le contenu
               // prend ce que la colonne laisse.

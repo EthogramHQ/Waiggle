@@ -29,7 +29,7 @@ import {
   useState,
 } from 'react'
 import { AccessibilityInfo, Platform, View, type ViewStyle } from 'react-native'
-import { type FloatingSpace, FloatingSpaceContext } from '../floatingSpace'
+import { FloatingClaimsContext, type FloatingSpace, FloatingSpaceContext } from '../floatingSpace'
 import type { IconName } from '../Icon'
 import { Mascot, type MascotPose } from '../Mascot'
 import { readingTime, Toast } from '../Toast'
@@ -137,15 +137,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const claims = useRef(new Map<object, number>())
   const [floatingTop, setFloatingTop] = useState(0)
   const highest = useCallback(() => Math.max(0, ...claims.current.values()), [])
+  // R20 : une copie des réserves, lue par la Goutte (`useFloatingTopOfOthers`) pour se poser
+  // au-dessus de la capsule des réactions sur téléphone. Un contexte à part : seuls ses lecteurs
+  // sont redessinés quand une réserve change, pas tous les écrans.
+  const [claimsShown, setClaimsShown] = useState<ReadonlyMap<object, number>>(() => new Map())
   const floating = useMemo<FloatingSpace>(
     () => ({
       claim: (owner, top) => {
         claims.current.set(owner, top)
         setFloatingTop(highest())
+        setClaimsShown(new Map(claims.current))
       },
       release: (owner) => {
         if (!claims.current.delete(owner)) return
         setFloatingTop(highest())
+        setClaimsShown(new Map(claims.current))
       },
     }),
     [highest],
@@ -212,7 +218,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       <ToastShownContext.Provider value={shown !== null}>
         <ToastBottomContext.Provider value={bottom}>
-          <FloatingSpaceContext.Provider value={floating}>{children}</FloatingSpaceContext.Provider>
+          <FloatingSpaceContext.Provider value={floating}>
+            <FloatingClaimsContext.Provider value={claimsShown}>
+              {children}
+            </FloatingClaimsContext.Provider>
+          </FloatingSpaceContext.Provider>
         </ToastBottomContext.Provider>
       </ToastShownContext.Provider>
       <ToastLayer>

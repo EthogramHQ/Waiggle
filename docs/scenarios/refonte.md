@@ -4674,3 +4674,176 @@ des Éclaireuses, R20).
 
 Les réactions, commentaires, retours et ruches marchent comme avant. Les Éclaireuses (R20)
 viennent ensuite, avec leur sceau de fondatrice et le parrainage.
+
+## R20 — Les Éclaireuses
+
+Statut : **validé par la session** le 26/11/2026, pendant la délégation de nuit de Louis (décisions
+de Louis du 17/11 : 30 au plus, un mois, web et applis, la Goutte, retour normé, contexte montré,
+missions de la semaine, page de tri, « Ta danse a été entendue », sceau de fondatrice, code
+spécial). Louis le relit avant la fusion.
+
+Avant d'ouvrir Waiggle à tout le monde, une trentaine de proches l'essaient pendant un mois et
+disent ce qui coince : ce sont **les Éclaireuses** (en anglais : Scouts), les abeilles qui partent
+devant et reviennent danser ce qu'elles ont trouvé. Elles ont un moyen simple et rangé de le dire
+(**la Goutte**), des **missions** chaque semaine, et elles sont remerciées : un titre et un sceau à
+elles, gardés pour toujours, du pollen pour chaque retour, et « Ta danse a été entendue » quand
+leur retour est corrigé.
+
+### Devenir Éclaireuse
+
+- Les Éclaireuses ont leur **code d'invitation à elles**, différent du code commun. Il se tape au
+  même endroit que le code commun, à l'inscription.
+- Étant donné une personne sans compte, avec le code des Éclaireuses
+  Quand elle s'inscrit
+  Alors son compte est créé comme avec le code commun ;
+  Et elle devient Éclaireuse : elle reçoit le sceau **« Éclaireuse fondatrice »** et le titre
+  **Éclaireuse** (Éclaireur au masculin, Scout en anglais), annoncés dans son Activité ;
+  Et la Goutte apparaît.
+- Étant donné un membre déjà inscrit (les proches de Louis le sont presque tous)
+  Quand il tape le code des Éclaireuses dans ses réglages (« Les Éclaireuses », « J'ai un code »)
+  Alors il devient Éclaireuse de la même façon.
+- **30 places au plus.** La 31e personne qui tape le code est refusée, avec « Les 30 places sont
+  prises. » ; à l'inscription, rien n'est créé (elle peut s'inscrire avec le code commun).
+- Un code faux est refusé comme un code d'invitation faux, sans dire si c'est le bon format. Les
+  essais sont comptés comme ceux de l'inscription.
+- Le code ne marche plus une fois le mois fini.
+- On ne devient pas Éclaireuse autrement : ni par l'administrateur, ni par une ruche. On ne cesse
+  d'être Éclaireuse que si l'administrateur la retire (abus) ou si le compte est supprimé.
+
+### Le mois des Éclaireuses
+
+- Le mois commence quand l'administrateur le lance, depuis la page de tri (« Lancer le mois ») :
+  Louis le fait le jour où il annonce Waiggle à ses proches. Il dure **30 jours**, jusqu'à minuit
+  (heure de Paris) du 30e jour.
+- Avant le lancement, une Éclaireuse a déjà la Goutte : Louis et les premières peuvent l'essayer.
+- **Après le mois**, la Goutte disparaît, les retours et les missions s'arrêtent, le code ne marche
+  plus. Le titre, le sceau, le pollen et « Mes retours » restent, pour toujours.
+
+### La Goutte
+
+- Étant donné une Éclaireuse connectée, pendant le mois
+  Quand elle est sur n'importe quel écran de l'appli (web, téléphone, ordinateur)
+  Alors une goutte de miel flotte en bas à droite, au-dessus de la barre d'onglets sur téléphone,
+  sans cacher le bouton « Publier », les toasts ni le gain de pollen ;
+  Et le lecteur d'écran la lit « Faire un retour sur {{appName}} ».
+- Elle n'apparaît pas aux autres membres, ni sans compte, ni sur les pages de connexion,
+  d'inscription et des règles, ni pendant qu'une feuille est ouverte.
+- **La replier** : un appui long (ou le menu « Replier la Goutte » de la feuille) la range en une
+  petite languette au bord droit de l'écran, qui la rouvre d'un geste ; le réglage « Afficher la
+  Goutte » des réglages « Les Éclaireuses » la cache tout à fait.
+- Quand l'administrateur a publié les missions de la semaine et qu'il en reste à faire, la Goutte
+  porte une pastille (le nombre), jamais rouge.
+
+### Le retour normé
+
+- Étant donné une Éclaireuse
+  Quand elle touche la Goutte
+  Alors une feuille « Ton retour » s'ouvre (une fenêtre sur ordinateur) :
+  - **la sorte** : Bug, Confus, Idée, J'adore (une seule, obligatoire) ;
+  - **la gravité**, pour un Bug ou un Confus seulement : Détail, Gênant, Bloquant ;
+  - **le texte** : obligatoire, 2 000 caractères au plus, compteur visible ;
+  - **une capture**, facultative : une image choisie dans l'appareil (JPEG, PNG ou WebP, 5 Mo au
+    plus), ré-encodée sans ses métadonnées ;
+  - **« Joint à ton retour »** : l'écran où elle était (son adresse, sans ses paramètres), l'appareil
+    (web, iOS ou Android, la largeur de l'écran), la version de {{appName}}, la langue, jour ou
+    nuit. Tout est écrit en clair, et une case cochée par défaut, « Joindre ces informations », le
+    retire d'un geste.
+- Quand elle envoie
+  Alors la feuille se ferme, un toast dit « Merci, c'est noté » et elle gagne **25 pollen**
+  (4 retours par jour au plus, puis sans pollen ; R19) ;
+  Et le retour apparaît dans « Mes retours » avec le statut **Envoyé**.
+- Fermer la feuille avec un texte tapé demande « Abandonner ce retour ? » (comme les autres
+  feuilles) ; Échap et Retour du navigateur ferment comme Annuler.
+- Pas plus de **20 retours par jour** et par Éclaireuse : au-delà, « Tu as envoyé beaucoup de
+  retours aujourd'hui, reprends demain. » (pour éviter qu'un défaut ou un abus remplisse la page).
+- Le retour ne parle que de {{appName}} lui-même : il ne va à aucun membre, aucun projet, aucune
+  ruche. Seuls l'administrateur et son autrice le voient.
+
+### Les missions de la semaine
+
+- Chaque semaine (du lundi au dimanche, heure de Paris), l'administrateur peut écrire **jusqu'à 3
+  missions** (« Publie un projet avec une photo », « Essaie Waiggle sur ton téléphone ») : un texte
+  en français, et en anglais s'il le veut (sinon le français s'affiche).
+- Étant donné une Éclaireuse, une semaine avec des missions
+  Quand elle ouvre la Goutte
+  Alors les missions de la semaine sont en tête de la feuille, chacune avec « Faite » si elle y a
+  déjà répondu ;
+  Quand elle en touche une
+  Alors son retour porte « Mission : <texte> », et l'envoyer marque la mission faite et rapporte
+  **30 pollen** de plus, une fois par mission.
+- Une page « Missions de la semaine » (depuis la feuille et depuis « Ma récolte ») les montre
+  aussi.
+- Le lundi où des missions sont publiées, l'Activité d'une Éclaireuse dit « 3 missions cette
+  semaine ». Pas d'e-mail, pas de notification poussée. Une semaine sans mission, rien.
+- Une mission non faite disparaît le lundi suivant, sans trace ni reproche.
+
+### Mes retours et « Ta danse a été entendue »
+
+- Les réglages « Les Éclaireuses » montrent « Mes retours » : chacun avec sa sorte, sa date, son
+  texte et son statut : **Envoyé**, **Lu**, **Prévu**, **Corrigé**, **Gardé de côté**.
+- Étant donné un retour d'une Éclaireuse
+  Quand l'administrateur le marque **Corrigé** (une fois le correctif en ligne)
+  Alors elle reçoit dans son Activité « Ta danse a été entendue : <début du retour> est corrigé »,
+  avec **50 pollen** et **10 miel** ;
+  Et le statut de « Mes retours » devient Corrigé, avec la note de l'administrateur s'il en a écrit
+  une (« Corrigé le 28/11, merci ! »).
+- « Gardé de côté » ne déclenche aucune annonce : rien qui culpabilise.
+- Elle peut supprimer un de ses retours (il disparaît de la page de tri ; le pollen reste).
+
+### La page de tri (l'administrateur)
+
+- Dans la modération, une page **« Éclaireuses »**, que seul l'administrateur voit (les autres
+  reçoivent « Page introuvable », comme le reste de la modération).
+- En tête : le mois (pas lancé, « Lancer le mois » ; en cours, « jour 12 sur 30 » ; fini), les
+  places (« 18 sur 30 »), les missions de la semaine (écrire, modifier, retirer).
+- La liste des retours, les plus récents d'abord, filtrée par statut (Nouveaux d'abord), par sorte
+  et par gravité : la sorte, la gravité, le début du texte, l'Éclaireuse, la date, la mission.
+- Ouvert, un retour montre tout : le texte entier, la capture, ce qui est joint, et :
+  - changer son statut (Lu, Prévu, Corrigé, Gardé de côté) ; Corrigé demande une confirmation
+    (l'annonce part et ne se reprend pas), avec une note facultative pour l'Éclaireuse ;
+  - une note privée, que l'Éclaireuse ne voit pas.
+- La liste des Éclaireuses (nom, date d'entrée, nombre de retours), et « Retirer » pour un abus,
+  avec un motif obligatoire : elle n'est plus Éclaireuse (Goutte, titre, missions), garde son
+  pollen ; le sceau reste, gagné. Son Activité lui dit le motif, ce qui reste, et comment écrire à
+  l'éditeur ; ses réglages montrent « Retirée le <date> » et « Mes retours ».
+- Le texte d'un retour est un contenu de membre : affiché tel quel, jamais interprété (Markdown
+  assaini comme ailleurs), et il ne quitte pas l'appli.
+
+### Le titre et le sceau
+
+- Le titre **Éclaireuse** se gagne en devenant Éclaireuse, et c'est le titre qu'elle porte tant
+  qu'elle n'en épingle pas un autre (R19). Il reste après le mois. Une Éclaireuse retirée revient
+  à la règle de R19.
+- Le pollen des retours, des missions et des danses entendues compte dans la famille Gardienne
+  (tester et faire des retours), et un retour rend la semaine butinée.
+- Le sceau **« Éclaireuse fondatrice »** (miel, une goutte) n'existe que pour les Éclaireuses de ce
+  mois-ci : personne ne pourra plus le gagner ensuite.
+- Le classement de la semaine ne compte pas ce pollen : les autres membres ne peuvent pas le
+  gagner (le niveau et le titre, si).
+
+### Les données
+
+- Les retours, leurs captures, les missions faites et l'entrée dans les Éclaireuses sont dans
+  l'export du compte, et partent avec lui (un compte supprimé efface ses retours et captures).
+- La note privée de l'administrateur n'apparaît jamais dans l'appli pour l'Éclaireuse, mais elle
+  est dans son export.
+- **Durée** : les retours et leurs captures sont effacés 6 mois après la fin du mois des
+  Éclaireuses (7 mois après leur envoi si le mois n'a jamais été lancé) ; les missions faites, 8
+  jours après leur semaine ; l'entrée dans les Éclaireuses, avec le compte ; ce qui reste (titre,
+  sceau, pollen) suit les règles de R19.
+- Ce qui est joint ne vient que de ce que l'écran montre : rien n'est lu en douce dans la requête.
+- La Confidentialité et le registre disent ce que contient un retour, ce qui est joint et qui le
+  voit (l'administrateur seul).
+
+### Hors de cette tranche
+
+- Le parrainage (chacun son code, du pollen pour une inscription) : une tranche à part, après
+  l'annonce.
+- Une capture d'écran prise automatiquement par l'appli : on choisit une image, la capture de
+  l'appareil suffit.
+- Prolonger le mois, ou un second mois : une nouvelle décision.
+
+### Le reste ne change pas
+
+Les retours de testeurs sur les projets des membres, la modération et la gamification marchent
+comme avant.

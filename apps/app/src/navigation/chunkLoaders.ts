@@ -12,3 +12,6 @@ export const loadSettingsChunk = () => import('./chunks/settings')
 
 /** Le morceau de l'éditeur de projet : la danse de publication (R6a), jouée après « Publier ». */
 export const loadProjectEditorChunk = () => import('./chunks/projectEditor')
+
+/** Le morceau des Éclaireuses : le bouton de la Goutte, pour une Éclaireuse seulement (R20). */
+export const loadScoutChunk = () => import('./chunks/scout')

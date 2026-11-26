@@ -23,6 +23,8 @@ export const leaMe: Me = {
   // change » vide). Un membre dont l'accord manque se fabrique en écrasant `rulesAccepted`.
   rulesAccepted: true,
   rulesChanges: [],
+  // R20 : Léa n'a jamais été Éclaireuse (pas de Goutte) ; `scout.testkit.tsx` en fabrique une.
+  scout: null,
 }
 
 /** Louis, administrateur (tranche 7a) : il voit « Modération » dans Mon compte. */

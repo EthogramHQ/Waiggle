@@ -415,6 +415,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
   { text: 'text', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'honeySoft', min: 4.5 },
+  // R20 : la rangée d'un retour d'Éclaireuse ouvert (ui/ScoutTriageRow) passe sur honeySoft ; son
+  // autrice, sa date et sa mission y sont en textSecondary (textMuted y tombe à 4,44:1 la nuit).
+  { text: 'textSecondary', on: 'honeySoft', min: 4.5 },
   // Le surlignage d'une recherche (R3, relecture ui-9) : les lettres trouvées passent à l'encre sur
   // le miel, dans un titre comme dans une ligne grise.
   { text: 'text', on: 'highlight', min: 4.5 },
@@ -441,6 +444,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'onDanger', on: 'dangerPressed', min: 4.5 },
   // Le chiffre de la pastille des nouveautés (CountBadge).
   { text: 'onBadge', on: 'badge', min: 4.5 },
+  // R20 : le chiffre de la pastille des missions sur la Goutte (HoneyDrop) : la couleur du fond
+  // sur l'encre (encre foncée de jour, claire de nuit), jamais rouge (planche R20-Goutte).
+  { text: 'background', on: 'text', min: 4.5 },
   // R6a : les ronds de couleur de « Facile à refaire ? » (Choices, `dot` : vert, jaune, rouge). Des
   // formes, qui doivent se voir sur le blanc d'un choix (3:1) ; la couleur n'est jamais seule, le
   // texte dit tout. Sur le miel d'un choix coché, le rond est cerclé d'encre (onHoney sur honey, plus

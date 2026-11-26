@@ -35,6 +35,7 @@ import { useLevelRise } from '../gamification/levelRise'
 import { useSealOf } from '../gamification/sealOf'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { useMe } from '../profile/hooks'
 import { AmountFigure } from '../ui/AmountFigure'
 import { Button } from '../ui/Button'
 import { CardGrid } from '../ui/CardGrid'
@@ -61,6 +62,7 @@ import { LoadingScreen } from './states'
 /** Les adresses où mène la page. */
 const RANKINGS_HREF = '/harvest/rankings'
 const RANKINGS_SETTING_HREF = '/settings/appearance'
+const MISSIONS_HREF = '/scout/missions'
 
 /**
  * La garde de session commune (accounts/SessionGate.tsx) : en attente, des rangées vides à la
@@ -138,7 +140,14 @@ function HarvestContent({ harvest }: { harvest: Harvest }) {
   const { columns } = useLayout()
   const [decorating, setDecorating] = useState(false)
 
-  const panel = <LevelPanel harvest={harvest} />
+  // R20 : sous le niveau, la rangée des missions (seulement pour une Éclaireuse active).
+  const missionsRow = <MissionsRow />
+  const panel = (
+    <Stack gap="lg">
+      <LevelPanel harvest={harvest} />
+      {missionsRow}
+    </Stack>
+  )
   const week = <WeekSection harvest={harvest} />
   const challenge = <ChallengeSection challenge={harvest.personalChallenge} />
   const hives = harvest.hiveChallenges.length > 0 ? <HivesSection harvest={harvest} /> : null
@@ -190,6 +199,35 @@ function HarvestContent({ harvest }: { harvest: Harvest }) {
       {/* La feuille « Décorer mon rayon » : un aperçu, une teinte, un motif, le prix. */}
       <DecorateSheet open={decorating} harvest={harvest} onClose={() => setDecorating(false)} />
     </>
+  )
+}
+
+/**
+ * R20 (planche R20-Missions) : « Missions de la semaine · 2 à faire », une rangée vers la page des
+ * missions, pour une Éclaireuse active seulement (le profil dit `scout.active` et les missions qui
+ * restent). Rien tant que le profil n'est pas lu : la rangée n'apparaît qu'une fois, sans sauter.
+ */
+function MissionsRow() {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const scout = useMe().data?.scout
+  if (!scout?.active) return null
+  return (
+    <ListGroup>
+      <ListRow
+        icon="flag"
+        label={t(($) => $.scout.missions.title)}
+        {...(scout.missionsLeft > 0
+          ? { detail: t(($) => $.scout.missions.left, { count: scout.missionsLeft }) }
+          : null)}
+        href={MISSIONS_HREF}
+        onPress={(event?: { preventDefault?: () => void }) => {
+          event?.preventDefault?.()
+          router.push(MISSIONS_HREF)
+        }}
+        trailing="chevron"
+      />
+    </ListGroup>
   )
 }
 

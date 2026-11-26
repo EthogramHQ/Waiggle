@@ -17,7 +17,7 @@ import type { IconName } from '../ui/Icon'
 type T = ReturnType<typeof useTranslation>['t']
 
 /** Le code d'un sceau de palier (« first_feedback »), la clé de son nom. */
-type MilestoneSeal = (typeof MILESTONE_SEALS)[number]['code']
+type MilestoneSeal = (typeof MILESTONE_SEALS)[number]['code'] | 'scout_founder'
 
 export type SealLook = { name: string; icon: IconName; matter: SealMatter }
 

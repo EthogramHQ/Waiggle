@@ -61,11 +61,13 @@ describe('SignUpRequest', () => {
 })
 
 describe('SignUpRefusalCode', () => {
-  it('names the three refusals the app recognizes', () => {
+  it('names the refusals the app recognizes', () => {
     expect(SignUpRefusalCode.options).toEqual([
       'INVITE_CODE_INVALID',
       'RULES_NOT_ACCEPTED',
       'AGE_NOT_DECLARED',
+      'SCOUT_FULL',
+      'SCOUT_CLOSED',
     ])
   })
 })
@@ -88,6 +90,8 @@ describe('Me', () => {
     hideFromSuggestions: false,
     rulesAccepted: true,
     rulesChanges: [],
+    // R20 : jamais Éclaireuse.
+    scout: null,
   }
 
   it('says whether the current rules are accepted, and what changed', () => {

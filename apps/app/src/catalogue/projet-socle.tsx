@@ -38,6 +38,8 @@ const fr = {
     'Disclosure : avec sa pastille (formulaire), puis en simple ligne, sans pastille (contenu secondaire d’une page). Replié, puis déplié.',
   recipe: 'Ajouter la recette',
   recipeHint: 'Les outils et le temps passé, si tu veux.',
+  hintWhenClosed:
+    'Disclosure avec hintWhenClosed (R20) : la phrase d’aide seulement quand elle est repliée. Replié, puis déplié.',
   recipeBody: 'Le contenu de la section, une fois dépliée.',
   others: 'Les autres prompts · 2',
   prompt2: 'Ajoute un niveau « Capitaine de l’espace » après dix bonnes réponses.',
@@ -87,6 +89,8 @@ const en: typeof fr = {
     'Disclosure: with its badge (a form), then as a plain row, without a badge (secondary content of a page). Collapsed, then expanded.',
   recipe: 'Add the recipe',
   recipeHint: 'The tools and the time spent, if you like.',
+  hintWhenClosed:
+    'Disclosure with hintWhenClosed (R20): the hint only while collapsed. Collapsed, then expanded.',
   recipeBody: 'The content of the section, once expanded.',
   others: 'Other prompts · 2',
   prompt2: 'Add a “Space captain” level after ten right answers.',
@@ -161,6 +165,14 @@ export function ProjectGroundworkCatalogue() {
         <Callout tone="caution" icon="info" title={l.cautionWhole} />
         <CodeBlock>{l.prompt2}</CodeBlock>
         <CodeBlock>{l.prompt3}</CodeBlock>
+      </Disclosure>
+
+      <Text tone="secondary">{l.hintWhenClosed}</Text>
+      <Disclosure title={l.recipe} hint={l.recipeHint} hintWhenClosed>
+        <Text>{l.recipeBody}</Text>
+      </Disclosure>
+      <Disclosure title={l.recipe} hint={l.recipeHint} hintWhenClosed initiallyOpen>
+        <Text>{l.recipeBody}</Text>
       </Disclosure>
 
       <Text tone="secondary">{l.pair}</Text>

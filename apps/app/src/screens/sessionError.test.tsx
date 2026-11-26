@@ -71,6 +71,9 @@ import { ProjectUpdatesScreen } from './ProjectUpdatesScreen'
 import { PublicPageSettingsScreen } from './PublicPageSettingsScreen'
 import { RankingsScreen } from './RankingsScreen'
 import { ReportSheet } from './ReportSheet'
+import { ScoutMissionsScreen } from './ScoutMissionsScreen'
+import { ScoutSettingsScreen } from './ScoutSettingsScreen'
+import { ScoutTriageScreen } from './ScoutTriageScreen'
 import { SearchScreen } from './SearchScreen'
 import { SettingsScreen } from './SettingsScreen'
 import { TagScreen } from './TagScreen'
@@ -513,6 +516,27 @@ const guarded: Guarded[] = [
     visitor: 'signIn',
   },
   {
+    name: 'ScoutMissionsScreen',
+    render: () => <ScoutMissionsScreen />,
+    pathname: '/scout/missions',
+    file: 'src/screens/ScoutMissionsScreen.tsx',
+    visitor: 'signIn',
+  },
+  {
+    name: 'ScoutSettingsScreen',
+    render: () => <ScoutSettingsScreen />,
+    pathname: '/settings/scouts',
+    file: 'src/screens/ScoutSettingsScreen.tsx',
+    visitor: 'signIn',
+  },
+  {
+    name: 'ScoutTriageScreen',
+    render: () => <ScoutTriageScreen />,
+    pathname: '/moderation/scouts',
+    file: 'src/screens/ScoutTriageScreen.tsx',
+    visitor: 'signIn',
+  },
+  {
     name: 'SearchScreen',
     render: () => <SearchScreen />,
     pathname: '/search',
@@ -580,6 +604,7 @@ const excluded: Record<string, string> = {
   'src/projects/ProjectActions.tsx':
     'lit seulement le nom du membre pour la feuille d’offre de miel, n’attend pas la session',
   'src/screens/HiveInviteSheet.tsx': 'rend `null` sans session',
+  'src/scout/ScoutDrop.tsx': 'la Goutte flottante (R20) : rend `null` sans session',
   'src/screens/ReportSheet.tsx': 'sa branche visiteur de R12',
   'src/screens/ShowcaseScreen.tsx': 'l’accueil public, pré-rendu pour le visiteur',
   'src/screens/EmailChangeResultScreen.tsx': 'ses pages parlent aussi à un visiteur',

@@ -154,6 +154,17 @@ import {
   recipesProject,
   summaryOf,
 } from '../src/testing/projects.ts'
+import {
+  adminReportsOf,
+  joinedScout,
+  myReportsOf,
+  noMissions,
+  SHOT_SCOUT_CODE,
+  scoutOf,
+  sentReportOf,
+  triageOf,
+  weekMissions,
+} from '../src/testing/scouts.ts'
 import { build, buildSite, checkStamp, createSiteServer, root } from './dist-shots.mjs'
 import { loadingProblem, unfinishedTexts, waitUntilLoaded } from './loading-guard.ts'
 import { parseShard, shardOf } from './shard.ts'
@@ -2808,7 +2819,20 @@ const fakeApi = (
   // classements vides) ; 'retired' : retirée des classements (Réglages) ; 'newcomer' : un nouveau
   // membre, niveau 1, sans titre ni sceau.
   game = 'lea',
+  // R20 : les Éclaireuses (testing/scouts.ts). null : Léa n'a jamais été Éclaireuse ; 'active' :
+  // Éclaireuse, deux missions à faire, la Goutte affichée ; 'no-missions' : aucune mission cette
+  // semaine ; 'removed' : retirée ; 'hidden' : la Goutte coupée dans ses réglages. Pour la page de
+  // tri (admin) : 'not-launched', le mois pas encore lancé ; sinon, le mois en cours.
+  scout = null,
 ) => {
+  // R20 : l'objet `scout` du profil de Léa, tel que ses gestes l'ont laissé (entrer par un code,
+  // couper la Goutte) ; ses retours, avec ceux envoyés dans ce navigateur ; la page de tri.
+  const scoutStates = ['active', 'no-missions', 'removed', 'hidden']
+  const scoutMe = scoutOf(scoutStates.includes(scout) ? scout : null)
+  const scoutCapture = `${apiUrl}/media/scouts/1f2e3d4c-5b6a-4978-8a6b-5c4d3e2f1a0b.webp`
+  const scoutReports = myReportsOf(scoutCapture).reports
+  let scoutTriage = triageOf(scout === 'not-launched' ? 'not-launched' : 'running')
+  const adminScoutReports = adminReportsOf(scoutCapture).reports
   // « Ma récolte », telle que les écritures de ce navigateur l'ont laissée (un réglage changé, un
   // défi choisi, une décoration achetée, du miel offert), comme le faux serveur des tests
   // (screens/Game.testkit.ts) : la relecture qui suit montre le changement.
@@ -2847,6 +2871,7 @@ const fakeApi = (
       : null),
   })
   if (rules) me = withoutRules(me, rules === 'changed' ? shownRulesChanges : [])
+  me = { ...me, scout: scoutMe }
   // R11 : ce que Léa supprime dans ce navigateur, depuis « Mes commentaires » ou « Mes retours
   // envoyés » : la ligne quitte la liste à la relecture, comme dans l'API.
   const deletedMine = new Set()
@@ -2939,7 +2964,8 @@ const fakeApi = (
     }
     // R7b : les images (photos des projets, du coin des testeurs) : un dégradé par identifiant. R12 :
     // avant la garde de session, car un visiteur voit les photos d'un projet public.
-    const media = pathname.match(/^\/media\/(?:visuals|testers)\/([0-9a-f-]+)\.webp$/)
+    // R20 : la capture jointe à un retour d'Éclaireuse (dossier `scouts`), servie de même.
+    const media = pathname.match(/^\/media\/(?:visuals|testers|scouts)\/([0-9a-f-]+)\.webp$/)
     if (media) {
       return route.fulfill({
         status: 200,
@@ -3065,6 +3091,57 @@ const fakeApi = (
         return json(404, { error: { code: 'not_found', message: '' } })
       }
       deletedMine.add(myMessageOf[1])
+      return route.fulfill({ status: 204, body: '' })
+    }
+    // R20, les Éclaireuses (testing/scouts.ts). Entrer par un code (le bon : SHOT_SCOUT_CODE),
+    // couper la Goutte : l'API rend le profil complet. Les missions et les retours sont réservés aux
+    // Éclaireuses actives (`scout_only`), sauf la liste de ses retours, lisible après un retrait.
+    if (pathname === '/v1/me/scout' && method === 'POST') {
+      const { code = '' } = JSON.parse(route.request().postData() ?? '{}')
+      if (me.scout) return json(409, { error: { code: 'scout_already', message: '' } })
+      if (code.trim().toLowerCase() !== SHOT_SCOUT_CODE) {
+        return json(400, { error: { code: 'scout_code_invalid', message: '' } })
+      }
+      me = { ...me, scout: joinedScout }
+      return json(200, me)
+    }
+    if (pathname === '/v1/me/scout' && method === 'PATCH' && me.scout) {
+      const { showDrop } = JSON.parse(route.request().postData() ?? '{}')
+      me = { ...me, scout: { ...me.scout, showDrop: showDrop === true } }
+      return json(200, me)
+    }
+    if (pathname === '/v1/me/scout/reports' && method === 'GET') {
+      return json(200, { reports: me.scout ? scoutReports : [] })
+    }
+    if (pathname.startsWith('/v1/me/scout/') && !me.scout?.active) {
+      return json(403, { error: { code: 'scout_only', message: '' } })
+    }
+    if (pathname === '/v1/me/scout/missions') {
+      return json(200, scout === 'no-missions' ? noMissions : weekMissions)
+    }
+    if (pathname === '/v1/me/scout/reports' && method === 'POST') {
+      // Le corps est un formulaire « multipart » : la partie `report` porte le JSON du retour.
+      const body = route.request().postData() ?? ''
+      const part = body.match(/name="report"\r?\n(?:[^\r\n]*\r?\n)*?\r?\n([^\r\n]*)/)
+      const report = JSON.parse(part?.[1] ?? '{}')
+      const sent = sentReportOf(
+        `6f7a8b9c-0d1e-4f3a-8b4c-${String(scoutReports.length).padStart(12, '0')}`,
+        {
+          kind: report.kind ?? 'bug',
+          severity: report.severity ?? null,
+          text: report.text ?? '',
+          context: report.context ?? null,
+        },
+        new Date(SHOT_NOW).toISOString(),
+      )
+      scoutReports.unshift(sent)
+      return json(201, sent)
+    }
+    const myScoutReport = pathname.match(/^\/v1\/me\/scout\/reports\/([^/]+)$/)
+    if (myScoutReport && method === 'DELETE') {
+      const index = scoutReports.findIndex((r) => r.id === myScoutReport[1])
+      if (index < 0) return json(404, { error: { code: 'not_found', message: '' } })
+      scoutReports.splice(index, 1)
       return route.fulfill({ status: 204, body: '' })
     }
     // Les réglages d'e-mail (tranche 6c) : lus, puis modifiés un par un ; l'API rend l'état complet.
@@ -3748,6 +3825,67 @@ const fakeApi = (
     if (pathname.startsWith('/v1/moderation/') && !admin) {
       return json(404, { error: { code: 'not_found', message: '' } })
     }
+    // R20, la page de tri des Éclaireuses (testing/scouts.ts) : le tableau, les retours filtrés
+    // (une seule page), un retour changé (statut, notes), le mois lancé, les missions publiées,
+    // une Éclaireuse retirée. Chaque écriture se relit, comme l'API.
+    if (pathname === '/v1/moderation/scouts' && method === 'GET') return json(200, scoutTriage)
+    if (pathname === '/v1/moderation/scouts/reports' && method === 'GET') {
+      const wanted = ['status', 'kind', 'severity'].map((key) => [key, url.searchParams.get(key)])
+      const reports = adminScoutReports.filter((report) =>
+        wanted.every(([key, value]) => value === null || report[key] === value),
+      )
+      return json(200, { reports, nextCursor: null })
+    }
+    const scoutReportPatch = pathname.match(/^\/v1\/moderation\/scouts\/reports\/([^/]+)$/)
+    if (scoutReportPatch && method === 'PATCH') {
+      const report = adminScoutReports.find((r) => r.id === scoutReportPatch[1])
+      if (!report) return json(404, { error: { code: 'not_found', message: '' } })
+      if (report.status === 'fixed') {
+        return json(409, { error: { code: 'scout_report_fixed', message: '' } })
+      }
+      const patch = JSON.parse(route.request().postData() ?? '{}')
+      Object.assign(report, patch, {
+        updatedAt: new Date(SHOT_NOW).toISOString(),
+        ...(patch.status === 'fixed' ? { fixedAt: new Date(SHOT_NOW).toISOString() } : null),
+      })
+      return json(200, report)
+    }
+    if (pathname === '/v1/moderation/scouts/program' && method === 'POST') {
+      const now = new Date(SHOT_NOW)
+      scoutTriage = {
+        ...scoutTriage,
+        program: {
+          startedAt: now.toISOString(),
+          endsAt: new Date(SHOT_NOW + 30 * 86_400_000).toISOString(),
+        },
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === '/v1/moderation/scouts/missions' && method === 'PUT') {
+      const { missions = [] } = JSON.parse(route.request().postData() ?? '{}')
+      scoutTriage = {
+        ...scoutTriage,
+        missions: missions.map((mission, index) => ({
+          id: mission.id ?? `2b3c4d5e-6f7a-4b9c-8d1e-00000000000${index}`,
+          position: index + 1,
+          textFr: mission.textFr,
+          textEn: mission.textEn ?? null,
+        })),
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    const scoutRemoval = pathname.match(/^\/v1\/moderation\/scouts\/([^/]+)$/)
+    if (scoutRemoval && (method === 'DELETE' || method === 'POST')) {
+      scoutTriage = {
+        ...scoutTriage,
+        scouts: scoutTriage.scouts.map((entry) =>
+          entry.member.id === decodeURIComponent(scoutRemoval[1])
+            ? { ...entry, removedAt: new Date(SHOT_NOW).toISOString() }
+            : entry,
+        ),
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
     // R6b : l'administration du catalogue (pages « Outils » et « Catégories »), les données des
     // tests de ces pages (`testing/catalogue.ts`), chaque liste en une seule page.
     const onePage = (items) => json(200, { items, nextCursor: null })
@@ -3869,6 +4007,33 @@ const fillVisitorReport = async (page) => {
   await page.getByRole('button', { name: 'Continuer' }).click()
   await page.getByRole('radio', { name: /^Lien, démo ou prompt dangereux/ }).click()
   await page.getByLabel(fr.report.visitor.email).fill('camille.carnot@exemple.fr')
+}
+// R20 : la feuille « Ton retour », ouverte par la Goutte (son nom dit les missions à faire), puis
+// remplie comme une Éclaireuse : un bug gênant, raconté ; une capture choisie dans les fichiers.
+const openScoutSheet = async (page) => {
+  await page.getByRole('button', { name: /^Faire un retour sur / }).click()
+  await page.getByRole('dialog', { name: fr.scout.sheet.title }).waitFor()
+}
+const fillScoutReport = async (page) => {
+  const sheet = page.getByRole('dialog', { name: fr.scout.sheet.title })
+  await sheet.getByRole('radio', { name: fr.scout.kinds.bug, exact: true }).click()
+  await sheet.getByRole('radio', { name: fr.scout.severities.annoying, exact: true }).click()
+  await sheet
+    .getByRole('textbox', { name: fr.scout.sheet.text })
+    .fill('Le bouton Publier se cache derrière le clavier quand j’écris la description.')
+}
+const attachScoutCapture = async (page) => {
+  const sheet = page.getByRole('dialog', { name: fr.scout.sheet.title })
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    sheet.getByRole('button', { name: fr.scout.sheet.capture }).click(),
+  ])
+  await chooser.setFiles({
+    name: 'capture.png',
+    mimeType: 'image/png',
+    buffer: png(390, 844, [220, 170, 90]),
+  })
+  await sheet.getByRole('button', { name: fr.scout.sheet.removeCapture }).waitFor()
 }
 // R18 : le morceau des textes anglais, chargé à la demande (`ensureLanguage` de `@ruche/i18n`) ;
 // Metro le nomme d'après son module, `en`, suivi de son empreinte.
@@ -5591,6 +5756,123 @@ const pages = [
       await page.getByRole('dialog').waitFor()
     },
   },
+  // R20, les Éclaireuses (planches R20 a et b ; données : testing/scouts.ts, `scout` de fakeApi).
+  // La Goutte sur le Fil d'une Éclaireuse, avec ses deux missions à faire ; puis sur la page d'un
+  // projet, où elle ne doit toucher ni la capsule des réactions ni la barre du bas (320 à 430 px).
+  { name: 'fil-eclaireuse', path: '/feed', signedIn: true, scout: 'active' },
+  {
+    name: 'projet-eclaireuse',
+    path: `/projects/${notMineProject.id}`,
+    signedIn: true,
+    scout: 'active',
+    layoutWidths: [320, 360, 375, 390, 430],
+  },
+  // La feuille « Ton retour », ouverte par la Goutte depuis le Fil : vide, remplie (un bug gênant),
+  // avec une capture jointe, puis envoyée (« Merci, c'est noté » sur le Fil).
+  {
+    name: 'retour-vide',
+    path: '/feed',
+    signedIn: true,
+    scout: 'active',
+    prepare: (page) => openScoutSheet(page),
+  },
+  {
+    name: 'retour-rempli',
+    path: '/feed',
+    signedIn: true,
+    scout: 'active',
+    prepare: async (page) => {
+      await openScoutSheet(page)
+      await fillScoutReport(page)
+    },
+  },
+  {
+    name: 'retour-capture',
+    path: '/feed',
+    signedIn: true,
+    scout: 'active',
+    prepare: async (page) => {
+      await openScoutSheet(page)
+      await fillScoutReport(page)
+      await attachScoutCapture(page)
+    },
+  },
+  {
+    name: 'retour-envoye',
+    path: '/feed',
+    signedIn: true,
+    scout: 'active',
+    prepare: async (page) => {
+      await openScoutSheet(page)
+      await fillScoutReport(page)
+      await page.getByRole('dialog').getByRole('button', { name: fr.scout.sheet.send }).click()
+      await page.getByText(fr.scout.sheet.sent).first().waitFor()
+    },
+  },
+  // Réglages > Les Éclaireuses : un membre sans code (puis « J'ai un code » ouvert), l'Éclaireuse
+  // (la Goutte, « Mes retours » avec un retour corrigé et sa note) et l'Éclaireuse retirée.
+  { name: 'eclaireuses-membre', path: '/settings/scouts', signedIn: true },
+  {
+    name: 'eclaireuses-code',
+    path: '/settings/scouts',
+    signedIn: true,
+    prepare: async (page) => {
+      // « J'ai un code » est un dépliant (Disclosure) : son nom peut porter sa phrase d'aide.
+      await page.getByRole('button', { name: new RegExp(`^${fr.scout.haveCode}`) }).click()
+      await page.getByRole('textbox', { name: fr.scout.codeLabel }).fill(SHOT_SCOUT_CODE)
+    },
+  },
+  {
+    name: 'eclaireuses-reglages',
+    path: '/settings/scouts',
+    signedIn: true,
+    scout: 'active',
+    fullPage: true,
+  },
+  {
+    name: 'eclaireuses-retiree',
+    path: '/settings/scouts',
+    signedIn: true,
+    scout: 'removed',
+    fullPage: true,
+  },
+  // Les missions de la semaine : deux à faire et une faite, puis une semaine sans mission.
+  { name: 'missions', path: '/scout/missions', signedIn: true, scout: 'active' },
+  { name: 'missions-vide', path: '/scout/missions', signedIn: true, scout: 'no-missions' },
+  // La page de tri de l'administrateur : avant le lancement, pendant le mois (jour 13 sur 30), un
+  // retour ouvert (capture, informations jointes, statut, note privée), l'onglet des Éclaireuses.
+  {
+    name: 'tri-avant',
+    path: '/moderation/scouts',
+    signedIn: true,
+    admin: true,
+    scout: 'not-launched',
+  },
+  { name: 'tri-mois', path: '/moderation/scouts', signedIn: true, admin: true, fullPage: true },
+  {
+    name: 'tri-retour',
+    path: '/moderation/scouts',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page
+        .getByRole('button', { name: /Le fil ne se recharge plus/ })
+        .first()
+        .click()
+      await page.getByText(fr.scout.triage.privateNote).first().waitFor()
+    },
+  },
+  {
+    name: 'tri-eclaireuses',
+    path: '/moderation/scouts',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('tab', { name: /^Éclaireuses \(/ }).click()
+    },
+  },
   // R14 : la page de Tante Odile en mosaïque (avant R14, `membre-tuiles` : des tuiles), à 4 projets ;
   // puis la mosaïque à 1, 2, 3 et 5 projets, et « toutes les pastilles » (privé, exemple, mis à
   // jour, 248 réactions) sur la grande carte et les compactes.
@@ -6054,6 +6336,7 @@ if (script) {
       rules,
       myData,
       game,
+      scout,
       ...options
     } = {},
   ) => {
@@ -6081,6 +6364,7 @@ if (script) {
         rules,
         myData,
         game,
+        scout,
       ),
     )
     return context
@@ -6203,6 +6487,7 @@ async function layoutReport() {
               shot.rules,
               shot.myData,
               shot.game,
+              shot.scout,
             ),
           ),
         )
@@ -6401,6 +6686,7 @@ const capture = async ({ shot, device, scheme }) => {
           shot.rules,
           shot.myData,
           shot.game,
+          shot.scout,
         ),
       ),
     )

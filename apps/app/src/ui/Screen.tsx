@@ -48,7 +48,7 @@ import { useArrivalTitle } from './arrivalFocus'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { CoverReturnScope, useCoverReturn } from './coverTransition'
-import { useFloatingClaim } from './floatingSpace'
+import { useFloatingClaim, useFloatingTopOfOthers } from './floatingSpace'
 import { type Focusable, focusTarget, holdsFocus } from './focus'
 import { hiddenFrame } from './HiddenHeading'
 import { IconButton } from './IconButton'
@@ -414,7 +414,12 @@ export function Screen({
   const floatingTop = floatingHeight > 0 ? floatingLift + floatingHeight : 0
   // Seul l'écran affiché soulève le toast : sur le web, la page quittée reste montée, cachée.
   const focused = useScreenFocused()
-  useFloatingClaim(focused ? floatingTop : 0)
+  const floatingOwner = useFloatingClaim(focused ? floatingTop : 0)
+  // R20 : ce que les autres éléments flottants réservent (la Goutte des Éclaireuses, posée dans le
+  // coin) ; la fin du contenu remonte aussi au-dessus d'eux, sinon la Goutte couvrait la dernière
+  // phrase d'une page défilée jusqu'en bas (relecture du design, 26/11/2026). Sa propre réserve est
+  // écartée.
+  const othersTop = useFloatingTopOfOthers(floatingOwner)
   // R18 (le focus à l'arrivée, ui/arrivalFocus.ts) : la vue du titre, affiché ou caché, est donnée
   // au module, qui y pose le focus quand la page arrive. Seul l'écran affiché la donne (`focused`) :
   // une page restée montée dessous, cachée, ne compte pas. La vue est tenue ici même si l'écran
@@ -778,11 +783,14 @@ export function Screen({
                           // d'onglets ou zone sûre comprises, dans `floatingTop`), plus le même air.
                           paddingBottom: pinnedFooter
                             ? space.xl
-                            : floatingTop > 0
-                              ? floatingTop + space.xl
-                              : tabBar.height > 0
-                                ? tabBar.height + space.xl
-                                : insets.bottom + space.huge,
+                            : Math.max(
+                                othersTop > 0 ? othersTop + space.xl : 0,
+                                floatingTop > 0
+                                  ? floatingTop + space.xl
+                                  : tabBar.height > 0
+                                    ? tabBar.height + space.xl
+                                    : insets.bottom + space.huge,
+                              ),
                           paddingHorizontal: padding,
                           gap: space.xl,
                         }}

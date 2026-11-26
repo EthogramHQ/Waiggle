@@ -37,6 +37,18 @@ const isSecret = (gesture: Gesture) =>
   (SECRET_AUTHOR_GESTURES as readonly Gesture[]).includes(gesture)
 
 /**
+ * R20 (relecture juridique J6, 26/11/2026) : le pollen des Éclaireuses (retour envoyé, mission
+ * faite, danse entendue) ne compte pas dans le classement. Trente membres choisis ne doivent pas
+ * prendre la tête de la semaine en écrivant des retours sur l'appli plutôt qu'en partageant leurs
+ * projets ; ce pollen reste le leur, dans « Ma récolte ».
+ */
+const SCOUT_GESTURES = [
+  'scout_report',
+  'scout_mission',
+  'scout_heard',
+] as const satisfies readonly Gesture[]
+
+/**
  * Les défis perso qui comptent un de ces gestes (aujourd'hui `react_5`), tirés de la liste du
  * contrat : un défi de ce genre ajouté plus tard est exclu lui aussi, sans toucher à ce fichier.
  */
@@ -46,7 +58,8 @@ const SECRET_AUTHOR_CHALLENGES = PERSONAL_CHALLENGES.filter((challenge) =>
 
 /**
  * La condition « cette ligne compte dans le classement » :
- * - ni une réaction, ni un suivi (`not in`, sur la colonne `gesture` de la ligne déjà lue) ;
+ * - ni une réaction, ni un suivi, ni un geste d'Éclaireuse (`not in`, sur la colonne `gesture` de
+ *   la ligne déjà lue) ;
  * - ni le pollen d'un défi perso réussi qui comptait l'un d'eux. Ce pollen est une ligne `challenge`
  *   écrite la semaine du défi ; on le reconnaît par le défi choisi cette semaine-là, lu par la clé
  *   primaire de `personal_challenge` (member_id, week) dans une sous-requête « corrélée » : elle
@@ -61,7 +74,7 @@ const countsInRankings = (): SQL | undefined => {
         sql`, `,
       )}))`
   return and(
-    notInArray(pe.gesture, [...SECRET_AUTHOR_GESTURES]),
+    notInArray(pe.gesture, [...SECRET_AUTHOR_GESTURES, ...SCOUT_GESTURES]),
     SECRET_AUTHOR_CHALLENGES.length === 0
       ? undefined
       : sql`not (${pe.gesture} = ${'challenge'} and ${secretChallenge})`,

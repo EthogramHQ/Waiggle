@@ -54,6 +54,8 @@ jest.mock('../accounts/memberMarker', () => ({ useMemberMarkerSync: () => {} }))
 jest.mock('../navigation/chunks/preload', () => ({ EditorPreload: () => null }))
 // Ni lumière dessinée (WebGL), ni thème qui touche au navigateur : l'hôte donne seulement sa place.
 jest.mock('../ui/AmbientLight', () => ({ AmbientLight: () => null }))
+// R20 : la Goutte des Éclaireuses a ses propres tests (scout/ScoutDrop.test.tsx).
+jest.mock('../scout/ScoutDrop', () => ({ ScoutDrop: () => null }))
 
 type Theme = { colors: { background: string; card: string } }
 type StackProps = { screenOptions: { contentStyle: { backgroundColor: string } } }

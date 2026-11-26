@@ -11,12 +11,13 @@
 // dit ce qui manque, avec « Réessayer » ; un enregistrement refusé, sous le groupe.
 //
 // Ce fichier n'écrit aucun style : il assemble des composants de `src/ui`.
-import { type Family, type GameSettingsUpdate, TitleForm } from '@ruche/contracts'
+import { type GameSettingsUpdate, type TitleFamily, TitleForm } from '@ruche/contracts'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../../api/errors'
 import { useGameSettings, useHarvest } from '../../gamification/api'
 import { titleLabel } from '../../gamification/titleLabel'
+import { useMe } from '../../profile/hooks'
 import { ListGroup, ListRow } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { Stack } from '../../ui/Stack'
@@ -112,19 +113,26 @@ export function TitleSettings() {
   const { t, i18n } = useTranslation()
   const setting = useGameSetting()
   const { harvest, set, hidden } = setting
+  // R20 : le profil dit si l'on est Éclaireuse active (le titre « Éclaireuse » est alors épinglable).
+  // « Mon profil » l'a déjà lu : on prend sa copie, sans nouvelle demande à l'API.
+  const scoutActive = useMe(true, { refetchOnMount: false }).data?.scout?.active === true
   if (hidden) return null
   const data = harvest.data
   if (!data) return <SettingNotice setting={setting} />
   const { titleForm: form, pinnedFamily } = data.settings
   // L'aide cite le titre des 4 dernières semaines, connu seulement quand rien n'est épinglé.
+  // R20 : « Éclaireuse » s'ajoute aux titres déjà obtenus tant qu'on l'est (active, non retirée).
+  const families: TitleFamily[] = scoutActive
+    ? [...data.obtainedFamilies, 'scout']
+    : data.obtainedFamilies
   const hint =
     data.title && !data.title.pinned
       ? t(($) => $.game.settings.titleHint, { title: titleLabel(t, data.title.family, form) })
-      : data.obtainedFamilies.length === 0
+      : families.length === 0
         ? t(($) => $.game.settings.titleNone)
         : undefined
   // La forme se montre sur le titre qu'on porte (« Gardienne | Gardien »), ou la première famille.
-  const shownFamily: Family = data.title?.family ?? data.obtainedFamilies[0] ?? 'forager'
+  const shownFamily: TitleFamily = data.title?.family ?? families[0] ?? 'forager'
   // L'anglais n'a qu'une forme : pas de choix (la clé `_m` y porte le même mot que `_f`).
   const withForm = i18n.language.startsWith('fr')
   return (
@@ -138,7 +146,7 @@ export function TitleSettings() {
             if (pinnedFamily !== null) set({ pinnedFamily: null })
           }}
         />
-        {data.obtainedFamilies.map((family) => (
+        {families.map((family) => (
           <ListRow
             key={family}
             label={titleLabel(t, family, form)}

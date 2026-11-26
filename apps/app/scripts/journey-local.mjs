@@ -89,6 +89,9 @@ const work = mkdtempSync(join(tmpdir(), 'waiggle-parcours-'))
 const logFile = join(work, 'api.log')
 const mediaDir = join(work, 'media')
 const inviteCode = randomBytes(8).toString('hex')
+// R20 : le code des Éclaireuses, tiré au hasard lui aussi (jamais écrit en dur : le dépôt est
+// public, et l'API refuse un code d'exemple du dépôt ou le même que celui de l'inscription).
+const scoutCode = randomBytes(8).toString('hex')
 
 // Deux petits scripts que journey.mjs lance pour lire les e-mails (écrits par l'API dans son log)
 // et lister les photos sur le disque. En Node plutôt que « cat » et « find », absents de Windows.
@@ -186,6 +189,7 @@ const api = spawn(process.execPath, ['--import', tsx, 'src/index.ts'], {
     MEDIA_DIR: mediaDir,
     MAIL_PROVIDER: 'console',
     SIGNUP_INVITE_CODE: inviteCode,
+    SCOUT_INVITE_CODE: scoutCode,
     APP_URL: appUrl,
     PUBLIC_API_URL: apiUrl,
   },
@@ -245,6 +249,7 @@ const journey = spawn(process.execPath, [join(root, 'scripts', 'journey.mjs'), a
   env: {
     ...process.env,
     JOURNEY_INVITE_CODE: inviteCode,
+    JOURNEY_SCOUT_CODE: scoutCode,
     // Le déclencheur de la base (plus haut) retire l'accord d'Inès : le parcours peut le jouer.
     JOURNEY_RULES_TRIGGER: '1',
     JOURNEY_MAIL_CMD: command(mailScript),

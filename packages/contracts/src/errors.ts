@@ -105,6 +105,20 @@ export const ErrorCode = z.enum([
   'invalid_challenge',
   'invalid_level_seen',
   'family_not_obtained',
+  // Tranche R20 (les Éclaireuses) : les 30 places prises, ou le mois fini (le code ne marche plus,
+  // les retours s'arrêtent) ; un code des Éclaireuses faux (400, le même message qu'un code
+  // d'invitation faux) ; déjà Éclaireuse, ou retirée (409, on ne revient pas) ; une route réservée
+  // aux Éclaireuses actives (403) ; une mission qui n'est pas de la semaine en cours (400) ; un
+  // retour déjà corrigé dont on change le statut (409) ; le mois déjà lancé (409).
+  'scout_full',
+  'scout_closed',
+  'scout_code_invalid',
+  'scout_already',
+  'scout_removed',
+  'scout_only',
+  'scout_mission_invalid',
+  'scout_report_fixed',
+  'scout_program_started',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

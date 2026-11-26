@@ -15,6 +15,7 @@ import {
   SealCode,
   TITLE_THRESHOLD,
   TITLE_WINDOW_DAYS,
+  TitleFamily,
   type TitleForm,
   TitleForm as TitleFormSchema,
 } from '@ruche/contracts'
@@ -30,7 +31,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 /** Les réglages du jeu d'un membre, avec la décoration brute (`decorated` : faux s'il n'a rien choisi). */
 export type StoredGameSettings = {
   titleForm: TitleForm
-  pinnedFamily: Family | null
+  pinnedFamily: TitleFamily | null
   inRankings: boolean
   harvestNotices: boolean
   levelSeen: number
@@ -56,7 +57,7 @@ type SettingsRow = {
  */
 const settingsFrom = (row: SettingsRow | undefined): StoredGameSettings => ({
   titleForm: TitleFormSchema.parse(row?.titleForm ?? 'f'),
-  pinnedFamily: row?.pinnedFamily ? Family.parse(row.pinnedFamily) : null,
+  pinnedFamily: row?.pinnedFamily ? TitleFamily.parse(row.pinnedFamily) : null,
   inRankings: row?.inRankings ?? true,
   harvestNotices: row?.harvestNotices ?? true,
   levelSeen: row?.levelSeen ?? 1,
@@ -126,16 +127,42 @@ export const obtainedFamiliesOf = (pollen: FamilyPollen): Family[] =>
   FAMILIES.filter((family) => pollen[family].total >= TITLE_THRESHOLD)
 
 /**
- * Le titre (choix 12) : la famille épinglée si elle est obtenue ; sinon celle de plus de pollen sur
- * les 28 derniers jours (à égalité, l'ordre de FAMILIES : Butineuse, Bâtisseuse, Gardienne,
- * Danseuse) ; null sans pollen depuis 28 jours. Une famille épinglée puis perdue (pollen retiré par la
- * modération) laisse revenir le titre selon les gestes.
+ * Vrai si ce membre est une Éclaireuse non retirée (R20) : elle porte le titre `scout` et peut
+ * l'épingler, même une fois le mois fini. Une lecture par la clé primaire de `scout` (member_id).
+ * `Pick<Database, 'select'>` : la base ou une transaction.
  */
-export const titleOf = (pollen: FamilyPollen, settings: StoredGameSettings): GameTitle | null => {
+export const isScoutTitleHolder = async (
+  db: Pick<Database, 'select'>,
+  memberId: string,
+): Promise<boolean> => {
+  const [row] = await db
+    .select({ removedAt: schema.scout.removedAt })
+    .from(schema.scout)
+    .where(eq(schema.scout.memberId, memberId))
+  return row !== undefined && row.removedAt === null
+}
+
+/**
+ * Le titre (choix 12, R20 choix 11) : la famille épinglée si elle est obtenue, ou `scout` épinglé
+ * par une Éclaireuse ; sinon `scout` pour une Éclaireuse non retirée (son titre par défaut, même
+ * avec des gestes dans d'autres familles) ; sinon la famille de plus de pollen sur les 28 derniers
+ * jours (à égalité, l'ordre de FAMILIES : Butineuse, Bâtisseuse, Gardienne, Danseuse) ; null sans
+ * pollen depuis 28 jours. Une famille épinglée puis perdue (pollen retiré par la modération), ou
+ * `scout` épinglé puis retirée, laisse revenir le titre selon les gestes.
+ */
+export const titleOf = (
+  pollen: FamilyPollen,
+  settings: StoredGameSettings,
+  isScout = false,
+): GameTitle | null => {
   const pinned = settings.pinnedFamily
-  if (pinned && pollen[pinned].total >= TITLE_THRESHOLD) {
+  if (pinned === 'scout' && isScout) {
+    return { family: 'scout', form: settings.titleForm, pinned: true }
+  }
+  if (pinned && pinned !== 'scout' && pollen[pinned].total >= TITLE_THRESHOLD) {
     return { family: pinned, form: settings.titleForm, pinned: true }
   }
+  if (isScout) return { family: 'scout', form: settings.titleForm, pinned: false }
   let best: Family | null = null
   for (const family of FAMILIES) {
     if (pollen[family].recent > 0 && (!best || pollen[family].recent > pollen[best].recent)) {
@@ -197,16 +224,17 @@ export const loadMemberGame = async (
         }
       : undefined,
   )
-  const [pollen, seals] = await Promise.all([
+  const [pollen, seals, isScout] = await Promise.all([
     familyPollenOf(db, memberId, now),
     sealsOf(db, memberId),
+    isScoutTitleHolder(db, memberId),
   ])
   const total = FAMILIES.reduce((sum, family) => sum + pollen[family].total, 0)
   const { level, cells } = levelProgress(total)
   return {
     level,
     cells,
-    title: titleOf(pollen, settings),
+    title: titleOf(pollen, settings, isScout),
     seals,
     decoration: decorationOf(settings),
   }

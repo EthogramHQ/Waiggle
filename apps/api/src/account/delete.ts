@@ -7,7 +7,7 @@
 //   appelle `deleteAccount`, qui fait les mêmes trois temps.
 // Une étape ajoutée un jour ici vaut donc pour les deux, sans risque d'en oublier une.
 import { type Database, schema } from '@ruche/db'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { forgetResetLinks } from '../auth/password'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import { removeFromHive } from '../hives/write'
@@ -68,7 +68,20 @@ export const beforeAccountDeletion = async (db: Database, userId: string): Promi
     .select({ storageKey: schema.testerMedia.storageKey })
     .from(schema.testerMedia)
     .where(eq(schema.testerMedia.ownerId, userId))
-  const all = [...new Set([...keys, ...ownedImages.map((image) => image.storageKey)])]
+  // R20 (sécurité A5, juridique J3) : les captures de ses retours d'Éclaireuse ; leurs lignes
+  // partent avec le compte (`member_id`, cascade), pas leurs fichiers. La lecture suit
+  // `scout_report_member_idx` (member_id en tête).
+  const scoutCaptures = await db
+    .select({ mediaKey: schema.scoutReport.mediaKey })
+    .from(schema.scoutReport)
+    .where(and(eq(schema.scoutReport.memberId, userId), isNotNull(schema.scoutReport.mediaKey)))
+  const all = [
+    ...new Set([
+      ...keys,
+      ...ownedImages.map((image) => image.storageKey),
+      ...scoutCaptures.flatMap((row) => (row.mediaKey ? [row.mediaKey] : [])),
+    ]),
+  ]
   // R9 : une photo de profil retirée par la modération porte la clé `withheld/<id>` ; le vrai
   // fichier est gardé dans son retrait (hidden_value.storageKey). releaseAvatarKey rend la vraie
   // clé, pour qu'il parte aussi du stockage et ne reste pas orphelin.

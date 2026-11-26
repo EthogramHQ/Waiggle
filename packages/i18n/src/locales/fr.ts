@@ -219,12 +219,12 @@ export const fr = {
           // « probables » : à faire valider par un professionnel.
           data: {
             title: 'Ce qui est gardé, et pourquoi',
-            body: 'Sauf mention contraire, la base est le contrat : les règles que tu acceptes pour utiliser {{appName}}.\n\n- **Ton compte** : ton nom affiché, ton adresse e‑mail, ta langue, ton mot de passe (seulement son empreinte, jamais le mot de passe lui-même). Pour te connecter et t’écrire. Les membres connectés voient ton nom ; tout le monde, sur tes projets et ta page publics. Personne ne voit ton adresse.\n- **Ton profil** : ton pseudo, ta bio, ta photo et tes outils favoris. Vus des membres connectés. Ta page publique, de tout le monde, avec ce que tu y coches ; ton nom et ta photo accompagnent aussi tes projets publics. La photo est recadrée et nettoyée de ses informations cachées.\n- **Tes projets et leurs mises à jour** : textes, prompts, photos, liens des démos, catégories. Vus des personnes que tu choisis : tous les membres connectés, une ruche, toi seul, ou tout le monde quand il est public.\n- **Ce qui est public** : un projet ou une page publics sont lus et copiés par les moteurs de recherche, y compris ceux des assistants d’IA, qui peuvent les citer ou les résumer. Après un retour en arrière, ils les montrent jusqu’à leur prochain passage ; tu peux aussi leur demander de retirer leur copie. {{appName}} demande aux robots qui collectent pour entraîner des IA de ne pas lire le site ; certains ne respectent pas cette demande. Base : ton choix, que tu peux retirer à tout moment.\n- **Les réactions et les abonnements** : qui réagit ou suit quoi. Les autres ne voient que des nombres.\n- **Les commentaires et les mentions** : le texte, la date, qui est mentionné. Vus de ceux qui voient le projet ; la mention, de la personne mentionnée.\n- **Le fil et les suggestions** : la date de ta dernière lecture du fil, les suggestions que tu as écartées, ton choix « Ne pas me proposer aux autres ». Vus de toi seul.\n- **La recherche** : rien n’est gardé de ce que tu cherches.\n- **Les testeurs** : ton inscription comme testeur, tes retours, tes messages et leurs captures. Vus de l’auteur du projet et de toi ; dans les commentaires du projet, un badge « Testeur » s’affiche à côté de ton nom. Un message signalé, et sa capture, est lu par la modération, jamais le reste du fil.\n- **Les ruches** : les ruches dont tu fais partie, qui t’a invité, les invitations. Vues des membres de chaque ruche.\n- **Ta récolte** : le pollen de chacun de tes gestes (le geste, la date, la chose concernée), ton niveau, ton titre, tes sceaux, ton miel, tes défis et tes réglages. Pour compter tes encouragements et te les montrer. La ligne d’un geste reste quand tu le retires, pour ne pas le compter deux fois ; un contenu retiré par la modération perd son pollen. Ton niveau, ton titre, ton rayon et tes sceaux sont vus des membres connectés ; ton miel, tes défis et tes réglages, de toi seul. Ton pollen de la semaine, sans tes réactions ni tes abonnements, est vu des membres qui te suivent et des membres de tes ruches, dans les classements, sauf si tu t’en retires dans Réglages, « Apparence », « Classements ». Base des classements : l’intérêt légitime d’encourager les échanges entre proches.\n- **Les notifications et les e‑mails** : ce qui t’est arrivé, tes choix d’e‑mails, les dates d’envoi. Vus de toi seul.\n- **Les signalements et la modération** : qui signale, le motif, une copie des textes signalés, les décisions et les suspensions. Vus des administrateurs ; la personne visée reçoit la décision, jamais le nom de qui a signalé. Base : l’intérêt légitime de protéger les membres, et la loi pour un contenu illicite.\n- **Les signalements sans compte** : la cible, le motif, la précision, l’adresse e‑mail si elle est donnée, pour l’accusé de réception et la décision, et l’adresse IP pour la limite de 5 par jour. Vus des administrateurs. Base : la loi (règlement sur les services numériques).\n- **Le blocage** : les membres que tu as bloqués. La personne bloquée n’est pas prévenue.\n- **La sécurité du compte** : tes sessions de connexion (avec l’adresse IP et le navigateur de leur création), les liens envoyés par e‑mail, des compteurs contre les abus. Vus de personne. Base : l’intérêt légitime de protéger les comptes.\n- **Les visites sans compte** : pour lire les pages publiques, un compteur par réseau (adresse IP), gardé en mémoire du serveur, jamais écrit ; pour un signalement, un compteur par adresse IP et un par empreinte de l’adresse e‑mail. Vus de personne. Base : l’intérêt légitime de protéger le service.\n- **Les règles acceptées** : la version, la date, et ta déclaration d’avoir 15 ans ou plus, jamais ta date de naissance. Pour prouver ton accord.\n- **La date de ta dernière visite** : pour supprimer un compte inactif depuis 3 ans.',
+            body: 'Sauf mention contraire, la base est le contrat : les règles que tu acceptes pour utiliser {{appName}}.\n\n- **Ton compte** : ton nom affiché, ton adresse e‑mail, ta langue, ton mot de passe (seulement son empreinte, jamais le mot de passe lui-même). Pour te connecter et t’écrire. Les membres connectés voient ton nom ; tout le monde, sur tes projets et ta page publics. Personne ne voit ton adresse.\n- **Ton profil** : ton pseudo, ta bio, ta photo et tes outils favoris. Vus des membres connectés. Ta page publique, de tout le monde, avec ce que tu y coches ; ton nom et ta photo accompagnent aussi tes projets publics. La photo est recadrée et nettoyée de ses informations cachées.\n- **Tes projets et leurs mises à jour** : textes, prompts, photos, liens des démos, catégories. Vus des personnes que tu choisis : tous les membres connectés, une ruche, toi seul, ou tout le monde quand il est public.\n- **Ce qui est public** : un projet ou une page publics sont lus et copiés par les moteurs de recherche, y compris ceux des assistants d’IA, qui peuvent les citer ou les résumer. Après un retour en arrière, ils les montrent jusqu’à leur prochain passage ; tu peux aussi leur demander de retirer leur copie. {{appName}} demande aux robots qui collectent pour entraîner des IA de ne pas lire le site ; certains ne respectent pas cette demande. Base : ton choix, que tu peux retirer à tout moment.\n- **Les réactions et les abonnements** : qui réagit ou suit quoi. Les autres ne voient que des nombres.\n- **Les commentaires et les mentions** : le texte, la date, qui est mentionné. Vus de ceux qui voient le projet ; la mention, de la personne mentionnée.\n- **Le fil et les suggestions** : la date de ta dernière lecture du fil, les suggestions que tu as écartées, ton choix « Ne pas me proposer aux autres ». Vus de toi seul.\n- **La recherche** : rien n’est gardé de ce que tu cherches.\n- **Les testeurs** : ton inscription comme testeur, tes retours, tes messages et leurs captures. Vus de l’auteur du projet et de toi ; dans les commentaires du projet, un badge « Testeur » s’affiche à côté de ton nom. Un message signalé, et sa capture, est lu par la modération, jamais le reste du fil.\n- **Les Éclaireuses** : ton entrée (la date, et un retrait s’il y en a un, avec son motif), tes retours (la sorte, la gravité, le texte, la mission, la capture si tu en joins une), leur statut et la note que l’administrateur t’adresse. Si tu laisses cochée « Joindre ces informations » : l’écran où tu étais (son adresse, qui peut nommer un projet ou un membre), l’appareil, la largeur de l’écran, la version de {{appName}}, la langue, jour ou nuit. Pour améliorer {{appName}} : tes retours ne sont jamais publiés. Vus de l’administrateur et de toi seuls ; il peut y ajouter une note de travail, que tu ne vois pas dans l’appli mais qui figure dans ton export. Une capture montre ce que tu voyais, parfois ce que d’autres t’ont confié : retire-le avant de l’envoyer. Ton titre Éclaireuse et ton sceau se voient sur ton profil, comme les autres. Base des informations jointes : l’intérêt légitime de reproduire un défaut ; décocher la case suffit.\n- **Les ruches** : les ruches dont tu fais partie, qui t’a invité, les invitations. Vues des membres de chaque ruche.\n- **Ta récolte** : le pollen de chacun de tes gestes (le geste, la date, la chose concernée), ton niveau, ton titre, tes sceaux, ton miel, tes défis et tes réglages. Pour compter tes encouragements et te les montrer. La ligne d’un geste reste quand tu le retires, pour ne pas le compter deux fois ; un contenu retiré par la modération perd son pollen. Ton niveau, ton titre, ton rayon et tes sceaux sont vus des membres connectés ; ton miel, tes défis et tes réglages, de toi seul. Ton pollen de la semaine, sans tes réactions ni tes abonnements, est vu des membres qui te suivent et des membres de tes ruches, dans les classements, sauf si tu t’en retires dans Réglages, « Apparence », « Classements ». Base des classements : l’intérêt légitime d’encourager les échanges entre proches.\n- **Les notifications et les e‑mails** : ce qui t’est arrivé, tes choix d’e‑mails, les dates d’envoi. Vus de toi seul.\n- **Les signalements et la modération** : qui signale, le motif, une copie des textes signalés, les décisions et les suspensions. Vus des administrateurs ; la personne visée reçoit la décision, jamais le nom de qui a signalé. Base : l’intérêt légitime de protéger les membres, et la loi pour un contenu illicite.\n- **Les signalements sans compte** : la cible, le motif, la précision, l’adresse e‑mail si elle est donnée, pour l’accusé de réception et la décision, et l’adresse IP pour la limite de 5 par jour. Vus des administrateurs. Base : la loi (règlement sur les services numériques).\n- **Le blocage** : les membres que tu as bloqués. La personne bloquée n’est pas prévenue.\n- **La sécurité du compte** : tes sessions de connexion (avec l’adresse IP et le navigateur de leur création), les liens envoyés par e‑mail, des compteurs contre les abus. Vus de personne. Base : l’intérêt légitime de protéger les comptes.\n- **Les visites sans compte** : pour lire les pages publiques, un compteur par réseau (adresse IP), gardé en mémoire du serveur, jamais écrit ; pour un signalement, un compteur par adresse IP et un par empreinte de l’adresse e‑mail. Vus de personne. Base : l’intérêt légitime de protéger le service.\n- **Les règles acceptées** : la version, la date, et ta déclaration d’avoir 15 ans ou plus, jamais ta date de naissance. Pour prouver ton accord.\n- **La date de ta dernière visite** : pour supprimer un compte inactif depuis 3 ans.',
           },
           // Choix 9 du scénario : toutes les durées, en liste, telles que le code les applique.
           retention: {
             title: 'Combien de temps',
-            body: '- **Ton compte et ce que tu publies** : tant que ton compte existe, ou jusqu’à ce que tu les supprimes.\n- **Ta récolte** : tant que ton compte existe ; les défis, jusqu’à la fin de la semaine qui suit. La ligne d’un geste garde ce qui l’a rapporté (le projet, le membre suivi ; pour ce que reçoivent tes projets, qui l’a fait), même si le geste est retiré, pour qu’il ne paie qu’une fois. Aucun membre ne la voit.\n- **Un compte sans visite** : supprimé après 3 ans, avec un e‑mail un mois avant.\n- **Une inscription dont l’adresse n’est jamais vérifiée** : 30 jours.\n- **Une session de connexion** : 7 jours après sa dernière utilisation, effacée sous 8 jours. Une session qui sert chaque jour garde l’adresse IP de sa création.\n- **Les liens envoyés par e‑mail** (vérification, mot de passe, adresse) : valables 1 heure, effacés sous 25 heures.\n- **Les compteurs contre les abus** : moins de 49 heures. Certains gardent une adresse IP. Ceux de la lecture des pages publiques, en mémoire seulement : 10 minutes.\n- **Ton ancien pseudo** : réservé 30 jours.\n- **Une photo ajoutée mais jamais publiée** : 24 heures, effacée sous 48 heures.\n- **Une invitation dans une ruche** : 30 jours, refusée ou non.\n- **Les avis de l’appli sur tes outils, tes ruches, la vitrine et ta récolte** : 90 jours.\n- **Un outil « Autre » écarté, et le journal du catalogue** : 1 an.\n- **Un signalement** : jusqu’à la décision ; 30 jours s’il est sans objet ; 1 an après la décision s’il est traité.\n- **L’adresse e‑mail donnée avec un signalement sans compte** : jusqu’à la clôture du signalement, décidé ou sans objet.\n- **La place d’un projet dans la vitrine** : tant que le projet reste public et que ni toi ni l’éditeur ne l’en retirez.\n- **Une décision de modération** : 1 an après la dernière décision sur le même contenu, et tant que le contenu reste retiré.\n- **Une suspension** : 1 an après sa fin ; sans fin, tant que le compte existe.\n- **Les sauvegardes du serveur** : 14 jours ; 30 jours au plus pour une sauvegarde faite avant une opération.\n- **La copie hebdomadaire de l’hébergeur** : [durée de la copie de l’hébergeur].\n- **Les journaux de l’appli et de la base** : 50 Mo au plus, les plus anciens effacés d’abord ; ceux de l’appli partent aussi à chaque mise à jour. Ils ne gardent ni adresse ni nom.\n- **Le journal du système du serveur** (connexions des administrateurs) : 6 mois.\n- **Un e‑mail envoyé à {{contactEmail}}** : 1 an après la réponse.\n- **Les extraits lus par l’assistant de code** : 30 jours chez Anthropic, sauf les exceptions de sa politique.',
+            body: '- **Ton compte et ce que tu publies** : tant que ton compte existe, ou jusqu’à ce que tu les supprimes.\n- **Ta récolte** : tant que ton compte existe ; les défis, jusqu’à la fin de la semaine qui suit. La ligne d’un geste garde ce qui l’a rapporté (le projet, le membre suivi ; pour ce que reçoivent tes projets, qui l’a fait), même si le geste est retiré, pour qu’il ne paie qu’une fois. Aucun membre ne la voit.\n- **Tes retours d’Éclaireuse et leurs captures** : 6 mois après la fin du mois des Éclaireuses (7 mois après le retour si le mois n’a jamais été lancé), ou jusqu’à ce que tu les supprimes. Les missions, et ce que tu en as fait : 8 jours après leur semaine. Ton entrée dans les Éclaireuses : tant que ton compte existe.\n- **Un compte sans visite** : supprimé après 3 ans, avec un e‑mail un mois avant.\n- **Une inscription dont l’adresse n’est jamais vérifiée** : 30 jours.\n- **Une session de connexion** : 7 jours après sa dernière utilisation, effacée sous 8 jours. Une session qui sert chaque jour garde l’adresse IP de sa création.\n- **Les liens envoyés par e‑mail** (vérification, mot de passe, adresse) : valables 1 heure, effacés sous 25 heures.\n- **Les compteurs contre les abus** : moins de 49 heures. Certains gardent une adresse IP. Ceux de la lecture des pages publiques, en mémoire seulement : 10 minutes.\n- **Ton ancien pseudo** : réservé 30 jours.\n- **Une photo ajoutée mais jamais publiée** : 24 heures, effacée sous 48 heures.\n- **Une invitation dans une ruche** : 30 jours, refusée ou non.\n- **Les avis de l’appli sur tes outils, tes ruches, la vitrine et ta récolte** : 90 jours.\n- **Un outil « Autre » écarté, et le journal du catalogue** : 1 an.\n- **Un signalement** : jusqu’à la décision ; 30 jours s’il est sans objet ; 1 an après la décision s’il est traité.\n- **L’adresse e‑mail donnée avec un signalement sans compte** : jusqu’à la clôture du signalement, décidé ou sans objet.\n- **La place d’un projet dans la vitrine** : tant que le projet reste public et que ni toi ni l’éditeur ne l’en retirez.\n- **Une décision de modération** : 1 an après la dernière décision sur le même contenu, et tant que le contenu reste retiré.\n- **Une suspension** : 1 an après sa fin ; sans fin, tant que le compte existe.\n- **Les sauvegardes du serveur** : 14 jours ; 30 jours au plus pour une sauvegarde faite avant une opération.\n- **La copie hebdomadaire de l’hébergeur** : [durée de la copie de l’hébergeur].\n- **Les journaux de l’appli et de la base** : 50 Mo au plus, les plus anciens effacés d’abord ; ceux de l’appli partent aussi à chaque mise à jour. Ils ne gardent ni adresse ni nom.\n- **Le journal du système du serveur** (connexions des administrateurs) : 6 mois.\n- **Un e‑mail envoyé à {{contactEmail}}** : 1 an après la réponse.\n- **Les extraits lus par l’assistant de code** : 30 jours chez Anthropic, sauf les exceptions de sa politique.',
           },
           device: {
             title: 'Sur ton appareil',
@@ -249,7 +249,7 @@ export const fr = {
           },
           rights: {
             title: 'Tes droits',
-            body: 'Tu as le droit d’accéder à tes données, de les corriger, de les effacer, de t’opposer à un traitement, d’en demander la limitation, et de les emporter.\n\nDepuis l’appli :\n\n- **télécharger tes données** : Réglages, « Mes données » ;\n- **les corriger** : « Mon profil », et ton adresse dans Réglages, « Compte » ;\n- **les effacer** : chaque contenu depuis sa page, tes commentaires depuis « Mes commentaires », tes retours de testeur depuis « Mes retours envoyés », ou tout ton compte ;\n- **t’opposer** : « Ne pas me proposer aux autres », « Apparaître dans les classements » (Réglages, « Apparence »), et le choix de tes e‑mails dans Réglages, « Notifications ».\n\nPar e‑mail, à {{contactEmail}} : écris depuis l’adresse de ton compte, pour que nous sachions que c’est bien toi. Sans compte, après un signalement : depuis l’adresse donnée. Nous répondons sous un mois ; si la demande est complexe, ce délai peut passer à trois mois, et nous te le disons.\n\nTu peux aussi saisir la CNIL : [cnil.fr](https://www.cnil.fr/fr/plaintes).',
+            body: 'Tu as le droit d’accéder à tes données, de les corriger, de les effacer, de t’opposer à un traitement, d’en demander la limitation, et de les emporter.\n\nDepuis l’appli :\n\n- **télécharger tes données** : Réglages, « Mes données » ;\n- **les corriger** : « Mon profil », et ton adresse dans Réglages, « Compte » ;\n- **les effacer** : chaque contenu depuis sa page, tes commentaires depuis « Mes commentaires », tes retours de testeur depuis « Mes retours envoyés », tes retours d’Éclaireuse depuis Réglages, « Les Éclaireuses », ou tout ton compte ;\n- **t’opposer** : « Ne pas me proposer aux autres », « Apparaître dans les classements » (Réglages, « Apparence »), la case « Joindre ces informations » de chaque retour d’Éclaireuse, et le choix de tes e‑mails dans Réglages, « Notifications ».\n\nPar e‑mail, à {{contactEmail}} : écris depuis l’adresse de ton compte, pour que nous sachions que c’est bien toi. Sans compte, après un signalement : depuis l’adresse donnée. Nous répondons sous un mois ; si la demande est complexe, ce délai peut passer à trois mois, et nous te le disons.\n\nTu peux aussi saisir la CNIL : [cnil.fr](https://www.cnil.fr/fr/plaintes).',
           },
         },
       },
@@ -608,6 +608,8 @@ export const fr = {
       testerFeedbackItem: 'Tes retours de testeur, avec leurs captures',
       testerFeedbackDetail:
         'Chaque fil où tu as écrit disparaît en entier, réponses des auteurs comprises.',
+      // R20 (relecture juridique du plan, J3).
+      scoutReportsItem: 'Tes retours d’Éclaireuse, avec leurs captures',
       notificationsItem:
         'Tes notifications, et les liens vers toi dans les commentaires des autres',
       notificationsDetail:
@@ -3822,6 +3824,15 @@ export const fr = {
     // La seconde ligne, pour qui y a participé ; les autres lisent le défi seul, sans le dire.
     gameHiveChallengeHoney: '{{challenge}} · +{{honey}} miel',
     gameHoneyGift: '<b>{{name}}</b> t’a offert du miel pour <b>{{title}}</b>',
+    // R20 : les avis des Éclaireuses, dans l'Activité seulement, coupés par « Ma récolte ».
+    // L'extrait du retour est lu à l'affichage : un retour supprimé emporte son avis (J3).
+    gameScoutHeard: 'Ta danse a été entendue : <b>« {{excerpt}} »</b> est corrigé',
+    gameScoutHeardGain: '+{{pollen}} pollen · +{{honey}} miel',
+    gameScoutMissions_one: '<b>{{count}} mission</b> cette semaine',
+    gameScoutMissions_other: '<b>{{count}} missions</b> cette semaine',
+    // Relecture juridique du plan (J1) : quoi, pourquoi, ce qui reste, comment contester.
+    gameScoutRemoved:
+      'Tu ne fais plus partie des Éclaireuses : {{reason}} Ton pollen, ton sceau et tes retours restent. Pour en parler : {{contactEmail}}',
     // Relecture juridique du plan (J1) : une fois par compte. « Les membres qui te suivent » : le
     // classement des proches liste ceux qu'on suit (décision de Louis du 23/11/2026).
     gameIntro:
@@ -3966,6 +3977,8 @@ export const fr = {
       invitations_5: '5 invitations acceptées',
       weeks_10: '10 semaines butinées',
       weeks_25: '25 semaines butinées',
+      // R20 : seulement pour les Éclaireuses de ce mois-ci, jamais gagné ensuite.
+      scout_founder: 'Éclaireuse fondatrice',
       category: {
         'home-garden': 'Jardin exploré',
         cooking: 'Cuisine explorée',
@@ -4090,7 +4103,209 @@ export const fr = {
         '{{types}} tout de suite ; le récap du dimanche t’apporte seulement les nouveaux projets de tes proches, les nouveautés de tes ruches et ta récolte de la semaine.',
     },
   },
+  // R20 (scénario « Les Éclaireuses », planches R20-* validées le 26/11/2026) : le programme des
+  // 30 premières testeuses. Le nom du programme reste au féminin (« les Éclaireuses ») ; le titre a
+  // ses deux formes dans game.titles. Rien ne culpabilise : pas de compte à rebours, pas de rouge
+  // pour une limite, « Gardé de côté » sans annonce.
+  scout: {
+    name: 'Les Éclaireuses',
+    intro: '30 proches essaient {{appName}} pendant un mois et disent ce qui coince.',
+    // Relecture juridique du plan (J1) : ce que l'entrée change, en une phrase, avant le code.
+    joinInfo:
+      'Ton titre Éclaireuse et ton sceau se voient sur ton profil. Seul l’administrateur de {{appName}} lit tes retours ; en cas d’abus, il peut te retirer des Éclaireuses, en te disant pourquoi.',
+    haveCode: 'J’ai un code',
+    codeLabel: 'Code des Éclaireuses',
+    join: 'Rejoindre les Éclaireuses',
+    since: 'Depuis le {{date}}',
+    removedOn: 'Retirée le {{date}}',
+    showDrop: 'Afficher la Goutte',
+    myReports: 'Mes retours',
+    reportsEmpty: 'Tes retours apparaîtront ici.',
+    retention:
+      'Tes retours et leurs captures sont effacés 6 mois après la fin du mois des Éclaireuses.',
+    reportMenu: 'Actions du retour',
+    deleteReport: 'Supprimer ce retour',
+    deleteTitle: 'Supprimer ce retour ?',
+    deleteBody: 'L’administrateur ne le verra plus, sa capture non plus. Le pollen gagné reste.',
+    delete: 'Supprimer',
+    // La note de l'administrateur quand il marque un retour corrigé.
+    fixedNote: '« {{note}} »',
+    kinds: {
+      bug: 'Bug',
+      confusing: 'Confus',
+      idea: 'Idée',
+      love: 'J’adore',
+    },
+    severities: {
+      minor: 'Détail',
+      annoying: 'Gênant',
+      blocking: 'Bloquant',
+    },
+    statuses: {
+      sent: 'Envoyé',
+      read: 'Lu',
+      planned: 'Prévu',
+      fixed: 'Corrigé',
+      parked: 'Gardé de côté',
+    },
+    // La Goutte (planche R20-Goutte) : le nom lu dit aussi les missions qui restent.
+    drop: {
+      label: 'Faire un retour sur {{appName}}',
+      labelMissions_one: 'Faire un retour sur {{appName}}, {{count}} mission à faire',
+      labelMissions_other: 'Faire un retour sur {{appName}}, {{count}} missions à faire',
+      unfold: 'Rouvrir la Goutte',
+      fold: 'Replier la Goutte',
+      settings: 'Réglages des Éclaireuses',
+    },
+    // La feuille « Ton retour » (planches R20-Retour, R20-Retour-Desktop, R20-Envoye).
+    sheet: {
+      title: 'Ton retour',
+      send: 'Envoyer',
+      more: 'Plus d’actions',
+      kind: 'Sorte de retour',
+      severity: 'Gravité',
+      text: 'Raconte',
+      textPlaceholder: 'Ce que tu faisais, ce que tu as vu',
+      capture: 'Ajouter une capture',
+      // Relecture juridique du plan (J3) : la même aide que la capture d'un testeur.
+      captureHint: 'Facultative. Retire de ta capture ce qui est personnel, à toi ou à d’autres.',
+      removeCapture: 'Retirer la capture',
+      attached: 'Joint à ton retour',
+      attachedShort: 'Écran, appareil, version, langue, thème',
+      attach: 'Joindre ces informations',
+      fields: {
+        screen: 'Écran',
+        device: 'Appareil',
+        version: 'Version',
+        language: 'Langue',
+        theme: 'Thème',
+      },
+      deviceValue: '{{platform}}, {{width}} points de large',
+      platforms: {
+        web: 'Web',
+        ios: 'iOS',
+        android: 'Android',
+      },
+      schemes: {
+        day: 'Jour',
+        night: 'Nuit',
+      },
+      privacy: 'Seul l’administrateur de {{appName}} lit tes retours.',
+      missions: 'Missions de la semaine',
+      mission: 'Mission : {{mission}}',
+      removeMission: 'Retirer la mission',
+      missingKind: 'Choisis une sorte de retour.',
+      missingSeverity: 'Choisis une gravité.',
+      missingText: 'Raconte ce qui se passe.',
+      // Option a10 des planches : la limite des 20 dite dès l'ouverture, sans chiffre.
+      limit: 'Tu as envoyé beaucoup de retours aujourd’hui, reprends demain.',
+      close: 'Fermer',
+      discardTitle: 'Abandonner ce retour ?',
+      discardBody: 'Ce que tu as écrit dans cette feuille sera perdu.',
+      keep: 'Continuer',
+      discard: 'Abandonner',
+      sent: 'Merci, c’est noté',
+    },
+    // La page « Missions de la semaine » (planche R20-Missions).
+    missions: {
+      title: 'Missions de la semaine',
+      left_one: '{{count}} à faire',
+      left_other: '{{count}} à faire',
+      pollen: '+{{count}} pollen',
+      answer: 'Répondre',
+      done: 'Faite',
+      empty: 'Pas de mission cette semaine.',
+    },
+    // La page de tri de l'administrateur (planches R20-Tri, R20-Corrige, R20-Missions-Admin).
+    triage: {
+      title: 'Éclaireuses',
+      tabReports: 'Retours ({{count}})',
+      tabScouts: 'Éclaireuses ({{count}})',
+      month: 'Le mois',
+      day: 'Jour {{day}} sur {{total}}',
+      until: 'Jusqu’au {{date}} à minuit',
+      notLaunched: 'Pas lancé',
+      notLaunchedHint: '30 jours, jusqu’à minuit (heure de Paris) du 30e. Ne se reprend pas.',
+      launch: 'Lancer le mois',
+      launchTitle: 'Lancer le mois ?',
+      launchBody:
+        'Le mois commence aujourd’hui et dure 30 jours, jusqu’à minuit (heure de Paris) du 30e. Il ne se reprend pas.',
+      ended: 'Fini le {{date}}',
+      endedHint: 'La Goutte, les retours et les missions sont arrêtés ; le code ne marche plus.',
+      places: 'Les places',
+      placesValue: '{{count}} sur {{total}}',
+      missions: 'Missions de la semaine',
+      editMissions: 'Modifier',
+      writeMissions: 'Écrire',
+      answers_one: '{{count}} réponse',
+      answers_other: '{{count}} réponses',
+      noMission: 'Pas de mission cette semaine.',
+      newFirst: 'Nouveaux d’abord',
+      filterStatus: 'Statut',
+      filterKind: 'Sorte',
+      filterSeverity: 'Gravité',
+      filterAll: 'Tous',
+      // Option b3 : l'administrateur lit « Nouveau » là où l'Éclaireuse lit « Envoyé ».
+      new: 'Nouveau',
+      empty: 'Aucun retour pour l’instant.',
+      noMatch: 'Aucun retour avec ces filtres.',
+      mission: 'Mission',
+      missionLabel: 'Mission : {{mission}}',
+      attached: 'Joint au retour',
+      nothingAttached: 'Rien n’est joint.',
+      openCapture: 'Agrandir la capture',
+      status: 'Statut',
+      // Relecture juridique du plan (J2) : la note entre dans l'export de l'Éclaireuse.
+      privateNote: 'Note privée',
+      privateNoteHint: '{{name}} ne la voit pas dans l’appli ; elle figure dans son export.',
+      saveNote: 'Enregistrer la note',
+      noteSaved: 'Note enregistrée',
+      fixTitle: 'Marquer comme corrigé ?',
+      fixBody:
+        'À faire une fois le correctif en ligne : {{name}} reçoit aussitôt cette annonce, qui ne se reprend pas.',
+      fixNote: 'Note pour {{name}}, facultative',
+      fixNoteHint: 'Elle la lit dans « Mes retours ».',
+      fixConfirm: 'Marquer corrigé',
+      editor: {
+        title: 'Missions de la semaine',
+        week: 'Du lundi {{start}} au dimanche {{end}}',
+        mission: 'Mission {{number}}',
+        remove: 'Retirer',
+        fr: 'En français',
+        en: 'En anglais, facultatif',
+        enPlaceholder: 'Sans anglais, le français s’affiche',
+        add: 'Ajouter une mission',
+        hint: '3 missions au plus. Les Éclaireuses les voient jusqu’à dimanche ; une mission non faite s’efface lundi.',
+        publish: 'Publier les missions',
+      },
+      scouts: {
+        name: 'Nom',
+        joined: 'Entrée',
+        reports: 'Retours',
+        remove: 'Retirer',
+        removed: 'Retirée le {{date}}',
+        empty: 'Aucune Éclaireuse pour l’instant.',
+        removeTitle: 'Retirer {{name}} des Éclaireuses ?',
+        removeBody:
+          'Plus de Goutte, de titre ni de missions. Son pollen et son sceau restent. On ne redevient pas Éclaireuse : ce retrait ne se reprend pas.',
+        // Relecture juridique du plan (J1) : un retrait est motivé, et le motif est lu.
+        reason: 'Motif',
+        reasonHint: 'Elle le lit dans son Activité.',
+        confirm: 'Retirer',
+      },
+    },
+  },
   errors: {
+    // Tranche R20 (les Éclaireuses). Un code faux est refusé sans dire pourquoi.
+    scoutFull: 'Les 30 places sont prises.',
+    scoutClosed: 'Le mois des Éclaireuses est fini.',
+    scoutCodeInvalid: 'Ce code n’est pas valide.',
+    scoutAlready: 'Tu fais déjà partie des Éclaireuses.',
+    scoutRemoved: 'Ce compte a été retiré des Éclaireuses : il ne peut pas y revenir.',
+    scoutOnly: 'Cette page est réservée aux Éclaireuses.',
+    scoutMissionInvalid: 'Cette mission n’est plus celle de la semaine.',
+    scoutReportFixed: 'Ce retour est déjà corrigé : l’annonce est partie.',
+    scoutProgramStarted: 'Le mois des Éclaireuses est déjà lancé.',
     notFound: 'Cette page n’existe pas.',
     validation: 'Certaines informations sont invalides.',
     unauthorized: 'Connecte-toi pour continuer.',

@@ -232,6 +232,13 @@
       "when": 1795453339305,
       "tag": "0032_personal_challenge_chosen_at",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795663363618,
+      "tag": "0033_scouts",
+      "breakpoints": true
     }
   ]
 }

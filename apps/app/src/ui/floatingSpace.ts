@@ -30,9 +30,10 @@ export const FloatingSpaceContext = createContext<FloatingSpace>(nobody)
  * à réserver (pas de place flottante, pas encore mesurée, ou écran caché) : la réserve est rendue.
  * Elle l'est aussi quand l'écran est démonté.
  */
-export function useFloatingClaim(top: number): void {
+export function useFloatingClaim(top: number): object {
   const { claim, release } = useContext(FloatingSpaceContext)
-  // Le jeton de cet écran : un objet propre à lui, le même d'un rendu à l'autre.
+  // Le jeton de cet écran : un objet propre à lui, le même d'un rendu à l'autre. Il est rendu, pour
+  // qu'un élément qui réserve sa place puisse lire celles des autres sans la sienne.
   const owner = useRef({})
   useEffect(() => {
     const token = owner.current
@@ -43,4 +44,25 @@ export function useFloatingClaim(top: number): void {
     const token = owner.current
     return () => release(token)
   }, [release])
+  return owner.current
+}
+
+/**
+ * Les réserves en cours, jeton par jeton (R20), tenues par le fournisseur des toasts. Hors d'un
+ * fournisseur : aucune.
+ */
+export const FloatingClaimsContext = createContext<ReadonlyMap<object, number>>(new Map())
+
+/**
+ * Hook (R20, la Goutte) : la plus haute réserve des AUTRES que `owner` (0 s'il n'y en a pas). La
+ * Goutte s'en sert pour se poser au-dessus de la capsule des réactions d'un projet, sur téléphone :
+ * de 320 à 390 points de large, elles se touchaient (mesuré le 26/11/2026 : 36 points de
+ * chevauchement à 320). Sa propre réserve est écartée : sinon, en montant, elle se pousserait
+ * elle-même sans fin.
+ */
+export function useFloatingTopOfOthers(owner: object): number {
+  const claims = useContext(FloatingClaimsContext)
+  let top = 0
+  for (const [token, value] of claims) if (token !== owner && value > top) top = value
+  return top
 }

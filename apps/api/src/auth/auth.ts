@@ -3,12 +3,10 @@
 // Écrire soi-même ces mécanismes est risqué (stockage des mots de passe, jetons, attaques) :
 // on s'appuie sur une bibliothèque éprouvée, et on règle ici son comportement pour Waiggle.
 
-import { createHash, timingSafeEqual } from 'node:crypto'
 import { expo } from '@better-auth/expo'
 import { appName } from '@ruche/brand'
 import {
   DisplayName,
-  normalizeInviteCode,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   type SignUpRefusalCode,
@@ -29,7 +27,9 @@ import { describeError, writeAuthLog } from '../log'
 import type { FileStorage } from '../media/storage'
 import { createRateLimiter } from '../rate-limit'
 import { acceptCurrentRules } from '../rules/accept'
+import { joinScouts, signUpScoutRefusal } from '../scouts/join'
 import { createEmailChange } from './change-email'
+import { isRightInviteCode } from './invite-code'
 import { createPasswordFlows, forgetResetLinks, RESET_LINK_LIFETIME_SECONDS } from './password'
 import { authSchemaOptions } from './schema-options'
 import { createVerificationResend } from './verification-resend'
@@ -59,26 +59,17 @@ export type AuthOptions = {
   /** Le code d'invitation exigé à l'inscription ; null : inscription libre (développement). */
   inviteCode: string | null
   /**
+   * R20 : le code des Éclaireuses (SCOUT_INVITE_CODE), accepté aussi dans le champ du code
+   * d'inscription ; il fait du compte créé une Éclaireuse. null : personne ne le devient ainsi.
+   */
+  scoutCode?: string | null
+  /**
    * Réservé aux tests (testing/context.ts) : un hachage rapide à la place de scrypt. La production
    * (index.ts) ne passe rien, et Better Auth garde scrypt, volontairement lent (~120 ms) pour
    * qu'un voleur de la base ne puisse pas essayer des milliards de mots de passe.
    */
   password?: PasswordHashing
 }
-
-// L'empreinte (SHA-256) d'un code d'invitation, sous sa forme comparable (voir
-// normalizeInviteCode). Deux empreintes ont toujours la même longueur : c'est ce que demande
-// timingSafeEqual, ci-dessous.
-const inviteDigest = (code: string) =>
-  createHash('sha256').update(normalizeInviteCode(code)).digest()
-
-/**
- * Le code envoyé est-il le bon ? timingSafeEqual compare les deux empreintes en un temps qui ne
- * dépend pas de leur contenu. Une comparaison ordinaire s'arrête au premier caractère différent :
- * en chronométrant les réponses, un attaquant pourrait deviner le code caractère par caractère.
- */
-const isRightInviteCode = (sent: unknown, expected: string) =>
-  typeof sent === 'string' && timingSafeEqual(inviteDigest(sent), inviteDigest(expected))
 
 /**
  * R11 : le refus de l'inscription quand une des deux cases manque, ou null si les deux valent le
@@ -138,8 +129,19 @@ export const createAuth = ({
   appUrl,
   rateLimit,
   inviteCode,
+  scoutCode = null,
   password,
 }: AuthOptions) => {
+  /**
+   * R20 : le code envoyé est-il celui des Éclaireuses ? Faux sans code réglé. Le corps de la demande
+   * est lu tel quel : le hook `before` et le rappel `create.after` le relisent de la même façon.
+   */
+  const isScoutCode = (body: unknown) =>
+    scoutCode !== null &&
+    typeof body === 'object' &&
+    body !== null &&
+    'inviteCode' in body &&
+    isRightInviteCode(body.inviteCode, scoutCode)
   // La suppression du compte par le membre (account/delete.ts) : ses deux rappels, avant et après
   // l'effacement de la ligne par Better Auth.
   const deletionHooks = accountDeletionHooks({ db, storage, secret })
@@ -424,9 +426,14 @@ export const createAuth = ({
               ctx.headers?.get('accept-language') ?? ctx.request?.headers.get('accept-language'),
             ),
           )
+        // R20 : le champ accepte le code commun ou celui des Éclaireuses. Les deux comparaisons ont
+        // toujours lieu, l'une après l'autre, sans s'arrêter à la première qui réussit : la durée
+        // de la réponse ne dit pas lequel des deux codes a été tapé.
+        const scout = isScoutCode(body)
         if (inviteCode !== null) {
           const sent = 'inviteCode' in body ? body.inviteCode : undefined
-          if (!isRightInviteCode(sent, inviteCode)) {
+          const common = isRightInviteCode(sent, inviteCode)
+          if (!common && !scout) {
             throw new APIError('FORBIDDEN', {
               code: 'INVITE_CODE_INVALID',
               message: resources[visitorLanguage()].translation.auth.errors.inviteInvalid,
@@ -454,6 +461,20 @@ export const createAuth = ({
         const name = 'name' in body ? body.name : ''
         if (!DisplayName.safeParse(name).success) {
           throw new APIError('BAD_REQUEST', { message: 'Invalid name' })
+        }
+        // R20 (choix 2, relecture de sécurité A1) : le code des Éclaireuses quand les 30 places sont
+        // prises, ou une fois le mois fini, est refusé ici (403), avant toute création : aucun
+        // compte, aucun e-mail. Comme les refus ci-dessus, avant que Better Auth ne cherche
+        // l'adresse : une adresse déjà inscrite reçoit le même refus qu'une inconnue.
+        if (scout) {
+          const refusal = await signUpScoutRefusal(db, new Date())
+          if (refusal !== null) {
+            const errors = resources[visitorLanguage()].translation.errors
+            throw new APIError('FORBIDDEN', {
+              code: refusal,
+              message: fill(refusal === 'SCOUT_FULL' ? errors.scoutFull : errors.scoutClosed),
+            })
+          }
         }
       }),
       // Un hook `after` s'exécute après la route, même quand elle a répondu par une redirection.
@@ -526,6 +547,11 @@ export const createAuth = ({
                 where not exists (select 1 from example_account e where e.user_id = ${user.id})
                   and not exists (select 1 from game_notice n where n.member_id = ${user.id} and n.kind = 'intro')`,
             )
+            // R20 : inscrite avec le code des Éclaireuses, elle le devient, avec le sceau
+            // « Éclaireuse fondatrice » et son avis. Les places et le mois sont recomptés sous le
+            // verrou des Éclaireuses (scouts/join.ts) : si la dernière place est partie depuis le
+            // hook `before`, le compte reste créé, sans le titre (rare, accepté par le plan).
+            if (isScoutCode(context.body)) await joinScouts(db, user.id, 'signup', now)
           },
         },
       },

@@ -278,6 +278,24 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'PUT /v1/me/game/decoration': ['own', 'refused', 'refused'],
   'POST /v1/projects/:id/honey': ['hidesBlocked', 'refused', 'refused'],
   'GET /v1/rankings': ['hidesBlocked', 'allowed', 'allowed'],
+  // R20 : les Éclaireuses. Entrer par un code, régler la Goutte et envoyer un retour ne touchent
+  // qu'à soi, mais restent refusés à un suspendu et sans l'accord aux règles, comme toute écriture
+  // neuve (ALLOWED_WRITES inchangé) ; lire ses missions et ses retours, supprimer le sien, restent
+  // permis. Le tri est une page d'administrateur : ses écritures sont refusées à un administrateur
+  // suspendu ; retirer une Éclaireuse, un DELETE, passe la garde comme tout DELETE, et la route
+  // exige un administrateur actif.
+  'POST /v1/me/scout': ['own', 'refused', 'refused'],
+  'PATCH /v1/me/scout': ['own', 'refused', 'refused'],
+  'GET /v1/me/scout/missions': ['own', 'allowed', 'allowed'],
+  'GET /v1/me/scout/reports': ['own', 'allowed', 'allowed'],
+  'POST /v1/me/scout/reports': ['own', 'refused', 'refused'],
+  'DELETE /v1/me/scout/reports/:id': ['own', 'allowed', 'allowed'],
+  'GET /v1/moderation/scouts': ['admin', 'allowed', 'allowed'],
+  'GET /v1/moderation/scouts/reports': ['admin', 'allowed', 'allowed'],
+  'PATCH /v1/moderation/scouts/reports/:id': ['admin', 'refused', 'refused'],
+  'POST /v1/moderation/scouts/program': ['admin', 'refused', 'refused'],
+  'PUT /v1/moderation/scouts/missions': ['admin', 'refused', 'refused'],
+  'DELETE /v1/moderation/scouts/:memberId': ['admin', 'allowed', 'allowed'],
 }
 
 /** Les routes lues sans compte (R12) : tout `/v1/public/*`, et rien d'autre. */
@@ -770,6 +788,12 @@ const HIVE_PROOFS: Record<string, { file: string; test: string } | { none: strin
   },
   // R19 : des membres et leur pollen de la semaine, sans projet.
   'GET /v1/rankings': { none: 'des membres et leur pollen de la semaine, sans projet' },
+  // R20 : le tri des Éclaireuses montre des retours sur l'appli (sorte, texte, capture, écran) et
+  // des Éclaireuses, jamais un projet ; l'écran d'où vient un retour n'est qu'une adresse.
+  'GET /v1/moderation/scouts': { none: 'la jauge, les missions et les Éclaireuses, sans projet' },
+  'GET /v1/moderation/scouts/reports': {
+    none: 'des retours sur l’appli ; l’écran d’origine est une adresse, jamais le projet lu',
+  },
   // Les lectures sans compte : l'état « ruche » de la table état × surface.
   'GET /v1/public/projects/:id': VISITOR_MATRIX,
   'GET /v1/public/projects/:id/updates': VISITOR_MATRIX,
