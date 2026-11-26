@@ -3720,6 +3720,15 @@ const fakeApi = (
         followedAuthorIds: [max.id],
       })
     }
+    // R21, le temps réel : une capture est une image fixe, rien n'y arrive pendant la prise. Le flux
+    // (`GET /v1/live`) répond « indisponible » sans corps : l'appli reste sur ses lectures d'avant
+    // (le repli), sans signal ni relecture en cours de capture. Les sujets déclarés sont acceptés.
+    if (pathname === '/v1/live' && method === 'GET') {
+      return json(503, { error: { code: 'unavailable', message: '' } })
+    }
+    if (/^\/v1\/live\/[^/]+\/topics$/.test(pathname) && method === 'PUT') {
+      return route.fulfill({ status: 204, body: '' })
+    }
     // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
     if (pathname === '/v1/notifications/unread') {
       const fresh = notificationList.flat().filter((n) => n.isNew).length
