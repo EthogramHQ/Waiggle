@@ -163,6 +163,7 @@ import { HiveNewsCatalogue } from './ruches-actualite'
 import { HiveCellsCatalogue } from './ruches-alveoles'
 import { HiveRowsCatalogue } from './ruches-lignes'
 import { ProjectTilesCatalogue } from './ruches-tuiles'
+import { ScoutCatalogue } from './scout'
 import { SealShelfCatalogue } from './sealShelf'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
@@ -1034,6 +1035,8 @@ export function CatalogueScreen() {
         <SealShelfCatalogue />
         {/* Le montant en grand de « Ma récolte » (harvestFigures.tsx). */}
         <HarvestFiguresCatalogue />
+        {/* Tranche R20 : la Goutte des Éclaireuses, dans tous ses états (scout.tsx). */}
+        <ScoutCatalogue />
       </LazySection>
     </Screen>
   )
