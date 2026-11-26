@@ -4850,10 +4850,10 @@ comme avant.
 
 ## R21 — Le temps réel
 
-Statut : **à valider par Louis** (demande du 26/11/2026 : « je souhaite que tout soit instantané, un
-commentaire est instantanément visible par les autres, idem pour les réactions, les suivis, les
-notifications etc., pas une fois qu'on a rechargé la page »). Les points marqués **(à trancher)**
-attendent sa réponse.
+Statut : **validé par Louis** le 27/11/2026 (« Validé tel quel »), à partir de sa demande du
+26/11/2026 : « je souhaite que tout soit instantané, un commentaire est instantanément visible par
+les autres, idem pour les réactions, les suivis, les notifications etc., pas une fois qu'on a
+rechargé la page ». Les points **(tranché)** suivent les recommandations proposées.
 
 Aujourd'hui, une page ouverte ne change que si on la recharge ; seuls le Fil et les ruches relisent
 leurs nouveautés, une fois par minute. Avec R21, ce que font les autres membres arrive **tout de
@@ -4876,7 +4876,7 @@ sous le doigt : ce qui pousserait le contenu qu'on lit s'annonce au lieu de s'in
     l'avis en haut ;
   - **le Fil et Explorer** : le bouton des nouveautés (« 2 nouveaux projets », avec les visages)
     paraît dès la publication, au lieu d'attendre la minute ; le fil ne s'insère pas tout seul
-    **(à trancher : garder le bouton, ou insérer en haut quand on est déjà tout en haut)** ;
+    **(tranché : on garde le bouton)** ;
   - **les mises à jour d'un projet** : le Journal ouvert reçoit la nouvelle mise à jour ;
   - **les ruches** : le fil d'une ruche, ses membres, une invitation reçue ;
   - **les fils des testeurs** : la réponse de l'auteur ou du testeur paraît dans le fil ouvert ;
@@ -4895,7 +4895,7 @@ sous le doigt : ce qui pousserait le contenu qu'on lit s'annonce au lieu de s'in
   confidentialité, de blocage et de modération. Un membre bloqué, un projet privé d'un autre, une
   ruche dont on n'est pas membre n'envoient rien, pas même le signe qu'il s'est passé quelque chose.
 - Ni présence (« en ligne »), ni « en train d'écrire », ni « vu » : personne ne sait qui regarde
-  quoi **(à trancher : confirmer qu'on n'en veut pas)**.
+  quoi **(tranché : on n'en veut pas)**.
 - Les nombres sans noms restent sans noms (abonnés, réactions, A2).
 
 ### Quand la connexion manque
