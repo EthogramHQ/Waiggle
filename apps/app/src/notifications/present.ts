@@ -618,7 +618,8 @@ export const presentNotification = (
     // R20 (planche R20-Danse) : les avis des Éclaireuses, dans l'Activité seulement. Les icônes
     // de la planche (abeille, cible) ne sont pas dessinées : on prend les plus proches.
     case 'game_scout_heard': {
-      // Ce que le retour a rapporté s'écrit sous la phrase ; au toucher, « Mes retours ».
+      // Ce que le retour a rapporté s'écrit sous la phrase, seulement s'il a été versé (un compte
+      // suspendu n'a rien reçu, relecture juridique L1) ; au toucher, « Mes retours ».
       const said = say({ excerpt: notification.excerpt }, (params) =>
         t(($) => $.notifications.gameScoutHeard, params as { excerpt: string }),
       )
@@ -627,9 +628,11 @@ export const presentNotification = (
         ...said,
         icon: 'megaphone-simple',
         leading: iconLeading('megaphone-simple', 'honey'),
-        detail: t(($) => $.notifications.gameScoutHeardGain, {
-          pollen: POLLEN_GESTURES.scout_heard.amount,
-          honey: SCOUT_HEARD_HONEY,
+        ...(notification.paid && {
+          detail: t(($) => $.notifications.gameScoutHeardGain, {
+            pollen: POLLEN_GESTURES.scout_heard.amount,
+            honey: SCOUT_HEARD_HONEY,
+          }),
         }),
         target: SCOUT_SETTINGS,
       }

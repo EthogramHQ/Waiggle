@@ -183,6 +183,26 @@ describe('the pollen of the scouts', () => {
     await fix((await scouts.report(nora.cookie)).id)
     expect(await honeyFor(ctx, nora.id, 'scout_heard')).toEqual({ n: 1, total: SCOUT_HEARD_HONEY })
   })
+
+  it('tells a suspended scout her dance was heard without announcing pollen or honey she did not get', async () => {
+    const fromSuspended = await scouts.report(malik.cookie)
+    later()
+    const fromScout = await scouts.report(ines.cookie)
+    later()
+    await suspend(act, louis.cookie, malik.id)
+
+    await fix(fromSuspended.id)
+    await fix(fromScout.id)
+
+    const paidOf = async (member: typeof ines) =>
+      (await noticesOf(member, 'game_scout_heard')).flatMap((notice) =>
+        notice.kind === 'game_scout_heard' ? [[notice.reportId, notice.paid] as const] : [],
+      )
+    // L'avis part quand même : sa danse a bien été entendue, mais rien n'a été versé.
+    expect(await paidOf(malik)).toEqual([[fromSuspended.id, false]])
+    // Témoin : une Éclaireuse ordinaire lit son gain.
+    expect(await paidOf(ines)).toEqual([[fromScout.id, true]])
+  })
 })
 
 // ─── Le classement de la semaine (relecture juridique J6) ────────────────────────────────────────

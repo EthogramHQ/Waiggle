@@ -379,7 +379,10 @@ export const patchReport = (
         })
         .onConflictDoNothing()
     }
-    await writeNotice(tx, current.memberId, { kind: 'scout_heard', reportId: id }, now)
+    // L'avis part toujours (la danse a bien été entendue), mais il ne garde le miel que s'il a été
+    // versé : une Éclaireuse suspendue ne lit pas « +50 pollen · +10 miel » (relecture juridique L1).
+    const honey = pollen > 0 ? SCOUT_HEARD_HONEY : null
+    await writeNotice(tx, current.memberId, { kind: 'scout_heard', reportId: id, honey }, now)
     return 'ok'
   })
 

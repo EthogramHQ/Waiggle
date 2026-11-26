@@ -89,6 +89,7 @@ const heard: Notification = {
   isNew: true,
   reportId,
   excerpt: 'Le bouton Publier se cache derrière le clavier',
+  paid: true,
 }
 const missions: Notification = {
   kind: 'game_scout_missions',
@@ -166,6 +167,13 @@ describe('the scouts notices in the Activity', () => {
 
     expect(shown(T.heard)).toBe(true)
     expect(shown(T.heardGain)).toBe(true)
+  })
+
+  it('reads « Ta danse a été entendue » without a gain when nothing was paid', async () => {
+    await open([{ ...heard, paid: false }])
+
+    expect(shown(T.heard)).toBe(true)
+    expect(shown(T.heardGain)).toBe(false)
   })
 
   it('reads the missions of the week by their number', async () => {
