@@ -12,6 +12,7 @@ import {
   SCOUT_HEARD_HONEY,
   SCOUT_TRIAGE_PAGE_SIZE,
   type ScoutMissionsInput,
+  ScoutReportAdmin,
   ScoutReportPage,
   type ScoutReportPatch,
   type ScoutReportsQuery,
@@ -225,7 +226,36 @@ export const loadReportPage = async (
   if (filters.kind) conditions.push(eq(r.kind, filters.kind))
   if (filters.severity) conditions.push(eq(r.severity, filters.severity))
   if (cursor) conditions.push(after(cursor, r.createdAt, r.id))
-  const rows = await db
+  const rows = await selectReports(db, and(...conditions), SCOUT_TRIAGE_PAGE_SIZE + 1)
+  const page = rows.slice(0, SCOUT_TRIAGE_PAGE_SIZE)
+  const last = page.at(-1)
+  const nextCursor =
+    rows.length > SCOUT_TRIAGE_PAGE_SIZE && last
+      ? encodeCursor({ at: last.report.createdAt.toISOString(), id: last.report.id })
+      : null
+  return ScoutReportPage.parse({
+    reports: page.map((row) => adminReportOf(row, english, publicApiUrl)),
+    nextCursor,
+  })
+}
+
+/**
+ * Un retour, tel que la page de tri le montre (la réponse de PATCH) ; null s'il n'existe pas. Une
+ * requête, par la clé primaire de scout_report.
+ */
+export const loadAdminReport = async (
+  db: Database,
+  id: string,
+  english: boolean,
+  publicApiUrl: string,
+): Promise<ScoutReportAdmin | null> => {
+  const [row] = await selectReports(db, eq(r.id, id), 1)
+  return row ? ScoutReportAdmin.parse(adminReportOf(row, english, publicApiUrl)) : null
+}
+
+/** Les retours qui remplissent `where`, avec leur autrice et leur mission, les plus récents d'abord. */
+const selectReports = (db: Database, where: SQL | undefined, limit: number) =>
+  db
     .select({
       report: r,
       author: memberColumns,
@@ -237,49 +267,47 @@ export const loadReportPage = async (
     .leftJoin(schema.profile, eq(schema.profile.userId, r.memberId))
     .leftJoin(schema.memberHandle, currentHandleOf(r.memberId))
     .leftJoin(m, eq(m.id, r.missionId))
-    .where(and(...conditions))
+    .where(where)
     .orderBy(desc(r.createdAt), desc(r.id))
-    .limit(SCOUT_TRIAGE_PAGE_SIZE + 1)
-  const page = rows.slice(0, SCOUT_TRIAGE_PAGE_SIZE)
-  const last = page.at(-1)
-  const nextCursor =
-    rows.length > SCOUT_TRIAGE_PAGE_SIZE && last
-      ? encodeCursor({ at: last.report.createdAt.toISOString(), id: last.report.id })
-      : null
-  return ScoutReportPage.parse({
-    reports: page.map(({ report, author, missionFr, missionEn }) => ({
-      id: report.id,
-      kind: report.kind,
-      severity: report.severity,
-      text: report.text,
-      mission:
-        report.missionId !== null && missionFr !== null
-          ? { id: report.missionId, text: english && missionEn !== null ? missionEn : missionFr }
-          : null,
-      // Le contexte est joint en entier ou pas du tout : sans écran, la case était décochée.
-      context:
-        report.screen === null
-          ? null
-          : {
-              screen: report.screen,
-              platform: report.platform,
-              width: report.width,
-              appVersion: report.appVersion,
-              language: report.language,
-              scheme: report.scheme,
-            },
-      mediaUrl: report.mediaKey === null ? null : mediaUrl(publicApiUrl, report.mediaKey),
-      status: report.status,
-      fixedNote: report.fixedNote,
-      createdAt: report.createdAt.toISOString(),
-      fixedAt: iso(report.fixedAt),
-      author: memberOf(author, publicApiUrl),
-      adminNote: report.adminNote,
-      updatedAt: report.updatedAt.toISOString(),
-    })),
-    nextCursor,
-  })
-}
+    .limit(limit)
+
+type ReportRow = Awaited<ReturnType<typeof selectReports>>[number]
+
+/** Une ligne lue en un retour de la page de tri (validé ensuite par le contrat). */
+const adminReportOf = (
+  { report, author, missionFr, missionEn }: ReportRow,
+  english: boolean,
+  publicApiUrl: string,
+) => ({
+  id: report.id,
+  kind: report.kind,
+  severity: report.severity,
+  text: report.text,
+  mission:
+    report.missionId !== null && missionFr !== null
+      ? { id: report.missionId, text: english && missionEn !== null ? missionEn : missionFr }
+      : null,
+  // Le contexte est joint en entier ou pas du tout : sans écran, la case était décochée.
+  context:
+    report.screen === null
+      ? null
+      : {
+          screen: report.screen,
+          platform: report.platform,
+          width: report.width,
+          appVersion: report.appVersion,
+          language: report.language,
+          scheme: report.scheme,
+        },
+  mediaUrl: report.mediaKey === null ? null : mediaUrl(publicApiUrl, report.mediaKey),
+  status: report.status,
+  fixedNote: report.fixedNote,
+  createdAt: report.createdAt.toISOString(),
+  fixedAt: iso(report.fixedAt),
+  author: memberOf(author, publicApiUrl),
+  adminNote: report.adminNote,
+  updatedAt: report.updatedAt.toISOString(),
+})
 
 // ─── Le statut et les notes d'un retour ──────────────────────────────────────────────────────────
 

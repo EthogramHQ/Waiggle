@@ -4,10 +4,10 @@
 // - POST   /v1/moderation/scouts/program         « Lancer le mois » → 204 (409 s'il l'est déjà) ;
 // - PUT    /v1/moderation/scouts/missions        les missions de la semaine (0 à 3) → 204 ;
 // - GET    /v1/moderation/scouts/reports         les retours, filtrés, 30 par page ;
-// - PATCH  /v1/moderation/scouts/reports/{id}    le statut et les notes d'un retour → 204 ;
+// - PATCH  /v1/moderation/scouts/reports/{id}    le statut et les notes d'un retour → 200, le retour ;
 // - DELETE /v1/moderation/scouts/{memberId}      « Retirer », avec un motif → 204.
-// Les écritures ne rendent rien : l'appli relit la page (les réponses de ces routes sont libres,
-// plan R20, « Tests qui doivent échouer », TA2).
+// Les autres écritures ne rendent rien : l'appli relit la page (les réponses de ces routes sont
+// libres, plan R20, « Tests qui doivent échouer », TA2) ; PATCH rend le retour changé.
 //
 // Pour tout autre visiteur (anonyme, membre, Éclaireuse, administrateur révoqué ou suspendu), ces
 // adresses répondent exactement comme une adresse qui n'existe pas, avant même de lire le corps
@@ -19,6 +19,7 @@ import {
   SCOUT_ADMIN_DAILY,
   ScoutMissionsInput,
   ScoutRemoval,
+  ScoutReportAdmin,
   ScoutReportPage,
   ScoutReportPatch,
   ScoutReportsQuery,
@@ -34,6 +35,7 @@ import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limi
 import { isActiveAdmin } from '../reports/admin'
 import {
   launchProgram,
+  loadAdminReport,
   loadReportPage,
   loadTriage,
   patchReport,
@@ -119,7 +121,10 @@ const patchRoute = createRoute({
     body: { required: true, content: { 'application/json': { schema: ScoutReportPatch } } },
   },
   responses: {
-    ...noContent,
+    200: {
+      description: 'The report changed, as the list shows it.',
+      content: { 'application/json': { schema: ScoutReportAdmin } },
+    },
     400: errorResponse('Nothing to change, the status sent, or a note for the scout before fixed.'),
     404: notFoundResponse,
     409: errorResponse('The report is fixed (scout_report_fixed).'),
@@ -170,8 +175,8 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
 
   // La garde, AVANT tout le reste (avant le validateur que Hono place devant chaque route) : le
   // rôle est relu en base à chaque requête (isActiveAdmin : non révoqué, non suspendu). Sinon, le
-  // même 404 que app.notFound (app.ts), mot pour mot. Deux motifs : la page elle-même, et tout ce
-  // qui est dessous.
+  // même 404 que app.notFound (app.ts), mot pour mot. Chez Hono, le motif « …/scouts/* » couvre
+  // aussi « …/scouts » lui-même : une seule garde pour la page et tout ce qui est dessous.
   const guard = async (c: Context<AppEnv>, next: () => Promise<void>) => {
     const user = c.get('user')
     if (!user || !(await isActiveAdmin(db, user.id))) return notFound(c)
@@ -186,8 +191,13 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
     }
     await next()
   }
-  app.use(ROOT, guard)
   app.use(`${ROOT}/*`, guard)
+
+  /** Le texte des missions dans la langue du compte de l'administrateur, le français à défaut. */
+  const englishFor = (c: Context<AppEnv>) => {
+    const user = c.get('user')
+    return user ? languageOfMember(user) === 'en' : false
+  }
 
   app.openapi(triageRoute, async (c) => c.json(await loadTriage(db, new Date(), publicApiUrl), 200))
 
@@ -208,10 +218,7 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
     const { cursor, ...filters } = c.req.valid('query')
     const decoded = readCursor(cursor)
     if (decoded === 'invalid') return fail(c, 'validation', 400)
-    const user = c.get('user')
-    // Le texte des missions dans la langue du compte de l'administrateur, le français à défaut.
-    const english = user ? languageOfMember(user) === 'en' : false
-    return c.json(await loadReportPage(db, filters, decoded, english, publicApiUrl), 200)
+    return c.json(await loadReportPage(db, filters, decoded, englishFor(c), publicApiUrl), 200)
   })
 
   app.openapi(patchRoute, async (c) => {
@@ -225,7 +232,10 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
     // Une note pour l'Éclaireuse avant « Corrigé » : refusée comme si elle venait avec un autre
     // statut (le contrat refuse déjà ce cas-là).
     if (outcome === 'not_fixed') return fail(c, 'validation', 400)
-    return c.body(null, 204)
+    // Le retour changé, relu hors de la transaction, tel que la liste le montre.
+    const report = await loadAdminReport(db, id, englishFor(c), publicApiUrl)
+    if (!report) return notFound(c)
+    return c.json(report, 200)
   })
 
   app.openapi(removeRoute, async (c) => {
