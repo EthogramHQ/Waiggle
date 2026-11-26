@@ -58,6 +58,13 @@ type Base<T extends string> = {
    * les choix, et le groupe porte `aria-invalid` (web) et cite la phrase dans `aria-describedby`.
    */
   error?: string | undefined
+  /**
+   * R20 : la question ne se change plus (le statut d'un retour d'Éclaireuse corrigé, que l'API
+   * refuse de changer : `scout_report_fixed`). Les choix restent lisibles, le coché compris, mais
+   * sont annoncés inactifs (`aria-disabled`) et un appui ne fait rien ; le coché reste une étape de
+   * Tab, pour qu'on puisse lire la réponse au clavier.
+   */
+  disabled?: boolean
 }
 type WithoutClear<T extends string> = Base<T> & {
   clearLabel?: undefined
@@ -84,7 +91,11 @@ type KeyEvent = { key: string; preventDefault: () => void }
 export function Choices<T extends string>(props: WithoutClear<T>): ReactNode
 export function Choices<T extends string>(props: WithClear<T>): ReactNode
 export function Choices<T extends string>(props: Props<T>) {
-  const { label, options, value, onChange, clearLabel, entryRef, error } = props
+  const { label, options, value, clearLabel, entryRef, error, disabled = false } = props
+  // Inactif, aucun geste ne change la réponse : ni l'appui, ni Espace, ni les flèches.
+  const onChange = (next: T) => {
+    if (!disabled) props.onChange(next)
+  }
   const { colors } = useTheme()
   // Relie la phrase d'erreur au groupe (aria-describedby) ; stable au pré-rendu web.
   const errorId = useId()
@@ -186,9 +197,13 @@ export function Choices<T extends string>(props: Props<T>) {
               accessibilityRole="radio"
               accessibilityLabel={option.label}
               aria-checked={checked}
+              aria-disabled={disabled || undefined}
+              accessibilityState={{ checked, disabled }}
               onPress={() => onChange(option.value)}
               {...keys(index, option)}
               style={({ pressed }) => ({
+                // Inactifs, les choix pâlissent, comme un bouton inactif (Button).
+                opacity: disabled ? 0.55 : 1,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: space.xs,

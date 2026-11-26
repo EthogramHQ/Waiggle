@@ -570,6 +570,17 @@ function AdminModeration() {
             router.push('/moderation/categories')
           }}
         />
+        {/* R20 : la page de tri des Éclaireuses (leurs retours, leurs missions). */}
+        <ListRow
+          label={t(($) => $.scout.triage.title)}
+          icon="flag"
+          trailing="chevron"
+          href="/moderation/scouts"
+          onPress={(event) => {
+            event?.preventDefault?.()
+            router.push('/moderation/scouts')
+          }}
+        />
       </ListGroup>
       <Segmented<Tab>
         label={t(($) => $.moderation.list)}
