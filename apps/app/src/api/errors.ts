@@ -77,6 +77,18 @@ export type ApiErrorKey =
   | 'invalidChallenge'
   | 'invalidLevelSeen'
   | 'familyNotObtained'
+  // Tranche R20 : les Éclaireuses. Les places prises et le mois fini (à l'inscription comme dans
+  // les réglages), un code faux, déjà Éclaireuse, retirée, une page réservée aux Éclaireuses, une
+  // mission d'une autre semaine, un retour déjà corrigé, un mois déjà lancé.
+  | 'scoutFull'
+  | 'scoutClosed'
+  | 'scoutCodeInvalid'
+  | 'scoutAlready'
+  | 'scoutRemoved'
+  | 'scoutOnly'
+  | 'scoutMissionInvalid'
+  | 'scoutReportFixed'
+  | 'scoutProgramStarted'
   | 'internal'
   | 'network'
 
@@ -207,6 +219,17 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   invalid_challenge: 'invalidChallenge',
   invalid_level_seen: 'invalidLevelSeen',
   family_not_obtained: 'familyNotObtained',
+  // Tranche R20 : les refus des Éclaireuses (403, 409 et 400), chacun avec sa phrase : « action non
+  // autorisée » ou « conflit » ne diraient pas quoi faire (les places prises, le mois fini…).
+  scout_full: 'scoutFull',
+  scout_closed: 'scoutClosed',
+  scout_code_invalid: 'scoutCodeInvalid',
+  scout_already: 'scoutAlready',
+  scout_removed: 'scoutRemoved',
+  scout_only: 'scoutOnly',
+  scout_mission_invalid: 'scoutMissionInvalid',
+  scout_report_fixed: 'scoutReportFixed',
+  scout_program_started: 'scoutProgramStarted',
 }
 
 /**

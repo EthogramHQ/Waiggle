@@ -19,6 +19,7 @@ import { sheetRoutes } from '../src/navigation/sheetRoutes'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { ProvisionalNameGate } from '../src/profile/ProvisionalNameGate'
 import { RulesGate } from '../src/rules/RulesGate'
+import { ScoutDrop } from '../src/scout/ScoutDrop'
 import {
   AmbientHost,
   hostedNavigationTheme,
@@ -115,6 +116,9 @@ export default function RootLayout() {
                 {/* R19 : la pastille « +3 pollen » des gestes sans place à eux (suivre, publier,
                     une ruche…), à la place du toast ; elle attend qu'un toast affiché parte. */}
                 <PollenGainHost />
+                {/* R20 : la Goutte des Éclaireuses, en bas à droite de chaque écran pendant le
+                    mois ; dans le fournisseur des toasts, pour qu'ils passent au-dessus d'elle. */}
+                {launching ? null : <ScoutDrop />}
               </ToastProvider>
             </TabBarHost>
           </HoneyWaveHost>
