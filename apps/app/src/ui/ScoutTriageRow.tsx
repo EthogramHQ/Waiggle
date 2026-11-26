@@ -79,71 +79,108 @@ export function ScoutTriageRow({
           backgroundColor: selected || pressed ? colors.honeySoft : 'transparent',
         })}
       >
-        {/* L'icône de la sorte, dans un rond : un repère pour l'œil, la sorte est écrite à côté. */}
-        <View
-          aria-hidden
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={{
-            width: layout.touchTarget - space.xs,
-            height: layout.touchTarget - space.xs,
-            borderRadius: radii.pill,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: borders.hairline,
-            borderColor: colors.outline,
-            backgroundColor: colors.surface,
-          }}
-        >
-          <Icon name={kind.icon} size={20} tone="muted" />
-        </View>
-        <View style={{ flex: 1, gap: space.xs }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              columnGap: space.sm,
-              rowGap: space.xxs,
-            }}
-          >
-            <Text variant="caption" weight={700}>
-              {kind.label}
-            </Text>
-            {severity ? <SeverityPill {...severity} /> : null}
-            <View style={{ flexGrow: 1 }} />
-            <RelativeTime date={date} {...(now ? { now } : null)} />
-          </View>
-          <Text variant="callout" numberOfLines={2} breakAnywhere>
-            {text}
-          </Text>
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              columnGap: space.sm,
-              rowGap: space.xxs,
-            }}
-          >
-            <Avatar name={author.name} source={author.avatar} label="" size={20} />
-            <Text variant="caption" tone="secondary">
-              {author.name}
-            </Text>
-            {mission ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
-                <Icon name="flag" size={14} tone="muted" />
-                <Text variant="caption" tone="muted">
-                  {mission}
-                </Text>
-              </View>
-            ) : null}
-            <View style={{ flexGrow: 1 }} />
-            <StatusLabel {...status} />
-          </View>
-        </View>
+        {({ pressed }) => (
+          <RowContent
+            kind={kind}
+            severity={severity}
+            text={text}
+            author={author}
+            date={date}
+            status={status}
+            mission={mission}
+            {...(now ? { now } : null)}
+            onCream={selected || pressed}
+          />
+        )}
       </Pressable>
     </View>
+  )
+}
+
+/**
+ * Le dedans de la rangée. Sur le fond crème (retour ouvert, ou rangée pressée), le gris discret
+ * (`textMuted`) tombe à 4,44:1 la nuit, sous le seuil de 4,5 : la date et la mission passent alors
+ * au gris plus soutenu (`textSecondary`, mesuré sur `honeySoft` dans `contrastPairs`).
+ */
+function RowContent({
+  kind,
+  severity,
+  text,
+  author,
+  date,
+  status,
+  mission,
+  now,
+  onCream,
+}: Omit<Props, 'selected' | 'onPress'> & { onCream: boolean }) {
+  const { colors } = useTheme()
+  const quiet = onCream ? 'secondary' : 'muted'
+  return (
+    <>
+      {/* L'icône de la sorte, dans un rond : un repère pour l'œil, la sorte est écrite à côté. */}
+      <View
+        aria-hidden
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={{
+          width: layout.touchTarget - space.xs,
+          height: layout.touchTarget - space.xs,
+          borderRadius: radii.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: borders.hairline,
+          borderColor: colors.outline,
+          backgroundColor: colors.surface,
+        }}
+      >
+        <Icon name={kind.icon} size={20} tone="muted" />
+      </View>
+      <View style={{ flex: 1, gap: space.xs }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: space.sm,
+            rowGap: space.xxs,
+          }}
+        >
+          <Text variant="caption" weight={700}>
+            {kind.label}
+          </Text>
+          {severity ? <SeverityPill {...severity} /> : null}
+          <View style={{ flexGrow: 1 }} />
+          <RelativeTime date={date} tone={quiet} {...(now ? { now } : null)} />
+        </View>
+        <Text variant="callout" numberOfLines={2} breakAnywhere>
+          {text}
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: space.sm,
+            rowGap: space.xxs,
+          }}
+        >
+          <Avatar name={author.name} source={author.avatar} label="" size={20} />
+          <Text variant="caption" tone="secondary">
+            {author.name}
+          </Text>
+          {mission ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
+              <Icon name="flag" size={14} tone={quiet} />
+              <Text variant="caption" tone={quiet}>
+                {mission}
+              </Text>
+            </View>
+          ) : null}
+          <View style={{ flexGrow: 1 }} />
+          <StatusLabel {...status} />
+        </View>
+      </View>
+    </>
   )
 }
 

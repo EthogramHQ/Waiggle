@@ -415,6 +415,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
   { text: 'text', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'honeySoft', min: 4.5 },
+  // R20 : la rangée d'un retour d'Éclaireuse ouvert (ui/ScoutTriageRow) passe sur honeySoft ; son
+  // autrice, sa date et sa mission y sont en textSecondary (textMuted y tombe à 4,44:1 la nuit).
+  { text: 'textSecondary', on: 'honeySoft', min: 4.5 },
   // Le surlignage d'une recherche (R3, relecture ui-9) : les lettres trouvées passent à l'encre sur
   // le miel, dans un titre comme dans une ligne grise.
   { text: 'text', on: 'highlight', min: 4.5 },
