@@ -23,9 +23,11 @@ import { Platform, type StyleProp, StyleSheet, type ViewStyle } from 'react-nati
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { Button } from './Button'
+import { useFloatingClaim } from './floatingSpace'
 import { Screen } from './Screen'
 import { Text } from './Text'
 import { type TabBarSpace, TabBarSpaceContext } from './tabBarSpace'
+import { ToastProvider } from './theme/toast'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
@@ -245,6 +247,23 @@ describe('Screen floating place', () => {
     // La marge habituelle du bas (space.huge, sans encoche) : rien n'est ajouté.
     expect(screen.getByText('La description du projet')).toBeTruthy() // témoin
     expect(bottomPadding()).toBeLessThan(140)
+  })
+
+  it('lifts the end of the content above what another floats in the corner (the scouts drop)', async () => {
+    // R20 : la Goutte réserve sa place (200 points ici) sans être la place flottante de l'écran.
+    // Les réserves sont tenues par le fournisseur des toasts, posé ici comme dans l'appli.
+    function CornerDrop() {
+      useFloatingClaim(200)
+      return null
+    }
+    await renderWithProviders(
+      <ToastProvider>
+        {page()}
+        <CornerDrop />
+      </ToastProvider>,
+    )
+
+    expect(bottomPadding()).toBeGreaterThan(200)
   })
 })
 
