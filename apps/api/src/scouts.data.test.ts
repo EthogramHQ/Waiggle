@@ -19,6 +19,7 @@ import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { inactiveAccounts } from './jobs/inactive-accounts'
 import { nightlyPurge } from './jobs/nightly-purge'
+import { MEMBER_INPUTS, NOT_MEMBER_INPUTS } from './moderation/inputs'
 import { activity } from './testing/activity'
 import {
   createTestContext,
@@ -230,6 +231,38 @@ describe('the purge of the scout data', () => {
       sql`select text, mission_id as "missionId" from scout_report where id = ${sent.id}`,
     )) as unknown as { rows: { text: string; missionId: string | null }[] }
     expect(kept.rows).toEqual([{ text: BUG.text, missionId: null }])
+  })
+})
+
+// ─── Le registre des entrées (choix 14) ──────────────────────────────────────────────────────────
+
+describe('the scout columns in the register of member inputs', () => {
+  /** L'entrée du registre de cette colonne, ou undefined. */
+  const entryOf = (table: string, column: string) =>
+    MEMBER_INPUTS.find((input) => input.table === table && input.column === column)
+
+  /** Vrai si la colonne est classée « pas une saisie d'un membre », avec sa raison. */
+  const notAnInput = (table: string, column: string) => {
+    const entry = NOT_MEMBER_INPUTS[table]
+    return entry === '*' || (entry !== undefined && Object.hasOwn(entry, column))
+  }
+
+  it('classes the text of a report as a member text in her export, and its capture as an image kept out of it', () => {
+    expect(entryOf('scout_report', 'text')).toMatchObject({ kind: 'text', export: true })
+    expect(entryOf('scout_report', 'media_key')).toMatchObject({ kind: 'image', export: false })
+  })
+
+  it('classes the notes of the administrator and the texts of the missions as not written by a member', () => {
+    const wrong = [
+      ['scout_report', 'admin_note'],
+      ['scout_report', 'fixed_note'],
+      ['scout_mission', 'text_fr'],
+      ['scout_mission', 'text_en'],
+    ]
+      .filter(([table = '', column = '']) => entryOf(table, column) || !notAnInput(table, column))
+      .map(([table, column]) => `${table}.${column}`)
+
+    expect(wrong).toEqual([])
   })
 })
 
