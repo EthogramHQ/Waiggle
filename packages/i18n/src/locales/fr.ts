@@ -1802,6 +1802,9 @@ export const fr = {
     pending: 'À traiter',
     removed: 'Retirés',
     empty: 'Aucun signalement en attente.',
+    // R21 : annoncé une fois au lecteur d'écran quand un signalement arrive ; la file ne se relit
+    // pas seule (rien ne bouge sous le doigt), elle se relit au retour sur l'onglet.
+    liveArrival: 'Nouveau signalement',
     emptyRemoved: 'Aucun contenu retiré.',
     // R12 (planche R12-Vitrine) : l'onglet qui choisit la vitrine de l'accueil et « À la une »
     // parmi les projets publics (Q9). L'auteur est prévenu dans Activité et peut la quitter.

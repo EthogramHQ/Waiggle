@@ -827,6 +827,7 @@ export const en: Translation = {
       seeAll_one: 'See the update',
       seeAll_other: 'See the {{count}} updates',
       empty: 'Your followers and your testers will be notified.',
+    liveArrival: 'New report',
       emptyPrivate:
         'No update yet. This project is private: no other member will see what you post, and nobody is notified.',
       sheetTitle: 'New update',
