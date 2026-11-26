@@ -604,7 +604,7 @@ describe('the sheet « Ton retour »', () => {
       await renderWithProviders(<ScoutDrop />)
 
       const tab = await screen.findByRole('button', { name: T.unfold })
-      fireEvent.press(tab)
+      await fireEvent.press(tab)
       expect(screen.queryByRole('button', { name: T.unfold })).toBeNull()
       // Témoin : la Goutte est revenue.
       expect(screen.getByRole('button', { name: new RegExp(`^${T.dropLabel}`) })).toBeTruthy()

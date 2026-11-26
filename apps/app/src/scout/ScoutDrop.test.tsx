@@ -175,7 +175,7 @@ describe('ScoutDrop', () => {
   it('folds into a tab on a long press, which unfolds it, and remembers it between screens', async () => {
     const view = await renderOn('/feed')
 
-    fireEvent(await screen.findByRole('button', { name: DROP }), 'longPress')
+    await fireEvent(await screen.findByRole('button', { name: DROP }), 'longPress')
 
     expect(screen.getByRole('button', { name: UNFOLD })).toBeTruthy()
     expect(screen.queryByRole('button', { name: DROP })).toBeNull()
@@ -185,7 +185,7 @@ describe('ScoutDrop', () => {
     await moveTo(view, '/projects/42')
     expect(screen.getByRole('button', { name: UNFOLD })).toBeTruthy()
 
-    fireEvent.press(screen.getByRole('button', { name: UNFOLD }))
+    await fireEvent.press(screen.getByRole('button', { name: UNFOLD }))
 
     expect(screen.getByRole('button', { name: DROP })).toBeTruthy()
     expect(screen.queryByRole('button', { name: UNFOLD })).toBeNull()
