@@ -43,6 +43,9 @@
 //                        d'accepter ». Sans elle, le parcours local la remplace par un déclencheur de
 //                        sa base (JOURNEY_RULES_TRIGGER=1, posé par journey-local.mjs) ; sans l'un ni
 //                        l'autre, cette étape est passée, et le dit ;
+//   JOURNEY_SCOUT_CODE   (facultatif, R20) le code des Éclaireuses du serveur (SCOUT_INVITE_CODE) :
+//                        un membre devient Éclaireur, envoie un retour par la Goutte, et
+//                        l'administrateur le passe en « Corrigé ». Sans lui, cette étape est passée ;
 //   JOURNEY_SHELL        (facultatif) le shell de ces commandes (par défaut celui du système).
 // La pile d'essai (infra/stack-test.sh) le lance sur https://ruche.localhost. Jamais sur le vrai site :
 // il crée des comptes, et le vrai site n'écrit pas ses e-mails dans les logs.
@@ -57,6 +60,9 @@ const mailCommand = process.env.JOURNEY_MAIL_CMD
 const mediaCommand = process.env.JOURNEY_MEDIA_CMD
 const shell = process.env.JOURNEY_SHELL
 const adminCommand = process.env.JOURNEY_ADMIN_CMD
+// R20 : le code des Éclaireuses du serveur essayé (SCOUT_INVITE_CODE de l'API). Facultatif : sans
+// lui, l'étape des Éclaireuses est passée.
+const scoutCode = process.env.JOURNEY_SCOUT_CODE ?? ''
 // R11 : un membre dont l'accord aux règles manque (le cas d'un membre inscrit avant leur arrivée).
 // Aucune route de l'API ne retire un accord : soit une commande l'efface dans la base une fois
 // l'inscription faite, soit la base elle-même ne l'écrit pas (le parcours local pose un
@@ -1590,6 +1596,79 @@ try {
     .getByText(/^Ton signalement a été traité\s*: la partie que tu as signalée a été retirée\.$/)
     .waitFor()
   console.log('  ok : Malik lit « la partie que tu as signalée a été retirée »')
+
+  // --- Tranche R20 : les Éclaireuses. Sam entre par le code, dans ses réglages ; il envoie un
+  // retour par la Goutte, le relit dans « Mes retours » ; l'administrateur le passe en « Corrigé »,
+  // avec une note, et Sam lit l'avis dans son Activité, puis la note sous son retour. Le code vient
+  // de JOURNEY_SCOUT_CODE (journey-local.mjs le tire au hasard pour SCOUT_INVITE_CODE de l'API) ;
+  // sans lui (une pile où le serveur n'en a pas), l'étape est passée, et le dit.
+  if (scoutCode) {
+    step('Sam devient Éclaireur avec le code, depuis Réglages > Les Éclaireuses')
+    await openSettings(sam, 'Les Éclaireuses', '/settings/scouts')
+    // « J'ai un code » est un dépliant : son nom peut porter sa phrase d'aide.
+    await byRole(sam.page, 'button', /^J’ai un code/).click()
+    await byRole(sam.page, 'textbox', 'Code des Éclaireuses').fill(scoutCode)
+    await byRole(sam.page, 'button', 'Rejoindre les Éclaireuses').click()
+    await waitFor(
+      'Sam Éclaireur',
+      async () => (await (await sam.request.get(`${apiUrl}/v1/me`)).json()).scout?.active === true,
+    )
+    await byRole(sam.page, 'switch', 'Afficher la Goutte').waitFor()
+    console.log('  ok : Sam est Éclaireur, « Afficher la Goutte » est là')
+
+    step('Sam touche la Goutte sur son Fil et envoie un retour : un bug gênant')
+    const scoutText = `Le fil saute en haut quand je reviens d’un projet (${randomBytes(3).toString('hex')})`
+    await open(sam.page, `${appUrl}/feed`)
+    await byRole(sam.page, 'button', /^Faire un retour sur /).click()
+    const sheet = sam.page.getByRole('dialog', { name: 'Ton retour' })
+    await byRole(sheet, 'radio', 'Bug').click()
+    await byRole(sheet, 'radio', 'Gênant').click()
+    await byRole(sheet, 'textbox', 'Raconte').fill(scoutText)
+    await byRole(sheet, 'button', 'Envoyer').click()
+    await sam.page.getByText('Merci, c’est noté', { exact: true }).first().waitFor()
+    const sentReport = await waitFor('le retour de Sam, dans l’API', async () => {
+      const { reports = [] } = await (await sam.request.get(`${apiUrl}/v1/me/scout/reports`)).json()
+      return reports.find((report) => report.text === scoutText)
+    })
+    // La Goutte joint l'écran d'où elle est partie (sans les paramètres), sauf refus du membre.
+    expectEqual('écran joint au retour', sentReport.context?.screen, '/feed')
+    expectEqual('statut du retour envoyé', sentReport.status, 'sent')
+
+    step('Sam relit son retour dans « Mes retours », marqué « Envoyé »')
+    await open(sam.page, `${appUrl}/settings/scouts`)
+    await shownText(sam.page, scoutText).waitFor()
+    console.log('  ok : Sam lit son retour dans « Mes retours »')
+
+    step('L’administrateur ouvre le retour dans « Éclaireuses » et le passe en « Corrigé »')
+    await open(admin.page, `${appUrl}/moderation/scouts`)
+    // La rangée se nomme par tout ce qu'elle montre (sorte, gravité, texte, auteur, statut).
+    await byRole(admin.page, 'button', new RegExp(scoutText.replace(/[()]/g, '\\$&')))
+      .first()
+      .click()
+    await byRole(admin.page, 'radio', 'Corrigé').click()
+    const fixDialog = admin.page.getByRole('dialog', { name: /^Marquer comme corrigé\s*\?$/ })
+    const fixedNote = 'Réglé, merci Sam !'
+    await fixDialog.getByRole('textbox').first().fill(fixedNote)
+    await byRole(fixDialog, 'button', 'Marquer corrigé').click()
+    await waitFor('retour corrigé, dans l’API', async () => {
+      const { reports = [] } = await (await sam.request.get(`${apiUrl}/v1/me/scout/reports`)).json()
+      return reports.find((report) => report.id === sentReport.id)?.status === 'fixed'
+    })
+    console.log('  ok : le retour est « Corrigé »')
+
+    step('Sam lit l’avis « Ta danse a été entendue » dans son Activité, puis la note du correctif')
+    await open(sam.page, `${appUrl}/notifications`)
+    await sam.page
+      .getByText(/^Ta danse a été entendue\s*:/)
+      .first()
+      .waitFor()
+    console.log('  ok : Sam lit l’avis du correctif dans son Activité')
+    await open(sam.page, `${appUrl}/settings/scouts`)
+    await shownText(sam.page, `« ${fixedNote} »`).waitFor()
+    console.log('  ok : Sam lit la note de l’administrateur sous son retour')
+  } else {
+    step('Les Éclaireuses : étape passée (JOURNEY_SCOUT_CODE absent, le serveur n’a pas de code)')
+  }
 
   // --- Tranche 7c : suspendre un compte, puis lever la suspension ---
   step('Karim s’inscrit : il a « Publier un projet » sur son accueil')
