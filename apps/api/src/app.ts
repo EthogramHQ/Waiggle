@@ -434,10 +434,10 @@ export const createApp = ({
   app.route('/', toolRoutes({ db, limiter }))
   app.route('/', followRoutes({ db, limiter, live }))
   // Bloquer, débloquer, la liste « Membres bloqués » (tranche 7b).
-  app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
+  app.route('/', blockRoutes({ db, limiter, publicApiUrl, live }))
   app.route('/', updateRoutes({ db, storage, limiter, publicApiUrl, live }))
   // Rejoindre et quitter les testeurs d'un projet (tranche R7a).
-  app.route('/', testerRoutes({ db, limiter, publicApiUrl }))
+  app.route('/', testerRoutes({ db, limiter, publicApiUrl, live }))
   // Le coin des testeurs (tranche R7b) : les appels à tester et l'envoi de leurs images.
   app.route('/', testerCallRoutes({ db, storage, limiter, publicApiUrl, live }))
   app.route('/', testerMediaRoutes({ db, storage, limiter, publicApiUrl }))
@@ -453,7 +453,7 @@ export const createApp = ({
   // « Proches à suivre » : la liste et « × » (tranche R4).
   app.route('/', suggestionRoutes({ db, limiter, publicApiUrl }))
   // Les ruches (R10) : mes ruches, créer, la page, l'actualité, les membres, l'animateur, quitter.
-  app.route('/', hiveRoutes({ db, limiter, publicApiUrl }))
+  app.route('/', hiveRoutes({ db, limiter, publicApiUrl, live }))
   // Les invitations : la recherche « Inviter », inviter, rejoindre, refuser (R10).
   app.route('/', hiveInvitationRoutes({ db, limiter, publicApiUrl, live }))
   // Les classements de la semaine : les proches, ou une ruche (R19).
@@ -473,7 +473,7 @@ export const createApp = ({
   app.route('/', reportRoutes({ db, limiter, publicApiUrl, live }))
   // Le temps réel (R21) : le flux de chaque appareil et la déclaration de ses pages ouvertes.
   app.route('/', liveRoutes({ db, limiter, hub }))
-  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl, appUrl }))
+  app.route('/', moderationRoutes({ db, limiter, auth, mailer, publicApiUrl, appUrl, live }))
   // L'administration du catalogue des outils et des catégories (tranche R6b).
   app.route('/', moderationCatalogueRoutes({ db, limiter, live }))
   // La vitrine de l'accueil (R12) : « À la une », l'onglet de la modération, « Retirer de l'accueil ».

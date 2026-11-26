@@ -19,7 +19,8 @@
 // - `ownerOf(id)`, `declaredOf(id)`, `declare(id, topics)`, `exclusive(id, task)` : la déclaration
 //   des sujets (PUT /v1/live/{connectionId}/topics), une seule à la fois par connexion (A1) ;
 // - `listeners(topic)` : les membres dont une connexion écoute ce sujet (pour borner les lectures
-//   du filtre : sans écouteur, aucune requête) ;
+//   du filtre : sans écouteur, aucune requête) ; `declaredBy(userId)` : les sujets déclarés d'un
+//   membre, toutes ses connexions réunies (la revérification d'un blocage, d'un départ) ;
 // - `emit(event, allow)` : le signal, aux seules connexions du sujet dont le membre passe `allow` ;
 // - `toMembers(ids, kind)` : un signal sur le `me` de ces membres seulement ;
 // - `withdraw(topic, allow)` : retire un sujet aux connexions dont le membre ne passe plus `allow`,
@@ -343,6 +344,18 @@ export const createLiveHub = ({ recheck }: { recheck?: SessionRecheck } = {}) =>
       const users = new Set<string>()
       for (const conn of byTopic.get(topic) ?? []) users.add(conn.userId)
       return users
+    },
+
+    /**
+     * Les sujets déclarés par ce membre, toutes ses connexions réunies (vide sans flux ouvert). Sert
+     * à la revérification d'un geste qui touche un membre (un blocage, un départ de ruche) : on ne
+     * relit que ce que ce membre regarde, sans parcourir les sujets des autres (live/recheck.ts).
+     */
+    declaredBy(userId: string): ReadonlySet<string> {
+      const topics = new Set<string>()
+      for (const conn of byUser.get(userId) ?? [])
+        for (const topic of conn.declared) topics.add(topic)
+      return topics
     },
 
     /** Vrai si aucun flux n'est ouvert : les aides d'émission n'ont alors rien à lire. */

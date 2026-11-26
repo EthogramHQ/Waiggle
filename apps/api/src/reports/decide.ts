@@ -22,6 +22,8 @@ import {
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import { type PollenSource, restoreFor, revokeFor } from '../game/award'
+import { hiveChanged, type Live, projectChanged, projectScopeOf, toAdmins } from '../live/emit'
+import { projectTopics, recheckTopics } from '../live/recheck'
 import {
   isDecisionConflict,
   lockDecision,
@@ -35,10 +37,55 @@ import {
   reportsOfPart,
   restorePart,
 } from '../moderation/parts'
-import { SuspensionChanged, type SuspensionError, suspendOrLift } from '../moderation/suspend'
+import {
+  announceSuspension,
+  SuspensionChanged,
+  type SuspensionError,
+  suspendOrLift,
+} from '../moderation/suspend'
 import { dropFromShowcase } from '../showcase/store'
 import { isActiveAdmin } from './admin'
 import { loadDecidable } from './target'
+
+/**
+ * R21 : le temps réel, après une décision validée (la route l'appelle hors de la transaction, avant
+ * de répondre).
+ * - Les autres administrateurs : la file de modération a changé (`moderation`).
+ * - Une suspension : le coin de chacun des projets du membre (moderation/suspend.ts).
+ * - Un projet retiré (entier) : qui regardait sa page ou son coin sans plus pouvoir les lire
+ *   reçoit `gone` (live/recheck.ts) ; son auteur, qui le lit toujours, voit sa page changer. Un
+ *   projet rétabli, ou une partie retirée ou rendue : sa page, celle de son auteur et celle de sa
+ *   ruche se relisent chez qui les lit. Le geste est celui de la modération, pas d'un membre :
+ *   l'« auteur du geste » passé au filtre est l'auteur du projet, pour qu'un blocage avec
+ *   l'administrateur ne change rien à qui reçoit le signal.
+ * - Une ruche (son nom retiré ou rendu) : sa page, chez ses membres.
+ */
+export const announceDecision = async (live: Live, input: ModerationDecisionInput) => {
+  toAdmins(live, 'moderation')
+  if (input.action === 'suspend' || input.action === 'lift') {
+    await announceSuspension(live, input)
+    return
+  }
+  if (input.action === 'dismiss') return
+  const { target } = input
+  if (target.kind === 'project') {
+    if (input.action === 'remove' && !input.part) {
+      await recheckTopics(live, projectTopics([target.id]))
+    }
+    if (live.hub.isIdle()) return
+    const project = await projectScopeOf(live.db, target.id)
+    if (!project) return
+    await projectChanged(live, {
+      project,
+      actorId: project.authorId,
+      page: 'project',
+      member: 'project',
+      hive: 'hive',
+    })
+  } else if (target.kind === 'hive') {
+    await hiveChanged(live, { hiveId: target.id, actorId: null })
+  }
+}
 
 /** Les refus d'une décision ; ceux de la suspension (SuspensionError) en plus, tranche 7c. */
 export type DecideError =

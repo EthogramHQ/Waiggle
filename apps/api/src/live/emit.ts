@@ -35,6 +35,8 @@
 // - `memberChanged(live, { memberId, actorId, page?, notify? })` : la page d'un membre (ses abonnés) ;
 // - `notifyMembers(live, { actorId, recipients, kind? })` : le `me` de membres, hors de tout projet
 //   (une invitation, un avis de jeu), sans blocage avec l'auteur du geste ;
+// - `hiveChanged(live, { hiveId, actorId })` : la page d'une ruche (nom, membres, animateur…), pour
+//   ses membres actuels ;
 // - `toOwnDevices(live, userIds, kind)` : le `me` de membres, sans filtre, pour ce qui n'appartient
 //   qu'à eux (le pollen, les deux personnes d'un fil de testeur, déjà vérifiées par la route) ;
 // - `toAdmins(live, kind)` : `moderation` ou `scouts`, que seuls les administrateurs en fonction
@@ -94,7 +96,7 @@ const audienceOf = (project: ProjectScope): Audience => {
 }
 
 /** Une émission ratée est notée sans données de membre, et la route répond quand même. */
-const safely = async (what: string, task: () => Promise<void>) => {
+export const safely = async (what: string, task: () => Promise<void>) => {
   try {
     await task()
   } catch (error) {
@@ -106,7 +108,7 @@ const safely = async (what: string, task: () => Promise<void>) => {
  * Les membres de ces ruches, aujourd'hui : « hive_id in (…) », par la clé primaire de hive_member
  * (hive_id, user_id), dont hive_id est la première colonne. Une ruche a peu de membres.
  */
-const hiveMembersOf = async (db: Pick<Database, 'select'>, hiveIds: readonly string[]) => {
+export const hiveMembersOf = async (db: Pick<Database, 'select'>, hiveIds: readonly string[]) => {
   const members = new Map<string, Set<string>>(hiveIds.map((id) => [id, new Set<string>()]))
   if (hiveIds.length === 0) return members
   const rows = await db
@@ -274,6 +276,31 @@ export const notifyMembers = (
       connected.filter((id) => !blocked.has(id)),
       kind,
     )
+  })
+
+/**
+ * La page d'une ruche (`hive:<id>`) a changé sans qu'un projet soit en cause : son nom, son
+ * icône, son épingle, ses membres, son animateur. Le signal ne part qu'à ses membres d'aujourd'hui
+ * (un ancien membre a déjà reçu `gone`, live/recheck.ts), sans blocage avec l'auteur du geste.
+ * Deux requêtes, et aucune sans écouteur : les membres par la clé primaire de hive_member
+ * (hive_id en tête), les blocages de l'acteur par `blockPartnersOf`.
+ */
+export const hiveChanged = (
+  live: Live,
+  { hiveId, actorId }: { hiveId: string; actorId: string | null },
+) =>
+  safely('hive', async () => {
+    const { db, hub } = live
+    const topic = `hive:${hiveId}`
+    if (hub.listeners(topic).size === 0) return
+    // `actorId` null : un geste de la modération (le nom de la ruche retiré), sans membre derrière.
+    const [members, partners] = await Promise.all([
+      hiveMembersOf(db, [hiveId]),
+      blockPartnersOf(db, actorId === null ? [] : [actorId]),
+    ])
+    const inHive = members.get(hiveId) ?? new Set<string>()
+    const blocked = (actorId === null ? undefined : partners.get(actorId)) ?? new Set<string>()
+    hub.emit({ topic, kind: 'hive' }, (userId) => inHive.has(userId) && !blocked.has(userId))
   })
 
 /** Le `me` de ces membres, sans filtre : ce qui n'appartient qu'à eux (voir l'en-tête). */

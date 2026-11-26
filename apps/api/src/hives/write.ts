@@ -85,10 +85,11 @@ export const isForeignKeyViolation = (error: unknown) => {
  * Rend privés les projets réservés à cette ruche (tous, ou ceux d'un auteur) : un auteur qui part
  * les garde pour lui seul, une ruche supprimée les rend à leurs auteurs. Index partiel
  * project_hive_created_idx (hive_id, …) where visibility = 'hive'. La date de mise à jour du projet
- * ne change pas : il n'a pas été modifié par son auteur.
+ * ne change pas : il n'a pas été modifié par son auteur. Rend les identifiants des projets rendus
+ * privés (`returning`) : le temps réel retire leur page à qui la regardait (R21, live/recheck.ts).
  */
-const privatizeReserved = (tx: Tx, hiveId: string, authorId?: string) =>
-  tx
+const privatizeReserved = async (tx: Tx, hiveId: string, authorId?: string) => {
+  const rows = await tx
     .update(p)
     .set({ visibility: 'private', hiveId: null })
     .where(
@@ -98,6 +99,9 @@ const privatizeReserved = (tx: Tx, hiveId: string, authorId?: string) =>
         authorId ? eq(p.authorId, authorId) : undefined,
       ),
     )
+    .returning({ id: p.id })
+  return rows.map((row) => row.id)
+}
 
 /**
  * R10, relecture de sécurité (A2) : avant de supprimer une ruche, ses copies du nom gardées pour
@@ -229,6 +233,19 @@ export const changeHive = (
 export type GestureOutcome = 'done' | 'not_found' | 'forbidden'
 
 /**
+ * R21 : ce qu'une suppression de ruche ou un départ a changé, pour le temps réel (routes/hives.ts) :
+ * les projets rendus privés (leur page se retire à qui ne les voit plus), les membres concernés
+ * (leur liste de ruches et leur Activité changent), et si la ruche a disparu.
+ */
+export type HiveDeparture = {
+  privatized: readonly string[]
+  /** Les membres qui lisent un avis neuf dans leur Activité (supprimée, retiré, nouvel animateur). */
+  noticed: readonly string[]
+  hiveDeleted: boolean
+}
+const NOTHING_CHANGED: HiveDeparture = { privatized: [], noticed: [], hiveDeleted: false }
+
+/**
  * L'animateur supprime la ruche, en une transaction : ses projets réservés redeviennent privés pour
  * leurs auteurs, chaque autre membre lit « La ruche Famille a été supprimée. » dans son Activité,
  * puis la ruche part, avec ses membres et ses invitations (cascade). Les lignes de hive_member sont
@@ -237,7 +254,7 @@ export type GestureOutcome = 'done' | 'not_found' | 'forbidden'
  * la ruche (`hive_id` null) : elle n'existe plus, seule la copie du nom reste.
  */
 export const deleteHive = (db: Database, hiveId: string, animatorId: string, now: Date) =>
-  db.transaction(async (tx): Promise<GestureOutcome> => {
+  db.transaction(async (tx): Promise<'not_found' | 'forbidden' | HiveDeparture> => {
     const hive = await lockHive(tx, hiveId)
     if (!hive) return 'not_found'
     if (hive.animatorId !== animatorId) return 'forbidden'
@@ -246,7 +263,7 @@ export const deleteHive = (db: Database, hiveId: string, animatorId: string, now
       .from(hm)
       .where(eq(hm.hiveId, hiveId))
       .for('update')
-    await privatizeReserved(tx, hiveId)
+    const privatized = await privatizeReserved(tx, hiveId)
     const reported = await blankReportedCopies(tx, hiveId)
     const others = members.filter((member) => member.userId !== animatorId)
     if (others.length > 0) {
@@ -259,7 +276,7 @@ export const deleteHive = (db: Database, hiveId: string, animatorId: string, now
         )
     }
     await tx.delete(h).where(eq(h.id, hiveId))
-    return 'done'
+    return { privatized, noticed: others.map((member) => member.userId), hiveDeleted: true }
   })
 
 // ─── Quitter, retirer ─────────────────────────────────────────────────────────────────────────────
@@ -283,17 +300,17 @@ export const removeFromHive = (
   memberId: string,
   now: Date,
 ) =>
-  db.transaction(async (tx): Promise<GestureOutcome> => {
+  db.transaction(async (tx): Promise<'not_found' | 'forbidden' | HiveDeparture> => {
     const leaving = actorId === memberId
     const hive = await lockHive(tx, hiveId)
-    if (!hive) return leaving ? 'done' : 'not_found'
+    if (!hive) return leaving ? NOTHING_CHANGED : 'not_found'
     if (!leaving && hive.animatorId !== actorId) return 'forbidden'
     const gone = await tx
       .delete(hm)
       .where(and(eq(hm.hiveId, hiveId), eq(hm.userId, memberId)))
       .returning({ userId: hm.userId })
-    if (gone.length === 0) return leaving ? 'done' : 'not_found'
-    await privatizeReserved(tx, hiveId, memberId)
+    if (gone.length === 0) return leaving ? NOTHING_CHANGED : 'not_found'
+    const privatized = await privatizeReserved(tx, hiveId, memberId)
 
     // Le plus ancien des membres restants (clé primaire de hive_member, lue par son début).
     const [oldest] = await tx
@@ -305,10 +322,10 @@ export const removeFromHive = (
     if (!oldest) {
       // Le dernier membre est parti : la ruche n'a plus personne. Ses projets réservés (il ne
       // devrait plus y en avoir) redeviennent privés d'abord, sinon leur clé étrangère l'empêcherait.
-      await privatizeReserved(tx, hiveId)
+      const others = await privatizeReserved(tx, hiveId)
       await blankReportedCopies(tx, hiveId)
       await tx.delete(h).where(eq(h.id, hiveId))
-      return 'done'
+      return { privatized: [...privatized, ...others], noticed: [], hiveDeleted: true }
     }
     const notices = []
     if (hive.animatorId === memberId || hive.animatorId === null) {
@@ -317,7 +334,11 @@ export const removeFromHive = (
     }
     if (!leaving) notices.push(notice(memberId, 'removed', hive, now))
     if (notices.length > 0) await tx.insert(schema.hiveNotice).values(notices)
-    return 'done'
+    return {
+      privatized,
+      noticed: notices.map((one) => one.recipientId),
+      hiveDeleted: false,
+    }
   })
 
 // ─── Confier l'animation ──────────────────────────────────────────────────────────────────────────
