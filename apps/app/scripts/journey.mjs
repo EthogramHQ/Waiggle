@@ -1669,6 +1669,9 @@ try {
       ).json()
       return missions.find((mission) => mission.id === missionId)?.done === true
     })
+    // La feuille se ferme par une navigation de l'appli (retour aux missions) : la page n'est
+    // rechargée qu'une fois la feuille partie, sinon Chromium coupe l'une des deux (ERR_ABORTED).
+    await answerSheet.waitFor({ state: 'hidden' })
     await open(sam.page, `${appUrl}/scout/missions`)
     // La page relue : la mission répondue porte « Faite ».
     await sam.page.getByText('Faite', { exact: true }).first().waitFor()
