@@ -4809,10 +4809,11 @@ leur retour est corrigé.
 
 ### Le titre et le sceau
 
-- Le titre **Éclaireuse** se gagne en devenant Éclaireuse. Les retours à {{appName}}, les missions
-  et les danses entendues comptent pour lui (une cinquième famille de gestes, R19) : il s'affiche
-  tout seul quand c'est ce qui a rapporté le plus de pollen sur 4 semaines, et s'épingle comme les
-  autres.
+- Le titre **Éclaireuse** se gagne en devenant Éclaireuse, et c'est le titre qu'elle porte tant
+  qu'elle n'en épingle pas un autre (R19). Il reste après le mois. Une Éclaireuse retirée revient
+  à la règle de R19.
+- Le pollen des retours, des missions et des danses entendues compte dans la famille Gardienne
+  (tester et faire des retours), et un retour rend la semaine butinée.
 - Le sceau **« Éclaireuse fondatrice »** (miel, une goutte) n'existe que pour les Éclaireuses de ce
   mois-ci : personne ne pourra plus le gagner ensuite.
 - Le classement de la semaine compte ce pollen comme les autres.
