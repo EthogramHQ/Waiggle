@@ -114,7 +114,8 @@ export function TitleSettings() {
   const setting = useGameSetting()
   const { harvest, set, hidden } = setting
   // R20 : le profil dit si l'on est Éclaireuse active (le titre « Éclaireuse » est alors épinglable).
-  const scoutActive = useMe().data?.scout?.active === true
+  // « Mon profil » l'a déjà lu : on prend sa copie, sans nouvelle demande à l'API.
+  const scoutActive = useMe(true, { refetchOnMount: false }).data?.scout?.active === true
   if (hidden) return null
   const data = harvest.data
   if (!data) return <SettingNotice setting={setting} />

@@ -13,10 +13,13 @@ export const meQueryKey = ['me'] as const
 /**
  * Le profil du membre connecté. `enabled: false` (personne de connecté) : aucune requête.
  * `retryOnMount: false` : ce lecteur, en apparaissant, ne relance pas une lecture qui a échoué
- * (voir TopNav). Renvoie { data, isPending, isError… } : les écrans affichent un état selon le cas.
+ * (voir TopNav). `refetchOnMount: false` : ce lecteur se contente du profil déjà en cache, sans
+ * le relire en apparaissant (il ne le lit que s'il manque) ; pour un élément posé dans un écran qui
+ * lit déjà le profil (R20, le titre « Éclaireuse » dans « Mon profil »). Renvoie { data, isPending,
+ * isError… } : les écrans affichent un état selon le cas.
  */
-export const useMe = (enabled = true, { retryOnMount = true } = {}) =>
-  useQuery({ queryKey: meQueryKey, queryFn: getMe, enabled, retryOnMount })
+export const useMe = (enabled = true, { retryOnMount = true, refetchOnMount = true } = {}) =>
+  useQuery({ queryKey: meQueryKey, queryFn: getMe, enabled, retryOnMount, refetchOnMount })
 
 /** Remplace le profil gardé en cache par celui renvoyé par l'API après une modification. */
 export const useSetMe = () => {
