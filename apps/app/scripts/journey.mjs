@@ -1634,6 +1634,46 @@ try {
     expectEqual('écran joint au retour', sentReport.context?.screen, '/feed')
     expectEqual('statut du retour envoyé', sentReport.status, 'sent')
 
+    step('L’administrateur publie une mission ; Sam y répond depuis « Missions de la semaine »')
+    const missionText = `Cherche un outil par son nom (${randomBytes(2).toString('hex')})`
+    await open(admin.page, `${appUrl}/moderation/scouts`)
+    await byRole(admin.page, 'button', /^(Écrire|Modifier)$/).click()
+    const editor = admin.page.getByRole('dialog', { name: 'Missions de la semaine' })
+    const firstMission = byRole(editor, 'textbox', 'En français, Mission 1')
+    if ((await firstMission.count()) === 0) {
+      await byRole(editor, 'button', 'Ajouter une mission').click()
+    }
+    await firstMission.fill(missionText)
+    await byRole(editor, 'button', 'Publier les missions').click()
+    const missionId = await waitFor('la mission, chez Sam', async () => {
+      const { missions = [] } = await (
+        await sam.request.get(`${apiUrl}/v1/me/scout/missions`)
+      ).json()
+      return missions.find((mission) => mission.text === missionText)?.id
+    })
+    await open(sam.page, `${appUrl}/scout/missions`)
+    await shownText(sam.page, missionText).waitFor()
+    await byRole(sam.page, 'button', 'Répondre').first().click()
+    const answerSheet = sam.page.getByRole('dialog', { name: 'Ton retour' })
+    await answerSheet.getByText(`Mission : ${missionText}`).first().waitFor()
+    await byRole(answerSheet, 'radio', 'Idée').click()
+    await byRole(answerSheet, 'textbox', 'Raconte').fill(
+      'Trouvé tout de suite, la recherche est rapide.',
+    )
+    // « Continuer » puis « Envoyer » : la garde de double tape des feuilles (pieges/parcours.md).
+    await sam.page.waitForTimeout(700)
+    await byRole(answerSheet, 'button', 'Envoyer').click()
+    await waitFor('mission faite, dans l’API', async () => {
+      const { missions = [] } = await (
+        await sam.request.get(`${apiUrl}/v1/me/scout/missions`)
+      ).json()
+      return missions.find((mission) => mission.id === missionId)?.done === true
+    })
+    await open(sam.page, `${appUrl}/scout/missions`)
+    // La page relue : la mission répondue porte « Faite ».
+    await sam.page.getByText('Faite', { exact: true }).first().waitFor()
+    console.log('  ok : la mission est « Faite » pour Sam')
+
     step('Sam relit son retour dans « Mes retours », marqué « Envoyé »')
     await open(sam.page, `${appUrl}/settings/scouts`)
     await shownText(sam.page, scoutText).waitFor()

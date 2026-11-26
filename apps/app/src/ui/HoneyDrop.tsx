@@ -25,7 +25,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import { BADGE_SIZE, badgeText } from './CountBadge'
-import { useFloatingClaim } from './floatingSpace'
+import { useFloatingClaim, useFloatingTopOfOthers } from './floatingSpace'
 import { focusWithoutScroll, moveReaderTo } from './focus'
 import { Icon } from './Icon'
 import { Text } from './Text'
@@ -106,9 +106,16 @@ export function HoneyDrop({
 function CornerPlace({ folded, children }: { folded: boolean; children: ReactNode }) {
   const tabBar = useTabBarSpace()
   const insets = useSafeAreaInsets()
-  const { padding } = useLayout()
-  const bottom = tabBar.height > 0 ? tabBar.height + space.md : insets.bottom + padding
-  useFloatingClaim(bottom + (folded ? TAB.height : DROP_SIZE))
+  const { padding, sizeClass } = useLayout()
+  const corner = tabBar.height > 0 ? tabBar.height + space.md : insets.bottom + padding
+  // R20 : sur téléphone, la capsule des réactions d'un projet occupe le bas de l'écran sur presque
+  // toute sa largeur ; la Goutte se pose alors au-dessus de la plus haute place réservée par un autre
+  // (l'écran, sa capsule). Sur tablette et ordinateur, la capsule centrée laisse le coin libre.
+  const owner = useRef<object | null>(null)
+  const othersTop = useFloatingTopOfOthers(owner.current ?? {})
+  const bottom =
+    sizeClass === 'compact' && othersTop > 0 ? Math.max(corner, othersTop + space.sm) : corner
+  owner.current = useFloatingClaim(bottom + (folded ? TAB.height : DROP_SIZE))
   const place: ViewStyle = {
     position: layerPosition as ViewStyle['position'],
     bottom,
