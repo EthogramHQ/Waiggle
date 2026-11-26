@@ -57,6 +57,7 @@ import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limi
 import { reactionsOfMember } from '../reactions/load'
 import { partOwnerKey, removedPartsOf } from '../removals/parts'
 import { rulesAcceptancesOf } from '../rules/acceptance'
+import { scoutExportOf } from '../scouts/export'
 import { showcaseExportOf } from '../showcase/store'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isJsonObject, suspendedProfileChange } from '../suspension/guard'
@@ -795,6 +796,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         updates,
         testerOf,
         ...testerCorner,
+        // R20 : sa part d'Éclaireuse (entrée, retrait, retours avec la note de l'administrateur et
+        // l'adresse de leur capture, missions répondues), null s'il ne l'a jamais été.
+        scout: await scoutExportOf(db, user.id, publicApiUrl),
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
         comments: comments.map((comment) => ({

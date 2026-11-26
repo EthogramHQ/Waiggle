@@ -29,6 +29,7 @@ import {
   type FamilyPollen,
   familyPollenOf,
   gameSettingsOf,
+  isScoutTitleHolder,
   obtainedFamiliesOf,
   sealsOf,
   titleOf,
@@ -87,7 +88,7 @@ export const loadHarvest = async (
   now: Date,
 ): Promise<Harvest | null> => {
   if (await isExample(db, memberId)) return null
-  const [pollen, byFamily, honey, settings, seals, weeks, personalChallenge, hives] =
+  const [pollen, byFamily, honey, settings, seals, weeks, personalChallenge, isScout, hives] =
     await Promise.all([
       familyPollenOf(db, memberId, now),
       weekPollenOf(db, memberId, now),
@@ -96,6 +97,7 @@ export const loadHarvest = async (
       sealsOf(db, memberId),
       loadForagedWeeks(db, memberId, now),
       personalChallengeOf(db, memberId, now),
+      isScoutTitleHolder(db, memberId),
       db
         .select({
           id: schema.hive.id,
@@ -120,7 +122,7 @@ export const loadHarvest = async (
     total,
     cells,
     toNext,
-    title: titleOf(pollen, settings),
+    title: titleOf(pollen, settings, isScout),
     obtainedFamilies: obtainedFamiliesOf(pollen),
     week: { total: FAMILIES.reduce((sum, family) => sum + byFamily[family], 0), byFamily },
     weeks,
@@ -172,7 +174,13 @@ export const updateGameSettings = (
         return 'invalid_level_seen'
       }
       const pinned = patch.pinnedFamily ?? null
-      if (pinned !== null && pollen[pinned].total < TITLE_THRESHOLD) return 'family_not_obtained'
+      // R20 : `scout` s'épingle si l'on est Éclaireuse non retirée (clé primaire de `scout`) ; une
+      // famille, si elle est obtenue. Le même refus 422 dans les deux cas.
+      if (pinned === 'scout') {
+        if (!(await isScoutTitleHolder(tx, memberId))) return 'family_not_obtained'
+      } else if (pinned !== null && pollen[pinned].total < TITLE_THRESHOLD) {
+        return 'family_not_obtained'
+      }
     }
     if (patch.personalChallenge !== undefined) {
       const refused = await choosePersonalChallenge(tx, memberId, patch.personalChallenge, now)
