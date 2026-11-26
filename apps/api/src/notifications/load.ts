@@ -20,6 +20,8 @@ import {
   type Notification,
   RemovalGround,
   ReportPartField,
+  SCOUT_EXCERPT_MAX,
+  SCOUT_MISSIONS_MAX,
   SealCode,
   StoredReportTargetKind,
   UNREAD_COUNT_MAX,
@@ -479,6 +481,10 @@ const sources = (me: string, since: Date, now: Date, until?: Date, keepOnShowcas
  * primaire. Ce qui reste montré se décide ici, à la lecture :
  * - « Ma récolte » coupée (`member_game.harvest_notices` faux) les cache tous ; rallumée, ils
  *   reviennent. Pas de ligne de réglages : allumée (valeur par défaut). Clé primaire de member_game.
+ *   Sauf le retrait des Éclaireuses (R20, `scout_removed`), toujours montré : il dit pourquoi et
+ *   comment joindre l'éditeur (relecture juridique J1 ; `ALWAYS_SHOWN_NOTICES` de game/notices.ts).
+ * - R20, « Ta danse a été entendue » : l'avis part avec le retour (clé étrangère en cascade) ; son
+ *   extrait est lu dans le retour, plus bas (loadDetailedRows).
  * - Du miel offert : caché si l'un a bloqué l'autre, dans un sens ou dans l'autre (relecture
  *   juridique B1, `notBlockedWith` par les index de member_block) ; parti avec le compte de qui l'a
  *   offert (clé étrangère en cascade) ; seulement sur un de ses projets.
@@ -493,7 +499,8 @@ const gameSources = (me: string, during: (column: string) => SQL): SQL => sql`
       null, null, null, null, null, null, gn.id
     from game_notice gn
     where gn.member_id = ${me} and ${during('gn.created_at')}
-      and coalesce((select mg.harvest_notices from member_game mg where mg.member_id = ${me}), true)
+      and (gn.kind = 'scout_removed'
+        or coalesce((select mg.harvest_notices from member_game mg where mg.member_id = ${me}), true))
       and (gn.actor_id is null or ${notBlockedWith(me, sql.raw('gn.actor_id'))})
       and (gn.project_id is null
         or (select 1 from project gp where gp.id = gn.project_id and gp.author_id = ${me} limit 1) is not null)
@@ -988,6 +995,10 @@ const ListRow = z.object({
     'game_seal',
     'game_hive_challenge',
     'game_honey_gift',
+    // R20 : les Éclaireuses (source 21 aussi).
+    'game_scout_heard',
+    'game_scout_missions',
+    'game_scout_removed',
   ]),
   key: z.string(),
   at: z.string(),
@@ -1074,6 +1085,12 @@ const ListRow = z.object({
   game_level: z.number().int().nullable(),
   game_code: z.string().nullable(),
   game_honey: z.number().int().nullable(),
+  // R20 : le nombre de missions, le motif d'un retrait, le retour corrigé et le début de son texte
+  // (lu dans le retour, jamais recopié dans l'avis : relecture juridique J3).
+  game_count: z.number().int().nullable(),
+  game_reason: z.string().nullable(),
+  game_report_id: z.string().nullable(),
+  game_report_text: z.string().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -1524,7 +1541,38 @@ export const present = (
       // Qui a offert (son nom et sa photo, comme dans le coin des testeurs) et le projet.
       if (!project || row.author_id === null || row.author_name === null) return null
       return { ...common, kind: 'game_honey_gift', actor: authorOf(row, publicApiUrl), project }
+    // R20 : les avis des Éclaireuses.
+    case 'game_scout_heard': {
+      // Le retour et le début de son texte ; un retour supprimé emporte l'avis (cascade).
+      const excerpt = scoutExcerptOf(row.game_report_text)
+      if (row.game_report_id === null || excerpt === null) return null
+      return { ...common, kind: 'game_scout_heard', reportId: row.game_report_id, excerpt }
+    }
+    case 'game_scout_missions': {
+      const count = row.game_count
+      if (count === null || count < 1 || count > SCOUT_MISSIONS_MAX) return null
+      return { ...common, kind: 'game_scout_missions', count }
+    }
+    case 'game_scout_removed':
+      if (row.game_reason === null || row.game_reason === '') return null
+      return { ...common, kind: 'game_scout_removed', reason: row.game_reason }
   }
+}
+
+/**
+ * L'extrait d'un retour dans « Ta danse a été entendue » : le texte sur une ligne (les blancs
+ * répétés et les retours à la ligne deviennent un espace), ses 80 premiers caractères (comptés par
+ * point de code, comme le contrat : une abeille 🐝 compte 1), puis « … » s'il est coupé. Null : pas
+ * de texte (le retour a disparu entre-temps).
+ */
+const scoutExcerptOf = (text: string | null): string | null => {
+  if (text === null) return null
+  const flat = text.replace(/\s+/g, ' ').trim()
+  if (flat === '') return null
+  const points = Array.from(flat)
+  return points.length > SCOUT_EXCERPT_MAX
+    ? `${points.slice(0, SCOUT_EXCERPT_MAX).join('').trimEnd()}…`
+    : flat
 }
 
 /**
@@ -1635,7 +1683,9 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
         select 1 from showcase s where s.project_id = n.project_id limit 1
       ) is not null end as on_showcase,
       -- R19 : l'avis du jeu (alias gn, plus bas) et ce qu'il porte.
-      gn.id as game_notice_id, gn.level as game_level, gn.code as game_code, gn.honey as game_honey
+      gn.id as game_notice_id, gn.level as game_level, gn.code as game_code, gn.honey as game_honey,
+      gn.count as game_count, gn.reason as game_reason, gn.report_id as game_report_id,
+      gn.report_text as game_report_text
     from (${chosen}) n
     left join hive hv on hv.id = n.item_id and n.target_kind = 'hive'
     left join project on project.id = n.project_id
@@ -1712,8 +1762,14 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     ) hn on true
     -- R19 : l'avis du jeu de item_id, par la clé primaire de game_notice, pour ses seules lignes
     -- (« lateral … limit 1 », pour la même raison que les deux jointures du dessus).
+    -- R20 : le texte du retour corrigé (« Ta danse a été entendue »), par la clé primaire de
+    -- scout_report, et seulement s'il est à ce membre ; ses 1 000 premiers caractères suffisent à
+    -- l'extrait de 80 (left compte en caractères).
     left join lateral (
-      select gn.id, gn.level, gn.code, gn.honey, gn.hive_id from game_notice gn
+      select gn.id, gn.level, gn.code, gn.honey, gn.hive_id, gn.count, gn.reason, gn.report_id,
+        (select left(sr.text, 1000) from scout_report sr
+          where sr.id = gn.report_id and sr.member_id = ${me} limit 1) as report_text
+      from game_notice gn
       where left(n.kind, 5) = 'game_' and gn.id = n.item_id
       limit 1
     ) gn on true
