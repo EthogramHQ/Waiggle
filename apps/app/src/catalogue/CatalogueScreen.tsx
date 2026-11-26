@@ -164,6 +164,7 @@ import { HiveCellsCatalogue } from './ruches-alveoles'
 import { HiveRowsCatalogue } from './ruches-lignes'
 import { ProjectTilesCatalogue } from './ruches-tuiles'
 import { ScoutCatalogue } from './scout'
+import { ScoutTriageCatalogue } from './scout-triage'
 import { SealShelfCatalogue } from './sealShelf'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
@@ -1037,6 +1038,8 @@ export function CatalogueScreen() {
         <HarvestFiguresCatalogue />
         {/* Tranche R20 : la Goutte des Éclaireuses, dans tous ses états (scout.tsx). */}
         <ScoutCatalogue />
+        {/* Tranche R20 : la page de tri des Éclaireuses, ses tuiles, rangées et listes. */}
+        <ScoutTriageCatalogue />
       </LazySection>
     </Screen>
   )

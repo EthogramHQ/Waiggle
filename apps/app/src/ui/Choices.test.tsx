@@ -266,3 +266,68 @@ describe('Choices, the entry of the group (R6a, C9)', () => {
     expect(labelOf(entry.current)).toBe('Les règles')
   })
 })
+
+// R20 : le statut d'un retour d'Éclaireuse corrigé ne se change plus (`scout_report_fixed`). Les
+// choix restent lisibles, le coché compris, mais sont inactifs : ni l'appui, ni le clavier.
+describe('Choices, disabled', () => {
+  const options = [
+    { value: 'planned', label: 'Prévu' },
+    { value: 'fixed', label: 'Corrigé' },
+  ] as const
+  /** Une touche du clavier, telle que react-native-web la passe à onKeyDown. */
+  const key = (name: string) => ({ key: name, repeat: false, preventDefault: () => {} })
+  // Le web lit `aria-disabled`, le téléphone `accessibilityState` : React Native en garde l'un ou
+  // l'autre selon sa version, on accepte les deux (comme le test de la page de tri).
+  const isDisabled = (element: { props: Record<string, unknown> }) =>
+    Boolean(
+      element.props['aria-disabled'] ??
+        (element.props.accessibilityState as { disabled?: boolean } | undefined)?.disabled,
+    )
+
+  it('says every choice disabled, and keeps the checked one readable', async () => {
+    await renderWithProviders(
+      <Choices label="Statut" options={[...options]} value="fixed" onChange={jest.fn()} disabled />,
+    )
+
+    const radios = screen.getAllByRole('radio')
+    expect(radios).toHaveLength(2)
+    for (const radio of radios) expect(isDisabled(radio)).toBe(true)
+    expect(screen.getByRole('radio', { name: 'Corrigé', checked: true })).toBeTruthy()
+  })
+
+  it('changes nothing on a press or with the keyboard', async () => {
+    const onChange = jest.fn()
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Choices
+          label="Statut"
+          options={[...options]}
+          value="fixed"
+          onChange={onChange}
+          disabled
+        />,
+      )
+
+      await fireEvent.press(screen.getByRole('radio', { name: 'Prévu' }))
+      await fireEvent(screen.getByRole('radio', { name: 'Prévu' }), 'keyDown', key(' '))
+      await fireEvent(screen.getByRole('radio', { name: 'Corrigé' }), 'keyDown', key('ArrowLeft'))
+
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('is not disabled by default', async () => {
+    const onChange = jest.fn()
+    await renderWithProviders(
+      <Choices label="Statut" options={[...options]} value="fixed" onChange={onChange} />,
+    )
+
+    const planned = screen.getByRole('radio', { name: 'Prévu' })
+    expect(planned.props['aria-disabled']).toBeUndefined()
+    await fireEvent.press(planned)
+    expect(onChange).toHaveBeenCalledWith('planned')
+  })
+})

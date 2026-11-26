@@ -40,26 +40,34 @@ export function FactList({ title, facts, empty }: Props) {
           {empty}
         </Text>
       ) : null}
-      {facts.map((fact) => (
-        <View
-          key={fact.label}
-          accessible
-          accessibilityLabel={`${fact.label} : ${fact.value}`}
-          style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: 0 }}
-        >
-          {/* Une colonne d'intitulés de même largeur, tant que la place le permet. */}
-          <View style={{ minWidth: space.huge * 2 }}>
-            <Text variant="callout" tone="status">
-              {fact.label}
-            </Text>
-          </View>
-          <View style={{ flexShrink: 1 }}>
-            <Text variant={fact.mono ? 'code' : 'callout'} breakAnywhere>
-              {fact.value}
-            </Text>
-          </View>
+      {facts.length > 0 ? (
+        // Une vraie liste, nommée par son titre : le lecteur d'écran dit « Joint au retour, liste,
+        // 4 éléments ». Une vue nommée sans rôle, le web ne la lit pas (pôle design) : chaque ligne
+        // est donc un élément de liste, qui porte son nom « Écran : /projects/42 ».
+        <View role="list" accessibilityLabel={title} style={{ gap: space.sm }}>
+          {facts.map((fact) => (
+            <View
+              key={fact.label}
+              role="listitem"
+              accessible
+              accessibilityLabel={`${fact.label} : ${fact.value}`}
+              style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: 0 }}
+            >
+              {/* Une colonne d'intitulés de même largeur, tant que la place le permet. */}
+              <View style={{ minWidth: space.huge * 2 }}>
+                <Text variant="callout" tone="status">
+                  {fact.label}
+                </Text>
+              </View>
+              <View style={{ flexShrink: 1 }}>
+                <Text variant={fact.mono ? 'code' : 'callout'} breakAnywhere>
+                  {fact.value}
+                </Text>
+              </View>
+            </View>
+          ))}
         </View>
-      ))}
+      ) : null}
     </View>
   )
 }
