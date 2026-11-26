@@ -17,4 +17,6 @@ export { PublicPageSettingsScreen } from '../../screens/PublicPageSettingsScreen
 export { RankingsScreen } from '../../screens/RankingsScreen'
 // La feuille « Signaler » (route /report) : posée sur la page d'avant, ouverte au toucher.
 export { ReportSheet } from '../../screens/ReportSheet'
+// R20 : les réglages « Les Éclaireuses », ouverts depuis la liste des réglages.
+export { ScoutSettingsScreen } from '../../screens/ScoutSettingsScreen'
 export { SettingsScreen } from '../../screens/SettingsScreen'

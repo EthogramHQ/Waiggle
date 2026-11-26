@@ -5,7 +5,10 @@
 // l'appli, elle se pose seule dans le coin de l'écran. Les gestes ne mènent nulle part ici.
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { kindIcon } from '../moderation/scouts/look'
 import { HoneyDrop } from '../ui/HoneyDrop'
+import { ListGroup } from '../ui/ListGroup'
+import { ScoutReportRow } from '../ui/ScoutReportRow'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -83,6 +86,88 @@ function Samples({ l, scheme }: { l: Labels; scheme: Scheme }) {
   )
 }
 
+/** Une heure figée : les dates des rangées ne bougent pas d'une capture à l'autre. */
+const NOW = new Date('2026-11-26T12:00:00.000Z')
+
+/**
+ * « Mes retours » (ui/ScoutReportRow, R20) dans tous ses états : envoyé (un bug gênant, avec son
+ * menu), prévu (une idée qui répond à une mission), corrigé (bloquant, avec la note de
+ * l'administrateur), lu, gardé de côté (un texte long, replié après quatre lignes), et sans menu.
+ */
+function ReportRows({ scheme }: { scheme: Scheme }) {
+  const { t } = useTranslation()
+  const kind = (code: 'bug' | 'confusing' | 'idea' | 'love') => ({
+    label: t(($) => $.scout.kinds[code]),
+    icon: kindIcon[code],
+  })
+  const status = (code: 'sent' | 'read' | 'planned' | 'fixed' | 'parked') => {
+    const label = t(($) => $.scout.statuses[code])
+    const tone = code === 'fixed' ? 'strong' : code === 'planned' ? 'soft' : 'neutral'
+    return { label, tone } as const
+  }
+  const menu = {
+    label: t(($) => $.scout.reportMenu),
+    items: [{ label: t(($) => $.scout.deleteReport), tone: 'danger' as const, onPress: nothing }],
+  }
+  return (
+    <Stack gap="md">
+      <Text variant="headline" heading={3}>
+        {`ScoutReportRow — ${scheme}`}
+      </Text>
+      <ListGroup title={t(($) => $.scout.myReports)} footer={t(($) => $.scout.retention)} list>
+        <ScoutReportRow
+          kind={kind('bug')}
+          severity={{ label: t(($) => $.scout.severities.annoying), strong: false }}
+          text="Quand je touche « 2 nouveaux projets », le fil remonte mais les cartes restent."
+          date="2026-11-26T10:00:00.000Z"
+          status={status('sent')}
+          menu={menu}
+          now={NOW}
+        />
+        <ScoutReportRow
+          kind={kind('love')}
+          text="Tout glisse bien sur mon téléphone, et la goutte sous le pouce."
+          date="2026-11-25T10:00:00.000Z"
+          mission={t(($) => $.scout.sheet.mission, { mission: 'Essaie Waiggle sur ton téléphone' })}
+          status={status('read')}
+          menu={menu}
+          now={NOW}
+        />
+        <ScoutReportRow
+          kind={kind('idea')}
+          text="Pouvoir épingler une ruche en haut du fil."
+          date="2026-11-24T10:00:00.000Z"
+          status={status('planned')}
+          menu={menu}
+          now={NOW}
+        />
+        <ScoutReportRow
+          kind={kind('bug')}
+          severity={{ label: t(($) => $.scout.severities.blocking), strong: true }}
+          text="Le bouton Publier ne répond plus après une troisième photo."
+          date="2026-11-21T10:00:00.000Z"
+          status={status('fixed')}
+          note={t(($) => $.scout.fixedNote, { note: 'Corrigé le 28/11, merci !' })}
+          menu={menu}
+          now={NOW}
+        />
+        <ScoutReportRow
+          kind={kind('confusing')}
+          severity={{ label: t(($) => $.scout.severities.minor), strong: false }}
+          text={
+            'Je ne vois pas la différence entre suivre un projet et rejoindre ses testeurs. '.repeat(
+              4,
+            ) + 'Un texte long se replie après quatre lignes.'
+          }
+          date="2026-11-20T10:00:00.000Z"
+          status={status('parked')}
+          now={NOW}
+        />
+      </ListGroup>
+    </Stack>
+  )
+}
+
 export function ScoutCatalogue() {
   const { i18n } = useTranslation()
   const l: Labels = i18n.language === 'en' ? en : fr
@@ -98,6 +183,14 @@ export function ScoutCatalogue() {
         <ThemeProvider key={scheme} appearance={scheme}>
           <Surface variant="sheet" padding="lg" gap="lg">
             <Samples l={l} scheme={scheme} />
+          </Surface>
+        </ThemeProvider>
+      ))}
+      {schemes.map((scheme) => (
+        // « Mes retours », de jour puis de nuit, sur le fond de la page.
+        <ThemeProvider key={`rows-${scheme}`} appearance={scheme}>
+          <Surface variant="sheet" padding="lg" gap="lg">
+            <ReportRows scheme={scheme} />
           </Surface>
         </ThemeProvider>
       ))}
