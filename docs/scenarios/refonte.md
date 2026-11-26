@@ -4802,8 +4802,10 @@ leur retour est corrigé.
   - changer son statut (Lu, Prévu, Corrigé, Gardé de côté) ; Corrigé demande une confirmation
     (l'annonce part et ne se reprend pas), avec une note facultative pour l'Éclaireuse ;
   - une note privée, que l'Éclaireuse ne voit pas.
-- La liste des Éclaireuses (nom, date d'entrée, nombre de retours), et « Retirer » pour un abus :
-  elle n'est plus Éclaireuse (Goutte, titre, missions), garde son pollen ; le sceau reste, gagné.
+- La liste des Éclaireuses (nom, date d'entrée, nombre de retours), et « Retirer » pour un abus,
+  avec un motif obligatoire : elle n'est plus Éclaireuse (Goutte, titre, missions), garde son
+  pollen ; le sceau reste, gagné. Son Activité lui dit le motif, ce qui reste, et comment écrire à
+  l'éditeur ; ses réglages montrent « Retirée le <date> » et « Mes retours ».
 - Le texte d'un retour est un contenu de membre : affiché tel quel, jamais interprété (Markdown
   assaini comme ailleurs), et il ne quitte pas l'appli.
 
@@ -4816,14 +4818,20 @@ leur retour est corrigé.
   (tester et faire des retours), et un retour rend la semaine butinée.
 - Le sceau **« Éclaireuse fondatrice »** (miel, une goutte) n'existe que pour les Éclaireuses de ce
   mois-ci : personne ne pourra plus le gagner ensuite.
-- Le classement de la semaine compte ce pollen comme les autres.
+- Le classement de la semaine ne compte pas ce pollen : les autres membres ne peuvent pas le
+  gagner (le niveau et le titre, si).
 
 ### Les données
 
 - Les retours, leurs captures, les missions faites et l'entrée dans les Éclaireuses sont dans
   l'export du compte, et partent avec lui (un compte supprimé efface ses retours et captures).
+- La note privée de l'administrateur n'apparaît jamais dans l'appli pour l'Éclaireuse, mais elle
+  est dans son export.
 - **Durée** : les retours et leurs captures sont effacés 6 mois après la fin du mois des
-  Éclaireuses ; ce qui reste (titre, sceau, pollen) suit les règles de R19.
+  Éclaireuses (7 mois après leur envoi si le mois n'a jamais été lancé) ; les missions faites, 8
+  jours après leur semaine ; l'entrée dans les Éclaireuses, avec le compte ; ce qui reste (titre,
+  sceau, pollen) suit les règles de R19.
+- Ce qui est joint ne vient que de ce que l'écran montre : rien n'est lu en douce dans la requête.
 - La Confidentialité et le registre disent ce que contient un retour, ce qui est joint et qui le
   voit (l'administrateur seul).
 
