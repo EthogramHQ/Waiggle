@@ -141,9 +141,9 @@ export function NewCommentsCatalogue() {
       <NewCommentsButton count={3} onPress={noop} />
       <NewCommentsButton count={128} onPress={noop} />
 
-      {/* Une colonne de 180 points : le libellé passe à la ligne, comme avec le texte agrandi. */}
+      {/* Une colonne de 230 points : le libellé passe à la ligne, comme avec le texte agrandi. */}
       <Text tone="secondary">{l.wrap}</Text>
-      <View style={{ width: 180, alignSelf: 'center' }}>
+      <View style={{ width: 230, alignSelf: 'center' }}>
         <NewCommentsButton count={12} onPress={noop} />
       </View>
 
