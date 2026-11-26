@@ -3514,6 +3514,8 @@ export const en: Translation = {
       status: 'Status',
       privateNote: 'Private note',
       privateNoteHint: '{{name}} does not see it in the app; it is in their export.',
+      saveNote: 'Save the note',
+      noteSaved: 'Note saved',
       fixTitle: 'Mark as fixed?',
       fixBody:
         'Do this once the fix is live: {{name}} gets this announcement right away, and it cannot be taken back.',

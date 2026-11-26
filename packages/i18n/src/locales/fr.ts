@@ -4258,6 +4258,8 @@ export const fr = {
       // Relecture juridique du plan (J2) : la note entre dans l'export de l'Éclaireuse.
       privateNote: 'Note privée',
       privateNoteHint: '{{name}} ne la voit pas dans l’appli ; elle figure dans son export.',
+      saveNote: 'Enregistrer la note',
+      noteSaved: 'Note enregistrée',
       fixTitle: 'Marquer comme corrigé ?',
       fixBody:
         'À faire une fois le correctif en ligne : {{name}} reçoit aussitôt cette annonce, qui ne se reprend pas.',
