@@ -71,14 +71,19 @@ type SignUpBody = Credentials & {
  * en production ; sans lui, l'inscription est libre (comme en développement). `publicApiUrl` :
  * l'adresse publique de l'API ; une adresse en https fait poser à Better Auth des cookies
  * « Secure », comme en production (les autres tests restent en http, comme en développement).
+ * R20 : `scoutCode`, le code des Éclaireuses (SCOUT_INVITE_CODE en production) ; null, le défaut :
+ * personne ne devient Éclaireuse par un code. L'inscription le lit (createAuth), POST /v1/me/scout
+ * aussi (createApp).
  */
 export const createTestContext = async ({
   version = 'test',
   inviteCode = null,
+  scoutCode = null,
   publicApiUrl = TEST_API_URL,
 }: {
   version?: string
   inviteCode?: string | null
+  scoutCode?: string | null
   publicApiUrl?: string
 } = {}) => {
   const { db, close } = await createTestPgliteDb()
@@ -93,6 +98,7 @@ export const createTestContext = async ({
     appUrl: TEST_APP_URL,
     rateLimit: true,
     inviteCode,
+    scoutCode,
     password: fastPasswordHashing,
   })
   const app = createApp({
@@ -104,6 +110,7 @@ export const createTestContext = async ({
     publicApiUrl,
     secret: TEST_AUTH_SECRET,
     mailer,
+    scoutCode,
   })
 
   /**
