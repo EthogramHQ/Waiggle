@@ -28,7 +28,7 @@ import { type ContentSection, SettingsSection } from './settings/sections'
 import { LoadingScreen } from './states'
 
 /** Les rubriques des réglages, dans l'ordre du scénario. */
-export type SettingsSectionKey = 'profile' | ContentSection | 'moderation'
+export type SettingsSectionKey = 'profile' | ContentSection | 'scouts' | 'moderation'
 
 /** Les rubriques, avec leur icône et la page où elles mènent. */
 const catalog: { key: SettingsSectionKey; icon: IconName; href: string }[] = [
@@ -36,6 +36,9 @@ const catalog: { key: SettingsSectionKey; icon: IconName; href: string }[] = [
   { key: 'notifications', icon: 'bell', href: '/settings/notifications' },
   { key: 'language', icon: 'translate', href: '/settings/language' },
   { key: 'appearance', icon: 'circle-half', href: '/settings/appearance' },
+  // R20 (planche R20-Reglages) : « Les Éclaireuses », sous Apparence, a sa propre page. Elle se
+  // montre à tout membre : qui n'est pas Éclaireuse y tape le code (« J'ai un code »).
+  { key: 'scouts', icon: 'drop', href: '/settings/scouts' },
   { key: 'data', icon: 'download-simple', href: '/settings/data' },
   { key: 'security', icon: 'lock-simple', href: '/settings/security' },
   { key: 'account', icon: 'gear-six', href: '/settings/account' },
@@ -45,7 +48,11 @@ const catalog: { key: SettingsSectionKey; icon: IconName; href: string }[] = [
 ]
 
 /** Les rubriques qui n'ont pas leur contenu ici, et la page qui les montre. */
-const ownPages = { profile: '/settings/profile', moderation: '/moderation' } as const
+const ownPages = {
+  profile: '/settings/profile',
+  scouts: '/settings/scouts',
+  moderation: '/moderation',
+} as const
 
 /** Sur ordinateur, la rubrique montrée à droite quand l'adresse n'en nomme aucune (/settings). */
 const firstContent: ContentSection = 'notifications'
@@ -58,7 +65,7 @@ type Props = {
 export function SettingsScreen({ section }: Props) {
   // Mon profil et Modération ont leur propre page : une adresse qui les nomme y mène, avant même de
   // savoir qui est là (la page d'arrivée a sa propre garde).
-  if (section === 'profile' || section === 'moderation')
+  if (section === 'profile' || section === 'scouts' || section === 'moderation')
     return <Redirect href={ownPages[section]} />
   // R16 : la garde commune (attente, erreur, visiteur). Son attente a la forme de la liste des
   // rubriques, à la largeur d'avant (un formulaire) ; les pages d'état aussi (`form` par défaut).
@@ -96,7 +103,9 @@ function Settings({ section, session: data }: SettingsProps) {
   // Le retour : de la liste vers le Fil (`/feed`) ; d'une rubrique (téléphone) vers la liste.
   const back = useGoBack(section && !wide ? '/settings' : '/feed')
 
-  const label = (key: SettingsSectionKey) => t(($) => $.settings.sections[key])
+  // « Les Éclaireuses » garde le nom de la fonction (`scout.name`), écrit une seule fois.
+  const label = (key: SettingsSectionKey) =>
+    key === 'scouts' ? t(($) => $.scout.name) : t(($) => $.settings.sections[key])
   // La modération, pour un administrateur seulement : elle apparaît quand le profil est arrivé. Ce
   // champ ne donne aucun droit, l'API refait la vérification.
   const items: SettingsNavItem<SettingsSectionKey>[] = catalog

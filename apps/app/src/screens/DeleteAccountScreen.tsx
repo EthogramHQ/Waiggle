@@ -208,6 +208,12 @@ function DeleteAccount({ session: data }: { session: SessionData }) {
             label={t(($) => $.account.delete.testerFeedbackItem)}
             detail={t(($) => $.account.delete.testerFeedbackDetail)}
           />
+          {/* R20 (relecture juridique du plan, J3) : une Éclaireuse, même retirée ou après le mois,
+            lit que ses retours partent avec leurs captures. Les autres membres n'en ont pas : la
+            ligne ne les concerne pas. */}
+          {me.data?.scout ? (
+            <ListRow icon="drop" label={t(($) => $.account.delete.scoutReportsItem)} />
+          ) : null}
           {/* Tranche 6b : ses notifications et ses mentions partent aussi ; ses gestes sortent des
             notifications des autres, qui sont calculées et non recopiées. */}
           <ListRow
