@@ -215,6 +215,14 @@ export const memberCounterKeys = (userId: string) => ({
   // Lire les classements de la semaine (R19) : 120 par heure, mal formées comprises ; chaque
   // lecture recalcule le pollen de la semaine de tout un cercle.
   rankings: `rankings:${userId}`,
+  // R20 (les Éclaireuses) : taper un code (10 par heure, mal formés compris : on ne le devine pas),
+  // envoyer un retour (20 par 24 h), changer « Afficher la Goutte », lire ses missions et ses
+  // retours, et la page de tri de l'administrateur (300 écritures par jour).
+  scoutCode: `scout-code:${userId}`,
+  scoutReport: `scout-report:${userId}`,
+  scoutSettings: `scout-settings:${userId}`,
+  scoutRead: `scout-read:${userId}`,
+  scoutAdmin: `scout-admin:${userId}`,
 })
 
 /**

@@ -88,6 +88,8 @@ const auth = createAuth({
   appUrl: env.appUrl,
   rateLimit: env.nodeEnv === 'production',
   inviteCode: env.inviteCode,
+  // R20 : le code des Éclaireuses, accepté aussi à l'inscription.
+  scoutCode: env.scoutCode,
 })
 const app = createApp({
   version,
@@ -98,6 +100,8 @@ const app = createApp({
   publicApiUrl: env.publicApiUrl,
   secret: env.authSecret,
   mailer,
+  // R20 : le même code, pour « J'ai un code » dans les réglages (POST /v1/me/scout).
+  scoutCode: env.scoutCode,
 })
 
 const server = serve({ fetch: app.fetch, port: env.port }, ({ port }) => {
