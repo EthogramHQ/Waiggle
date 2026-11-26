@@ -1380,6 +1380,10 @@ export const fr = {
       spokenCount_other: '{{count}} commentaires',
       seeAll_one: 'Voir le commentaire',
       seeAll_other: 'Voir les {{count}} commentaires',
+      // R21 : le bouton qui paraît quand des commentaires arrivent hors de vue ; il y mène. Le même
+      // texte est annoncé une fois au lecteur d'écran.
+      newComments_one: '{{count}} nouveau commentaire',
+      newComments_other: '{{count}} nouveaux commentaires',
       empty: 'Aucun commentaire pour l’instant.',
       // Un projet privé garde les commentaires des autres, que personne ne lit (R5b, jur-P9, `sees`).
       emptyPrivate:

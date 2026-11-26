@@ -1134,6 +1134,8 @@ export const en: Translation = {
       spokenCount_other: '{{count}} comments',
       seeAll_one: 'See the comment',
       seeAll_other: 'See the {{count}} comments',
+      newComments_one: '{{count}} new comment',
+      newComments_other: '{{count}} new comments',
       empty: 'No comments yet.',
       emptyPrivate:
         'No comments to read for now. Any left by other members are kept: no member, you included, reads them while the project stays private.',
