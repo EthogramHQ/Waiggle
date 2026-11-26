@@ -13,6 +13,7 @@ import { useMemberMarkerSync } from '../src/accounts/memberMarker'
 import { queryClient } from '../src/api/query-client'
 import { PollenGainHost } from '../src/gamification/PollenGainHost'
 import { createI18n, detectLanguage } from '../src/i18n'
+import { LiveConnection } from '../src/live/connection'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { EditorPreload } from '../src/navigation/chunks/preload'
 import { sheetRoutes } from '../src/navigation/sheetRoutes'
@@ -85,6 +86,9 @@ export default function RootLayout() {
           {/* R12 : sur le web, le marqueur `waiggle_member` suit la session (posé, effacé), pour
               que le serveur envoie au Fil un membre qui arrive sur `/`. */}
           <MemberMarkerSync />
+          {/* R21 : le flux du temps réel, un seul pour l'appli, ouvert pour un membre connecté au
+              premier plan ; les écrans y déclarent ce qu'ils regardent (src/live/). */}
+          <LiveConnection />
           {/* R13 : le morceau de l'éditeur, demandé d'avance pour un membre (web). */}
           <EditorPreload />
           {/* R3 : la barre d'onglets du téléphone, posée une seule fois au-dessus de toutes les pages,
