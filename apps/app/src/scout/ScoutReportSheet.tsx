@@ -53,6 +53,7 @@ import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
 import { TextField, type TextFieldInput } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
+import { useHydrated } from '../ui/theme/hydration'
 import { useCalmMotion } from '../ui/theme/motion'
 import { useTheme } from '../ui/theme/ThemeProvider'
 import { useToast } from '../ui/theme/toast'
@@ -111,7 +112,18 @@ export function ScoutReportSheet() {
   // Le contexte joint : figé à l'ouverture de la feuille (l'écran d'où l'on vient, la largeur de
   // la fenêtre…), pour que ce qui part soit exactement ce qui est écrit.
   const language: Language = i18n.language?.startsWith('en') ? 'en' : 'fr'
-  const [context] = useState(() => scoutContext(from, { width }, scheme, language))
+  const [context, setContext] = useState(() => scoutContext(from, { width }, scheme, language))
+  // Sur le web, une feuille ouverte par son adresse (page rechargée) se dessine d'abord comme sur le
+  // serveur : thème de jour, largeur inconnue. Le contexte est relevé une seconde fois, une seule,
+  // dès la page hydratée ; sinon une Éclaireuse de nuit enverrait « Thème : Jour » (relecture de
+  // l'interface, R20). Ouverte depuis la Goutte, la page l'est déjà : rien ne change.
+  const hydrated = useHydrated()
+  const settled = useRef(hydrated)
+  useEffect(() => {
+    if (!hydrated || settled.current) return
+    settled.current = true
+    setContext(scoutContext(from, { width }, scheme, language))
+  }, [hydrated, from, width, scheme, language])
 
   // --- Le focus, sur ce qui manque à un envoi refusé ---
   const kindRef = useRef<Focusable>(null)

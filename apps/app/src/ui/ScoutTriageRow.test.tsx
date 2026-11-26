@@ -54,6 +54,16 @@ describe('ScoutTriageRow', () => {
     ).toBeTruthy()
   })
 
+  it('reads only the start of a long report, so its status is still heard', async () => {
+    const long = `${'Le fil ne se recharge plus. '.repeat(70)}Fin.`
+    await renderWithProviders(<ScoutTriageRow {...row} text={long} onPress={() => {}} />)
+
+    const start = Array.from(long).slice(0, 80).join('')
+    expect(
+      screen.getByRole('button', { name: `Bug, Bloquant, ${start}…, Inès, Mission, Nouveau` }),
+    ).toBeTruthy()
+  })
+
   it('marks the opened report as current', async () => {
     await renderWithProviders(<ScoutTriageRow {...row} selected onPress={() => {}} />)
 

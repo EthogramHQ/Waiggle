@@ -11,6 +11,7 @@
 import { borders, layout, radii, space } from '@ruche/brand'
 import { Platform, Pressable, View } from 'react-native'
 import { Avatar } from './Avatar'
+import { excerpt } from './CommentAction'
 import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
@@ -28,7 +29,7 @@ type Props = {
   kind: { label: string; icon: IconName }
   /** La gravité (« Bloquant ») ; `strong` : en encre. Absente pour une Idée ou un J'adore. */
   severity?: { label: string; strong: boolean } | undefined
-  /** Le texte du retour, coupé à deux lignes dans la rangée (lu en entier). */
+  /** Le texte du retour, coupé à deux lignes dans la rangée (lu en extrait de 80 caractères). */
   text: string
   author: { name: string; avatar: ImageSource | null }
   /** La date d'envoi, au format ISO du contrat. */
@@ -56,7 +57,9 @@ export function ScoutTriageRow({
   now,
 }: Props) {
   const { colors } = useTheme()
-  const spoken = [kind.label, severity?.label, text, author.name, mission, status.label]
+  // Le texte lu est un extrait (80 caractères, comme « Mes retours ») : un retour de 2 000
+  // caractères lu en entier cachait le statut, dit en dernier (relecture de l'interface, R20).
+  const spoken = [kind.label, severity?.label, excerpt(text), author.name, mission, status.label]
     .filter(Boolean)
     .join(', ')
   return (
