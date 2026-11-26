@@ -25,24 +25,34 @@ import {
 import { user } from './auth'
 import { hive } from './hives'
 import { project } from './projects'
+import { scoutReport } from './scouts'
 
 // Les listes fermées du contrat, écrites comme des listes SQL (`in (…)`). `sql.raw` : du texte de
 // notre code, jamais une valeur venue d'un client.
+// R20 : les trois gestes des Éclaireuses (un retour, une mission faite, une danse entendue), leurs
+// deux sources (un retour, une mission), le titre `scout` qu'on peut épingler (il n'est pas une
+// famille de gestes : le grand livre ne le porte jamais), le miel d'une danse entendue et les trois
+// avis (danse entendue, missions de la semaine, retrait).
 const LEDGER_GESTURES_SQL = sql.raw(
-  "'feedback', 'feedback_settled', 'tester', 'comment', 'publish', 'update', 'reaction', 'follow', 'receive_feedback', 'receive_tester', 'receive_comment', 'receive_reaction', 'hive_created', 'invitation_accepted', 'invitation_joined', 'profile_photo', 'profile_bio', 'profile_tool', 'challenge'",
+  "'feedback', 'feedback_settled', 'tester', 'comment', 'publish', 'update', 'reaction', 'follow', 'receive_feedback', 'receive_tester', 'receive_comment', 'receive_reaction', 'hive_created', 'invitation_accepted', 'invitation_joined', 'profile_photo', 'profile_bio', 'profile_tool', 'scout_report', 'scout_mission', 'scout_heard', 'challenge'",
 )
 const FAMILIES_SQL = sql.raw("'forager', 'builder', 'keeper', 'dancer'")
+const TITLE_FAMILIES_SQL = sql.raw("'forager', 'builder', 'keeper', 'dancer', 'scout'")
 const POLLEN_SOURCE_KINDS_SQL = sql.raw(
-  "'reaction', 'comment', 'tester', 'tester_message', 'project', 'update', 'member', 'hive', 'invitation', 'profile', 'personal_challenge'",
+  "'reaction', 'comment', 'tester', 'tester_message', 'project', 'update', 'member', 'hive', 'invitation', 'profile', 'personal_challenge', 'scout_report', 'scout_mission'",
 )
-const HONEY_REASONS_SQL = sql.raw("'week', 'challenge', 'hive_challenge', 'gift', 'decoration'")
+const HONEY_REASONS_SQL = sql.raw(
+  "'week', 'challenge', 'hive_challenge', 'scout_heard', 'gift', 'decoration'",
+)
 const PERSONAL_CHALLENGES_SQL = sql.raw("'feedback', 'update', 'test', 'comment_3', 'react_5'")
 const HIVE_CHALLENGES_SQL = sql.raw(
   "'feedback_5', 'updates_3', 'tested_3', 'reactions_10', 'comments_5'",
 )
 const DECORATION_TINTS_SQL = sql.raw("'honey', 'amber', 'pollen'")
 const DECORATION_PATTERNS_SQL = sql.raw("'smooth', 'waffle', 'striped', 'dotted'")
-const GAME_NOTICE_KINDS_SQL = sql.raw("'intro', 'level', 'seal', 'hive_challenge', 'honey_gift'")
+const GAME_NOTICE_KINDS_SQL = sql.raw(
+  "'intro', 'level', 'seal', 'hive_challenge', 'honey_gift', 'scout_heard', 'scout_missions', 'scout_removed'",
+)
 
 /**
  * Le grand livre du pollen : une ligne par geste payé (« Max a gagné 2 pollen en réagissant au
@@ -170,7 +180,7 @@ export const honeyEntry = pgTable(
     // Un crédit est positif, un débit négatif ; jamais zéro (une décoration gratuite n'écrit rien).
     check(
       'honey_entry_amount_check',
-      sql`(${t.reason} in ('week', 'challenge', 'hive_challenge') and ${t.amount} > 0)
+      sql`(${t.reason} in ('week', 'challenge', 'hive_challenge', 'scout_heard') and ${t.amount} > 0)
         or (${t.reason} in ('gift', 'decoration') and ${t.amount} < 0)`,
     ),
   ],
@@ -257,7 +267,8 @@ export const memberGame = pgTable(
       .references(() => user.id, { onDelete: 'cascade' }),
     // `f` (Butineuse) ou `m` (Butineur).
     titleForm: text('title_form').notNull().default('f'),
-    // La famille épinglée comme titre ; null : selon ses gestes des 28 derniers jours.
+    // La famille épinglée comme titre ; null : selon ses gestes des 28 derniers jours. R20 : ou
+    // `scout`, le titre d'Éclaireuse (l'API vérifie qu'elle l'est).
     pinnedFamily: text('pinned_family'),
     inRankings: boolean('in_rankings').notNull().default(true),
     harvestNotices: boolean('harvest_notices').notNull().default(true),
@@ -271,7 +282,7 @@ export const memberGame = pgTable(
     check('member_game_title_form_check', sql`${t.titleForm} in ('f', 'm')`),
     check(
       'member_game_pinned_family_check',
-      sql`${t.pinnedFamily} is null or ${t.pinnedFamily} in (${FAMILIES_SQL})`,
+      sql`${t.pinnedFamily} is null or ${t.pinnedFamily} in (${TITLE_FAMILIES_SQL})`,
     ),
     check(
       'member_game_decoration_check',
@@ -309,6 +320,15 @@ export const gameNotice = pgTable(
     projectId: uuid('project_id').references(() => project.id, { onDelete: 'cascade' }),
     // `hive_challenge` : la ruche ; son nom se lit à l'affichage (relecture J2).
     hiveId: uuid('hive_id').references(() => hive.id, { onDelete: 'cascade' }),
+    // R20, `scout_heard` (« Ta danse a été entendue ») : le retour corrigé. L'extrait de son texte
+    // n'est pas recopié ici, il est lu à l'affichage ; supprimer le retour emporte l'avis
+    // (`cascade`, relecture juridique J3).
+    reportId: uuid('report_id').references(() => scoutReport.id, { onDelete: 'cascade' }),
+    // R20, `scout_missions` : le nombre de missions de la semaine (1 à 3) ; la semaine (son lundi)
+    // va dans `code`, pour qu'un seul avis parte par membre et par semaine (index ci-dessous).
+    count: integer('count'),
+    // R20, `scout_removed` : le motif du retrait, écrit par l'administrateur.
+    reason: text('reason'),
     createdAt: timestamp('created_at').notNull(),
   },
   (t) => [
@@ -317,6 +337,14 @@ export const gameNotice = pgTable(
     // Un compte supprimé emporte les avis où il offrait du miel : sans index, une lecture de toute
     // la table à chaque suppression.
     index('game_notice_actor_idx').on(t.actorId).where(sql`${t.actorId} is not null`),
+    // R20 : un seul avis « danse entendue » par retour ; l'index sert aussi l'effacement en cascade
+    // d'un retour supprimé (sans lui, une lecture de toute la table).
+    uniqueIndex('game_notice_report_idx').on(t.reportId).where(sql`${t.reportId} is not null`),
+    // R20 : un seul avis « missions de la semaine » par membre et par semaine (`code` : le lundi),
+    // même si l'administrateur réécrit les missions : « insert … on conflict do nothing ».
+    uniqueIndex('game_notice_scout_missions_idx')
+      .on(t.memberId, t.code)
+      .where(sql`${t.kind} = 'scout_missions'`),
     check('game_notice_kind_check', sql`${t.kind} in (${GAME_NOTICE_KINDS_SQL})`),
     // Ce que chaque sorte d'avis porte, et rien de plus.
     check(
@@ -325,7 +353,10 @@ export const gameNotice = pgTable(
         or (${t.kind} = 'level' and ${t.level} is not null)
         or (${t.kind} = 'seal' and ${t.code} is not null)
         or (${t.kind} = 'hive_challenge' and ${t.hiveId} is not null and ${t.code} is not null and ${t.honey} is not null)
-        or (${t.kind} = 'honey_gift' and ${t.actorId} is not null and ${t.projectId} is not null)`,
+        or (${t.kind} = 'honey_gift' and ${t.actorId} is not null and ${t.projectId} is not null)
+        or (${t.kind} = 'scout_heard' and ${t.reportId} is not null)
+        or (${t.kind} = 'scout_missions' and ${t.code} is not null and ${t.count} between 1 and 3)
+        or (${t.kind} = 'scout_removed' and char_length(${t.reason}) between 1 and 500)`,
     ),
   ],
 )
