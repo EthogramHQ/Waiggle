@@ -417,15 +417,19 @@ describe('answering a mission of the week', () => {
     expect(again.status).toBe(201)
     expect(pollenHeader(again)).toBe('25')
 
-    expect(await gesturesOf(ctx, leaId)).toEqual([
-      ['scout_report', 25],
+    // Le retour et sa mission sont payés à la même heure (celle de la requête) : leur ordre dans le
+    // registre dépend de l'identifiant tiré au hasard. On compare donc les entrées triées.
+    const sorted = <T>(rows: readonly T[]) =>
+      [...rows].sort((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1))
+    expect(sorted(await gesturesOf(ctx, leaId))).toEqual([
       ['scout_mission', 30],
+      ['scout_report', 25],
       ['scout_report', 25],
     ])
     const ledger = await ledgerOf(ctx, leaId)
-    expect(ledger.map((row) => [row.sourceKind, row.family])).toEqual([
-      ['scout_report', 'keeper'],
+    expect(sorted(ledger.map((row) => [row.sourceKind, row.family]))).toEqual([
       ['scout_mission', 'keeper'],
+      ['scout_report', 'keeper'],
       ['scout_report', 'keeper'],
     ])
   })
