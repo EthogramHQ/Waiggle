@@ -81,6 +81,12 @@ const EnvSchema = z
     SIGNUP_INVITE_CODE: optional(
       z.string().trim().min(INVITE_CODE_MIN_LENGTH).max(INVITE_CODE_MAX_LENGTH),
     ),
+    // R20 : le code des Éclaireuses, facultatif, aux mêmes règles que le code d'inscription (12
+    // caractères au moins, espaces autour non comptés). Absent : personne ne devient Éclaireuse par
+    // un code. Il sert aussi à s'inscrire : le champ du code accepte l'un ou l'autre.
+    SCOUT_INVITE_CODE: optional(
+      z.string().trim().min(INVITE_CODE_MIN_LENGTH).max(INVITE_CODE_MAX_LENGTH),
+    ),
     // L'interrupteur des e-mails de notification (tranche 6c) : « on » par défaut, « off » pour que
     // l'ordonnanceur ne planifie ni le récap ni les e-mails de mentions (la purge de nuit continue).
     // On le coupe avant de restaurer une sauvegarde (docs/ops/serveur.md). Toute autre valeur
@@ -122,6 +128,27 @@ const EnvSchema = z
         message:
           'this code is a public example of the repository: choose another one (openssl rand -hex 8)',
       })
+    }
+    // R20 : le code des Éclaireuses ne doit être ni un exemple public, ni le code d'inscription
+    // (comparés sous leur forme normalisée : capitales et espaces ne comptent pas). Égal au code
+    // commun, il ferait de chaque inscrit une Éclaireuse.
+    if (env.SCOUT_INVITE_CODE) {
+      const scout = normalizeInviteCode(env.SCOUT_INVITE_CODE)
+      if (PUBLIC_EXAMPLE_INVITE_CODES.includes(scout)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['SCOUT_INVITE_CODE'],
+          message:
+            'this code is a public example of the repository: choose another one (openssl rand -hex 8)',
+        })
+      }
+      if (env.SIGNUP_INVITE_CODE && normalizeInviteCode(env.SIGNUP_INVITE_CODE) === scout) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['SCOUT_INVITE_CODE'],
+          message: 'must differ from SIGNUP_INVITE_CODE',
+        })
+      }
     }
     const transport = resolveTransport(env)
     if (
@@ -198,6 +225,8 @@ export type Env = {
   mail: MailConfig
   /** Le code d'invitation exigé à l'inscription ; null : inscription libre (développement). */
   inviteCode: string | null
+  /** R20 : le code des Éclaireuses (SCOUT_INVITE_CODE) ; null : personne ne le devient par un code. */
+  scoutCode: string | null
   /** Les e-mails de notification (récap, mentions) sont-ils planifiés ? (EMAIL_JOBS) */
   emailJobs: boolean
 }
@@ -252,6 +281,7 @@ export const loadEnv = (source: Record<string, string | undefined>): Env => {
     appUrl: env.APP_URL,
     mail,
     inviteCode: env.SIGNUP_INVITE_CODE ?? null,
+    scoutCode: env.SCOUT_INVITE_CODE ?? null,
     emailJobs: env.EMAIL_JOBS === 'on',
   }
 }
