@@ -102,7 +102,9 @@ type Scheme = 'day' | 'night'
 const schemes: Scheme[] = ['day', 'night']
 
 type SealCode = (typeof SEALS)[number]['code']
-type MilestoneCode = (typeof MILESTONE_SEALS)[number]['code']
+// R20 : « scout_founder » n'est pas un palier du contrat, mais il a lui aussi un « _ » et son nom
+// dans `game.seals` : il se lit comme un sceau de palier.
+type MilestoneCode = (typeof MILESTONE_SEALS)[number]['code'] | 'scout_founder'
 type CategoryCode = Exclude<SealCode, MilestoneCode>
 
 /** Un sceau de palier a toujours un « _ » dans son code, une catégorie jamais (contrat). */

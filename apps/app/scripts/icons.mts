@@ -146,6 +146,7 @@ const icons = [
   'crown',
   'hexagon',
   'user-minus',
+  'drop', // R20 : le sceau « Éclaireuse fondatrice » (SCOUT_SEAL du contrat)
   // R19 : les icônes des sceaux qui manquaient (MILESTONE_SEALS de @ruche/contracts ; les autres y
   // sont déjà) : premier retour, 10 retours, 5 invitations acceptées, 25 semaines butinées.
   'chat-centered-text',
