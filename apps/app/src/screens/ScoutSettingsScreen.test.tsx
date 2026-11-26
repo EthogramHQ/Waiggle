@@ -124,7 +124,7 @@ describe('the scouts settings of a member who is not a scout', () => {
     await open()
 
     expect(screen.queryByLabelText(containing(T.codeLabel))).toBeNull()
-    fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
+    await fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
 
     expect(screen.getByLabelText(containing(T.codeLabel))).toBeTruthy()
     expect(screen.getByText(containing(T.joinInfo))).toBeTruthy()
@@ -133,9 +133,9 @@ describe('the scouts settings of a member who is not a scout', () => {
 
   it('joins the scouts with the typed code, then shows the scout settings', async () => {
     await open()
-    fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
+    await fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
 
-    fireEvent.changeText(screen.getByLabelText(containing(T.codeLabel)), 'ECLAIREUSES-2026')
+    await fireEvent.changeText(screen.getByLabelText(containing(T.codeLabel)), 'ECLAIREUSES-2026')
     await fireEvent.press(screen.getByRole('button', { name: T.join }))
     await act(async () => {})
 
@@ -147,9 +147,9 @@ describe('the scouts settings of a member who is not a scout', () => {
   it('says « Les 30 places sont prises. » when the places are taken', async () => {
     scoutServer.join.mockRejectedValue(new ApiError('scoutFull'))
     await open()
-    fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
+    await fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
 
-    fireEvent.changeText(screen.getByLabelText(containing(T.codeLabel)), 'ECLAIREUSES-2026')
+    await fireEvent.changeText(screen.getByLabelText(containing(T.codeLabel)), 'ECLAIREUSES-2026')
     await fireEvent.press(screen.getByRole('button', { name: T.join }))
 
     expect(await screen.findByText(containing(T.full))).toBeTruthy()
@@ -160,9 +160,9 @@ describe('the scouts settings of a member who is not a scout', () => {
   it('says a wrong code like a wrong invite code', async () => {
     scoutServer.join.mockRejectedValue(new ApiError('scoutCodeInvalid'))
     await open()
-    fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
+    await fireEvent.press(await screen.findByRole('button', { name: T.haveCode }))
 
-    fireEvent.changeText(screen.getByLabelText(containing(T.codeLabel)), 'PAS-LE-BON-CODE')
+    await fireEvent.changeText(screen.getByLabelText(containing(T.codeLabel)), 'PAS-LE-BON-CODE')
     await fireEvent.press(screen.getByRole('button', { name: T.join }))
 
     expect(await screen.findByText(containing(T.invalid))).toBeTruthy()
