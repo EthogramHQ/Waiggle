@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # Image Docker « web » : la porte d'entrée du serveur. Elle contient Caddy (voir infra/Caddyfile)
 # et l'appli web déjà construite, prête à être servie. À construire depuis la racine du dépôt :
 #   docker build -f infra/web/Dockerfile --build-arg APP_DOMAIN=waiggle.com \
@@ -45,7 +45,7 @@ RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
 RUN node infra/web/precompress.mjs apps/app/dist
 
 # --- Étape 2 : Caddy et les fichiers de l'appli, rien d'autre ---
-FROM caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
+FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 COPY infra/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/app/dist /srv/app
 # La politique MTA-STS des e-mails (voir infra/Caddyfile, « MTA-STS »), servie à part.

@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # Image Docker de l'API. À construire depuis la racine du dépôt :
 #   docker build -f apps/api/Dockerfile .
 # Deux étapes : une pour construire (avec tous les outils), une pour exécuter (le strict minimum).
