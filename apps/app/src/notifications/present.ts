@@ -13,9 +13,11 @@ import {
   type Category,
   type Notification,
   type NotifiedCover,
+  POLLEN_GESTURES,
   REACTION_KINDS,
   type ReactionKind,
   type ReportPartField,
+  SCOUT_HEARD_HONEY,
   type SealMatter,
 } from '@ruche/contracts'
 import type { Translation } from '@ruche/i18n'
@@ -69,6 +71,10 @@ export type Presented = {
 
 /** R19 : « Ma récolte », où mènent un niveau, un sceau et l'avis d'arrivée de la récolte. */
 const HARVEST: Href = '/harvest'
+
+/** R20 : « Les Éclaireuses » des réglages, où se lisent « Mes retours », et les missions de la semaine. */
+const SCOUT_SETTINGS: Href = '/settings/scouts'
+const SCOUT_MISSIONS: Href = '/scout/missions'
 
 /** L'onglet des ruches : où l'on rejoint une ruche ou refuse une invitation. */
 const HIVES_TAB: Href = '/hives'
@@ -607,6 +613,50 @@ export const presentNotification = (
         icon: 'sparkle',
         leading: iconLeading('sparkle', 'honey'),
         target: HARVEST,
+      }
+    }
+    // R20 (planche R20-Danse) : les avis des Éclaireuses, dans l'Activité seulement. Les icônes
+    // de la planche (abeille, cible) ne sont pas dessinées : on prend les plus proches.
+    case 'game_scout_heard': {
+      // Ce que le retour a rapporté s'écrit sous la phrase ; au toucher, « Mes retours ».
+      const said = say({ excerpt: notification.excerpt }, (params) =>
+        t(($) => $.notifications.gameScoutHeard, params as { excerpt: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: 'megaphone-simple',
+        leading: iconLeading('megaphone-simple', 'honey'),
+        detail: t(($) => $.notifications.gameScoutHeardGain, {
+          pollen: POLLEN_GESTURES.scout_heard.amount,
+          honey: SCOUT_HEARD_HONEY,
+        }),
+        target: SCOUT_SETTINGS,
+      }
+    }
+    case 'game_scout_missions': {
+      const { count } = notification
+      const said = say({}, () => t(($) => $.notifications.gameScoutMissions, { count }))
+      return {
+        ...plain,
+        ...said,
+        icon: 'flag',
+        leading: iconLeading('flag', 'honey'),
+        target: SCOUT_MISSIONS,
+      }
+    }
+    case 'game_scout_removed': {
+      // Le motif et l'adresse de contact sont dans la phrase (relecture juridique du plan, J1) ;
+      // les retours restent lisibles dans les réglages.
+      const said = say({ reason: notification.reason }, (params) =>
+        t(($) => $.notifications.gameScoutRemoved, params as { reason: string }),
+      )
+      return {
+        ...plain,
+        ...said,
+        icon: 'info',
+        leading: iconLeading('info'),
+        target: SCOUT_SETTINGS,
       }
     }
     case 'handle': {
