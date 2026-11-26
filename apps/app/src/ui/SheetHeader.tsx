@@ -8,7 +8,7 @@
 // sur le titre seul : un glissé commencé sur « Publier » ou « Annuler » ne ferme rien (ui-M1). Sans
 // « Annuler » (« Catégorie et outils » : le titre, puis « OK »), le titre se range à gauche.
 import { space } from '@ruche/brand'
-import { type Ref, useState } from 'react'
+import { type ReactNode, type Ref, useState } from 'react'
 import { type LayoutChangeEvent, View } from 'react-native'
 import { Button } from './Button'
 import { Text } from './Text'
@@ -46,6 +46,11 @@ type Props = {
   titleId?: string
   /** Pour Sheet : ce qui fait glisser la feuille vers le bas, posé autour du titre seul. */
   dragHandlers?: object
+  /**
+   * R20 (planche R20-Retour) : un bouton de plus juste avant l'action, du même côté (le menu « ⋯ »
+   * de la feuille « Ton retour »). Il est mesuré avec l'action : le titre reste centré.
+   */
+  extra?: ReactNode
 }
 
 // La place minimale à laisser au titre pour qu'il reste lisible (sur deux lignes au plus).
@@ -58,6 +63,7 @@ export function SheetHeader({
   heading: level = 1,
   titleId,
   dragHandlers,
+  extra,
 }: Props) {
   // La disposition dépend de la place : on mesure la barre et la largeur naturelle de chaque côté
   // (« Annuler », « Enregistrer »). onLayout donne la largeur réelle d'un élément une fois dessiné ;
@@ -101,7 +107,16 @@ export function SheetHeader({
   const actionButton = (
     // Jamais de `flexShrink` : un bouton rétréci coupait « Enregistrer » au milieu du mot (320 points,
     // 200 %, R6a). Sa largeur naturelle est gardée ; c'est la rangée qui passe à la ligne.
-    <View onLayout={measure('right')} style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+    <View
+      onLayout={measure('right')}
+      style={{
+        alignSelf: 'flex-start',
+        maxWidth: '100%',
+        // Avec un bouton de plus (`extra`), les deux côte à côte, centrés sur la même ligne.
+        ...(extra ? { flexDirection: 'row', alignItems: 'center', gap: space.xs } : null),
+      }}
+    >
+      {extra}
       <Button
         label={action.label}
         size="compact"

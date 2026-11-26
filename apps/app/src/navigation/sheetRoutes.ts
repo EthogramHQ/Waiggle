@@ -14,6 +14,8 @@ export const sheetRoutes = [
   'suspend',
   'hives/new',
   'hives/[id]/invite',
+  // R20 : la feuille « Ton retour » des Éclaireuses.
+  'scout-report',
 ] as const
 export type SheetRoute = (typeof sheetRoutes)[number]
 
