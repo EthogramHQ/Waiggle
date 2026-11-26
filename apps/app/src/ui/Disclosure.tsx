@@ -36,20 +36,27 @@ type Props = {
    * dernier élément (le seul testeur retiré de « 1 testeur »), au lieu de le laisser se perdre.
    */
   toggleRef?: Ref<View>
+  /**
+   * R20 (planche R20-Retour, « Joint à ton retour ») : `hint` résume le contenu replié et part une
+   * fois déplié, où le contenu le dit en entier (la même liste ne se lit pas deux fois).
+   */
+  hintWhenClosed?: boolean
   children: ReactNode
 }
 
 export function Disclosure({
   title,
-  hint,
+  hint: givenHint,
   icon = 'plus',
   initiallyOpen = false,
   variant = 'card',
   toggleRef,
+  hintWhenClosed = false,
   children,
 }: Props) {
   const { colors, shadows } = useTheme()
   const [open, setOpen] = useState(initiallyOpen)
+  const hint = hintWhenClosed && open ? undefined : givenHint
   if (variant === 'inline') {
     return (
       <View style={{ gap: space.xs }}>
