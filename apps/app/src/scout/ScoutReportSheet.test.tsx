@@ -182,8 +182,8 @@ describe('the sheet « Ton retour »', () => {
     for (const code of ['bug', 'confusing', 'idea', 'love'] as const)
       expect(radio(T.kind(code))).toBeTruthy()
 
-    choose(T.kind('idea'))
-    choose(T.kind('love'))
+    await choose(T.kind('idea'))
+    await choose(T.kind('love'))
 
     expect(checked(radio(T.kind('love')))).toBe(true)
     expect(checked(radio(T.kind('idea')))).toBe(false)
@@ -192,7 +192,7 @@ describe('the sheet « Ton retour »', () => {
   it.each(['bug', 'confusing'] as const)('asks the severity of a %s', async (code) => {
     await openSheet()
 
-    choose(T.kind(code))
+    await choose(T.kind(code))
 
     expect(screen.getByText(T.severity)).toBeTruthy()
     for (const level of ['minor', 'annoying', 'blocking'] as const)
@@ -202,7 +202,7 @@ describe('the sheet « Ton retour »', () => {
   it.each(['idea', 'love'] as const)('asks no severity for a %s', async (code) => {
     await openSheet()
 
-    choose(T.kind(code))
+    await choose(T.kind(code))
 
     expect(screen.queryByText(T.severity)).toBeNull()
     expect(screen.queryByRole('radio', { name: T.severityOf('minor') })).toBeNull()
@@ -210,10 +210,10 @@ describe('the sheet « Ton retour »', () => {
 
   it('sends no severity once a bug becomes an idea', async () => {
     await openSheet()
-    choose(T.kind('bug'))
-    choose(T.severityOf('blocking'))
-    choose(T.kind('idea'))
-    write('Trier mes projets par date')
+    await choose(T.kind('bug'))
+    await choose(T.severityOf('blocking'))
+    await choose(T.kind('idea'))
+    await write('Trier mes projets par date')
 
     await send()
 
@@ -224,9 +224,9 @@ describe('the sheet « Ton retour »', () => {
 
   it('sends a bug with its kind, severity, text and the screen it came from', async () => {
     await openSheet()
-    choose(T.kind('bug'))
-    choose(T.severityOf('annoying'))
-    write('Le bouton Publier se cache derrière le clavier')
+    await choose(T.kind('bug'))
+    await choose(T.severityOf('annoying'))
+    await write('Le bouton Publier se cache derrière le clavier')
 
     await send()
 
@@ -253,7 +253,7 @@ describe('the sheet « Ton retour »', () => {
   describe('what it requires', () => {
     it('refuses to send without a kind, and says so', async () => {
       await openSheet()
-      write('Quelque chose coince')
+      await write('Quelque chose coince')
 
       await send()
 
@@ -263,8 +263,8 @@ describe('the sheet « Ton retour »', () => {
 
     it('refuses to send a bug without a severity, and says so', async () => {
       await openSheet()
-      choose(T.kind('bug'))
-      write('Quelque chose coince')
+      await choose(T.kind('bug'))
+      await write('Quelque chose coince')
 
       await send()
 
@@ -274,8 +274,8 @@ describe('the sheet « Ton retour »', () => {
 
     it.each(['', '   '])('refuses to send an empty text (%j), and says so', async (text) => {
       await openSheet()
-      choose(T.kind('love'))
-      write(text)
+      await choose(T.kind('love'))
+      await write(text)
 
       await send()
 
@@ -285,20 +285,20 @@ describe('the sheet « Ton retour »', () => {
 
     it('sends a text of 2 000 characters, and refuses one of 2 001', async () => {
       await openSheet()
-      choose(T.kind('idea'))
-      write('a'.repeat(2001))
+      await choose(T.kind('idea'))
+      await write('a'.repeat(2001))
 
       await send()
       expect(sent()).toEqual([])
 
-      write('a'.repeat(2000))
+      await write('a'.repeat(2000))
       await send()
       expect(sent()).toHaveLength(1)
     })
 
     it('shows the 2 000 characters limit with the text', async () => {
       await openSheet()
-      write('Bonjour')
+      await write('Bonjour')
 
       // Le compteur de `TextField` (« 7 / 2 000 », l'espace des milliers est insécable).
       expect(screen.getAllByText(/2\s000/).length).toBeGreaterThan(0)
@@ -315,8 +315,8 @@ describe('the sheet « Ton retour »', () => {
 
     it('sends the chosen image with the report', async () => {
       await openSheet()
-      choose(T.kind('love'))
-      write('La danse de l’abeille')
+      await choose(T.kind('love'))
+      await write('La danse de l’abeille')
       mockPicked.next = { uri: 'file:///capture.jpg', width: 1170, height: 2532 }
 
       await fireEvent.press(screen.getByRole('button', { name: containing(T.capture) }))
@@ -328,8 +328,8 @@ describe('the sheet « Ton retour »', () => {
 
     it('sends no image once the capture is removed', async () => {
       await openSheet()
-      choose(T.kind('love'))
-      write('La danse de l’abeille')
+      await choose(T.kind('love'))
+      await write('La danse de l’abeille')
       mockPicked.next = { uri: 'file:///capture.jpg', width: 1170, height: 2532 }
       await fireEvent.press(screen.getByRole('button', { name: containing(T.capture) }))
 
@@ -344,14 +344,14 @@ describe('the sheet « Ton retour »', () => {
     it('shows in clear each value that will be attached', async () => {
       await openSheet()
 
-      openAttached()
+      await openAttached()
 
       for (const code of ['screen', 'device', 'version', 'language', 'theme'] as const)
         expect(screen.getByText(containing(T.field(code)))).toBeTruthy()
       for (const value of ATTACHED_VALUES) expect(screen.getByText(containing(value))).toBeTruthy()
       // Et ce qui part est exactement ce qui est écrit.
-      choose(T.kind('love'))
-      write('Tout est clair')
+      await choose(T.kind('love'))
+      await write('Tout est clair')
       await send()
       expect(sent()[0]?.report.context).toEqual({
         screen: '/projects/42',
@@ -366,12 +366,12 @@ describe('the sheet « Ton retour »', () => {
     it('attaches the screen without its parameters', async () => {
       mockNav.params = { from: '/projects/42?comment=9#top' }
       await openSheet()
-      openAttached()
+      await openAttached()
 
       expect(screen.getByText(containing('/projects/42'))).toBeTruthy()
       expect(screen.queryByText(/comment=9/)).toBeNull()
-      choose(T.kind('love'))
-      write('Tout est clair')
+      await choose(T.kind('love'))
+      await write('Tout est clair')
       await send()
       expect(sent()[0]?.report.context?.screen).toBe('/projects/42')
     })
@@ -381,8 +381,8 @@ describe('the sheet « Ton retour »', () => {
     it('never attaches a screen that does not start with a slash', async () => {
       mockNav.params = { from: 'https://example.com/piege' }
       await openSheet()
-      choose(T.kind('love'))
-      write('Tout est clair')
+      await choose(T.kind('love'))
+      await write('Tout est clair')
 
       await send()
 
@@ -393,18 +393,18 @@ describe('the sheet « Ton retour »', () => {
 
     it('checks the attach box by default', async () => {
       await openSheet()
-      openAttached()
+      await openAttached()
 
       expect(checked(attachBox())).toBe(true)
     })
 
     it('sends no context once the attach box is unchecked', async () => {
       await openSheet()
-      openAttached()
-      fireEvent.press(attachBox())
-      choose(T.kind('bug'))
-      choose(T.severityOf('minor'))
-      write('Une faute dans le menu')
+      await openAttached()
+      await fireEvent.press(attachBox())
+      await choose(T.kind('bug'))
+      await choose(T.severityOf('minor'))
+      await write('Une faute dans le menu')
 
       await send()
 
@@ -425,13 +425,13 @@ describe('the sheet « Ton retour »', () => {
     it('sends the chosen mission with the report, which reads « Mission : … »', async () => {
       await openSheet()
 
-      fireEvent.press(await screen.findByRole('button', { name: containing(PHOTO_MISSION) }))
+      await fireEvent.press(await screen.findByRole('button', { name: containing(PHOTO_MISSION) }))
 
       expect(
         screen.getByText(containing(t(($) => $.scout.sheet.mission, { mission: PHOTO_MISSION }))),
       ).toBeTruthy()
-      choose(T.kind('idea'))
-      write('Une photo de la fusée')
+      await choose(T.kind('idea'))
+      await write('Une photo de la fusée')
       await send()
       expect(sent()[0]?.report.missionId).toBe(missionPhotoId)
     })
@@ -440,11 +440,11 @@ describe('the sheet « Ton retour »', () => {
     it('lets a scout answer a mission already done', async () => {
       await openSheet()
 
-      fireEvent.press(
+      await fireEvent.press(
         await screen.findByRole('button', { name: containing('Cherche un outil par son nom') }),
       )
-      choose(T.kind('love'))
-      write('Trouvé du premier coup')
+      await choose(T.kind('love'))
+      await write('Trouvé du premier coup')
       await send()
 
       expect(sent()[0]?.report.missionId).toBe(missionSearchId)
@@ -458,8 +458,8 @@ describe('the sheet « Ton retour »', () => {
       expect(
         screen.getByText(containing(t(($) => $.scout.sheet.mission, { mission: PHOTO_MISSION }))),
       ).toBeTruthy()
-      choose(T.kind('idea'))
-      write('Une photo de la fusée')
+      await choose(T.kind('idea'))
+      await write('Une photo de la fusée')
       await send()
       expect(sent()[0]?.report.missionId).toBe(missionPhotoId)
       expect(sent()[0]?.report.context?.screen).toBe('/scout/missions')
@@ -467,11 +467,11 @@ describe('the sheet « Ton retour »', () => {
 
     it('sends no mission once its band is closed', async () => {
       await openSheet()
-      fireEvent.press(await screen.findByRole('button', { name: containing(PHOTO_MISSION) }))
+      await fireEvent.press(await screen.findByRole('button', { name: containing(PHOTO_MISSION) }))
 
-      fireEvent.press(screen.getByRole('button', { name: T.removeMission }))
-      choose(T.kind('idea'))
-      write('Une idée sans mission')
+      await fireEvent.press(screen.getByRole('button', { name: T.removeMission }))
+      await choose(T.kind('idea'))
+      await write('Une idée sans mission')
       await send()
 
       expect(sent()[0]?.report).not.toHaveProperty('missionId')
@@ -503,8 +503,8 @@ describe('the sheet « Ton retour »', () => {
     it('says the limit when the API refuses a report for the quota', async () => {
       scoutServer.send.mockRejectedValue(new ApiError('rateLimited'))
       await openSheet()
-      choose(T.kind('love'))
-      write('Encore un')
+      await choose(T.kind('love'))
+      await write('Encore un')
 
       await send()
 
@@ -517,7 +517,7 @@ describe('the sheet « Ton retour »', () => {
   describe('closing', () => {
     it('asks « Abandonner ce retour ? » before closing with a typed text', async () => {
       await openSheet()
-      write('Un brouillon')
+      await write('Un brouillon')
 
       await pressEscape(T.title)
 
@@ -530,7 +530,7 @@ describe('the sheet « Ton retour »', () => {
 
     it('keeps the text with « Continuer »', async () => {
       await openSheet()
-      write('Un brouillon')
+      await write('Un brouillon')
       await pressEscape(T.title)
       await screen.findByText(T.discardTitle)
       await passTapGuard()
@@ -554,8 +554,8 @@ describe('the sheet « Ton retour »', () => {
   describe('once sent', () => {
     it('closes and says « Merci, c’est noté »', async () => {
       await openSheet()
-      choose(T.kind('love'))
-      write('Le pollen qui danse')
+      await choose(T.kind('love'))
+      await write('Le pollen qui danse')
 
       await send()
 
@@ -567,8 +567,8 @@ describe('the sheet « Ton retour »', () => {
       let finish: (value: (typeof myReports)[number]) => void = () => {}
       scoutServer.send.mockImplementation(() => new Promise((resolve) => (finish = resolve)))
       await openSheet()
-      choose(T.kind('love'))
-      write('Vite vite')
+      await choose(T.kind('love'))
+      await write('Vite vite')
 
       const button = screen.getByRole('button', { name: T.send })
       await fireEvent.press(button)
