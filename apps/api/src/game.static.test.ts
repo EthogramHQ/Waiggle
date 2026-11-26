@@ -19,6 +19,7 @@ import {
   HIVE_CHALLENGES,
   MILESTONE_SEALS,
   PERSONAL_CHALLENGES,
+  SCOUT_SEAL,
   SEALS,
   sealCategory,
 } from '@ruche/contracts'
@@ -151,7 +152,9 @@ describe('a text for every code of the game', () => {
     })
 
     expect(paths.length).toBe(SEALS.length)
-    expect(paths.filter((path) => path[2] !== 'category')).toHaveLength(MILESTONE_SEALS.length)
+    // Les paliers, plus le sceau de fondatrice des Éclaireuses (R20), qui a son propre texte.
+    expect(paths.filter((path) => path[2] !== 'category')).toHaveLength(MILESTONE_SEALS.length + 1)
+    expect(paths).toContainEqual(['game', 'seals', SCOUT_SEAL.code])
     expect(missingTexts(paths)).toEqual([])
     // Une catégorie créée plus tard a le texte commun, avec le nom de la catégorie.
     expect(missingTexts([['game', 'seals', 'categoryOther']])).toEqual([])

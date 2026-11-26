@@ -21,8 +21,10 @@ export type GameNoticeInput =
   | { kind: 'seal'; code: string }
   | { kind: 'hive_challenge'; hiveId: string; code: string; honey: number }
   | { kind: 'honey_gift'; actorId: string; projectId: string }
-  // R20 : le retour corrigé (son extrait se lit à l'affichage, jamais recopié ici).
-  | { kind: 'scout_heard'; reportId: string }
+  // R20 : le retour corrigé (son extrait se lit à l'affichage, jamais recopié ici). `honey` : le
+  // miel versé, ou null quand rien ne l'a été (compte suspendu ou d'exemples, relecture juridique
+  // L1) : l'avis ne promet alors aucun gain.
+  | { kind: 'scout_heard'; reportId: string; honey: number | null }
   // R20 : la semaine (son lundi, dans `code` : un seul avis par membre et par semaine) et le
   // nombre de missions publiées.
   | { kind: 'scout_missions'; week: string; count: number }
@@ -44,7 +46,7 @@ const columnsOf = (notice: GameNoticeInput) => {
     case 'honey_gift':
       return { kind: notice.kind, actorId: notice.actorId, projectId: notice.projectId }
     case 'scout_heard':
-      return { kind: notice.kind, reportId: notice.reportId }
+      return { kind: notice.kind, reportId: notice.reportId, honey: notice.honey }
     case 'scout_missions':
       return { kind: notice.kind, code: notice.week, count: notice.count }
     case 'scout_removed':

@@ -1546,7 +1546,14 @@ export const present = (
       // Le retour et le début de son texte ; un retour supprimé emporte l'avis (cascade).
       const excerpt = scoutExcerptOf(row.game_report_text)
       if (row.game_report_id === null || excerpt === null) return null
-      return { ...common, kind: 'game_scout_heard', reportId: row.game_report_id, excerpt }
+      // Le miel n'est gardé que s'il a été versé (scouts/triage.ts) : sans lui, aucun gain annoncé.
+      return {
+        ...common,
+        kind: 'game_scout_heard',
+        reportId: row.game_report_id,
+        excerpt,
+        paid: row.game_honey !== null,
+      }
     }
     case 'game_scout_missions': {
       const count = row.game_count

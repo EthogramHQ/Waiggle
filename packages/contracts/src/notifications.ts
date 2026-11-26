@@ -473,12 +473,15 @@ export const GameIntroNotification = z.object({
  * R20 : « Ta danse a été entendue : <début du retour> est corrigé » (50 pollen, 10 miel). La ligne
  * gardée ne porte que `reportId` ; l'extrait (80 caractères, plus « … ») est lu dans le retour au
  * moment de la lecture, pour qu'un retour supprimé n'y laisse pas son texte (la ligne part alors).
+ * `paid` : vrai si le pollen et le miel ont été versés. Un compte suspendu ou d'exemples reçoit
+ * l'avis sans gain, et l'appli ne lui annonce alors rien (relecture juridique L1).
  */
 export const GameScoutHeardNotification = z.object({
   ...Common,
   kind: z.literal('game_scout_heard'),
   reportId: ScoutReportId,
   excerpt: z.string().max(SCOUT_EXCERPT_MAX + 1),
+  paid: z.boolean(),
 })
 
 /** R20 : « 3 missions cette semaine », le lundi où l'administrateur les publie (Éclaireuses actives). */
