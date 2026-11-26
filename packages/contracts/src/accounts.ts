@@ -62,6 +62,9 @@ export const SignUpRefusalCode = z.enum([
   'INVITE_CODE_INVALID',
   'RULES_NOT_ACCEPTED',
   'AGE_NOT_DECLARED',
+  // R20 : le code des Éclaireuses tapé quand les 30 places sont prises, ou après le mois (403).
+  'SCOUT_FULL',
+  'SCOUT_CLOSED',
 ])
 export type SignUpRefusalCode = z.infer<typeof SignUpRefusalCode>
 

@@ -61,11 +61,13 @@ describe('SignUpRequest', () => {
 })
 
 describe('SignUpRefusalCode', () => {
-  it('names the three refusals the app recognizes', () => {
+  it('names the refusals the app recognizes', () => {
     expect(SignUpRefusalCode.options).toEqual([
       'INVITE_CODE_INVALID',
       'RULES_NOT_ACCEPTED',
       'AGE_NOT_DECLARED',
+      'SCOUT_FULL',
+      'SCOUT_CLOSED',
     ])
   })
 })

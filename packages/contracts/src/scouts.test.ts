@@ -25,7 +25,7 @@ const context = {
   screen: '/projects/42',
   platform: 'web',
   width: 390,
-  appVersion: '1.4.0',
+  appVersion: 'a1b2c3d',
   language: 'fr',
   scheme: 'night',
 } as const
@@ -62,6 +62,11 @@ describe('ScoutReportInput', () => {
 
   it('accepts a text of 2 000 characters, not one more, and never an empty one', () => {
     expect(ScoutReportInput.safeParse({ kind: 'idea', text: 'a'.repeat(2000) }).success).toBe(true)
+    // Des caractères, pas des unités UTF-16 : 2 000 abeilles passent, 2 001 non (A3).
+    expect(ScoutReportInput.safeParse({ kind: 'idea', text: '🐝'.repeat(2000) }).success).toBe(true)
+    expect(ScoutReportInput.safeParse({ kind: 'idea', text: '🐝'.repeat(2001) }).success).toBe(
+      false,
+    )
     expect(ScoutReportInput.safeParse({ kind: 'idea', text: 'a'.repeat(2001) }).success).toBe(false)
     expect(ScoutReportInput.safeParse({ kind: 'idea', text: '   ' }).success).toBe(false)
     expect(ScoutReportInput.safeParse({ kind: 'idea', text: '​' }).success).toBe(false)
@@ -114,8 +119,12 @@ describe('ScoutContext', () => {
     expect(ScoutContext.safeParse({ ...context, width: 10_001 }).success).toBe(false)
     expect(ScoutContext.safeParse({ ...context, width: -1 }).success).toBe(false)
     expect(ScoutContext.safeParse({ ...context, width: 390.5 }).success).toBe(false)
-    expect(ScoutContext.safeParse({ ...context, appVersion: 'v'.repeat(64) }).success).toBe(true)
-    expect(ScoutContext.safeParse({ ...context, appVersion: 'v'.repeat(65) }).success).toBe(false)
+    // La version est le commit de l'appli : de l'hexadécimal, ou null en développement (A3).
+    expect(ScoutContext.safeParse({ ...context, appVersion: 'f'.repeat(40) }).success).toBe(true)
+    expect(ScoutContext.safeParse({ ...context, appVersion: 'f'.repeat(41) }).success).toBe(false)
+    expect(ScoutContext.safeParse({ ...context, appVersion: null }).success).toBe(true)
+    expect(ScoutContext.safeParse({ ...context, appVersion: '1.4.0' }).success).toBe(false)
+    expect(ScoutContext.safeParse({ ...context, screen: '/feed\u202e' }).success).toBe(false)
     expect(ScoutContext.safeParse({ ...context, platform: 'windows' }).success).toBe(false)
     expect(ScoutContext.safeParse({ ...context, language: 'de' }).success).toBe(false)
     expect(ScoutContext.safeParse({ ...context, scheme: 'dusk' }).success).toBe(false)

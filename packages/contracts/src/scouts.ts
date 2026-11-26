@@ -43,8 +43,6 @@ export const SCOUT_REPORT_TEXT_MAX = 2000
 export const SCOUT_MISSION_TEXT_MAX = 200
 /** L'adresse de l'écran joint : 200 caractères au plus. */
 export const SCOUT_SCREEN_MAX = 200
-/** La version de l'appli jointe : 64 caractères au plus. */
-export const SCOUT_APP_VERSION_MAX = 64
 /** La largeur d'écran jointe, en points : de 0 à 10 000. */
 export const SCOUT_WIDTH_MAX = 10_000
 /** La note de l'administrateur pour l'Éclaireuse (« Corrigé le 28/11, merci ! ») : 300 au plus. */
@@ -154,15 +152,17 @@ export const ScoutSettings = z.strictObject({ showDrop: z.boolean() }).meta({ id
 export type ScoutSettings = z.infer<typeof ScoutSettings>
 
 /**
- * L'adresse de l'écran où l'on était (« /projects/42 ») : elle commence par « / », sans espace ni
- * caractère de contrôle (`\p{Cc}`, le drapeau `u` de la regex permet ces classes Unicode). Ce qui
+ * L'adresse de l'écran où l'on était (« /projects/42 ») : elle commence par « / », sans espace, ni
+ * caractère de contrôle (`\p{Cc}`), ni caractère de format invisible (`\p{Cf}`, qui comprend les
+ * marques bidi capables de retourner un texte à l'affichage ; relecture de sécurité du plan, A3). Le
+ * drapeau `u` de la regex permet ces classes Unicode. Ce qui
  * suit « ? » ou « # » (les paramètres) est accepté ici, puis coupé par l'API (`screenPathOf`) : on
  * ne garde jamais un paramètre, qui pourrait porter un jeton.
  */
 export const ScoutScreen = z
   .string()
   .max(SCOUT_SCREEN_MAX)
-  .regex(/^\/[^\s\p{Cc}]*$/u)
+  .regex(/^\/[^\s\p{Cc}\p{Cf}]*$/u)
 
 /** L'adresse sans ses paramètres : tout ce qui suit le premier « ? » ou « # » est coupé. */
 export const screenPathOf = (screen: string): string => screen.split(/[?#]/, 1)[0] ?? ''
@@ -176,7 +176,12 @@ export const ScoutContext = z
     screen: ScoutScreen,
     platform: ScoutPlatform,
     width: z.int().min(0).max(SCOUT_WIDTH_MAX),
-    appVersion: ShortLabel(SCOUT_APP_VERSION_MAX),
+    // Le commit de l'appli web (`config.ts`, `EXPO_PUBLIC_APP_VERSION`), null en développement :
+    // seulement de l'hexadécimal, rien qui puisse porter du texte (A3).
+    appVersion: z
+      .string()
+      .regex(/^[0-9a-f]{7,40}$/)
+      .nullable(),
     language: LanguageSchema,
     scheme: ScoutScheme,
   })
@@ -195,7 +200,12 @@ export const ScoutReportInput = z
   .strictObject({
     kind: ScoutReportKind,
     severity: ScoutSeverity.optional(),
-    text: VisibleFreeText(SCOUT_REPORT_TEXT_MAX),
+    // 2 000 caractères, comptés comme on les voit (`[...text]` découpe par point de code : une
+    // abeille 🐝 compte 1, alors que `.length` en compte 2) ; A3.
+    text: VisibleFreeText(SCOUT_REPORT_TEXT_MAX * 2).refine(
+      (text) => [...text].length <= SCOUT_REPORT_TEXT_MAX,
+      { message: 'at most 2000 characters' },
+    ),
     missionId: ScoutMissionId.optional(),
     context: ScoutContext.optional(),
   })
