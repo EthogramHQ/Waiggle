@@ -143,8 +143,8 @@ fichier partagé à l'exécution. Un test prouve que les deux blocs sont identiq
 ## A4. `waiggle-deployer <commit>`, dans l'ordre
 
 Codes de sortie : `0` déployé ; `2` refusé (la production n'a reçu, au plus, que `version`) ; `3` trop tôt (verrou,
-écart ou plafond : rien n'a été examiné) ; `4` échec ou délai dépassé du côté de la production ; `5` notification
-de début impossible (rien n'a été examiné).
+écart ou plafond : rien n'a été examiné) ; `4` échec ou délai dépassé du côté de la production. (Le code `5`,
+« notification de début impossible », n'existe plus depuis le 25/11/2026 : voir l'étape 3.)
 
 0. **Démarrage** (A3) : l'appelant est lu, l'environnement est vidé. `$ID -u` doit valoir `0`, sinon code 2, sans
    journal. Le verrou se prend par `$FLOCK -n` sur `$VERROU`. S'il est pris : une ligne `fin` (raison `verrou`),
@@ -162,7 +162,14 @@ de début impossible (rien n'a été examiné).
    secondes depuis 1970 de la dernière de ces notifications ; illisible ou absent, l'envoi est permis). Sinon, la ligne de l'essai
    s'ajoute à `essais` avant l'étape suivante : un essai refusé plus loin compte quand même.
 3. **Le début** : une ligne `debut` au journal, puis la notification de début. Si elle ne part pas (code de `curl`
-   non nul), une ligne `fin` (raison `notification`) et le code 5 (m3).
+   non nul : ntfy en panne, ou sa limite par jour atteinte), une phrase le dit à l'appelant sur sa sortie d'erreur,
+   et l'essai continue : toutes les vérifications suivantes s'appliquent, et le journal garde la ligne `debut`.
+   Décision du 25/11/2026 : le 25/11, la limite de ntfy.sh atteinte par vps-dev (429) a bloqué tout déploiement ;
+   un service de notification extérieur ne doit pas pouvoir empêcher de déployer. Avant, l'essai s'arrêtait
+   (raison `notification`, code 5, m3). Risque accepté : la limite de ntfy.sh étant par adresse, quelqu'un qui
+   agit sous `louis` peut l'épuiser puis déployer sans qu'aucune notification parte ; il ne peut déployer qu'un
+   commit de main fusionné par Louis, plus récent que la production, attesté, dans la cadence, et le journal de
+   root garde l'essai. Seule l'heure du déploiement lui appartient, et on ne fusionne que ce qui peut partir.
 4. **Sur `main`** : le `fetch` ; `rev-parse --verify --quiet "<commit>^{commit}"` doit rendre le commit ; puis
    `merge-base --is-ancestor <commit> refs/remotes/origin/main`. Sinon : raison `pas-sur-main`, code 2.
 5. **La version en service** : `ssh … version`, délai de 60 s. La réponse est une seule ligne conforme à
@@ -288,7 +295,7 @@ commande refusée n'est jamais recopiée.
 
 - Une ligne `debut` ne porte que l'horodatage, `script`, `appelant` et `commit`.
 - **Chaque essai a exactement une ligne `fin`**. Un essai qui passe la cadence a aussi une ligne `debut`, avant.
-- **Les raisons** forment une liste fermée : `ok`, `argument`, `verrou`, `ecart`, `plafond`, `notification`,
+- **Les raisons** forment une liste fermée : `ok`, `argument`, `verrou`, `ecart`, `plafond`,
   `pas-sur-main`, `version-illisible`, `deja-en-service`, `plus-ancien`, `intervalle-trop-long`, `sans-pr`,
   `pas-louis`, `site-env`, `mentions`, `attestation`, `empreinte`, `production`, `delai`, `interrompu`.
 - Le journal ne contient jamais le jeton, une clé, le sujet ntfy, ni le contenu d'un fichier de `/root`.
@@ -304,7 +311,7 @@ refusé (<raison>) : <commit ou ->, demandé par <appelant>, étape <n>
 
 Par exemple : `déployé : 1a2b3c4 (avant 9f8e7d6), demandé par louis, 212 s`.
 
-Chaque essai envoie le début et la fin. Les refus de cadence et d'argument envoient au plus une notification toutes
+Chaque essai tente d'envoyer le début et la fin ; ni l'un ni l'autre n'arrête l'essai s'il ne part pas. Les refus de cadence et d'argument envoient au plus une notification toutes
 les 600 s. Le refus du verrou n'en envoie pas.
 
 ## A8. `installer.sh` (vps-dev)
@@ -401,7 +408,7 @@ De la relecture v1 :
 - has no default taken from the environment and no test switch
 - records the calling user given by sudo before clearing the environment
 - logs and notifies a malformed argument without copying it
-- refuses to deploy when the start notification cannot be sent
+- deploys even when the start notification cannot be sent, and says so
 - runs the legal check in a transient unit without network, /home or /root, stopped after its time limit
 - refuses a commit pushed on main without a pull request
 - refuses a merge commit whose pull request was merged by another account, compared by numeric id
