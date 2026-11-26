@@ -83,6 +83,18 @@ const errorMessages = {
   invalid_challenge: 'invalidChallenge',
   invalid_level_seen: 'invalidLevelSeen',
   family_not_obtained: 'familyNotObtained',
+  // Tranche R20 (les Éclaireuses) : les places, le mois, le code, l'entrée, les routes réservées,
+  // la mission, le retour corrigé, le lancement. Un code faux répond le message d'un code
+  // d'invitation faux : routes/scouts.ts l'écrit elle-même (`auth.errors.inviteInvalid`).
+  scout_full: 'scoutFull',
+  scout_closed: 'scoutClosed',
+  scout_code_invalid: 'scoutCodeInvalid',
+  scout_already: 'scoutAlready',
+  scout_removed: 'scoutRemoved',
+  scout_only: 'scoutOnly',
+  scout_mission_invalid: 'scoutMissionInvalid',
+  scout_report_fixed: 'scoutReportFixed',
+  scout_program_started: 'scoutProgramStarted',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

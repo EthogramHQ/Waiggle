@@ -39,9 +39,14 @@ const HIVE_GESTURES: readonly LedgerGesture[] = [
  * Pose ces sceaux à ces membres, s'ils ne les ont pas encore, et écrit l'avis « Nouveau sceau » de
  * chacun gagné ici. « on conflict do nothing » sur la clé primaire : un sceau déjà là n'est ni
  * réécrit ni redaté, et deux gestes simultanés ne l'annoncent qu'une fois (`returning` ne rend que
- * les lignes écrites). Rend les sceaux gagnés.
+ * les lignes écrites). Rend les sceaux gagnés. R20 : aussi le sceau des Éclaireuses, donné à
+ * l'entrée (scouts/join.ts), qui ne se calcule pas.
  */
-const grant = async (tx: Tx, grants: readonly { memberId: string; code: string }[], now: Date) => {
+export const grantSeals = async (
+  tx: Tx,
+  grants: readonly { memberId: string; code: string }[],
+  now: Date,
+) => {
   if (grants.length === 0) return []
   const earned = await tx
     .insert(s)
@@ -172,5 +177,5 @@ export const evaluateSeals = async (tx: Tx, entry: AwardedEntry) => {
   const category = await categorySeal(tx, entry)
   if (category !== null && !owned.has(category)) grants.push({ memberId, code: category })
 
-  return grant(tx, grants, now)
+  return grantSeals(tx, grants, now)
 }

@@ -45,6 +45,9 @@ import { rankingRoutes } from './routes/rankings'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { rulesRoutes } from './routes/rules'
+import { scoutReportRoutes } from './routes/scout-reports'
+import { scoutTriageRoutes } from './routes/scout-triage'
+import { scoutRoutes } from './routes/scouts'
 import { searchRoutes } from './routes/search'
 import { showcaseRoutes } from './routes/showcase'
 import { suggestionRoutes } from './routes/suggestions'
@@ -83,7 +86,19 @@ export type AppOptions = {
    * (moderation/suspend.ts). Le même que celui de Better Auth.
    */
   mailer: Mailer
+  /**
+   * R20 : le code des Éclaireuses (SCOUT_INVITE_CODE), pour « J'ai un code » dans les réglages
+   * (POST /v1/me/scout) ; null, ou absent : aucun code ne marche.
+   */
+  scoutCode?: string | null
 }
+
+/**
+ * R20 : l'envoi d'un retour d'Éclaireuse (multipart, capture comprise), seule route des Éclaireuses
+ * sortie de la limite commune de 16 Ko. Le chemin exact, comparé à l'égalité (relecture de sécurité
+ * A3) : sa propre limite (5 Mo et 64 Ko) est posée par la route, après la session et le quota.
+ */
+const SCOUT_REPORTS_PATH = '/v1/me/scout/reports'
 
 // Déclaration de la route GET /health. createRoute décrit la route ET sa réponse attendue :
 // c'est ce qui permet de générer automatiquement la documentation OpenAPI.
@@ -180,6 +195,7 @@ export const createApp = ({
   publicApiUrl,
   secret,
   mailer,
+  scoutCode = null,
 }: AppOptions) => {
   const app = new OpenAPIHono<AppEnv>()
 
@@ -268,6 +284,9 @@ export const createApp = ({
     // L'envoi d'une image du coin des testeurs (R7b) a sa propre limite, comme les visuels : la
     // route la pose juste après avoir vérifié les droits (routes/tester-media.ts).
     if (/^\/v1\/projects\/[^/]+\/testers\/media$/.test(c.req.path)) return next()
+    // R20 : l'envoi d'un retour d'Éclaireuse, seulement en POST (« Mes retours », en GET, n'a pas
+    // de corps et garde la petite limite) ; sa route pose sa limite (routes/scout-reports.ts).
+    if (c.req.method === 'POST' && c.req.path === SCOUT_REPORTS_PATH) return next()
     // Une mise à jour (16 Ko : cinq lignes, un titre, quatre photos citées) ou un commentaire pèse
     // peu, une réaction ou une inscription de testeur n'a pas de corps : la petite limite suffit.
     // R7b : les appels (500 caractères), les fils, les messages (1 000 caractères), les retours
@@ -431,6 +450,11 @@ export const createApp = ({
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   // Le jeu (R19) : « Ma récolte », les réglages du jeu, la décoration du rayon, l'offre de miel.
   app.route('/', gameRoutes({ db, limiter }))
+  // Les Éclaireuses (R20) : l'entrée, « Afficher la Goutte » et les missions ; les retours ; la
+  // page de tri de l'administrateur.
+  app.route('/', scoutRoutes({ db, limiter, publicApiUrl, scoutCode }))
+  app.route('/', scoutReportRoutes({ db, storage, limiter, publicApiUrl }))
+  app.route('/', scoutTriageRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
   app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
