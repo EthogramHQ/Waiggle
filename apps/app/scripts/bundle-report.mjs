@@ -23,8 +23,11 @@ import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
 
 // La limite de la garde, en Ko de brotli : écrite une seule fois, ici. À relever (ou à baisser)
 // à la main quand le départ change volontairement. R18 : 686 Ko mesurés (1 096 avant) ; la cible
-// de 650 n'est pas atteinte, la garde est posée à 700 pour empêcher toute rechute (Louis, 22/11).
-const MAX_START_KB = 700
+// de 650 n'est pas atteinte, la garde est posée à 700 pour empêcher toute rechute (décision du
+// 22/11). R20 : main était à 700 ; les Éclaireuses ajoutent leurs textes et leur contrat, que tout
+// membre reçoit (le bouton de la Goutte, lui, se charge à la demande) : garde relevée à 710
+// (décision du 26/11).
+const MAX_START_KB = 710
 
 const args = process.argv.slice(2)
 const json = args.includes('--json')

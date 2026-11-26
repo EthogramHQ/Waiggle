@@ -24,6 +24,7 @@ jest.mock('./src/accounts/auth-client', () => ({ authClient: { getCookie: () => 
 jest.mock('./src/navigation/chunkLoaders', () => ({
   loadSettingsChunk: () => Promise.resolve(require('./src/navigation/chunks/settings')),
   loadProjectEditorChunk: () => Promise.resolve(require('./src/navigation/chunks/projectEditor')),
+  loadScoutChunk: () => Promise.resolve(require('./src/navigation/chunks/scout')),
 }))
 globalThis.fetch = jest.fn(() => Promise.reject(new Error('No network in tests')))
 

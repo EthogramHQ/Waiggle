@@ -10,16 +10,20 @@
 // - un appui long la replie en languette, pour la session de l'appli (scout/dropFold.ts).
 //
 // Il part dans le premier paquet de l'appli (poids du premier chargement) : il n'importe que des
-// modules déjà chargés (session, profil, navigation) ; la feuille et ses requêtes se chargent à la
-// demande, par son adresse (navigation/chunks/scout.ts). Aucun style ici : HoneyDrop se place seul.
+// modules déjà chargés (session, profil, navigation). Le bouton lui-même (ui/HoneyDrop) se charge à
+// la demande, la première fois qu'il doit se montrer, avec le morceau des Éclaireuses
+// (navigation/chunks/scout.ts) : seules une trentaine d'Éclaireuses le voient, les autres membres
+// ne le téléchargent pas (1,7 Ko de moins au départ, CI de R20). Aucun style ici : HoneyDrop se
+// place seul.
 import { LEGAL_PAGES } from '@ruche/contracts'
 import { supportedLanguages } from '@ruche/i18n'
 import { usePathname, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
+import { loadScoutChunk } from '../navigation/chunkLoaders'
+import { lazyModule } from '../navigation/lazyModule'
 import { isSheetPath } from '../navigation/sheetRoutes'
 import { useMe } from '../profile/hooks'
-import { HoneyDrop } from '../ui/HoneyDrop'
 import { useTapGuard } from '../ui/tapGuard'
 import { useHydrated } from '../ui/theme/hydration'
 import { foldDrop, unfoldDrop, useDropFolded } from './dropFold'
@@ -60,6 +64,10 @@ const dropAllowedOn = (path: string): boolean =>
   path !== '/scout-report' &&
   !isSheetPath(path)
 
+// Le bouton, demandé seulement quand il doit se montrer (navigation/lazyModule.ts), dans le morceau
+// des pages des Éclaireuses : la feuille « Ton retour » arrive avec lui, prête au premier toucher.
+const useScoutParts = lazyModule(loadScoutChunk)
+
 export function ScoutDrop() {
   const { t } = useTranslation()
   const router = useRouter()
@@ -87,7 +95,8 @@ export function ScoutDrop() {
     me?.rulesAccepted !== false &&
     !me?.suspension &&
     dropAllowedOn(path)
-  if (!shown) return null
+  const HoneyDrop = useScoutParts(shown)?.HoneyDrop
+  if (!shown || !HoneyDrop) return null
 
   const count = scout.missionsLeft
   const label =

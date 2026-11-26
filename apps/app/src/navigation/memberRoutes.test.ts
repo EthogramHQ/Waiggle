@@ -200,11 +200,12 @@ describe('the scouts pages loaded on demand (R20)', () => {
     expect(read('src/navigation/sheetRoutes.ts')).toMatch(/'scout-report'/)
   })
 
-  it('sends only the drop to the start script, never the scouts screens', () => {
+  it('sends only the wiring of the drop to the start script, never its button nor the scouts screens', () => {
     const reached = reachedFrom(['app/index.tsx', 'app/_layout.tsx'])
     // Témoin : la Goutte est bien montée par la mise en page de l'appli.
     expect(reached).toContain('src/scout/ScoutDrop.tsx')
-    expect(reached).toContain('src/ui/HoneyDrop.tsx')
+    // Son bouton vient avec le morceau des Éclaireuses, pour elles seules (garde de poids, 26/11).
+    expect(reached.has('src/ui/HoneyDrop.tsx')).toBe(false)
     expect(SCOUT_FILES.filter((file) => reached.has(file))).toEqual([])
   })
 
