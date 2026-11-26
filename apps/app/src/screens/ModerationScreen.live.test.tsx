@@ -19,7 +19,7 @@ import {
   scamCommentItem,
 } from '../testing/moderation'
 import { mockSession, renderWithProviders } from '../testing/render'
-import { containing } from '../testing/text'
+import { containing, fr } from '../testing/text'
 import { ModerationScreen } from './ModerationScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -90,7 +90,7 @@ describe('the moderation queue in real time', () => {
     expect(screen.queryByText(reviewsText())).toBeNull()
   })
 
-  it('announces the arrival once to the screen reader', async () => {
+  it('announces « Nouveau signalement » once to the screen reader', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility')
     const { queryClient } = await openQueue()
     announce.mockClear()
@@ -100,7 +100,9 @@ describe('the moderation queue in real time', () => {
     await act(async () => {})
 
     expect(announce).toHaveBeenCalledTimes(1)
-    expect(String(announce.mock.calls[0]?.[0]).trim()).not.toBe('')
+    expect(announce).toHaveBeenCalledWith(fr.t(($) => $.moderation.liveArrival))
+    // Témoin : le texte de la clé (R21), lu tel quel.
+    expect(fr.t(($) => $.moderation.liveArrival)).toBe('Nouveau signalement')
     announce.mockRestore()
   })
 
