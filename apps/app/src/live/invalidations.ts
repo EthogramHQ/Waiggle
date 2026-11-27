@@ -25,12 +25,19 @@ import { commentsQueryKey } from '../comments/api'
 import { feedQueryKey } from '../feed/api'
 import { harvestQueryKey } from '../gamification/keys'
 import { hiveQueryKey, myHivesQueryKey } from '../hives/api'
-import { queueKey as moderationQueueKey } from '../moderation/api'
+import { queueKey as moderationQueueKey } from '../moderation/keys'
 import { scoutTriageKey } from '../moderation/scouts/api'
 import { listKey as activityListKey, unreadKey } from '../notifications/api'
 import { projectQueryKey } from '../projects/hooks'
 import { scoutKeys } from '../scout/api'
-import { cornerKey, myTesterMessagesKey } from '../testers/corner-api'
+import {
+  allCornersKey,
+  allThreadMessagesKey,
+  allThreadsKey,
+  callsKey,
+  cornerKey,
+  myTesterMessagesKey,
+} from '../testers/corner-api'
 import { projectUpdatesQueryKey } from '../updates/api'
 
 /** La page d'un membre : la clé de `useMember` (members/api.ts), qui n'a pas de fabrique. */
@@ -86,9 +93,22 @@ const forMe = (kind: LiveKind): InvalidateQueryFilters[] => {
     // La Goutte : un retour d'Éclaireuse a été entendu (missions et retours, sous `['scout']`).
     case 'scouts':
       return [{ queryKey: scoutKeys.all }]
-    // Un message dans un de ses fils de testeur : il ne part qu'au `me` des deux personnes du fil.
+    // Un message dans un de ses fils de testeur : il ne part qu'au `me` des deux personnes du fil,
+    // jamais sur `corner:` (relecture du plan, B1), et sans dire de quel projet. Se relisent donc
+    // « Mes retours envoyés », le fil ouvert (ses messages), et, chez l'auteur, la liste de ses
+    // fils (le point « non lu », « À traiter » et « Réglés ») et le coin ; seules les lectures
+    // montrées à l'écran repartent.
     case 'corner':
-      return [{ queryKey: myTesterMessagesKey }]
+      return [
+        { queryKey: myTesterMessagesKey },
+        { queryKey: allThreadMessagesKey },
+        { queryKey: allThreadsKey },
+        { queryKey: allCornersKey },
+      ]
+    // Une invitation reçue, acceptée ou refusée, une ruche rejointe : « mes ruches », qui porte
+    // aussi les invitations valables (hives/api.ts).
+    case 'hive':
+      return [{ queryKey: myHivesQueryKey, exact: true }]
     // Un projet publié dans une de ses ruches : les têtes des fils, et la liste de ses ruches.
     case 'feed':
       return [feedHeads, { queryKey: myHivesQueryKey, exact: true }]
@@ -119,8 +139,9 @@ export const invalidationsFor = (event: LiveEvent): InvalidateQueryFilters[] => 
     // Tout ce qui est rangé sous la ruche (sa page, ses membres, ses projets, son activité).
     case 'hive':
       return [{ queryKey: hiveQueryKey(id) }]
+    // Le coin d'un projet : son état (les testeurs), et ses appels (un appel neuf de l'auteur).
     case 'corner':
-      return [{ queryKey: cornerKey(id) }]
+      return [{ queryKey: cornerKey(id) }, { queryKey: callsKey(id) }]
     case 'me':
       return forMe(event.kind)
     case 'feed':

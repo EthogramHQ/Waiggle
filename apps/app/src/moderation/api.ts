@@ -19,10 +19,13 @@ import { type InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/r
 import { useCallback } from 'react'
 import { request } from '../api/client'
 import { ApiError, type ApiResult } from '../api/errors'
+import { queueKey } from './keys'
 
 /** Toutes les clés de cache de la modération commencent par « moderation ». */
 export const moderationQueryKey = ['moderation'] as const
-export const queueKey = ['moderation', 'queue'] as const
+// La file : sa clé vit dans keys.ts (R21), redonnée ici à ceux qui la lisaient de ce module.
+export type { queueKey }
+
 const removedKey = ['moderation', 'removed'] as const
 /** L'historique : une liste par filtre (`null` : toutes les décisions). */
 const historyKey = ['moderation', 'history'] as const
@@ -73,7 +76,9 @@ export const useModerationQueue = (enabled = true) =>
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled,
     retry,
-    refetchOnWindowFocus: false,
+    // R21 : sauf si un signal l'a marquée périmée (un signalement neuf, annoncé) : revenir sur
+    // l'onglet du navigateur est alors un geste qui la relit, et le signalement y paraît.
+    refetchOnWindowFocus: (query) => query.state.isInvalidated,
     refetchOnReconnect: false,
   })
 

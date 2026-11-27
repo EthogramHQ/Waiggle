@@ -227,6 +227,45 @@ describe('what a personal signal (me) rereads', () => {
 
     expect(fate(threads)).toBe('reread')
   })
+
+  // R21 : le signal ne dit pas de quel projet vient le message ; le fil ouvert se relit, côté
+  // testeur comme côté auteur, et chez l'auteur sa liste de fils et son coin.
+  it('rereads the open tester thread and the author’s threads when a message arrives', async () => {
+    const thread = await watch(['tester-messages', P, 'nora'])
+    const threads = await watch(['tester-threads', P, 'open'])
+    const corner = await watch(cornerKey(P))
+    const bell = await watch(unreadKey)
+
+    await apply({ topic: 'me', kind: 'corner' })
+
+    expect(fate(thread)).toBe('reread')
+    expect(fate(threads)).toBe('reread')
+    expect(fate(corner)).toBe('reread')
+    // Témoin : le signal du fil ne recompte pas la cloche (son avis a son propre signal).
+    expect(fate(bell)).toBe('untouched')
+  })
+
+  it('rereads one’s hives and invitations when an invitation arrives (me:hive)', async () => {
+    const hives = await watch(myHivesQueryKey)
+    const page = await watch(hiveQueryKey(H))
+
+    await apply({ topic: 'me', kind: 'hive' })
+
+    expect(fate(hives)).toBe('reread')
+    expect(fate(page)).toBe('untouched')
+  })
+})
+
+describe('the calls of a tester corner (R21)', () => {
+  it('rereads the calls of that project when its author posts one', async () => {
+    const calls = await watch(['tester-calls', P])
+    const other = await watch(['tester-calls', Q])
+
+    await apply({ topic: `corner:${P}`, kind: 'corner' })
+
+    expect(fate(calls)).toBe('reread')
+    expect(fate(other)).toBe('untouched')
+  })
 })
 
 describe('the feeds: only the head is reread, never the list', () => {

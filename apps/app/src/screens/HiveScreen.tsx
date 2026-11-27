@@ -46,6 +46,7 @@ import {
   useSetHideFromSuggestions,
 } from '../hives/api'
 import { QuitHiveDialog, RemoveMemberDialog } from '../hives/HiveDialogs'
+import { useLiveTopic } from '../live/topics'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
 import { firstParam } from '../navigation/params'
@@ -107,6 +108,10 @@ const emptyMemberRows = (memberCount: number | undefined) =>
   Math.min(memberCount ?? DEFAULT_EMPTY_MEMBER_ROWS, MAX_EMPTY_MEMBER_ROWS)
 
 export function HiveScreen({ id }: { id: string }) {
+  // R21 : la page écoute sa ruche (`hive:<id>`) dès qu'elle est montée, sans attendre sa lecture :
+  // le sujet ne dépend que de l'adresse, et le serveur ignore, sans le dire, celui d'une ruche dont
+  // on n'est pas membre. Un signal relit ce qui est rangé sous la ruche (live/invalidations.ts).
+  useLiveTopic(`hive:${id}`)
   // R16 : la garde commune (attente, erreur, visiteur) ; son attente est déjà la page vide de la
   // ruche, à ses places. Les lectures ne partent qu'avec une session : elles vivent dans `Hive`.
   return (

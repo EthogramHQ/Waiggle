@@ -41,6 +41,7 @@ import type {
   ReportPart,
   StoredReportTarget,
 } from '@ruche/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   type Dispatch,
@@ -53,6 +54,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
+import { useKeptArrival } from '../live/arrival'
 import {
   useDecide,
   useDecisionHistory,
@@ -60,6 +62,7 @@ import {
   useRemovedItems,
 } from '../moderation/api'
 import { decisionFailure } from '../moderation/failure'
+import { queueKey } from '../moderation/keys'
 import {
   detailTitle,
   firstText,
@@ -83,6 +86,7 @@ import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import type { IconName } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
+import { LiveStatus } from '../ui/LiveStatus'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
 import { relativeDate } from '../ui/relativeDate'
 import { Screen } from '../ui/Screen'
@@ -265,10 +269,26 @@ function AdminModeration() {
     setLastDecided(null)
   }
 
+  // R21 : un signalement neuf arrive par le flux. La file ne se relit pas sous les yeux : elle est
+  // seulement marquée périmée, et l'arrivée est annoncée au lecteur d'écran, une fois (la région
+  // `LiveStatus` en bas de la page). On l'écoute quand la file se voit (l'onglet « À traiter »
+  // des signalements) ; ailleurs, la file se relira à son retour.
+  const queryClient = useQueryClient()
+  const reportArrived = useKeptArrival(queueKey, tab === 'pending' && view === 'reports')
+
+  /**
+   * Revenir sur la file est un geste : marquée périmée par un signal (ou par un contenu rétabli),
+   * elle se relit alors, et le nouveau signalement y paraît.
+   */
+  const rereadMarkedQueue = () => {
+    if (queryClient.getQueryState(queueKey)?.isInvalidated) void queue.refetch()
+  }
+
   /** Changer d'onglet est un geste qui range les éléments décidés. */
   const changeTab = (next: Tab) => {
     setTab(next)
     forgetDecided()
+    if (next === 'pending') rereadMarkedQueue()
   }
 
   /** Garde l'élément décidé à sa place, avec son résultat, et oublie sa dernière panne. */
@@ -808,6 +828,7 @@ function AdminModeration() {
     router.setParams({ tab: next === 'showcase' ? 'showcase' : undefined, item: undefined })
     setView(next)
     forgetDecided()
+    if (next === 'reports' && tab === 'pending') rereadMarkedQueue()
   }
 
   // Les deux onglets du haut : « Signalements » et « Vitrine de l'accueil » (planche R12-Vitrine).
@@ -868,6 +889,12 @@ function AdminModeration() {
         : null)}
     >
       {body}
+      {/* Toujours montée, vide sans arrivée : un lecteur d'écran n'annonce que ce qui change dans
+          une région qu'il connaît déjà (ui/LiveStatus). Cachée à l'œil : la file ne change pas. */}
+      <LiveStatus
+        message={reportArrived ? t(($) => $.moderation.liveArrival) : ''}
+        visible={false}
+      />
       {removing ? (
         <RemoveSheet
           item={removing.item}

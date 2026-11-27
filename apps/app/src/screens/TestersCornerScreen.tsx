@@ -47,6 +47,7 @@ import { Platform } from 'react-native'
 import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useLiveTopic } from '../live/topics'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
@@ -109,6 +110,10 @@ const FALLBACK = ':fallback'
  * privé, on ne dit même pas qu'il existe (R7b, L5). Les largeurs restent celles d'avant (`page`).
  */
 export function TestersCornerScreen({ id, member }: { id: string; member?: string }) {
+  // R21 : le coin écoute `corner:<id>` dès qu'il est monté (un appel neuf, un testeur qui part) ;
+  // le serveur ignore, sans le dire, le sujet de qui n'est ni l'auteur ni testeur. Les messages des
+  // fils arrivent, eux, par le sujet personnel `me` (live/invalidations.ts).
+  useLiveTopic(`corner:${id}`)
   // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
   return (
     <SessionGate

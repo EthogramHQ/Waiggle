@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { SessionGate } from '../accounts/SessionGate'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useLiveTopic } from '../live/topics'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { useProject } from '../projects/hooks'
@@ -52,6 +53,11 @@ export type ThreadTester = {
 }
 
 export function TesterThreadScreen({ id, member }: { id: string; member: string }) {
+  // R21 : la page écoute le coin du projet (`corner:<id>`) dès qu'elle est montée. Les messages du
+  // fil, eux, arrivent par le sujet personnel `me` (live/invalidations.ts) : le serveur ne les
+  // envoie qu'aux deux personnes du fil. Sur ordinateur, le coin rendu ci-dessous déclare le même
+  // sujet : il compte deux écrans, et ne part qu'avec le dernier (live/topics.ts).
+  useLiveTopic(`corner:${id}`)
   const hydrated = useHydrated()
   const { columns } = useLayout()
   // Sur ordinateur, une fois la page hydratée : le coin, la liste des fils à gauche et ce fil à
