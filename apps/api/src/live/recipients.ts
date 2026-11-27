@@ -7,10 +7,8 @@
 // Comme dans live/emit.ts : aucune lecture quand personne n'écoute (`hub.isIdle()`, ou aucun
 // écouteur du sujet), une émission après la transaction et avant la réponse, et une panne notée
 // dans les logs sans faire échouer la route (l'écriture est faite ; l'appli relira à sa reconnexion).
-import type { LiveKind } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, isNull } from 'drizzle-orm'
-import { blockPartnersOf } from '../blocks/visibility'
 import { describeError } from '../log'
 import type { Live } from './emit'
 
@@ -49,35 +47,6 @@ export const updateReadersOf = (live: Live, projectId: string): Promise<string[]
       .where(eq(schema.projectTester.projectId, projectId))
     const rows = await follows.union(testers)
     return rows.map((row) => row.memberId).filter((id) => live.hub.isConnected(id))
-  })
-
-/**
- * La page d'une ruche (`hive:<id>`) a changé par le geste de `actorId` (un membre est entré). Le
- * signal part aux connexions qui écoutent cette page ET dont le membre en est membre aujourd'hui
- * (règle B1 : un ancien membre dont la revérification n'est pas encore passée ne reçoit rien), sans
- * blocage, dans un sens ou dans l'autre, avec l'auteur du geste.
- *
- * Deux requêtes, seulement si quelqu'un écoute : les membres de la ruche (« hive_id = $1 », par la
- * clé primaire de hive_member, hive_id en tête) et les blocages de l'auteur du geste
- * (`blockPartnersOf` : clé primaire de member_block et member_block_blocked_idx).
- */
-export const hiveChanged = (
-  live: Live,
-  { hiveId, actorId, kind }: { hiveId: string; actorId: string; kind: LiveKind },
-) =>
-  safely('hive', undefined, async () => {
-    const topic = `hive:${hiveId}`
-    if (live.hub.listeners(topic).size === 0) return
-    const [members, partners] = await Promise.all([
-      live.db
-        .select({ userId: schema.hiveMember.userId })
-        .from(schema.hiveMember)
-        .where(eq(schema.hiveMember.hiveId, hiveId)),
-      blockPartnersOf(live.db, [actorId]),
-    ])
-    const inHive = new Set(members.map((row) => row.userId))
-    const blocked = partners.get(actorId) ?? new Set<string>()
-    live.hub.emit({ topic, kind }, (userId) => inHive.has(userId) && !blocked.has(userId))
   })
 
 /**

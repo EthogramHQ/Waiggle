@@ -37,8 +37,7 @@ import { loadInvitable } from '../hives/invitable'
 import { acceptInvitation, inviteToHive, refuseInvitation } from '../hives/invitations'
 import { hiveSummariesOf, membershipOf } from '../hives/load'
 import { isForeignKeyViolation } from '../hives/write'
-import { type Live, notifyMembers, toOwnDevices } from '../live/emit'
-import { hiveChanged } from '../live/recipients'
+import { hiveChanged, type Live, notifyMembers, toOwnDevices } from '../live/emit'
 import { describeError } from '../log'
 import {
   memberCounterKeys,
@@ -288,7 +287,7 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl, live }: Deps) 
     // blocage avec le nouveau venu (`hiveChanged`). Ses autres appareils : ses ruches, son Activité
     // (l'invitation n'y est plus) et sa récolte. Qui l'a invité : son Activité (« … a rejoint
     // Famille », source 18) et sa récolte (le pollen de l'invitation acceptée), sauf blocage.
-    await hiveChanged(live, { hiveId: outcome.hiveId, actorId: viewer.id, kind: 'hive' })
+    await hiveChanged(live, { hiveId: outcome.hiveId, actorId: viewer.id })
     // `feed` : les projets réservés à la ruche entrent dans son Fil.
     toOwnDevices(live, [viewer.id], 'hive')
     toOwnDevices(live, [viewer.id], 'feed')
