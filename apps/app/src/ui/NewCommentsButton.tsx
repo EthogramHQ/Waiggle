@@ -83,15 +83,16 @@ export function NewCommentsButton({ count, onPress, announce = true, on = 'page'
     >
       {count > 0 ? (
         // En verre plutôt qu'en miel : l'action miel de la page (« Tester la démo ») reste la
-        // seule. La flèche vers le bas : les nouveaux sont plus bas que ce qu'on lit. Hauteur
-        // `compact`, 44 points : la zone à toucher minimale.
+        // seule. La flèche montre où sont les nouveaux : sur la page, plus bas que ce qu'on lit (la
+        // section des commentaires) ; dans la feuille, rangée du plus récent au plus ancien, plus
+        // haut. Hauteur `compact`, 44 points : la zone à toucher minimale.
         <Button
           label={label}
           onPress={() => {
             pressed.current = true
             onPress()
           }}
-          icon="caret-down"
+          icon={on === 'sheet' ? 'caret-up' : 'caret-down'}
           variant={on === 'sheet' ? 'secondary' : 'glass'}
           size="compact"
         />
