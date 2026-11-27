@@ -52,6 +52,7 @@ import { useMediaSources } from '../api/media'
 import { useBlock, useUnblock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { useFollow } from '../follows/api'
+import { useLiveTopic } from '../live/topics'
 import { useMember } from '../members/api'
 import { useSuspension } from '../moderation/suspension'
 import { loadSettingsChunk } from '../navigation/chunkLoaders'
@@ -195,6 +196,10 @@ function RemovedProfileParts({ member }: { member: Member }) {
  * réservée aux membres). La fonction enfant ne fait que rendre `MemberContent`, qui porte les hooks.
  */
 export function MemberScreen({ id }: { id: string }) {
+  // R21 (plan, choix 3) : la page écoute son membre (`member:<pseudo ou id>`) dès qu'elle est
+  // montée, sans attendre la lecture : ses abonnés et ses projets publics changent sous les yeux.
+  // Le serveur ignore en silence un membre qu'il ne montrerait pas (bloqué, inconnu).
+  useLiveTopic(`member:${id}`)
   return (
     <SessionGate width="page" loading={<LoadingScreen shape="member" />}>
       {(session) => <MemberContent id={id} session={session} />}

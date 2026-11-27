@@ -47,6 +47,7 @@ import type { SessionData } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { usePollenGain } from '../gamification/pollen'
+import { useLiveTopic } from '../live/topics'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
 import { firstParam } from '../navigation/params'
@@ -87,6 +88,7 @@ import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
+import { NewCommentsButton } from '../ui/NewCommentsButton'
 import { OwnReactions } from '../ui/OwnReactions'
 import { PhotoGallery } from '../ui/PhotoGallery'
 import { CoverControls, CoverStraddle } from '../ui/ProjectCover'
@@ -101,7 +103,7 @@ import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
-import { Comments } from './ProjectComments'
+import { Comments, type CommentsFresh } from './ProjectComments'
 import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
 
 /**
@@ -116,6 +118,12 @@ import { LoadErrorScreen, LoadingScreen, NotFoundState } from './states'
  * avant l'arrivée de la page, il oublierait la carte touchée (ProjectView le lit).
  */
 export function ProjectScreen({ id }: { id: string }) {
+  // R21 (plan, choix 3) : la page écoute son projet (`project:<id>`) dès qu'elle est montée, sans
+  // attendre la session ni le projet : le sujet ne dépend que de l'adresse, et le serveur ignore en
+  // silence un projet qu'il ne montrerait pas. Les signaux (commentaires, réactions, abonnés…) font
+  // relire ce qui a changé (live/invalidations.ts). Quitter la page, ou changer de projet, retire
+  // ou remplace le sujet.
+  useLiveTopic(`project:${id}`)
   return (
     <SessionGate width="page" loading={<ProjectWaiting />}>
       {(session) => <ProjectContent id={id} session={session} />}
@@ -276,6 +284,10 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   // L'éventail des réactions (appui long sur la capsule), la feuille « Partager », la fenêtre qui
   // confirme la suppression (ouverte depuis le menu « … », dont `menuRef` est le bouton).
   const [fanOpen, setFanOpen] = useState(false)
+  // R21 : les commentaires arrivés hors de vue pendant qu'on lit la page (ProjectComments les
+  // compte), et ce qui y amène au toucher du bouton « N nouveaux commentaires ».
+  const [freshComments, setFreshComments] = useState(0)
+  const commentsFresh = useRef<CommentsFresh>(null)
   // R19 : le pollen d'une réaction posée, montré sur la réaction (capsule, ou éventail ouvert).
   const reactionPollen = usePollenGain('reaction')
   const reactionGain = reactionPollen
@@ -736,8 +748,24 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
       project={project}
       focusCommentId={focusCommentId}
       onContextClosed={closeCommentContext}
+      onPageFresh={setFreshComments}
+      freshRef={commentsFresh}
     />
   ) : null
+  // R21 : le bouton des nouveaux commentaires, toujours monté (sa région annonce l'arrivée), sans
+  // place à 0. Sur téléphone, il s'empile au-dessus de la capsule des réactions, dans la même place
+  // flottante ; ailleurs, la capsule est sur la galerie, le bouton flotte seul.
+  const freshButton = (
+    <NewCommentsButton count={freshComments} onPress={() => commentsFresh.current?.goToFresh()} />
+  )
+  const floating = large ? (
+    freshButton
+  ) : (
+    <Stack gap="sm" align="center">
+      {freshButton}
+      {capsule}
+    </Stack>
+  )
 
   // « Signaler ce projet », un lien gris en bas de la page, en plus du menu « … » (F-Pr12). Jamais
   // sur son propre projet. Dans une rangée : le lien garde la largeur de son texte.
@@ -848,7 +876,8 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
       fade={!arriving}
       // La capsule flotte en bas de l'écran du téléphone, hors du défilement : lue après tout le
       // contenu (décision de Louis du 2/11/2026). Ailleurs, elle est à cheval sur la galerie.
-      floating={capsule}
+      // R21 : avec, au-dessus, le bouton des nouveaux commentaires (voir `floating`).
+      floating={floating}
       bleed={bleed}
       wrap={faded}
       banner={removal}

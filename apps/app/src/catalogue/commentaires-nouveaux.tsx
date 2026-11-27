@@ -15,6 +15,7 @@ import { View } from 'react-native'
 import { CommentCard } from '../ui/CommentCard'
 import { NewCommentsButton } from '../ui/NewCommentsButton'
 import { ScreenFloating } from '../ui/Screen'
+import { SheetPanel } from '../ui/Sheet'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useTheme } from '../ui/theme/ThemeProvider'
@@ -35,6 +36,11 @@ const fr = {
   firstText: 'Super idée, je l’ai testé ce matin avec ma fille.',
   secondText: 'Oui, la lumière de la cuisine suffit, même le soir.',
   thirdText: 'Est-ce que ça marche aussi avec une photo prise de loin ?',
+  inSheet:
+    'Dans la feuille des commentaires (téléphone) : par-dessus le bas de la liste, juste au-dessus du champ (SheetPanel floating). La liste garde sa hauteur.',
+  sheetTitle: 'Commentaires',
+  sheetSpoken: '6 commentaires',
+  sheetField: 'Le champ « Écrire un commentaire », collé en bas.',
 }
 
 const en: typeof fr = {
@@ -51,6 +57,11 @@ const en: typeof fr = {
   firstText: 'Great idea, I tried it this morning with my daughter.',
   secondText: 'Yes, the kitchen light is enough, even in the evening.',
   thirdText: 'Does it also work with a photo taken from far away?',
+  inSheet:
+    'In the comments sheet (phone): over the bottom of the list, just above the field (SheetPanel floating). The list keeps its height.',
+  sheetTitle: 'Comments',
+  sheetSpoken: '6 comments',
+  sheetField: 'The “Write a comment” field, pinned at the bottom.',
 }
 
 const noop = () => {}
@@ -124,6 +135,36 @@ function CommentsFrame({ l }: { l: typeof fr }) {
   )
 }
 
+/**
+ * R21 : la feuille des commentaires (téléphone), défilée plus bas, avec le bouton posé par-dessus le
+ * bas de sa liste, juste au-dessus du champ (`SheetPanel floating`). La liste garde sa hauteur.
+ */
+function SheetFrame({ l }: { l: typeof fr }) {
+  return (
+    <View style={{ height: 520, width: '100%', maxWidth: 430, alignSelf: 'center' }}>
+      <SheetPanel
+        title={l.sheetTitle}
+        layout="phone"
+        onClose={noop}
+        titleCount={{ count: 6, spoken: l.sheetSpoken }}
+        footer={
+          <Text variant="callout" tone="secondary">
+            {l.sheetField}
+          </Text>
+        }
+        floating={<NewCommentsButton count={1} onPress={noop} />}
+      >
+        <Stack gap="md">
+          <CommentCard {...base} comment={sample('s-one', HUGO, l.firstText, 3)} />
+          <CommentCard {...base} comment={sample('s-two', SAM, l.secondText, 2)} />
+          <CommentCard {...base} comment={sample('s-three', NORA, l.thirdText, 1)} />
+          <CommentCard {...base} comment={sample('s-four', HUGO, l.secondText, 1)} />
+        </Stack>
+      </SheetPanel>
+    </View>
+  )
+}
+
 export function NewCommentsCatalogue() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -161,6 +202,9 @@ export function NewCommentsCatalogue() {
 
       <Text tone="secondary">{l.inList}</Text>
       <CommentsFrame l={l} />
+
+      <Text tone="secondary">{l.inSheet}</Text>
+      <SheetFrame l={l} />
     </Stack>
   )
 }
