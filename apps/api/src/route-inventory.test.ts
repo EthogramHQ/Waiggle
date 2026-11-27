@@ -299,7 +299,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   // R21 : le temps réel. Le flux montre, par des signaux sans contenu, les gestes des autres
   // membres : un blocage, dans un sens ou dans l'autre, les arrête (relecture de sécurité du plan,
   // B1), et la déclaration ignore la page d'un membre bloqué. Un compte suspendu garde son flux et
-  // déclare ses pages, comme il lit (choix 7, tranché par la session) : déclarer n'écrit rien en
+  // déclare ses pages, comme il lit (plan R21, choix 7, décision du 27/11/2026) : déclarer n'écrit rien en
   // base, la route entre donc dans ALLOWED_WRITES, et, selon D4, dans les sorties de la garde des
   // règles.
   'GET /v1/live': ['hidesBlocked', 'allowed', 'allowed'],

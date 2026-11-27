@@ -5,7 +5,7 @@
 //   signaux sans contenu (`{ topic, kind }`), et toutes les `LIVE_PING_MS` un battement `: ping` ;
 // - PUT /v1/live/{connectionId}/topics : les sujets des écrans ouverts de cet appareil.
 // Réservé aux membres connectés. Un compte suspendu garde son flux et déclare ses pages : il lit,
-// comme par les autres GET (plan, choix 7, tranché par la session).
+// comme par les autres GET (plan, choix 7, décision du 27/11/2026).
 import { createRoute, z } from '@hono/zod-openapi'
 import {
   LIVE_OPENS_PER_MINUTE,

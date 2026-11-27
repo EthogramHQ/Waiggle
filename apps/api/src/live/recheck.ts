@@ -36,7 +36,7 @@
 // - `member:<id>` : un compte qui a une page (`memberWithPage`), sans blocage dans un sens ni dans
 //   l'autre, comme `allowedTopics` (live/access.ts) ;
 // - `corner:<id>` : `cornerAccess`, auteur ou testeur inscrit ; un ancien testeur n'écoute plus le
-//   coin (relecture du plan, B4, choix de la session).
+//   coin (relecture du plan, B4 ; décision du 27/11/2026).
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray } from 'drizzle-orm'
 import { blockPartnersOf } from '../blocks/visibility'

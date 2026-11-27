@@ -4,7 +4,7 @@
 // (déconnexion, mot de passe changé ailleurs, expiration, purge de nuit, compte supprimé) est
 // fermé ; `moderation` et `scouts` partent (`gone`) quand le rôle est retiré. Un compte suspendu
 // garde son flux : il lit, comme par les autres GET. Scénario : docs/scenarios/refonte.md, « R21 —
-// Le temps réel » ; plan R21, choix 7 (tranché par la session) ; relecture de sécurité du plan, B2
+// Le temps réel » ; plan R21, choix 7 (décision du 27/11/2026) ; relecture de sécurité du plan, B2
 // (le compte volé dont le mot de passe change : le flux du voleur ne doit pas rester ouvert).
 //
 // L'horloge est simulée (`useLiveClock`) : `vi.advanceTimersByTimeAsync(LIVE_RECHECK_MS)` fait

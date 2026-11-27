@@ -13,7 +13,7 @@
 // en continu et range chaque message dans une file ; les tests y piochent avec un délai réel (le
 // scénario promet « en moins de 2 secondes »).
 //
-// Les formes supposées pour le backend (rapport du test-writer de R21, TA) :
+// Les formes supposées pour le backend (tests de R21, écrits avant le code) :
 // - une écriture émet ses signaux **avant** de répondre (l'émission est attendue après la fin de la
 //   transaction) : quand la réponse arrive, le signal est déjà écrit dans le flux. Les tests en
 //   déduisent l'ordre : un témoin émis après un geste arrive après les signaux de ce geste ;

@@ -4,7 +4,7 @@
 // le 404 et retire la ressource de l'écran. Ensuite, plus rien n'arrive sur ce sujet. Scénario :
 // docs/scenarios/refonte.md, « R21 — Le temps réel », « Ce qui change aussi en place » ; plan R21,
 // choix 3 (« Revérification ») ; relecture de sécurité du plan, B4 : un test par déclencheur, et
-// le choix de la session : un ancien testeur n'écoute plus `corner:` (son fil passe par `me`).
+// la décision du 27/11/2026 : un ancien testeur n'écoute plus `corner:` (son fil passe par `me`).
 //
 // Les fins de session, le compte supprimé et l'administrateur révoqué, relus toutes les
 // `LIVE_RECHECK_MS`, sont dans live.session.test.ts.

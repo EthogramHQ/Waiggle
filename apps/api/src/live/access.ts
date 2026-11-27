@@ -5,7 +5,7 @@
 // - `project:<id>` : `visibleTo` (projects/load.ts), la condition de GET /v1/projects/{id} ;
 // - `hive:<id>` : l'appartenance à la ruche aujourd'hui (hive_member, comme `isHiveMember`) ;
 // - `corner:<id>` : `cornerAccess` (testers/access.ts), auteur ou testeur ; un ancien testeur
-//   n'écoute plus le coin, son fil passe par `me` (relecture du plan, B4, choix de la session) ;
+//   n'écoute plus le coin, son fil passe par `me` (relecture du plan, B4 ; décision du 27/11/2026) ;
 // - `member:<id>` : un compte qui a une page (`memberWithPage`), sans blocage dans un sens ni dans
 //   l'autre (`notBlockedWith`) : sa page ne montre rien de ses gestes à qui est bloqué avec lui.
 //
