@@ -819,6 +819,7 @@ export function Comments({
               count={sheetOpen ? fresh.length : 0}
               onPress={goToFresh}
               announce={false}
+              on="sheet"
             />
           }
           // Revenu tout en haut par lui-même, le membre voit les nouveaux : le bouton s'en va.

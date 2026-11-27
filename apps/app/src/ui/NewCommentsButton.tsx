@@ -30,6 +30,13 @@ type Props = {
    * annonce le même texte ; deux régions dans une même fenêtre se liraient en double (R21).
    */
   announce?: boolean
+  /**
+   * Sur quoi le bouton se pose. `page` (défaut) : en verre, dans la place flottante de `Screen`, sur
+   * la lumière de la page. `sheet` : blanc et plein, par-dessus le texte de la liste d'une feuille :
+   * le verre de nuit y laissait passer les lignes du commentaire dessous, et le libellé se lisait
+   * mal (capture du catalogue, R21).
+   */
+  on?: 'page' | 'sheet'
 }
 
 /**
@@ -46,7 +53,7 @@ const focusLost = () => {
   return !page.activeElement || page.activeElement === page.body
 }
 
-export function NewCommentsButton({ count, onPress, announce = true }: Props) {
+export function NewCommentsButton({ count, onPress, announce = true, on = 'page' }: Props) {
   const { t } = useTranslation()
   // Au-delà de 0, le nombre lui-même : « 1 nouveau commentaire », « 3 nouveaux commentaires ».
   const label = count > 0 ? t(($) => $.project.comments.newComments, { count }) : ''
@@ -85,7 +92,7 @@ export function NewCommentsButton({ count, onPress, announce = true }: Props) {
             onPress()
           }}
           icon="caret-down"
-          variant="glass"
+          variant={on === 'sheet' ? 'secondary' : 'glass'}
           size="compact"
         />
       ) : null}

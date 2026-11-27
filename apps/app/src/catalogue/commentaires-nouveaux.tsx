@@ -152,7 +152,7 @@ function SheetFrame({ l }: { l: typeof fr }) {
             {l.sheetField}
           </Text>
         }
-        floating={<NewCommentsButton count={1} onPress={noop} />}
+        floating={<NewCommentsButton count={1} onPress={noop} announce={false} on="sheet" />}
       >
         <Stack gap="md">
           <CommentCard {...base} comment={sample('s-one', HUGO, l.firstText, 3)} />
