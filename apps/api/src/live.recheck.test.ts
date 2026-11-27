@@ -229,6 +229,12 @@ describe('a hive', () => {
       hiveId: amis.id,
     })
     expect(res.status).toBe(200)
+    // Marc n'est pas dans Famille : avant le déplacement, sa déclaration du projet était refusée
+    // en silence. Il la refait maintenant que le projet est réservé à Amis, dont il est membre.
+    await declareTopics(ctx, cast.marc.cookie, marc, [
+      topic.project(moved),
+      topic.project(cast.witness),
+    ])
     await comment(moved, cast.nora.cookie)
 
     await expectGoneThenSilence(lea, [topic.project(moved)])
