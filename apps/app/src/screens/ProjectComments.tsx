@@ -124,11 +124,12 @@ export function Comments({
    */
   onContextClosed?: () => void
   /**
-   * R21 : le nombre de commentaires arrivés hors de vue sur la page (0 : aucun). L'écran montre
-   * alors `NewCommentsButton` dans sa place flottante, qui appelle `freshRef.goToFresh()`. Doit
-   * rester la même d'un dessin à l'autre (le `set…` d'un `useState`).
+   * R21 : le nombre de commentaires arrivés hors de vue sur la page (0 : aucun ; `null` : la
+   * feuille est ouverte, elle a son propre bouton, celui de la page s'efface). L'écran montre
+   * `NewCommentsButton` dans sa place flottante, qui appelle `freshRef.goToFresh()`. Doit rester la
+   * même d'un dessin à l'autre (le `set…` d'un `useState`).
    */
-  onPageFresh?: (count: number) => void
+  onPageFresh?: (count: number | null) => void
   /** R21 : ce que l'écran appelle au toucher du bouton de la page. */
   freshRef?: Ref<CommentsFresh>
 }) {
@@ -377,10 +378,24 @@ export function Comments({
   // Le nombre montré par le bouton de la page (posé par l'écran dans sa place flottante, au-dessus de
   // la capsule des réactions) ; la feuille ouverte a le sien. `onPageFresh` est le `set…` d'un
   // `useState` de l'écran, le même à chaque dessin : seul le nombre redéclenche l'effet.
+  // `null` pendant que la feuille est ouverte : le bouton de la page s'efface (sa région se lirait en
+  // plus de celle de la feuille), et revient vide à sa fermeture.
   // biome-ignore lint/correctness/useExhaustiveDependencies: voir ci-dessus
   useEffect(() => {
-    onPageFresh?.(sheetOpen ? 0 : fresh.length)
+    onPageFresh?.(sheetOpen ? null : fresh.length)
   }, [fresh.length, sheetOpen])
+
+  // L'arrivée s'annonce une fois, dans la région de la section : celle de la feuille, ou celle de la
+  // colonne (ordinateur). Sur la page d'un téléphone, c'est le bouton de l'écran qui l'annonce. Une
+  // relecture qui n'apporte rien de neuf ne change pas le nombre, et ne répète rien.
+  const freshAnnounced = useRef(0)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seul le nombre compte
+  useEffect(() => {
+    const before = freshAnnounced.current
+    freshAnnounced.current = fresh.length
+    if (fresh.length <= before || !(sheetOpen || columns)) return
+    setAnnouncement(t(($) => $.project.comments.newComments, { count: fresh.length }))
+  }, [fresh.length])
 
   /**
    * Le toucher de « N nouveaux commentaires » : le bouton s'en va, le premier nouveau commentaire
@@ -389,6 +404,8 @@ export function Comments({
   const goToFresh = () => {
     const wanted = new Set(fresh)
     setFresh([])
+    // La région se vide : la prochaine arrivée, même « 1 nouveau commentaire », sera relue.
+    setAnnouncement('')
     const first = threadLines(threads).find((comment) => wanted.has(comment.id))
     if (!first) return
     if (sheetOpen) {
@@ -796,7 +813,14 @@ export function Comments({
           revealRef={sheetReveal}
           titleRef={sheetTitleRef}
           // R21 : le bouton des commentaires arrivés pendant qu'on lit plus bas, en bas de la liste.
-          floating={<NewCommentsButton count={sheetOpen ? fresh.length : 0} onPress={goToFresh} />}
+          // Sans région à lui : la feuille a la sienne, qui annonce l'arrivée (voir plus haut).
+          floating={
+            <NewCommentsButton
+              count={sheetOpen ? fresh.length : 0}
+              onPress={goToFresh}
+              announce={false}
+            />
+          }
           // Revenu tout en haut par lui-même, le membre voit les nouveaux : le bouton s'en va.
           onListScroll={(offset) => {
             sheetScrolled.current = offset > 0

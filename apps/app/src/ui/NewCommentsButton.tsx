@@ -24,6 +24,12 @@ type Props = {
   count: number
   /** Ce que fait l'écran au toucher : amener le membre aux nouveaux commentaires. */
   onPress: () => void
+  /**
+   * Vrai (défaut) : le bouton annonce lui-même l'arrivée, par sa propre région. Faux : l'écran a
+   * déjà une région au même endroit (la feuille des commentaires, la colonne de l'ordinateur) et y
+   * annonce le même texte ; deux régions dans une même fenêtre se liraient en double (R21).
+   */
+  announce?: boolean
 }
 
 /**
@@ -40,7 +46,7 @@ const focusLost = () => {
   return !page.activeElement || page.activeElement === page.body
 }
 
-export function NewCommentsButton({ count, onPress }: Props) {
+export function NewCommentsButton({ count, onPress, announce = true }: Props) {
   const { t } = useTranslation()
   // Au-delà de 0, le nombre lui-même : « 1 nouveau commentaire », « 3 nouveaux commentaires ».
   const label = count > 0 ? t(($) => $.project.comments.newComments, { count }) : ''
@@ -85,7 +91,7 @@ export function NewCommentsButton({ count, onPress }: Props) {
       ) : null}
       {/* Toujours montée, vide à 0 : un lecteur d'écran n'annonce que ce qui change dans une région
           qu'il connaît déjà (voir LiveStatus). */}
-      <LiveStatus message={label} visible={false} />
+      {announce ? <LiveStatus message={label} visible={false} /> : null}
     </View>
   )
 }

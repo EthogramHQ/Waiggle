@@ -275,7 +275,7 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   // « Tester la démo » passe par la page de sortie, qui apprend de quel projet vient le lien (R5a).
   const openDemo = useOpenDemo()
   const toSource = useMediaSources()
-  const { sizeClass } = useLayout()
+  const { sizeClass, columns } = useLayout()
   // large : tablette et ordinateur (Retour hors de la photo, la capsule à cheval sur la galerie).
   // Le reste de la mise en page est décidé par `ProjectPageLayout` (projects/ProjectPage.tsx).
   const large = sizeClass !== 'compact'
@@ -286,7 +286,7 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   const [fanOpen, setFanOpen] = useState(false)
   // R21 : les commentaires arrivés hors de vue pendant qu'on lit la page (ProjectComments les
   // compte), et ce qui y amène au toucher du bouton « N nouveaux commentaires ».
-  const [freshComments, setFreshComments] = useState(0)
+  const [freshComments, setFreshComments] = useState<number | null>(0)
   const commentsFresh = useRef<CommentsFresh>(null)
   // R19 : le pollen d'une réaction posée, montré sur la réaction (capsule, ou éventail ouvert).
   const reactionPollen = usePollenGain('reaction')
@@ -755,9 +755,16 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
   // R21 : le bouton des nouveaux commentaires, toujours monté (sa région annonce l'arrivée), sans
   // place à 0. Sur téléphone, il s'empile au-dessus de la capsule des réactions, dans la même place
   // flottante ; ailleurs, la capsule est sur la galerie, le bouton flotte seul.
-  const freshButton = (
-    <NewCommentsButton count={freshComments} onPress={() => commentsFresh.current?.goToFresh()} />
-  )
+  // Sur ordinateur, la colonne des commentaires a sa région et y annonce l'arrivée : le bouton n'en
+  // ajoute pas. `null` : la feuille des commentaires est ouverte, elle porte son propre bouton.
+  const freshButton =
+    freshComments === null ? null : (
+      <NewCommentsButton
+        count={freshComments}
+        onPress={() => commentsFresh.current?.goToFresh()}
+        announce={!columns}
+      />
+    )
   const floating = large ? (
     freshButton
   ) : (
