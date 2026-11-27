@@ -13,6 +13,10 @@
 // L'arrivée est annoncée une seule fois, poliment, par une région `LiveStatus` cachée à l'œil (le
 // bouton se voit déjà) : jamais par le focus, qui reste là où la personne lit. Un nouveau dessin
 // avec le même nombre se tait ; un nombre qui change (« 2 nouveaux commentaires ») s'annonce.
+//
+// Il sert aussi à l'Activité ouverte (`of="notifications"`, décision de Louis du 27/11/2026) : une
+// seule règle partout, « ce qui arrive dans une liste s'annonce par un bouton ». Le nom du
+// composant est resté celui de son premier usage.
 import { space } from '@ruche/brand'
 import { useContext, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,6 +29,12 @@ import { holdPageTaps } from './tapGuard'
 type Props = {
   /** Le nombre de commentaires arrivés hors de vue ; 0 : rien de neuf, le bouton n'est pas là. */
   count: number
+  /**
+   * Ce qui est arrivé. `comments` (défaut) : « 1 nouveau commentaire ». `notifications` :
+   * « 1 nouvelle notification », dans l'Activité, où les nouvelles arrivent en tête de liste (la
+   * flèche monte).
+   */
+  of?: 'comments' | 'notifications'
   /** Ce que fait l'écran au toucher : amener le membre aux nouveaux commentaires. */
   onPress: () => void
   /**
@@ -67,6 +77,7 @@ const focusLost = () => {
 
 export function NewCommentsButton({
   count,
+  of = 'comments',
   onPress,
   announce = true,
   on = 'page',
@@ -74,7 +85,15 @@ export function NewCommentsButton({
 }: Props) {
   const { t } = useTranslation()
   // Au-delà de 0, le nombre lui-même : « 1 nouveau commentaire », « 3 nouveaux commentaires ».
-  const label = count > 0 ? t(($) => $.project.comments.newComments, { count }) : ''
+  const label =
+    count === 0
+      ? ''
+      : of === 'notifications'
+        ? t(($) => $.notifications.newNotifications, { count })
+        : t(($) => $.project.comments.newComments, { count })
+  // Où sont les nouveaux : plus haut dans la feuille des commentaires et dans l'Activité (les plus
+  // récents en tête), plus bas sur la page d'un projet (la section des commentaires).
+  const above = on === 'sheet' || of === 'notifications'
 
   // La place du bouton. Après un toucher, l'écran remet le nombre à 0 et le bouton disparaît : sur
   // le web, le focus du clavier retomberait alors tout en haut de la page. S'il n'a été posé nulle
@@ -104,9 +123,8 @@ export function NewCommentsButton({
     >
       {count > 0 ? (
         // En verre ou plein plutôt qu'en miel : l'action miel de la page (« Tester la démo ») reste
-        // la seule. La flèche montre où sont les nouveaux : sur la page, plus bas que ce qu'on lit (la
-        // section des commentaires) ; dans la feuille, rangée du plus récent au plus ancien, plus
-        // haut. Hauteur `compact`, 44 points : la zone à toucher minimale.
+        // la seule. La flèche montre où sont les nouveaux (`above`, plus haut). Hauteur `compact`,
+        // 44 points : la zone à toucher minimale.
         <Button
           label={label}
           onPress={() => {
@@ -118,7 +136,7 @@ export function NewCommentsButton({
             holdPageTaps()
             onPress()
           }}
-          icon={on === 'sheet' ? 'caret-up' : 'caret-down'}
+          icon={above ? 'caret-up' : 'caret-down'}
           // Plein (`secondary`) dès qu'il se pose sur du texte : dans la feuille, et au-dessus de la
           // capsule sur téléphone, où il passe sur le contenu de la page qui défile dessous (à
           // 320 px avec la Goutte, sur « Rejoindre les testeurs » : les deux libellés se lisaient

@@ -3587,6 +3587,9 @@ export const fr = {
     bellNew_one: 'Notifications, {{count}} nouvelle',
     bellNew_other: 'Notifications, {{count}} nouvelles',
     bellNewMany: 'Notifications, plus de {{max}} nouvelles',
+    // R21 : le bouton qui paraît quand une notification arrive pendant qu'on lit l'Activité.
+    newNotifications_one: '{{count}} nouvelle notification',
+    newNotifications_other: '{{count}} nouvelles notifications',
     new: 'Nouveau',
     emptyTitle: 'Pas encore de notification',
     empty:

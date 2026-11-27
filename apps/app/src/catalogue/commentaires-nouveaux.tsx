@@ -47,6 +47,8 @@ const fr = {
   over: 'Sur la page d’un projet (téléphone) : au-dessus de la capsule des réactions (over), hors de la hauteur réservée. La Goutte des Éclaireuses ne bouge pas, et le bouton passe au-dessus d’elle.',
   capsule: 'La capsule des réactions',
   drop: 'Faire un retour',
+  activity:
+    'Dans l’Activité ouverte : une notification arrive pendant la lecture, le bouton paraît en bas de l’écran (over), la flèche vers le haut, où sont les plus récentes. La liste ne bouge pas.',
 }
 
 const en: typeof fr = {
@@ -71,6 +73,8 @@ const en: typeof fr = {
   over: 'On a project page (phone): above the reactions capsule (over), out of the reserved height. The scouts drop stays still, and the button goes above it.',
   capsule: 'The reactions capsule',
   drop: 'Give feedback',
+  activity:
+    'In the open Activity: a notification arrives while reading, the button appears at the bottom of the screen (over), the arrow pointing up, where the latest ones are. The list stays still.',
 }
 
 const noop = () => {}
@@ -219,6 +223,27 @@ function OverCapsuleFrame({ l }: { l: typeof fr }) {
   )
 }
 
+/** L'Activité ouverte (R21) : le bouton seul dans la place flottante, posé au-dessus d'elle (`over`). */
+function ActivityFrame() {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={{
+        height: 160,
+        width: 320,
+        alignSelf: 'center',
+        overflow: 'hidden',
+        borderRadius: radii.tile,
+        backgroundColor: colors.background,
+      }}
+    >
+      <ScreenFloating lift={space.lg}>
+        <NewCommentsButton count={2} of="notifications" onPress={noop} over />
+      </ScreenFloating>
+    </View>
+  )
+}
+
 export function NewCommentsCatalogue() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -262,6 +287,9 @@ export function NewCommentsCatalogue() {
 
       <Text tone="secondary">{l.over}</Text>
       <OverCapsuleFrame l={l} />
+
+      <Text tone="secondary">{l.activity}</Text>
+      <ActivityFrame />
     </Stack>
   )
 }

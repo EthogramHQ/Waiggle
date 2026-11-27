@@ -9,6 +9,11 @@
 // téléphone. Ce qui arrive pendant la lecture reste donc nouveau pour la prochaine fois.
 // La liste se lit 20 par 20 (« Afficher la suite ») et ne bouge jamais seule.
 //
+// R21 (décision de Louis du 27/11/2026) : une notification qui arrive pendant la lecture rallume la
+// cloche (le temps réel la recompte), mais ne vient pas pousser la liste. Un bouton
+// « 1 nouvelle notification » paraît en bas de l'écran ; le toucher relit la liste, où elle est en
+// tête, y amène le membre, et la marque vue à son tour.
+//
 // Le miel (R8, décision de Louis du 12/11/2026) : une ligne nouvelle à la première lecture le reste
 // pendant toute la visite, même quand « vu » relit la liste et que l'API ne la dit plus nouvelle.
 // Sur ordinateur, « Tout marquer comme lu » éteint tout de suite ce miel (dans l'appli seulement :
@@ -30,7 +35,7 @@ import { useHarvest } from '../gamification/api'
 import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
-import { useMarkSeen, useNotifications } from '../notifications/api'
+import { useMarkSeen, useNotifications, useUnreadCount } from '../notifications/api'
 import { groupByDay } from '../notifications/days'
 import { type Presented, presentNotification } from '../notifications/present'
 import { shortDate } from '../projects/format'
@@ -39,9 +44,10 @@ import { Button } from '../ui/Button'
 import { Columns } from '../ui/Columns'
 import { EmailSummary } from '../ui/EmailSummary'
 import { FeedEnd, type FirstArrived, useFirstArrived } from '../ui/FeedEnd'
-import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
 import { LiveStatus } from '../ui/LiveStatus'
+import { NewCommentsButton } from '../ui/NewCommentsButton'
 import {
   type NotificationAction,
   NotificationCard,
@@ -53,6 +59,7 @@ import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { useLayout } from '../ui/theme/layout'
+import { useCalmMotion } from '../ui/theme/motion'
 import { LoadingScreen, SignedOutScreen } from './states'
 
 /**
@@ -121,14 +128,39 @@ function MemberNotifications() {
   // allumé. Lue avec la colonne seulement (ordinateur), comme les réglages d'e-mail.
   const harvestNotices = useHarvest({ enabled: columns }).data?.settings.harvestNotices ?? false
 
-  // « Vu » une seule fois par ouverture, avec l'heure du serveur de la première page.
+  // « Vu » une fois par lecture de la liste, avec l'heure du serveur de la première page : à
+  // l'ouverture, puis après le bouton des nouvelles notifications (R21), qui relit la liste.
   const asOf = list.data?.pages[0]?.asOf
-  const marked = useRef(false)
+  const marked = useRef<string | null>(null)
+  // R21 : vrai une fois la page marquée vue. `markSeen` remet la cloche à zéro dans le même
+  // instant (notifications/api.ts) : tout nombre lu ensuite compte des notifications arrivées
+  // depuis. Avant, c'est le nombre d'avant l'ouverture, dont les notifications sont déjà dans la
+  // liste.
+  const armed = useRef(false)
   useEffect(() => {
-    if (!asOf || marked.current) return
-    marked.current = true
+    if (!asOf || marked.current === asOf) return
+    marked.current = asOf
     markSeen(asOf)
+    armed.current = true
   }, [asOf, markSeen])
+
+  // R21 : les notifications arrivées depuis, d'après le nombre de la cloche (voir `armed`).
+  const unread = useUnreadCount()
+  const arrivedSince = armed.current ? unread : 0
+  // Le toucher : la liste relue, le membre amené à la première ligne (la plus récente), sans
+  // animation sous « Réduire les animations ».
+  const calm = useCalmMotion()
+  const top = useRef<Focusable>(null)
+  // La ref que porte la première ligne : `top`, ou celle de « Afficher la suite » quand elle vise
+  // déjà cette ligne (une vue ne porte qu'une ref). Tenue à jour à chaque dessin, plus bas.
+  const firstRow = useRef<{ current: Focusable | null }>(top)
+  const [reveal, setReveal] = useState(0)
+  useEffect(() => {
+    if (reveal > 0) focusAndReveal(firstRow.current.current, calm)
+  }, [reveal, calm])
+  const showArrived = () => {
+    void list.refetch().then(() => setReveal((count) => count + 1))
+  }
 
   const items = list.data?.pages.flatMap((page) => page.items) ?? []
   const honey = useVisitHoney(items)
@@ -142,6 +174,7 @@ function MemberNotifications() {
   // La première notification arrivée avec la dernière page : le focus du clavier y va quand
   // « Afficher la suite » disparaît, la liste finissant sans phrase (jur-RF2).
   const arrived = useFirstArrived(items.length, list.isFetchingNextPage)
+  firstRow.current = arrived.index === 0 ? arrived.ref : top
   // Une session expirée en cours de route : se reconnecter, pas réessayer.
   if (!list.data && list.isError && errorKey(list.error) === 'unauthorized')
     return <SignedOutScreen expired />
@@ -201,7 +234,12 @@ function MemberNotifications() {
       </Text>
       <Stack gap="xs" accessibilityRole="list">
         {section.items.map((entry) =>
-          row(entry.notification, entry.at === arrived.index ? arrived.ref : undefined),
+          row(
+            entry.notification,
+            // La première ligne reçoit la vue où le bouton des nouvelles amène le membre (sauf si
+            // c'est déjà celle où « Afficher la suite » mène : les deux la cherchent alors là).
+            entry.at === arrived.index ? arrived.ref : entry.at === 0 ? top : undefined,
+          ),
         )}
       </Stack>
     </Stack>
@@ -309,6 +347,11 @@ function MemberNotifications() {
         ) : undefined
       }
       width={columns ? 'page' : undefined}
+      // R21 : le bouton des notifications arrivées pendant la lecture, posé en bas de l'écran
+      // (au-dessus de la Goutte des Éclaireuses s'il y en a une), sans pousser la liste.
+      floating={
+        <NewCommentsButton count={arrivedSince} of="notifications" onPress={showArrived} over />
+      }
     >
       {columns ? (
         <Columns

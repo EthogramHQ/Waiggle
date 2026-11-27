@@ -2952,6 +2952,8 @@ export const en: Translation = {
     bellNew_one: 'Notifications, {{count}} new',
     bellNew_other: 'Notifications, {{count}} new',
     bellNewMany: 'Notifications, more than {{max}} new',
+    newNotifications_one: '{{count}} new notification',
+    newNotifications_other: '{{count}} new notifications',
     new: 'New',
     emptyTitle: 'No notifications yet',
     empty: 'Comments, reactions and updates to the projects you follow will show up here.',
