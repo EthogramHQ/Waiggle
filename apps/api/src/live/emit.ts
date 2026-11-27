@@ -119,6 +119,22 @@ export const hiveMembersOf = async (db: Pick<Database, 'select'>, hiveIds: reado
   return members
 }
 
+/**
+ * Les testeurs inscrits aujourd'hui sur un projet, quand quelqu'un écoute son coin (relecture de
+ * sécurité de R21, point 2). Un sujet `corner:` déclaré juste avant d'être retiré du coin peut
+ * survivre à la revérification (la déclaration lisait encore l'inscription) : seule cette relecture,
+ * au moment du signal, garantit qu'il ne part qu'aux testeurs actuels.
+ * En SQL : select member_id from project_tester where project_id = $1 (index
+ * project_tester_project_idx).
+ */
+const currentTestersOf = async (db: Pick<Database, 'select'>, projectId: string) => {
+  const rows = await db
+    .select({ memberId: schema.projectTester.memberId })
+    .from(schema.projectTester)
+    .where(eq(schema.projectTester.projectId, projectId))
+  return new Set(rows.map((row) => row.memberId))
+}
+
 export type ProjectSignals = {
   /** L'auteur du geste (qui commente, réagit, suit, publie). */
   actorId: string
@@ -192,9 +208,12 @@ export const projectChanged = (live: Live, signals: ProjectSignals) =>
         ),
       ),
     ]
-    const [partners, hives] = await Promise.all([
+    const cornerHeard =
+      signals.corner !== undefined && hub.listeners(`corner:${project.id}`).size > 0
+    const [partners, hives, testers] = await Promise.all([
       blockPartnersOf(db, [...new Set([signals.actorId, project.authorId])]),
       hiveMembersOf(db, hiveIds),
+      cornerHeard ? currentTestersOf(db, project.id) : new Set<string>(),
     ])
     const blockedWithActor = partners.get(signals.actorId) ?? new Set<string>()
     const blockedWithAuthor = partners.get(project.authorId) ?? new Set<string>()
@@ -212,8 +231,11 @@ export const projectChanged = (live: Live, signals: ProjectSignals) =>
       return true
     }
 
+    // Le coin : l'auteur et les testeurs inscrits aujourd'hui, rien qu'eux (cornerAccess).
+    const inCorner = (userId: string) => userId === project.authorId || testers.has(userId)
     for (const { topic, kind, exempt } of topics) {
-      hub.emit({ topic, kind }, (userId) => reads(userId, exempt))
+      const corner = topic.startsWith('corner:')
+      hub.emit({ topic, kind }, (userId) => reads(userId, exempt) && (!corner || inCorner(userId)))
     }
     if (feedToHive) {
       hub.toMembers(

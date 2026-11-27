@@ -7,6 +7,8 @@
 // par `LiveEvent.parse` (un objet strict, testing/live.ts) : un texte, un nom ou un nombre de trop
 // dans un signal fait échouer le test qui le lit. Les destinataires (blocages, ruches, Activité, Fil)
 // sont dans live.recipients.test.ts ; la revérification (`gone`), dans live.recheck.test.ts.
+import { schema } from '@ruche/db'
+import { and, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -216,6 +218,41 @@ describe('the other gestures on a project', () => {
     expect(call.status).toBe(201)
 
     expect(await corner.nextSignal()).toEqual(signal(topic.corner(projectId), 'corner'))
+  })
+
+  // Relecture de sécurité de la branche R21, point 2 : un testeur retiré pendant que sa déclaration
+  // attend sa lecture garde le sujet du coin (la revérification est passée avant lui). Le filtre de
+  // l'émission relit donc l'inscription : l'inscription effacée sans passer par la route reproduit
+  // cet état, un abonnement au coin que plus rien ne justifie.
+  it('signals no call for testers to a member still listening to the corner but no longer a tester', async () => {
+    later()
+    expect(
+      (await act.send('POST', `/v1/projects/${projectId}/testers`, cast.marc.cookie)).status,
+    ).toBe(204)
+    const corner = await openLive(ctx, cast.marc.cookie)
+    await declareTopics(ctx, cast.marc.cookie, corner, [
+      topic.corner(projectId),
+      topic.project(cast.witness),
+    ])
+    await ctx.db
+      .delete(schema.projectTester)
+      .where(
+        and(
+          eq(schema.projectTester.projectId, projectId),
+          eq(schema.projectTester.memberId, cast.marc.id),
+        ),
+      )
+
+    later()
+    const call = await act.send('POST', `/v1/projects/${projectId}/calls`, cast.nora.cookie, {
+      text: 'Essayez le niveau 3 ce week-end.',
+      photoId: null,
+      photoDescription: null,
+    })
+    expect(call.status).toBe(201)
+    const witness = await poke(act, cast)
+
+    expect(await corner.signalsUntil(witness)).toEqual([witness])
   })
 
   it('signals nothing to who looks at another project', async () => {

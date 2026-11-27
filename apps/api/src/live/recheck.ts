@@ -5,9 +5,10 @@
 // reçoivent `{ topic, kind: 'gone' }` : l'appli relit, reçoit le 404 et retire la ressource de
 // l'écran. Ensuite, plus rien n'arrive sur ce sujet pour elles.
 //
-// Le filtre de l'émission (live/emit.ts, B1) empêche déjà toute fuite : un signal ne part jamais à
-// qui ne pourrait pas relire. La revérification sert l'écran (le `gone`) et vide le bus des sujets
-// morts.
+// Le filtre de l'émission (live/emit.ts, B1) empêche la fuite : un signal ne part jamais à qui ne
+// pourrait pas relire (audience, blocages ; pour le coin, l'inscription relue au moment du signal,
+// car une déclaration faite juste avant le retrait d'un testeur peut survivre à la revérification).
+// La revérification sert l'écran (le `gone`) et vide le bus des sujets morts.
 //
 // Deux portes d'entrée, selon ce que l'écriture connaît :
 // - `recheckTopics(live, topics)` : tous les écouteurs de ces sujets (un projet devenu privé : tous
