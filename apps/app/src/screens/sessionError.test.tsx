@@ -605,6 +605,8 @@ const excluded: Record<string, string> = {
     'lit seulement le nom du membre pour la feuille d’offre de miel, n’attend pas la session',
   'src/screens/HiveInviteSheet.tsx': 'rend `null` sans session',
   'src/scout/ScoutDrop.tsx': 'la Goutte flottante (R20) : rend `null` sans session',
+  'src/live/connection.tsx':
+    'le flux du temps réel (R21) : rend `null`, ne s’ouvre que pour un membre',
   'src/screens/ReportSheet.tsx': 'sa branche visiteur de R12',
   'src/screens/ShowcaseScreen.tsx': 'l’accueil public, pré-rendu pour le visiteur',
   'src/screens/EmailChangeResultScreen.tsx': 'ses pages parlent aussi à un visiteur',
