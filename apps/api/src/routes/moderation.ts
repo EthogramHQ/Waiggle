@@ -23,11 +23,12 @@ import type { Auth } from '../auth/auth'
 import { readCursor } from '../cursor'
 import type { Mailer } from '../email/mailer'
 import { errorBody, languageOf } from '../errors'
+import type { Live } from '../live/emit'
 import { confirmPassword, countDecision } from '../moderation/guard'
 import { sendSuspensionEmail } from '../moderation/suspend'
 import type { RateLimiter } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
-import { decide } from '../reports/decide'
+import { announceDecision, decide } from '../reports/decide'
 import { loadDecisionHistory } from '../reports/history'
 import { loadQueuePage, loadRemovedPage, voidReportsOfGoneTargets } from '../reports/queue'
 import { closeVisitorReports } from '../reports/visitor'
@@ -131,9 +132,19 @@ type Deps = {
   publicApiUrl: string
   /** R11 : l'adresse de l'appli, pour le pied de l'e-mail de suspension (page Confidentialité). */
   appUrl: string
+  /** R21 : la base et le bus du temps réel (live/emit.ts), pour annoncer une décision. */
+  live: Live
 }
 
-export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl, appUrl }: Deps) => {
+export const moderationRoutes = ({
+  db,
+  limiter,
+  auth,
+  mailer,
+  publicApiUrl,
+  appUrl,
+  live,
+}: Deps) => {
   const app = createRouter()
 
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
@@ -233,6 +244,8 @@ export const moderationRoutes = ({ db, limiter, auth, mailer, publicApiUrl, appU
       // R12 : la décision clôt peut-être des signalements de visiteurs : leur adresse est effacée,
       // puis chacun reçoit l'issue (retiré ou non), sans rien du contenu ni de l'explication.
       await closeVisitorReportsSafely()
+      // R21 : la décision, au temps réel (gone, pages relues, file des autres administrateurs).
+      await announceDecision(live, input)
       return c.json(ModerationDecision.parse(result.decision), 201)
     }
     switch (result.error) {

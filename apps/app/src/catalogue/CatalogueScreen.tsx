@@ -78,6 +78,7 @@ import { CommentComposerCatalogue } from './commentaires-composer'
 import { CommentThreadCatalogue } from './commentaires-fil'
 import { ReadMoreCatalogue } from './commentaires-lire-la-suite'
 import { CommentMentionsCatalogue } from './commentaires-mentions'
+import { NewCommentsCatalogue } from './commentaires-nouveaux'
 import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
 import { EntryCatalogue } from './entrer'
@@ -832,6 +833,8 @@ export function CatalogueScreen() {
         <CommentThreadCatalogue />
         <CommentMentionsCatalogue />
         <CommentComposerCatalogue />
+        {/* Tranche R21 : le bouton « 1 nouveau commentaire » et sa place (commentaires-nouveaux.tsx). */}
+        <NewCommentsCatalogue />
       </LazySection>
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <LazySection title={l.lazy.moderation}>

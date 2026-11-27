@@ -15,6 +15,8 @@ import { errorBody, languageOf } from '../errors'
 import { setPollen } from '../game/award'
 import { awardOnProject, pollenHeaders } from '../game/gesture'
 import { currentHandleOf } from '../handles/load'
+import { type Live, projectChanged } from '../live/emit'
+import { recheckMembers } from '../live/recheck'
 import { avatarUrlOf } from '../profile/me'
 import { visibleTo } from '../projects/load'
 import { inViewerHiveColumn, sharedWith } from '../projects/visibility'
@@ -110,9 +112,10 @@ const removeTesterRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string; live: Live }
 
-export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const testerRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (aussi pour …/testers/{memberId}).
   app.use('/v1/projects/:id/testers', requireUser)
@@ -129,6 +132,17 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   }
   // 204 : « c'est fait », sans corps : rien à lire, donc rien qui puisse fuiter.
   const ok = (c: Context<AppEnv>) => c.body(null, 204)
+
+  /**
+   * R21 : le nombre de testeurs a changé. La page du projet et le coin se relisent, chez ceux qui
+   * les lisent encore (le filtre de live/emit.ts) ; `leaver`, le testeur parti ou retiré, d'abord
+   * revérifié : il perd le coin et reçoit `gone` (live/recheck.ts ; un ancien testeur n'écoute plus
+   * le coin, son fil passe par `me`). Après la transaction, avant la réponse.
+   */
+  const testersChanged = async (projectId: string, actorId: string, leaver?: string) => {
+    if (leaver !== undefined) await recheckMembers(live, [leaver])
+    await projectChanged(live, { projectId, actorId, page: 'testers', corner: 'testers' })
+  }
 
   /** Compte la demande dans le quota du membre, avant de regarder ce qu'elle demande. */
   const overLimit = async (userId: string) => {
@@ -235,7 +249,11 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'not_testable') return c.json(errorBody(languageOf(c), 'not_testable'), 409)
     if (outcome === 'testers_full') return c.json(errorBody(languageOf(c), 'testers_full'), 409)
-    if (typeof outcome === 'number') setPollen(c, outcome)
+    if (typeof outcome === 'number') {
+      // Une inscription neuve (un nombre : son pollen) ; « déjà testeur » ne change rien.
+      setPollen(c, outcome)
+      await testersChanged(id, viewer.id)
+    }
     return ok(c)
   })
 
@@ -249,11 +267,14 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (!ProjectId.safeParse(id).success) return notFound(c)
     // On peut toujours quitter, même un projet devenu privé ou inconnu : seule la ligne du membre
     // qui demande s'efface (clé primaire), et la réponse ne dit rien du projet.
-    await db
+    // `returning` : la ligne vraiment effacée ; aucune (il ne testait pas), rien à annoncer.
+    const left = await db
       .delete(schema.projectTester)
       .where(
         and(eq(schema.projectTester.memberId, viewer.id), eq(schema.projectTester.projectId, id)),
       )
+      .returning({ memberId: schema.projectTester.memberId })
+    if (left.length > 0) await testersChanged(id, viewer.id, viewer.id)
     return ok(c)
   })
 
@@ -366,9 +387,10 @@ export const testerRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           .insert(schema.projectTesterRemoval)
           .values({ projectId: id, memberId, createdAt: new Date() })
           .onConflictDoNothing()
-        return 'done' as const
+        return 'removed' as const
       })
       if (outcome === 'closed') return cornerClosed(c)
+      if (outcome === 'removed') await testersChanged(id, viewer.id, memberId)
       return ok(c)
     } catch (error) {
       // 23503 : le compte retiré a été supprimé pendant l'écriture. Rien n'est écrit (la

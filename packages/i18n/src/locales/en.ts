@@ -1134,6 +1134,8 @@ export const en: Translation = {
       spokenCount_other: '{{count}} comments',
       seeAll_one: 'See the comment',
       seeAll_other: 'See the {{count}} comments',
+      newComments_one: '{{count}} new comment',
+      newComments_other: '{{count}} new comments',
       empty: 'No comments yet.',
       emptyPrivate:
         'No comments to read for now. Any left by other members are kept: no member, you included, reads them while the project stays private.',
@@ -1484,6 +1486,7 @@ export const en: Translation = {
     pending: 'To review',
     removed: 'Removed',
     empty: 'No reports pending.',
+    liveArrival: 'New report',
     emptyRemoved: 'No removed content.',
     showcase: {
       tab: 'Home showcase',
@@ -2949,6 +2952,8 @@ export const en: Translation = {
     bellNew_one: 'Notifications, {{count}} new',
     bellNew_other: 'Notifications, {{count}} new',
     bellNewMany: 'Notifications, more than {{max}} new',
+    newNotifications_one: '{{count}} new notification',
+    newNotifications_other: '{{count}} new notifications',
     new: 'New',
     emptyTitle: 'No notifications yet',
     empty: 'Comments, reactions and updates to the projects you follow will show up here.',

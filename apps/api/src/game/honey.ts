@@ -131,7 +131,8 @@ export const decorate = (
 
 /** Ce que rend une offre de miel : faite, introuvable (404), déjà faite (409), miel qui manque. */
 export type GiftOutcome =
-  | { kind: 'done' }
+  // R21 : `authorId`, l'auteur du projet, à qui la route signale l'avis « … t'a offert du miel ».
+  | { kind: 'done'; authorId: string }
   | { kind: 'not_found' }
   | { kind: 'honey_already' }
   | HoneyShort
@@ -197,5 +198,5 @@ export const offerHoney = (
       { kind: 'honey_gift', actorId: giverId, projectId: project.id },
       now,
     )
-    return { kind: 'done' }
+    return { kind: 'done', authorId: project.authorId }
   })

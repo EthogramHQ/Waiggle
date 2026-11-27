@@ -51,6 +51,7 @@ import {
   useMyHives,
   useRefuseInvitation,
 } from '../hives/api'
+import { useLiveFallback } from '../live/fallback'
 import { loadProjectEditorChunk } from '../navigation/chunkLoaders'
 import { lazyModule } from '../navigation/lazyModule'
 import { firstParam } from '../navigation/params'
@@ -745,8 +746,10 @@ const useHiveChoice = () => {
   const hydrated = useHydrated()
   const asked = useHiveParam()
   const wanted = hydrated ? asked : undefined
-  // Sous la pastille d'une ruche, relues chaque minute : ses nouveautés (voir hiveNewsOf).
-  const mine = useMyHives(wanted ? { refetchInterval: HIVE_NEWS_INTERVAL_MS } : {})
+  // Sous la pastille d'une ruche, relues chaque minute : ses nouveautés (voir hiveNewsOf). R21 :
+  // seulement faute de flux du temps réel ; sinon le signal `me:feed` les fait relire.
+  const fallback = useLiveFallback()
+  const mine = useMyHives(wanted && fallback ? { refetchInterval: HIVE_NEWS_INTERVAL_MS } : {})
   const hives: HiveSummary[] = mine.data?.hives ?? []
   const chosen = wanted ? hives.find((hive) => hive.id === wanted) : undefined
   const choose = useCallback(

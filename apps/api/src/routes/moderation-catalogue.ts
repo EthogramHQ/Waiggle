@@ -57,6 +57,7 @@ import {
 } from '../catalogue/pages'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { type Live, projectChanged, toOwnDevices } from '../live/emit'
 import { countDecision } from '../moderation/guard'
 import type { RateLimiter } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
@@ -247,9 +248,10 @@ const CATALOGUE_WRITE =
 /** Un uuid : la forme des identifiants de projet (sinon, le même 404 qu'un projet inconnu). */
 const Uuid = z.uuid()
 
-type Deps = { db: Database; limiter: RateLimiter }
+/** R21 : `live`, la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; live: Live }
 
-export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
+export const moderationCatalogueRoutes = ({ db, limiter, live }: Deps) => {
   const app = createRouter()
 
   // Le statut est un paramètre de type (`S`) : chaque appel garde son statut exact (404, pas
@@ -345,7 +347,11 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
       if (result.error === 'not_found') return notFound(c)
       return fail(c, result.error, 409)
     }
-    return c.json(await toolResponse(result.value), 200)
+    // R21 : les auteurs prévenus (« L'outil que tu as cité entre au catalogue ») voient l'avis
+    // arriver dans leur Activité. Sans filtre de blocage : l'avis est signé par l'équipe, jamais
+    // par l'administrateur (catalogue/admin.ts). Rien sur le Fil ni Explorer : leur tête ne change pas.
+    toOwnDevices(live, result.value.noticed, 'notifications')
+    return c.json(await toolResponse(result.value.toolId), 200)
   })
 
   app.openapi(editRoute, async (c) => {
@@ -376,6 +382,8 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
     if (adminId === null || slug === null) return notFound(c)
     const result = await mergeTool(db, adminId, slug, c.req.valid('json').into, new Date())
     if (!result.ok) return notFound(c)
+    // R21 : l'avis du rattachement, comme l'admission ci-dessus.
+    toOwnDevices(live, result.value, 'notifications')
     return c.body(null, 204)
   })
 
@@ -406,7 +414,14 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
     const id = c.req.valid('param').id
     if (!Uuid.safeParse(id).success) return notFound(c)
     const result = await recategorize(db, adminId, id, category, new Date())
-    if (result.ok) return c.body(null, 204)
+    if (result.ok) {
+      // R21 : la page du projet (ses catégories) pour qui la regarde, filtrée comme tout geste sur
+      // un projet (`projectChanged`) ; l'avis « Ton projet a été rangé » à son auteur, sans filtre
+      // de blocage (signé par l'équipe).
+      await projectChanged(live, { projectId: id, actorId: adminId, page: 'project' })
+      toOwnDevices(live, [result.value.authorId], 'notifications')
+      return c.body(null, 204)
+    }
     switch (result.error) {
       case 'not_found':
         return notFound(c)

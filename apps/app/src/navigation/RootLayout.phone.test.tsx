@@ -50,6 +50,8 @@ jest.mock('../navigation/chunks/preload', () => ({ EditorPreload: () => null }))
 jest.mock('../ui/AmbientLight', () => ({ AmbientLight: () => null }))
 // R20 : la Goutte des Éclaireuses a ses propres tests (scout/ScoutDrop.test.tsx).
 jest.mock('../scout/ScoutDrop', () => ({ ScoutDrop: () => null }))
+// R21 : le flux du temps réel a ses propres tests (live/connection.test.tsx).
+jest.mock('../live/connection', () => ({ LiveConnection: () => null }))
 
 // L'écran du lancement, nommé dans la langue de l'appareil (celle de Jest : l'anglais), qu'on ne
 // suppose pas ici : son nom dans l'une ou l'autre langue.

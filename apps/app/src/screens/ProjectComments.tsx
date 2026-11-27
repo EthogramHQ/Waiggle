@@ -18,8 +18,9 @@
 // Qui n'écrit pas : un compte suspendu, et tout le monde sur un projet retiré par la modération (l'API
 // refuse, 409). Ni champ, ni audience, ni « Écrire » ; mais « Voir » s'il y a de quoi lire.
 import { type Comment, type CommentReply, CommentText, type Project } from '@ruche/contracts'
-import { useEffect, useRef, useState } from 'react'
+import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Dimensions } from 'react-native'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
@@ -40,6 +41,7 @@ import { CommentPreview, type CommentPreviewAction } from '../ui/CommentPreview'
 import { CommentThread } from '../ui/CommentThread'
 import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
+import { NewCommentsButton } from '../ui/NewCommentsButton'
 import { Notice } from '../ui/Notice'
 import { Sheet } from '../ui/Sheet'
 import { Loading } from '../ui/Skeleton'
@@ -88,11 +90,19 @@ function CommentContextReader({
   return null
 }
 
+/** R21 : ce que la section donne à l'écran pour son bouton « N nouveaux commentaires ». */
+export type CommentsFresh = {
+  /** Amène au premier commentaire arrivé hors de vue, et lui donne le focus. */
+  goToFresh: () => void
+}
+
 export function Comments({
   project,
   focusCommentId = null,
   onFocusDone,
   onContextClosed,
+  onPageFresh,
+  freshRef,
 }: {
   project: Project
   /**
@@ -113,6 +123,15 @@ export function Comments({
    * la rouvre au même endroit. Sur ordinateur, sans feuille, la colonne garde le paramètre.
    */
   onContextClosed?: () => void
+  /**
+   * R21 : le nombre de commentaires arrivés hors de vue sur la page (0 : aucun ; `null` : la
+   * feuille est ouverte, elle a son propre bouton, celui de la page s'efface). L'écran montre
+   * `NewCommentsButton` dans sa place flottante, qui appelle `freshRef.goToFresh()`. Doit rester la
+   * même d'un dessin à l'autre (le `set…` d'un `useState`).
+   */
+  onPageFresh?: (count: number | null) => void
+  /** R21 : ce que l'écran appelle au toucher du bouton de la page. */
+  freshRef?: Ref<CommentsFresh>
 }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
@@ -198,6 +217,19 @@ export function Comments({
   const cards = useRef<CommentCards>(new Map())
   const previewCards = useRef<CommentCards>(new Map())
 
+  // --- R21 : les commentaires qui arrivent pendant qu'on lit ----------------------------------------
+  // Un signal du serveur fait relire la liste (live/invalidations.ts) : un commentaire d'un autre
+  // membre y paraît à sa place, en haut (les plus récents d'abord). S'il arrive hors de vue, rien ne
+  // défile tout seul : le bouton « 1 nouveau commentaire » paraît, et c'est le membre qui choisit
+  // d'y aller. `fresh` : ces commentaires-là, dans l'ordre d'arrivée.
+  const [fresh, setFresh] = useState<string[]>([])
+  // Les commentaires déjà connus (`null` avant la première lecture : tout ce qu'elle rend est déjà là,
+  // rien n'« arrive »).
+  const known = useRef<Set<string> | null>(null)
+  // La feuille est-elle défilée (son haut, où arrivent les nouveaux, hors de vue) ? Une `ref` : la
+  // position change à chaque image du défilement, sans rien redessiner.
+  const sheetScrolled = useRef(false)
+
   /** Le champ prend le focus ; le navigateur le fait venir à l'écran, le clavier s'ouvre sur téléphone. */
   const focusField = () => inputRef.current?.focus()
 
@@ -224,11 +256,15 @@ export function Comments({
     openedFrom.current = from
     setOpenOnField(onField)
     setSheetOpen(true)
+    // La feuille s'ouvre en haut, où sont les nouveaux : le bouton de la page n'a plus lieu d'être.
+    sheetScrolled.current = false
+    setFresh([])
   }
 
   const closeSheet = () => {
     setSheetOpen(false)
     setAnnouncement('')
+    setFresh([])
     // Fermée avant l'arrivée (lecture en cours ou en panne) : le paramètre part quand même. Rouverte
     // ensuite, la feuille montre la liste telle quelle.
     if (contextId !== null && arrivedFor.current !== contextId) {
@@ -300,6 +336,100 @@ export function Comments({
     }
     wasOpen.current = sheetOpen
   }, [sheetOpen])
+
+  // --- R21 : repérer les arrivées, et y amener sur demande ------------------------------------------
+
+  // La liste vient d'être relue : ce qui n'y était pas encore vient d'arriver. Seulement à la
+  // relecture (`comments.data`), pas à chaque dessin.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: voir ci-dessus
+  useEffect(() => {
+    if (!comments.data) return
+    const lines = threadLines(threads)
+    if (known.current === null) {
+      known.current = new Set(lines.map((comment) => comment.id))
+      return
+    }
+    const seen = known.current
+    const arrived = lines.filter((comment) => !seen.has(comment.id))
+    for (const comment of arrived) seen.add(comment.id)
+    // Ses propres commentaires (envoyés d'ici, ou d'un autre de ses appareils) ne sont pas des
+    // nouveautés : le champ en annonce déjà l'envoi.
+    const others = arrived.filter((comment) => !comment.isMine).map((comment) => comment.id)
+    if (others.length === 0) return
+    const add = () => setFresh((before) => [...before, ...others])
+    if (sheetOpen) {
+      // Feuille en haut : le commentaire paraît sous les yeux, rien de plus.
+      if (sheetScrolled.current) add()
+      return
+    }
+    // Sur la page : hors de vue si le titre de la section est sous le bas de la fenêtre (le membre
+    // lit plus haut, la description) ou au-dessus de son haut (la liste déroulée de l'ordinateur,
+    // lue plus bas). `measureInWindow` : la place de la vue dans la fenêtre, téléphone et web.
+    const title = titleRef.current as {
+      measureInWindow?: (
+        done: (x: number, y: number, width: number, height: number) => void,
+      ) => void
+    } | null
+    title?.measureInWindow?.((_x, y, _width, height) => {
+      if (y > Dimensions.get('window').height || y + height < 0) add()
+    })
+  }, [comments.data])
+
+  // Le nombre montré par le bouton de la page (posé par l'écran dans sa place flottante, au-dessus de
+  // la capsule des réactions) ; la feuille ouverte a le sien. `onPageFresh` est le `set…` d'un
+  // `useState` de l'écran, le même à chaque dessin : seul le nombre redéclenche l'effet.
+  // `null` pendant que la feuille est ouverte : le bouton de la page s'efface (sa région se lirait en
+  // plus de celle de la feuille), et revient vide à sa fermeture.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: voir ci-dessus
+  useEffect(() => {
+    onPageFresh?.(sheetOpen ? null : fresh.length)
+  }, [fresh.length, sheetOpen])
+
+  // L'arrivée s'annonce une fois, dans la région de la section : celle de la feuille, ou celle de la
+  // colonne (ordinateur). Sur la page d'un téléphone, c'est le bouton de l'écran qui l'annonce. Une
+  // relecture qui n'apporte rien de neuf ne change pas le nombre, et ne répète rien.
+  const freshAnnounced = useRef(0)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seul le nombre compte
+  useEffect(() => {
+    const before = freshAnnounced.current
+    freshAnnounced.current = fresh.length
+    if (fresh.length <= before || !(sheetOpen || columns)) return
+    setAnnouncement(t(($) => $.project.comments.newComments, { count: fresh.length }))
+  }, [fresh.length])
+
+  /**
+   * Le toucher de « N nouveaux commentaires » : le bouton s'en va, le premier nouveau commentaire
+   * (dans l'ordre de la liste) vient en vue et reçoit le focus du clavier, ou du lecteur d'écran.
+   */
+  const goToFresh = () => {
+    const wanted = new Set(fresh)
+    setFresh([])
+    // La région se vide : la prochaine arrivée, même « 1 nouveau commentaire », sera relue.
+    setAnnouncement('')
+    const first = threadLines(threads).find((comment) => wanted.has(comment.id))
+    if (!first) return
+    if (sheetOpen) {
+      const card = cards.current.get(first.id)
+      // Un nouveau fil arrive tout en haut : la feuille y remonte. Une réponse, dans un fil plus
+      // bas : la feuille l'amène en vue.
+      if (!card || threads[0]?.id === first.id) sheetReveal.current?.top()
+      else sheetReveal.current?.reveal(card.view())
+      card?.focusSelf()
+      return
+    }
+    // Sur la page : la carte de la liste déroulée (ordinateur), sinon la ligne de l'aperçu ; une
+    // réponse hors de l'aperçu : le titre de la section.
+    const card = (whole ? cards : previewCards).current.get(first.id)
+    if (!card) {
+      focusAndReveal(titleRef.current, calm)
+      moveReaderTo(titleRef.current)
+      return
+    }
+    focusAndReveal(card.view(), calm)
+    if (whole) card.focusSelf()
+    else card.focusCard()
+  }
+  useImperativeHandle(freshRef, () => ({ goToFresh }))
 
   /** Quitter la page depuis une carte : la feuille se ferme d'abord, sinon elle resterait dessus (ui-B2). */
   const leave = (go: () => void) => {
@@ -682,6 +812,21 @@ export function Comments({
           phoneHeight={contextId === null ? 'full' : 'partial'}
           revealRef={sheetReveal}
           titleRef={sheetTitleRef}
+          // R21 : le bouton des commentaires arrivés pendant qu'on lit plus bas, en bas de la liste.
+          // Sans région à lui : la feuille a la sienne, qui annonce l'arrivée (voir plus haut).
+          floating={
+            <NewCommentsButton
+              count={sheetOpen ? fresh.length : 0}
+              onPress={goToFresh}
+              announce={false}
+              on="sheet"
+            />
+          }
+          // Revenu tout en haut par lui-même, le membre voit les nouveaux : le bouton s'en va.
+          onListScroll={(offset) => {
+            sheetScrolled.current = offset > 0
+            if (offset <= 0) setFresh((before) => (before.length > 0 ? [] : before))
+          }}
           // Une feuille couvre le bandeau de la suspension : elle redit pourquoi il n'y a pas de champ.
           footer={
             suspended ? (

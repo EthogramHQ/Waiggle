@@ -30,6 +30,7 @@ const icons = [
   'caret-left',
   'caret-right',
   'caret-down',
+  'caret-up', // le bouton des nouveaux commentaires dans la feuille, où ils sont au-dessus (R21)
   'sign-in',
   'sign-out',
   // Actions

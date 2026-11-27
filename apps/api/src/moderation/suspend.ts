@@ -34,6 +34,8 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
 import { suspensionEmail } from '../email/templates'
+import type { Live } from '../live/emit'
+import { recheckAuthorCorners } from '../live/recheck'
 import { describeError } from '../log'
 import type { RateLimiter, RateRule } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
@@ -252,6 +254,20 @@ const SUSPENSION_EMAIL_RULE: RateRule = { windowMs: DAY, max: 1 }
  * identifiant.
  */
 export const suspensionEmailKey = (userId: string) => `suspension-email:${userId}`
+
+// ─── Le temps réel ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * R21 (relecture de sécurité du plan, B4) : après une suspension validée (jamais dans la
+ * transaction), le coin des testeurs de chacun des projets du membre se ferme pour tous les
+ * autres (`cornerAccess` rend alors `not_found`) : ceux qui le regardaient reçoivent `gone`
+ * (live/recheck.ts). Ses projets restent lus, et un administrateur ne peut pas être suspendu
+ * (`cannot_suspend_admin`) : rien d'autre à revérifier. Une levée ne retire rien : le coin rouvert
+ * se relira quand le testeur reviendra sur la page.
+ */
+export const announceSuspension = async (live: Live, input: SuspendInput | LiftInput) => {
+  if (input.action === 'suspend') await recheckAuthorCorners(live, input.memberId)
+}
 
 /**
  * Envoie l'e-mail de suspension à `memberId`, après la décision (jamais en tenant la transaction).

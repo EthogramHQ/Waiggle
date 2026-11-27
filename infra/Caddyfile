@@ -400,7 +400,11 @@ www.{$APP_DOMAIN:localhost} {
 
 # L'API. Ses en-têtes de sécurité sont posés par l'API elle-même (apps/api/src/app.ts).
 {$API_DOMAIN:api.localhost} {
-	encode zstd gzip
+	# R21 : le flux du temps réel (GET /v1/live, `text/event-stream`) n'est pas compressé. Un
+	# compresseur attend d'avoir assez d'octets pour en faire un bloc : chaque petit signal resterait
+	# coincé chez Caddy au lieu de partir tout de suite (docs/adr/0008-temps-reel.md).
+	@not_live not path /v1/live
+	encode @not_live zstd gzip
 	header -Server
 	# Aucune requête de plus de 6 Mo n'atteint l'API (la plus grosse légitime : un avatar de 5 Mo).
 	request_body {
@@ -410,5 +414,8 @@ www.{$APP_DOMAIN:localhost} {
 		# Adresse IP réelle du visiteur, utilisée par la limitation de débit.
 		# header_up REMPLACE toute valeur envoyée par le visiteur : il ne peut pas la falsifier.
 		header_up X-Real-IP {remote_host}
+		# R21 : chaque octet reçu de l'API repart aussitôt (pas de tampon). Caddy le fait déjà seul
+		# pour `text/event-stream` ; l'écrire évite de dépendre de cette détection.
+		flush_interval -1
 	}
 }

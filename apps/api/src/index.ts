@@ -15,6 +15,8 @@ import {
 import { loadEnv } from './env'
 import { backfillHandles, purgeExpiredHandles } from './handles/claim'
 import { type Scheduler, startScheduler } from './jobs/scheduler'
+import { sessionRecheckOf } from './live/access'
+import { createLiveHub } from './live/hub'
 import { describeError } from './log'
 import { createDiskStorage } from './media/storage'
 
@@ -91,7 +93,11 @@ const auth = createAuth({
   // R20 : le code des Éclaireuses, accepté aussi à l'inscription.
   scoutCode: env.scoutCode,
 })
+// R21 : le bus du temps réel, créé ici pour être fermé à l'arrêt (plus bas), avec la relecture des
+// sessions de ses flux toutes les minutes (live/access.ts).
+const hub = createLiveHub({ recheck: sessionRecheckOf(database.db) })
 const app = createApp({
+  hub,
   version,
   auth,
   db: database.db,
@@ -139,7 +145,11 @@ if (env.databaseUrl) {
 // Arrêt propre : quand Docker ou Ctrl+C demandent l'arrêt (SIGTERM / SIGINT),
 // on laisse les requêtes en cours se terminer, puis les tâches planifiées, on ferme la base, et on
 // quitte.
+// R21 : d'abord les flux du temps réel. Une réponse SSE ne finit jamais seule : `server.close`
+// l'attendrait jusqu'à ce que Docker tue le processus. Le bus refuse dès maintenant tout flux neuf
+// et ferme les ouverts ; l'appli se reconnecte seule au serveur suivant.
 const shutdown = () => {
+  hub.shutdown()
   server.close(async () => {
     try {
       await scheduler?.stop()

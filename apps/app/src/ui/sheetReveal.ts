@@ -23,6 +23,11 @@ import type {
 export type SheetReveal = {
   /** Garde cet élément (la `ref` d'une vue de la liste) dans la zone ; `null` : la laisse tranquille. */
   reveal: (node: unknown) => void
+  /**
+   * R21 : ramène la zone tout en haut, là où arrivent les commentaires neufs (les plus récents
+   * d'abord), sur un geste du membre (« 1 nouveau commentaire »). Lâche aussi l'élément gardé.
+   */
+  top: () => void
 }
 
 /** L'air gardé entre l'élément et le bord de la zone. */
@@ -87,6 +92,10 @@ export const useSheetReveal = (handle: Ref<SheetReveal> | undefined, calm: boole
     reveal: (node) => {
       target.current = (node ?? null) as Measurable | null
       place()
+    },
+    top: () => {
+      target.current = null
+      scroller.current?.scrollTo({ y: 0, animated: !calm })
     },
   }))
 

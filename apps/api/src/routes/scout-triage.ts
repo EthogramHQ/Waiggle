@@ -30,6 +30,8 @@ import type { Context } from 'hono'
 import { readCursor } from '../cursor'
 import { languageOfMember } from '../email/language'
 import { errorBody, languageOf } from '../errors'
+import { type Live, toAdmins, toOwnDevices } from '../live/emit'
+import { connectedScoutsOf } from '../live/recipients'
 import type { FileStorage } from '../media/storage'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
@@ -162,9 +164,11 @@ export type ScoutTriageDeps = {
   storage: FileStorage
   limiter: RateLimiter
   publicApiUrl: string
+  /** R21 : la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+  live: Live
 }
 
-export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps) => {
+export const scoutTriageRoutes = ({ db, limiter, publicApiUrl, live }: ScoutTriageDeps) => {
   const app = createRouter()
 
   // Le statut est un paramètre de type (`S`) : chaque appel garde son statut exact, que le typage
@@ -203,6 +207,8 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
 
   app.openapi(programRoute, async (c) => {
     if (!(await launchProgram(db, new Date()))) return fail(c, 'scout_program_started', 409)
+    // R21 : la page de tri des autres administrateurs (le mois et ses places).
+    toAdmins(live, 'scouts')
     return c.body(null, 204)
   })
 
@@ -211,6 +217,14 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
     // Un `id` qui n'est pas une mission de la semaine : une demande mal formée, comme un `id` cité
     // deux fois (refusé par le contrat).
     if (outcome === 'unknown_mission') return fail(c, 'validation', 400)
+    // R21 : les missions de la semaine changent pour chaque Éclaireuse active (la pastille de la
+    // Goutte), et l'avis « N missions cette semaine » a pu leur être écrit : `scouts` et
+    // `notifications` sur leur `me`. Elles seules (`connectedScoutsOf`), sans filtre : ce sont
+    // leurs missions, et l'avis est signé par l'équipe. Puis la page de tri des administrateurs.
+    const scouts = await connectedScoutsOf(live)
+    toOwnDevices(live, scouts, 'scouts')
+    toOwnDevices(live, scouts, 'notifications')
+    toAdmins(live, 'scouts')
     return c.body(null, 204)
   })
 
@@ -232,6 +246,16 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
     // Une note pour l'Éclaireuse avant « Corrigé » : refusée comme si elle venait avec un autre
     // statut (le contrat refuse déjà ce cas-là).
     if (outcome === 'not_fixed') return fail(c, 'validation', 400)
+    // R21 : la page de tri des administrateurs ; et, au `me` de l'Éclaireuse seule, « Mes retours »
+    // (son statut), puis, si sa danse vient d'être entendue, son Activité (« Ta danse a été
+    // entendue ») et sa récolte (pollen et miel). Pas de filtre de blocage : l'avis est signé par
+    // l'équipe, comme celui du catalogue (catalogue/admin.ts).
+    toAdmins(live, 'scouts')
+    toOwnDevices(live, [outcome.memberId], 'scouts')
+    if (outcome.heard) {
+      toOwnDevices(live, [outcome.memberId], 'notifications')
+      toOwnDevices(live, [outcome.memberId], 'pollen')
+    }
     // Le retour changé, relu hors de la transaction, tel que la liste le montre.
     const report = await loadAdminReport(db, id, englishFor(c), publicApiUrl)
     if (!report) return notFound(c)
@@ -243,6 +267,11 @@ export const scoutTriageRoutes = ({ db, limiter, publicApiUrl }: ScoutTriageDeps
     const outcome = await removeScout(db, memberId, c.req.valid('json').reason, new Date())
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'scout_removed') return fail(c, 'scout_removed', 409)
+    // R21 : l'Éclaireuse retirée perd la Goutte et reçoit l'avis qui dit pourquoi ; la page de tri
+    // des administrateurs perd une Éclaireuse.
+    toOwnDevices(live, [memberId], 'scouts')
+    toOwnDevices(live, [memberId], 'notifications')
+    toAdmins(live, 'scouts')
     return c.body(null, 204)
   })
 

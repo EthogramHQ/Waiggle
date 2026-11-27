@@ -242,6 +242,17 @@ type PanelProps = {
    * était la Goutte) au lieu d'être centrée. Sans effet sur téléphone.
    */
   corner?: boolean
+  /**
+   * R21 : ce qui flotte en bas de la zone qui défile, juste au-dessus du pied, centré (le bouton
+   * « 1 nouveau commentaire »). Posé par-dessus la liste, il ne la pousse pas : rien ne bouge sous
+   * le doigt quand il paraît. Lu après le contenu, avant le pied.
+   */
+  floating?: ReactNode
+  /**
+   * R21 : appelée à chaque défilement de la zone, avec sa position (0 : tout en haut). L'écran sait
+   * ainsi si le haut de sa liste est encore en vue, sans rien mesurer lui-même.
+   */
+  onListScroll?: (offset: number) => void
 }
 
 /**
@@ -1199,6 +1210,8 @@ export function SheetPanel({
   closeInFooter = false,
   headerMenu,
   corner = false,
+  floating,
+  onListScroll,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -1525,6 +1538,7 @@ export function SheetPanel({
       onScroll={(event) => {
         listProps?.onScroll(event)
         fold.onScroll(event)
+        onListScroll?.(event.nativeEvent.contentOffset.y)
       }}
       onLayout={(event) => {
         listProps?.onLayout(event)
@@ -1564,10 +1578,30 @@ export function SheetPanel({
     </ScrollView>
   )
   // Avec le fondu, posé juste après la zone qui défile, par-dessus son bas (voir `SheetFade`).
+  // R21 : ce qui flotte (`floating`) se pose comme le fondu, par-dessus le bas de la zone : une vue
+  // de hauteur nulle juste après elle, d'où la place dépasse vers le haut (`bottom`). La zone garde
+  // sa hauteur, la liste ne bouge pas. `box-none` : à côté du bouton, le doigt atteint la liste.
+  const floatingPlace = floating ? (
+    <View pointerEvents="box-none" style={{ height: 0, flexShrink: 0, zIndex: 1 }}>
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          left: space.xl,
+          right: space.xl,
+          bottom: space.md,
+          alignItems: 'center',
+        }}
+      >
+        {floating}
+      </View>
+    </View>
+  ) : null
   const scrolling = (
     <>
       {content}
       {fold.more ? <SheetFade /> : null}
+      {floatingPlace}
     </>
   )
 

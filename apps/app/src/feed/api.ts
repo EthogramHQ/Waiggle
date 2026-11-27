@@ -18,6 +18,7 @@ import {
 import { useEffect, useMemo, useRef } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError } from '../api/errors'
+import { useLiveFallback } from '../live/fallback'
 import { feedItemId } from './items'
 
 export type FeedKind = 'following' | 'discover'
@@ -143,6 +144,9 @@ export const useFeedNews = (
   category: string | null = null,
 ): FeedNews => {
   const queryClient = useQueryClient()
+  // R21 : la relecture de chaque minute n'est que le repli ; tant que le flux du temps réel est
+  // ouvert, le signal `feed` (ou `me:feed`) fait relire la tête à chaque publication.
+  const fallback = useLiveFallback()
   const shown = keyOf(kind, testers, category)
   const head = useQuery({
     queryKey: [...shown, 'head'],
@@ -154,7 +158,7 @@ export const useFeedNews = (
     // Seulement une fois le fil affiché chargé : la première vérification attend sa minute.
     enabled: queryClient.getQueryState(shown)?.status === 'success',
     staleTime: NEWS_INTERVAL_MS,
-    refetchInterval: NEWS_INTERVAL_MS,
+    refetchInterval: fallback ? NEWS_INTERVAL_MS : false,
     refetchOnWindowFocus: true,
   })
   const page = head.data

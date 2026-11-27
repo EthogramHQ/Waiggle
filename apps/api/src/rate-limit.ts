@@ -223,6 +223,10 @@ export const memberCounterKeys = (userId: string) => ({
   scoutSettings: `scout-settings:${userId}`,
   scoutRead: `scout-read:${userId}`,
   scoutAdmin: `scout-admin:${userId}`,
+  // R21 (le temps réel, routes/live.ts) : ouvrir un flux (30 par minute, compté avant d'ouvrir) et
+  // déclarer les sujets de ses pages (60 par minute, mal formées comprises, avant le validateur).
+  live: `live:${userId}`,
+  liveTopics: `live-topics:${userId}`,
 })
 
 /**

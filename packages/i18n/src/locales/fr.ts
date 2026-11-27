@@ -1380,6 +1380,10 @@ export const fr = {
       spokenCount_other: '{{count}} commentaires',
       seeAll_one: 'Voir le commentaire',
       seeAll_other: 'Voir les {{count}} commentaires',
+      // R21 : le bouton qui paraît quand des commentaires arrivent hors de vue ; il y mène. Le même
+      // texte est annoncé une fois au lecteur d'écran.
+      newComments_one: '{{count}} nouveau commentaire',
+      newComments_other: '{{count}} nouveaux commentaires',
       empty: 'Aucun commentaire pour l’instant.',
       // Un projet privé garde les commentaires des autres, que personne ne lit (R5b, jur-P9, `sees`).
       emptyPrivate:
@@ -1798,6 +1802,9 @@ export const fr = {
     pending: 'À traiter',
     removed: 'Retirés',
     empty: 'Aucun signalement en attente.',
+    // R21 : annoncé une fois au lecteur d'écran quand un signalement arrive ; la file ne se relit
+    // pas seule (rien ne bouge sous le doigt), elle se relit au retour sur l'onglet.
+    liveArrival: 'Nouveau signalement',
     emptyRemoved: 'Aucun contenu retiré.',
     // R12 (planche R12-Vitrine) : l'onglet qui choisit la vitrine de l'accueil et « À la une »
     // parmi les projets publics (Q9). L'auteur est prévenu dans Activité et peut la quitter.
@@ -3580,6 +3587,9 @@ export const fr = {
     bellNew_one: 'Notifications, {{count}} nouvelle',
     bellNew_other: 'Notifications, {{count}} nouvelles',
     bellNewMany: 'Notifications, plus de {{max}} nouvelles',
+    // R21 : le bouton qui paraît quand une notification arrive pendant qu'on lit l'Activité.
+    newNotifications_one: '{{count}} nouvelle notification',
+    newNotifications_other: '{{count}} nouvelles notifications',
     new: 'Nouveau',
     emptyTitle: 'Pas encore de notification',
     empty:

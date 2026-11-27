@@ -12,6 +12,8 @@ import { award, setPollen, type Tx } from '../game/award'
 import { pollenHeaders } from '../game/gesture'
 import { isHiveMember } from '../hives/load'
 import { isForeignKeyViolation, lockMembershipForShare } from '../hives/write'
+import { hiveChanged, type Live, projectChanged, projectScopeOf } from '../live/emit'
+import { projectTopics, recheckTopics } from '../live/recheck'
 import type { FileStorage } from '../media/storage'
 import { dropProjectPartRemovals, replacedProjectParts } from '../moderation/replaced'
 import { categoriesExist } from '../projects/categories'
@@ -155,9 +157,16 @@ const hiveGone = (error: unknown): typeof HIVE_GONE => {
   throw error
 }
 
-type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = {
+  db: Database
+  storage: FileStorage
+  limiter: RateLimiter
+  publicApiUrl: string
+  live: Live
+}
 
-export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
+export const projectRoutes = ({ db, storage, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, vérifié avant même de lire le contenu de la requête.
@@ -305,6 +314,18 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
     if (created > counted) await chargeOtherTools(limiter, user.id, created - counted)
 
+    // R21 : la publication, après la transaction et avant la réponse. Le filtre des destinataires
+    // (live/emit.ts) choisit selon la visibilité : visible de tous, `feed` (le bouton des
+    // nouveautés) et la page de l'auteur ; réservé à une ruche, `hive:<ruche>` et le `me` / `feed`
+    // de ses seuls membres ; privé, rien pour personne d'autre que lui.
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      member: 'project',
+      hive: 'hive',
+      feed: true,
+    })
+
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) throw new Error('project not found right after its creation')
     setPollen(c, pollen)
@@ -381,6 +402,9 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     let createdHere = 0
     // R19 : le pollen de la première publication, si ce changement en est une (rempli plus bas).
     let pollen = 0
+    // R21 : la ruche du projet avant le changement (lue sous le verrou), pour prévenir sa page
+    // quand le projet la quitte.
+    let hiveBefore: string | null = null
     const outcome = await db
       .transaction(async (tx) => {
         // R10 : passer en « réservé » prend d'abord la ligne de l'auteur dans hive_member, en
@@ -396,6 +420,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           .select({
             removedAt: schema.project.removedAt,
             visibility: schema.project.visibility,
+            hiveId: schema.project.hiveId,
             publishedAt: schema.project.publishedAt,
             primaryCategory: schema.project.primaryCategory,
             secondaryCategory: schema.project.secondaryCategory,
@@ -410,6 +435,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // Ce qui est lu ici ne peut donc plus changer avant la fin de la transaction.
         if (!locked) return 'gone' as const
         if (locked.removedAt !== null) return 'removed' as const
+        hiveBefore = locked.hiveId
         // R12 : la garde a laissé un suspendu descendre de « Public » vers « Membres » ou une ruche
         // d'après la visibilité lue avant la transaction. Relue ici sous le verrou : si le projet
         // n'est plus `web` (une autre de ses demandes l'a changé entre-temps), seul « privé » reste
@@ -520,6 +546,26 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (outcome === 'same_category') return c.json(errorBody(languageOf(c), 'same_category'), 400)
     if (outcome === 'invalid_order') return c.json(errorBody(languageOf(c), 'validation'), 400)
 
+    // R21, après la transaction et avant la réponse. Une visibilité changée (privé, une autre
+    // ruche, « Membres ») d'abord : qui regardait sa page ou son coin sans plus pouvoir les lire
+    // reçoit `gone` (live/recheck.ts). Puis le changement, aux lecteurs d'aujourd'hui : sa page, la
+    // page de son auteur et celle de sa ruche ; le Fil seulement pour une première publication.
+    // `hiveBefore` est assigné dans la transaction : TypeScript le croit encore null ici, d'où la
+    // relecture par une constante typée.
+    const previousHive = hiveBefore as string | null
+    if (changes.visibility !== undefined) await recheckTopics(live, projectTopics([id]))
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      page: 'project',
+      member: 'project',
+      hive: 'hive',
+      feed: pollen > 0,
+    })
+    if (previousHive !== null && previousHive !== hiveId) {
+      await hiveChanged(live, { hiveId: previousHive, actorId: user.id })
+    }
+
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) return notFound(c)
     setPollen(c, pollen)
@@ -537,6 +583,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const access = await projectAccess(db, id, user.id)
     if (access === 'not_found') return notFound(c)
     if (access === 'forbidden') return forbidden(c)
+
+    // R21 : ce qu'il faut savoir du projet pour prévenir les pages de son auteur et de sa ruche,
+    // lu avant que la ligne ne disparaisse (clé primaire), seulement si un flux est ouvert.
+    const scope = live.hub.isIdle() ? null : await projectScopeOf(db, id)
 
     // Les fichiers des photos, notés avant que leurs lignes ne disparaissent avec le projet. Le
     // verrou (FOR UPDATE) fait attendre un envoi de photo en cours : il ne peut pas glisser une
@@ -564,6 +614,17 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       return found
     })
     for (const key of keys) await storage.delete(key)
+    // R21 : le projet n'existe plus. Qui regardait sa page ou son coin reçoit `gone` ; la page de
+    // son auteur et celle de sa ruche se relisent, pour ceux qui le voyaient.
+    await recheckTopics(live, projectTopics([id]))
+    if (scope) {
+      await projectChanged(live, {
+        project: scope,
+        actorId: user.id,
+        member: 'project',
+        hive: 'hive',
+      })
+    }
     // 204 : « c'est fait », sans contenu à renvoyer.
     return c.body(null, 204)
   })

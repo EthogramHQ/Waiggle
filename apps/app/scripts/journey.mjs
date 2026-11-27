@@ -1012,13 +1012,32 @@ try {
 
   step('Sam réagit « Waggle ! » et commente ; Léa répond, puis masque le commentaire de Sam')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
+  step('Temps réel : Léa, page ouverte sans recharger, voit la réaction et le commentaire de Sam')
+  // R21 (« Le temps réel ») : deux navigateurs. Léa garde la page de son projet ouverte, sur
+  // ordinateur, sans la recharger ; ce que fait Sam y paraît en moins de 2 secondes, par le flux
+  // (`GET /v1/live`) : la page écoute `project:<id>`, et un signal fait relire ce qui a changé.
+  // Témoin : chez l'auteur, le bloc des réactions dit « Pas encore de réaction » tant que tout est à 0.
+  console.log('  temps réel : Léa garde la page de son projet ouverte')
+  await asDesktop(lea.page)
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
+  const noReaction = lea.page.getByText('Pas encore de réaction', { exact: true })
+  await noReaction.waitFor()
   // Le nom lu de chaque réaction dit son nombre, et « réagi » une fois posée.
   await byRole(sam.page, 'button', 'Waggle\u202f!, 0').click()
   await byRole(sam.page, 'button', 'Waggle\u202f!, 1, ta réaction').waitFor()
   // R19 : une réaction rapporte 2 pollen ; la pastille « +2 pollen » monte de la capsule, puis
   // s'efface (elle est seulement dessinée : le lecteur d'écran l'entend par une région polie).
+  const reactedAt = Date.now()
   await sam.page.getByText('+2 pollen', { exact: true }).first().waitFor()
   console.log('  ok : la pastille « +2 pollen » monte de la réaction de Sam')
+  // R21 : sur la page de Léa, jamais rechargée, la réaction compte en moins de 2 secondes (depuis
+  // la réaction posée chez Sam).
+  await noReaction
+    .waitFor({ state: 'detached', timeout: Math.max(0, 2_000 - (Date.now() - reactedAt)) })
+    .catch(() => fail('temps réel : la réaction de Sam n’a pas paru chez Léa en 2 secondes'))
+  console.log(
+    `  ok : la réaction de Sam paraît chez Léa sans recharger (${Date.now() - reactedAt} ms)`,
+  )
   await waitFor(
     'réaction enregistrée',
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
@@ -1041,6 +1060,17 @@ try {
   await byRole(sam.page, 'button', 'Envoyer le commentaire').click()
   // L'avis n'est que lu par les lecteurs d'écran : c'est le commentaire qui apparaît, dans la feuille.
   await shownText(sam.page, samSays, false).waitFor()
+  // R21 : chez Léa, sans recharger, en moins de 2 secondes : le commentaire à sa place, ou, s'il
+  // arrive hors de vue, le bouton « 1 nouveau commentaire » qui y mène (la liste ne saute pas).
+  const commentedAt = Date.now()
+  await shownText(lea.page, samSays, false)
+    .or(byRole(lea.page, 'button', /^1 nouveau commentaire/))
+    .first()
+    .waitFor({ timeout: 2_000 })
+    .catch(() => fail('temps réel : le commentaire de Sam n’a pas paru chez Léa en 2 secondes'))
+  console.log(
+    `  ok : le commentaire de Sam paraît chez Léa sans recharger (${Date.now() - commentedAt} ms)`,
+  )
   await waitFor(
     'commentaire de Sam enregistré',
     async () => (await readProject(lea, projectId)).commentCount === 1,

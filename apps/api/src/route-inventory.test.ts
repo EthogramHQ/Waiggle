@@ -296,6 +296,14 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension, WithoutRule
   'POST /v1/moderation/scouts/program': ['admin', 'refused', 'refused'],
   'PUT /v1/moderation/scouts/missions': ['admin', 'refused', 'refused'],
   'DELETE /v1/moderation/scouts/:memberId': ['admin', 'allowed', 'allowed'],
+  // R21 : le temps réel. Le flux montre, par des signaux sans contenu, les gestes des autres
+  // membres : un blocage, dans un sens ou dans l'autre, les arrête (relecture de sécurité du plan,
+  // B1), et la déclaration ignore la page d'un membre bloqué. Un compte suspendu garde son flux et
+  // déclare ses pages, comme il lit (plan R21, choix 7, décision du 27/11/2026) : déclarer n'écrit rien en
+  // base, la route entre donc dans ALLOWED_WRITES, et, selon D4, dans les sorties de la garde des
+  // règles.
+  'GET /v1/live': ['hidesBlocked', 'allowed', 'allowed'],
+  'PUT /v1/live/:connectionId/topics': ['hidesBlocked', 'allowed', 'allowed'],
 }
 
 /** Les routes lues sans compte (R12) : tout `/v1/public/*`, et rien d'autre. */
@@ -503,6 +511,16 @@ const PROOFS: Record<string, { file: string; test: string }> = {
     file: 'game.rankings.test.ts',
     test: 'leaves a member blocked either way out of the hive ranking',
   },
+  // R21 : rien ne part vers qui a bloqué l'auteur du geste ou en est bloqué (B1), et la page d'un
+  // membre bloqué, dans un sens ou dans l'autre, se déclare sans rien recevoir.
+  'GET /v1/live': {
+    file: 'live.recipients.test.ts',
+    test: 'sends nothing, on any topic, to a member of a common hive blocked by the author, and nothing back',
+  },
+  'PUT /v1/live/:connectionId/topics': {
+    file: 'live.topics.test.ts',
+    test: 'ignores without a word the page of a member when %s',
+  },
 }
 
 /**
@@ -689,6 +707,11 @@ const PART_PROOFS: Record<string, { file: string; test: string } | { none: strin
     file: 'game.moderation.test.ts',
     test: 'never shows a removed avatar in a ranking',
   },
+  // R21 : un signal ne porte que son sujet et sa sorte ; un contenu retiré fait partir `gone`.
+  'GET /v1/live': {
+    file: 'live.recheck.test.ts',
+    test: 'sends gone when the moderation removes the project',
+  },
 }
 
 /**
@@ -788,6 +811,11 @@ const HIVE_PROOFS: Record<string, { file: string; test: string } | { none: strin
   },
   // R19 : des membres et leur pollen de la semaine, sans projet.
   'GET /v1/rankings': { none: 'des membres et leur pollen de la semaine, sans projet' },
+  // R21 : le flux ne montre aucun projet, mais un signal d'un projet réservé dirait qu'il bouge.
+  'GET /v1/live': {
+    file: 'live.recipients.test.ts',
+    test: 'sends a project reserved to a hive to the members of that hive only, by their me',
+  },
   // R20 : le tri des Éclaireuses montre des retours sur l'appli (sorte, texte, capture, écran) et
   // des Éclaireuses, jamais un projet ; l'écran d'où vient un retour n'est qu'une adresse.
   'GET /v1/moderation/scouts': { none: 'la jauge, les missions et les Éclaireuses, sans projet' },
@@ -1054,6 +1082,8 @@ describe('the inventory of routes', () => {
       'POST /v1/projects/:id/threads/:testerId/read',
       'POST /v1/reports',
       'PUT /v1/feed/read',
+      // R21 : déclarer les pages ouvertes au temps réel, permis pendant une suspension (choix 7).
+      'PUT /v1/live/:connectionId/topics',
       'PUT /v1/members/:id/block',
       'PUT /v1/notifications/seen',
       'PUT /v1/projects/:id/comments/:commentId/hide',

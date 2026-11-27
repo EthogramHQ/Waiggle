@@ -6,11 +6,12 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useCallback } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError } from '../api/errors'
+import { useLiveFallback } from '../live/fallback'
 
 /** Toutes les clés de cache des notifications commencent par « notifications ». */
 export const notificationsQueryKey = ['notifications'] as const
-const unreadKey = ['notifications', 'unread'] as const
-const listKey = ['notifications', 'list'] as const
+export const unreadKey = ['notifications', 'unread'] as const
+export const listKey = ['notifications', 'list'] as const
 
 /** Toutes les minutes, la cloche redemande son nombre (comme le bandeau des nouveautés du fil). */
 const UNREAD_INTERVAL_MS = 60_000
@@ -39,17 +40,20 @@ export const getNotificationPage = async (cursor?: string): Promise<Notification
 /**
  * Hook : le nombre de nouveautés, pour la cloche. 0 tant qu'il n'est pas arrivé, s'il n'a pas pu
  * être lu, ou si `enabled` est faux (personne n'est connecté : on ne demande rien).
- * refetchInterval relit toutes les minutes, mais seulement quand l'appli est au premier plan ;
+ * refetchInterval relit toutes les minutes, mais seulement quand l'appli est au premier plan, et
+ * seulement faute de flux du temps réel (R21, `useLiveFallback`) : tant que le flux est ouvert,
+ * le signal `me:notifications` fait relire le nombre à chaque nouvel avis ;
  * refetchOnWindowFocus relit au retour sur l'appli (un onglet retrouvé, ou le téléphone qui
  * revient au premier plan : voir api/query-client.ts) si le nombre a plus d'une minute.
  */
 export const useUnreadCount = (enabled = true): number => {
+  const fallback = useLiveFallback()
   const query = useQuery({
     queryKey: unreadKey,
     queryFn: getUnreadCount,
     enabled,
     staleTime: UNREAD_INTERVAL_MS,
-    refetchInterval: UNREAD_INTERVAL_MS,
+    refetchInterval: fallback ? UNREAD_INTERVAL_MS : false,
     refetchOnWindowFocus: true,
   })
   return enabled ? (query.data ?? 0) : 0

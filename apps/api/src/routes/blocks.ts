@@ -17,6 +17,8 @@ import { requireUser } from '../auth/session'
 import { loadBlockedPage, readBlocksCursor } from '../blocks/list'
 import { blockMember, unblockMember } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
+import type { Live } from '../live/emit'
+import { recheckMembers } from '../live/recheck'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -82,9 +84,10 @@ const listRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string; live: Live }
 
-export const blockRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const blockRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste.
   app.use('/v1/members/:id/block', requireUser)
@@ -122,7 +125,12 @@ export const blockRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (id === viewer.id) return c.json(errorBody(languageOf(c), 'cannot_block_own'), 422)
     // Inconnu, jamais vérifié, ou qui m'a bloqué : la même réponse, mot pour mot (blocks/write.ts).
     const blocked = await blockMember(db, viewer.id, id, new Date())
-    return blocked ? ok(c) : notFound(c)
+    if (!blocked) return notFound(c)
+    // R21 (relecture de sécurité du plan, B4) : un blocage joue dans les deux sens. Chacun des deux
+    // perd les pages de l'autre qu'il regardait (ses projets, sa page de membre, le coin d'un
+    // projet qu'il testait) et reçoit `gone` ; rien n'est relu pour les autres membres.
+    await recheckMembers(live, [viewer.id, id])
+    return ok(c)
   })
 
   app.openapi(unblockRoute, async (c) => {

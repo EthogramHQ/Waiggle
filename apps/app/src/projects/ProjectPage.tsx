@@ -114,7 +114,10 @@ type LayoutProps = ProjectPageSlots & {
   thumbhash: string | null
   /** Le fondu des pages ; faux pendant l'arrivée depuis une carte (elle a son propre passage). */
   fade: boolean
-  /** Téléphone : ce qui flotte en bas de l'écran, hors du défilement (la capsule des réactions). */
+  /**
+   * Ce qui flotte en bas de l'écran, hors du défilement : sur téléphone, la capsule des réactions ;
+   * partout, le bouton des nouveaux commentaires (R21).
+   */
   floating?: ReactNode
   /**
    * Téléphone : la galerie est bord à bord, et la page se pose sur une feuille qui remonte sur le bas
@@ -247,6 +250,8 @@ export function ProjectPageLayout({
         }
         thumbhash={thumbhash}
         pageTitle={pageTitle}
+        // R21 : le bouton des nouveaux commentaires (la capsule, elle, est sur la galerie).
+        floating={floating}
       >
         {w(banner)}
         {columns ? (

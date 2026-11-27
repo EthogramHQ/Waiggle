@@ -37,6 +37,7 @@ import { loadInvitable } from '../hives/invitable'
 import { acceptInvitation, inviteToHive, refuseInvitation } from '../hives/invitations'
 import { hiveSummariesOf, membershipOf } from '../hives/load'
 import { isForeignKeyViolation } from '../hives/write'
+import { hiveChanged, type Live, notifyMembers, toOwnDevices } from '../live/emit'
 import { describeError } from '../log'
 import {
   memberCounterKeys,
@@ -145,9 +146,10 @@ const refuseRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string; live: Live }
 
-export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (même avant la lecture du corps).
   app.use('/v1/hives/:id/invitable', requireUser)
@@ -249,6 +251,12 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'forbidden') return c.json(errorBody(languageOf(c), 'forbidden'), 403)
     if (outcome !== 'done') return c.json(errorBody(languageOf(c), outcome), 409)
+    // R21 : l'invitation n'est connue que de l'invité (la page de la ruche ne montre pas les
+    // invitations en attente) : son `me` seul, `hive` (la liste de ses ruches et invitations) et
+    // `notifications` (l'avis « … t'invite dans Famille », source 17 de notifications/load.ts).
+    // `notifyMembers` écarte un blocage avec l'inviteur, que l'écriture a déjà refusé.
+    await notifyMembers(live, { actorId: viewer.id, recipients: [userId], kind: 'hive' })
+    await notifyMembers(live, { actorId: viewer.id, recipients: [userId] })
     return c.body(null, 201)
   })
 
@@ -275,6 +283,21 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const [summary] = await hiveSummariesOf(db, viewer.id, [outcome.hiveId], publicApiUrl, now)
     // Parti juste après être entré (un autre appareil) : la ruche n'est plus la sienne.
     if (!summary) return notFound(c)
+    // R21 : la page de la ruche (ses membres) change pour ses membres qui la regardent, sans
+    // blocage avec le nouveau venu (`hiveChanged`). Ses autres appareils : ses ruches, son Activité
+    // (l'invitation n'y est plus) et sa récolte. Qui l'a invité : son Activité (« … a rejoint
+    // Famille », source 18) et sa récolte (le pollen de l'invitation acceptée), sauf blocage.
+    await hiveChanged(live, { hiveId: outcome.hiveId, actorId: viewer.id })
+    // `feed` : les projets réservés à la ruche entrent dans son Fil.
+    toOwnDevices(live, [viewer.id], 'hive')
+    toOwnDevices(live, [viewer.id], 'feed')
+    toOwnDevices(live, [viewer.id], 'notifications')
+    toOwnDevices(live, [viewer.id], 'pollen')
+    if (outcome.inviterId !== null) {
+      const recipients = [outcome.inviterId]
+      await notifyMembers(live, { actorId: viewer.id, recipients })
+      await notifyMembers(live, { actorId: viewer.id, recipients, kind: 'pollen' })
+    }
     // Après la transaction : le pollen est écrit, l'en-tête peut le dire (R19).
     setPollen(c, outcome.pollen)
     return c.json(HiveSummary.parse(summary), 200)
@@ -286,6 +309,11 @@ export const hiveInvitationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const { id } = c.req.valid('param')
     if (!HiveInvitationId.safeParse(id).success) return notFound(c)
     if (!(await refuseInvitation(db, id, viewer.id, new Date()))) return notFound(c)
+    // R21 : le refus est muet. Rien sur la page de la ruche (une invitation refusée y garde sa
+    // place, et un signal dirait aux membres qu'il s'est passé quelque chose) ; seulement les
+    // autres appareils de l'invité : ses invitations et son Activité.
+    toOwnDevices(live, [viewer.id], 'hive')
+    toOwnDevices(live, [viewer.id], 'notifications')
     return c.body(null, 204)
   })
 

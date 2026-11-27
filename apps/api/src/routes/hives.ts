@@ -46,11 +46,14 @@ import {
   changeHive,
   createHive,
   deleteHive,
+  type HiveDeparture,
   handAnimation,
   isForeignKeyViolation,
   markHiveSeen,
   removeFromHive,
 } from '../hives/write'
+import { hiveChanged, type Live, toOwnDevices } from '../live/emit'
+import { projectTopics, recheckMembers, recheckTopics } from '../live/recheck'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { isSuspended } from '../suspension/load'
 import type { AppEnv } from '../types'
@@ -226,9 +229,10 @@ const animatorRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel (live/emit.ts). */
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string; live: Live }
 
-export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
+export const hiveRoutes = ({ db, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (même avant la lecture du corps).
   app.use('/v1/hives', requireUser)
@@ -272,6 +276,32 @@ export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       if (isForeignKeyViolation(error)) return 'not_found'
       throw error
     }
+  }
+
+  /**
+   * R21 : après une suppression ou un départ (la transaction finie, avant la réponse).
+   * 1. La revérification (live/recheck.ts) : qui ne peut plus lire la ruche, ses projets rendus
+   *    privés ou leurs coins reçoit `gone` ; `leaver`, le membre parti ou retiré, est revérifié sur
+   *    tous ses sujets (la ruche, les projets réservés des autres, leurs coins).
+   * 2. La page de la ruche, pour ses membres restants (un membre de moins, un nouvel animateur).
+   * 3. Le `me` des membres concernés : leur liste de ruches (`hive`) et, pour qui lit un avis neuf
+   *    (ruche supprimée, retiré, nouvel animateur), leur Activité. Ce sont leurs propres avis,
+   *    écrits par la transaction : aucun filtre de plus (`toOwnDevices`).
+   */
+  const departed = async (
+    hiveId: string,
+    actorId: string,
+    outcome: HiveDeparture,
+    leaver: string | null,
+  ) => {
+    await recheckTopics(live, [
+      ...(outcome.hiveDeleted ? [`hive:${hiveId}`] : []),
+      ...projectTopics(outcome.privatized),
+    ])
+    if (leaver !== null) await recheckMembers(live, [leaver])
+    if (!outcome.hiveDeleted) await hiveChanged(live, { hiveId, actorId })
+    toOwnDevices(live, [...outcome.noticed, ...(leaver === null ? [] : [leaver])], 'hive')
+    toOwnDevices(live, outcome.noticed, 'notifications')
   }
 
   app.openapi(myHivesRoute, async (c) => {
@@ -326,6 +356,8 @@ export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (outcome === 'pin_not_visible') {
       return c.json(errorBody(languageOf(c), 'pin_not_visible'), 422)
     }
+    // R21 : son nom, son icône ou son épingle ont changé : sa page se relit chez ses membres.
+    await hiveChanged(live, { hiveId: membership.hiveId, actorId: viewer.id })
     // Relue après la transaction (sous PGlite, une lecture par `db` pendant elle attendrait).
     const fresh = await membershipOf(db, membership.hiveId, viewer.id)
     const page = fresh && (await loadHivePage(db, viewer.id, fresh, publicApiUrl, now))
@@ -344,6 +376,7 @@ export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const outcome = await orGone(() => deleteHive(db, membership.hiveId, viewer.id, now))
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'forbidden') return forbidden(c)
+    await departed(membership.hiveId, viewer.id, outcome, null)
     return c.body(null, 204)
   })
 
@@ -405,6 +438,7 @@ export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     )
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'forbidden') return forbidden(c)
+    await departed(membership.hiveId, viewer.id, outcome, userId)
     return c.body(null, 204)
   })
 
@@ -420,6 +454,12 @@ export const hiveRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     )
     if (outcome === 'not_found') return notFound(c)
     if (outcome === 'forbidden') return forbidden(c)
+    // R21 : un nouvel animateur. Sa page se relit chez les membres, et l'Activité du successeur
+    // (« Tu animes maintenant la ruche… ») sur ses appareils. Confier à soi-même ne change rien.
+    if (userId !== viewer.id) {
+      await hiveChanged(live, { hiveId: membership.hiveId, actorId: viewer.id })
+      toOwnDevices(live, [userId], 'notifications')
+    }
     return c.body(null, 204)
   })
 

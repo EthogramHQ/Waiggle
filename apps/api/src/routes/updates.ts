@@ -23,6 +23,8 @@ import { after, encodeCursor, readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { award, lockMembers, setPollen } from '../game/award'
 import { pollenHeaders } from '../game/gesture'
+import { type Live, projectChanged, toOwnDevices } from '../live/emit'
+import { updateReadersOf } from '../live/recipients'
 import type { FileStorage } from '../media/storage'
 import { projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -98,7 +100,14 @@ const deleteUpdateRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
+/** R21 : `live`, la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+type Deps = {
+  db: Database
+  storage: FileStorage
+  limiter: RateLimiter
+  publicApiUrl: string
+  live: Live
+}
 
 /** Levée dans la transaction de publication pour l'annuler : une photo n'est pas rattachable. */
 class InvalidPhotos extends Error {}
@@ -106,7 +115,7 @@ class InvalidPhotos extends Error {}
 /** Levée dans la même transaction : un retour cité n'est pas réglable par cette mise à jour (R7b). */
 class InvalidFeedback extends Error {}
 
-export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
+export const updateRoutes = ({ db, storage, limiter, publicApiUrl, live }: Deps) => {
   const app = createRouter()
 
   // Connecté obligatoire, avant tout le reste.
@@ -176,7 +185,13 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       | { kind: 'gone' }
       | { kind: 'removed' }
       | { kind: 'invalid_photos' }
-      | { kind: 'ok'; photos: (typeof schema.projectMedia.$inferSelect)[]; pollen: number }
+      | {
+          kind: 'ok'
+          photos: (typeof schema.projectMedia.$inferSelect)[]
+          pollen: number
+          // R21 : les testeurs dont un retour vient d'être réglé (leur fil et leur récolte changent).
+          settled: string[]
+        }
     try {
       outcome = await db.transaction(async (tx) => {
         const [locked] = await tx
@@ -243,7 +258,10 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             now: update.createdAt,
           })
         }
-        if (body.photos.length === 0) return { kind: 'ok' as const, photos: [], pollen }
+        const settledTesters = [...new Set(settled.map((one) => one.testerId))]
+        if (body.photos.length === 0) {
+          return { kind: 'ok' as const, photos: [], pollen, settled: settledTesters }
+        }
 
         // Le rattachement des photos : UNE seule écriture conditionnelle (relecture A1). La
         // condition « de ce projet, slot update, pas encore rattachée » est dans l'UPDATE lui-même,
@@ -286,6 +304,7 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           kind: 'ok' as const,
           photos: attached.sort((a, b) => a.position - b.position),
           pollen,
+          settled: settledTesters,
         }
       })
     } catch (error) {
@@ -300,6 +319,23 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (outcome.kind === 'invalid_photos') {
       return c.json(errorBody(languageOf(c), 'invalid_photos'), 400)
     }
+    // R21 : la transaction est finie (rien n'est annoncé d'une écriture annulée) ; les signaux
+    // partent avant la réponse. Le Journal du projet change pour qui le regarde ; le bouton des
+    // nouveautés du Fil, pour qui voit le projet (une mise à jour paraît dans le Fil) ; l'Activité,
+    // pour ses abonnés et ses testeurs (source 11 de notifications/load.ts). `projectChanged`
+    // filtre les trois selon l'audience du projet et les blocages (relecture B1).
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      page: 'updates',
+      feed: true,
+      notify: await updateReadersOf(live, id),
+    })
+    // Les testeurs dont un retour est réglé par cette mise à jour : leur fil (« Réglé dans la mise
+    // à jour du … ») et leur récolte (le pollen du retour réglé) changent. Ce n'est qu'à eux, déjà
+    // vérifiés par l'écriture (un retour de ce projet) : sans filtre.
+    toOwnDevices(live, outcome.settled, 'corner')
+    toOwnDevices(live, outcome.settled, 'pollen')
     setPollen(c, outcome.pollen)
     return c.json(toUpdate(update, outcome.photos, publicApiUrl), 201)
   })
@@ -370,6 +406,14 @@ export const updateRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       .where(and(eq(schema.projectUpdate.id, updateId), eq(schema.projectUpdate.projectId, id)))
       .returning({ id: schema.projectUpdate.id })
     if (deleted.length === 0) return notFound(c)
+    // R21 : le Journal change pour qui le regarde, et l'avis disparaît de l'Activité des abonnés et
+    // des testeurs (il se calcule à la lecture). Pas de `feed` : rien de neuf à annoncer.
+    await projectChanged(live, {
+      projectId: id,
+      actorId: user.id,
+      page: 'updates',
+      notify: await updateReadersOf(live, id),
+    })
     for (const photo of photos) await storage.delete(photo.storageKey)
     // 204 : « c'est fait », sans contenu à renvoyer.
     return c.body(null, 204)

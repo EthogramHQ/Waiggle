@@ -48,7 +48,7 @@ import { useArrivalTitle } from './arrivalFocus'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { CoverReturnScope, useCoverReturn } from './coverTransition'
-import { useFloatingClaim, useFloatingTopOfOthers } from './floatingSpace'
+import { FloatingClearanceContext, useFloatingClaim, useFloatingTopOfOthers } from './floatingSpace'
 import { type Focusable, focusTarget, holdsFocus } from './focus'
 import { hiddenFrame } from './HiddenHeading'
 import { IconButton } from './IconButton'
@@ -871,7 +871,15 @@ export function Screen({
                       width={columnMax}
                       onHeight={setMeasuredFloating}
                     >
-                      {floating}
+                      {/* R21 : ce qui flotte plus haut qu'elle dans le coin (la Goutte), pour le
+                          bouton des nouveaux commentaires posé au-dessus de la capsule. Mesurée
+                          sur le haut de la place, même vide : sans capsule (l'auteur), le bouton
+                          seul s'y pose, hors du flux, et la place garde 0 de haut. */}
+                      <FloatingClearanceContext.Provider
+                        value={Math.max(0, othersTop - (floatingLift + floatingHeight))}
+                      >
+                        {floating}
+                      </FloatingClearanceContext.Provider>
                     </ScreenFloating>
                   ) : null}
                   {/* La couche du dessus (R6a), après tout le reste : dessinée au-dessus de la page. */}

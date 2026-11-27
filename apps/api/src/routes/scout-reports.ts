@@ -26,6 +26,7 @@ import { requireUser } from '../auth/session'
 import { languageOfMember } from '../email/language'
 import { errorBody, languageOf } from '../errors'
 import { setPollen } from '../game/award'
+import { type Live, toAdmins, toOwnDevices } from '../live/emit'
 import type { FileStorage } from '../media/storage'
 import { processVisual } from '../media/visual'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -119,9 +120,17 @@ export type ScoutReportDeps = {
   storage: FileStorage
   limiter: RateLimiter
   publicApiUrl: string
+  /** R21 : la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+  live: Live
 }
 
-export const scoutReportRoutes = ({ db, storage, limiter, publicApiUrl }: ScoutReportDeps) => {
+export const scoutReportRoutes = ({
+  db,
+  storage,
+  limiter,
+  publicApiUrl,
+  live,
+}: ScoutReportDeps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (même avant la lecture du corps).
   app.use(REPORTS_PATH, requireUser)
@@ -245,6 +254,12 @@ export const scoutReportRoutes = ({ db, storage, limiter, publicApiUrl }: ScoutR
       if (mediaKey !== null) await storage.delete(mediaKey)
       return c.json(errorBody(languageOf(c), 'scout_mission_invalid'), 400)
     }
+    // R21 : un retour neuf paraît dans la page de tri (`scouts`, que seuls les administrateurs en
+    // fonction écoutent) ; sur les autres appareils de l'Éclaireuse, « Mes retours », ses missions
+    // faites et sa récolte (le pollen du retour).
+    toAdmins(live, 'scouts')
+    toOwnDevices(live, [user.id], 'scouts')
+    toOwnDevices(live, [user.id], 'pollen')
     setPollen(c, outcome.pollen)
     return c.json(outcome.report, 201)
   })
@@ -269,6 +284,9 @@ export const scoutReportRoutes = ({ db, storage, limiter, publicApiUrl }: ScoutR
     // La ligne effacée d'abord, puis son fichier : un fichier orphelin ne s'ouvre plus (la route des
     // médias relit la ligne), alors qu'une ligne sans fichier montrerait une image cassée.
     if (deleted.mediaKey !== null) await storage.delete(deleted.mediaKey)
+    // R21 : le retour quitte la page de tri, et « Mes retours » de ses autres appareils.
+    toAdmins(live, 'scouts')
+    toOwnDevices(live, [user.id], 'scouts')
     return c.body(null, 204)
   })
 

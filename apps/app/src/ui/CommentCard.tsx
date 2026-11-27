@@ -79,7 +79,10 @@ export type CommentCardHandle = {
   focusReply: () => boolean
   /** Vrai si le focus a pu être posé (la carte `compact`, qui est un seul bouton). */
   focusCard: () => boolean
-  /** La vue de la carte, pour l'amener en vue dans une liste (`reveal` de la feuille). */
+  /**
+   * La vue de la carte, pour l'amener en vue dans une liste (`reveal` de la feuille, la page) : son
+   * cadre, ou le bouton de l'aperçu (`compact`).
+   */
   view: () => unknown
   /**
    * R8 : pose le focus sur le commentaire lui-même (le commentaire visé par une notification), sans
@@ -274,7 +277,10 @@ export function CommentCard({
     focusMenu: () => focusOn(menuRef),
     focusReply: () => focusOn(replyRef),
     focusCard: () => focusOn(cardRef),
-    view: () => frameRef.current,
+    // La carte écrite rend son cadre ; l'aperçu (`compact`), qui n'en a pas, son seul bouton : sans
+    // lui, « N nouveaux commentaires » de la page ne faisait rien venir en vue (relecture de design
+    // de R21). Son cadre reste à `null` : `focusSelf` ne vaut pas pour l'aperçu.
+    view: () => frameRef.current ?? cardRef.current,
     // Le cadre de la carte lui-même, jamais une de ses actions : on arrive sur le commentaire, pas
     // sur « Répondre ». Sur le web, il est focalisable sans être une étape de Tab (tabIndex -1, au
     // rendu) et Tab repart de lui, vers le nom ; sur téléphone, le lecteur d'écran est amené à lui

@@ -585,6 +585,20 @@ describe('the register of member inputs', () => {
   // seul ; un test échoue si un champ n'y est pas classé ». La colonne `removable` du registre suit
   // le contrat (REMOVABLE_PARTS) : un champ qui n'est pas une partie (la version, une ligne d'une mise
   // à jour, un commentaire, la précision d'un signalement) ne se retire pas seul.
+  // R21 : les deux routes du temps réel (GET /v1/live, PUT /v1/live/{connectionId}/topics) ne
+  // reçoivent d'un membre que des sujets (`project:<id>`…), validés par le contrat, gardés en
+  // mémoire le temps du flux et jamais écrits en base : ni journal des connexions, ni présence
+  // (plan R21, choix 13). Ce test passe dès aujourd'hui : c'est une garde. Une table qui noterait
+  // un jour les connexions ou les sujets le ferait échouer, et devrait alors passer par le registre
+  // et la relecture juridique.
+  it('stores nothing a member sends to the live routes: no table of slice R21', () => {
+    const live = tables
+      .map((t) => t.name)
+      .filter((name) => /live|topic|connection|presence/.test(name))
+    expect(live).toEqual([])
+    expect(MEMBER_INPUTS.filter((input) => /live|topic/.test(input.table))).toEqual([])
+  })
+
   it('says for every field of the register whether it can be removed alone, as the contract does', () => {
     const parts = new Set<string>(ReportPartField.options)
     const expected = (input: MemberInput) =>

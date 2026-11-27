@@ -80,8 +80,16 @@ const reasonOf = (error: unknown): CornerFailure | undefined => {
 
 // --- Clés de cache et adresses ---
 
-const cornerKey = (projectId: string) => ['tester-corner', projectId] as const
-const callsKey = (projectId: string) => ['tester-calls', projectId] as const
+export const cornerKey = (projectId: string) => ['tester-corner', projectId] as const
+export const callsKey = (projectId: string) => ['tester-calls', projectId] as const
+/**
+ * Les débuts de clé de tous les coins, de tous les fils et de tous leurs messages, quel que soit le
+ * projet (R21) : un message de fil arrive par le sujet personnel `me`, qui ne dit pas de quel
+ * projet il vient ; seules les lectures montrées à l'écran se relisent.
+ */
+export const allCornersKey = ['tester-corner'] as const
+export const allThreadsKey = ['tester-threads'] as const
+export const allThreadMessagesKey = ['tester-messages'] as const
 // Sans le filtre : « tous les fils de ce projet », pour changer « À traiter » et « Réglés » ensemble.
 const threadsKeyOf = (projectId: string) => ['tester-threads', projectId] as const
 const threadsKey = (projectId: string, state: TesterThreadState) =>

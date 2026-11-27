@@ -4847,3 +4847,83 @@ leur retour est corrigé.
 
 Les retours de testeurs sur les projets des membres, la modération et la gamification marchent
 comme avant.
+
+## R21 — Le temps réel
+
+Statut : **validé par Louis** le 27/11/2026 (« Validé tel quel »), à partir de sa demande du
+26/11/2026 : « je souhaite que tout soit instantané, un commentaire est instantanément visible par
+les autres, idem pour les réactions, les suivis, les notifications etc., pas une fois qu'on a
+rechargé la page ». Les points **(tranché)** suivent les recommandations proposées.
+
+Aujourd'hui, une page ouverte ne change que si on la recharge ; seuls le Fil et les ruches relisent
+leurs nouveautés, une fois par minute. Avec R21, ce que font les autres membres arrive **tout de
+suite** sur l'écran ouvert, sans recharger, sur le web, le téléphone et l'ordinateur. Rien ne bouge
+sous le doigt : ce qui pousserait le contenu qu'on lit s'annonce au lieu de s'insérer.
+
+### Ce qui arrive tout de suite
+
+- Étant donné Léa et Nora qui regardent la page du projet « Décollage ! »
+  Quand Nora publie un commentaire
+  Alors Léa le voit apparaître en moins de 2 secondes, à sa place dans la liste, sans recharger ;
+  Et si Léa lit plus haut dans la page, la liste ne saute pas : un bouton « 1 nouveau commentaire »
+  apparaît, qui l'y amène.
+- De même, en moins de 2 secondes et sans recharger :
+  - **les réactions** : le nombre et l'éventail d'une carte ou d'un commentaire changent sous les
+    yeux de ceux qui les regardent ;
+  - **les abonnés et les testeurs** : « 12 abonnés » devient « 13 abonnés » sur la page du projet
+    ou du membre ;
+  - **l'Activité** : la pastille de la cloche s'allume, et la liste de l'Activité ouverte reçoit
+    l'avis en haut ;
+  - **le Fil et Explorer** : le bouton des nouveautés (« 2 nouveaux projets », avec les visages)
+    paraît dès la publication, au lieu d'attendre la minute ; le fil ne s'insère pas tout seul
+    **(tranché : on garde le bouton)** ;
+  - **les mises à jour d'un projet** : le Journal ouvert reçoit la nouvelle mise à jour ;
+  - **les ruches** : le fil d'une ruche, ses membres, une invitation reçue ;
+  - **les fils des testeurs** : la réponse de l'auteur ou du testeur paraît dans le fil ouvert ;
+  - **les Éclaireuses** : la pastille des missions de la Goutte, « Ta danse a été entendue », et,
+    pour l'administrateur, un nouveau retour dans la page de tri ;
+  - **la modération** : un contenu retiré disparaît de l'écran de ceux qui le regardent ; un
+    signalement neuf paraît dans la file de l'administrateur.
+- Ce qui change aussi en place : un commentaire modifié montre son nouveau texte, un commentaire
+  effacé disparaît, un projet passé en privé ou retiré disparaît des listes des autres.
+- Ses propres gestes restent immédiats comme aujourd'hui (le commentaire de Léa paraît dès qu'elle
+  l'envoie) et arrivent en même temps sur ses autres appareils ouverts.
+
+### Ce que l'on voit, et ce que l'on ne voit jamais
+
+- On ne reçoit tout de suite que ce qu'on verrait en rechargeant la page : mêmes règles de
+  confidentialité, de blocage et de modération. Un membre bloqué, un projet privé d'un autre, une
+  ruche dont on n'est pas membre n'envoient rien, pas même le signe qu'il s'est passé quelque chose.
+- Ni présence (« en ligne »), ni « en train d'écrire », ni « vu » : personne ne sait qui regarde
+  quoi **(tranché : on n'en veut pas)**.
+- Les nombres sans noms restent sans noms (abonnés, réactions, A2).
+
+### Quand la connexion manque
+
+- Étant donné Léa dont la connexion coupe (métro, ordinateur en veille, onglet caché)
+  Quand elle revient
+  Alors l'écran rattrape ce qu'elle a manqué, en une fois, sans recharger ni perdre sa place ;
+  Et rien n'est annoncé deux fois.
+- Un onglet caché ou une appli en arrière-plan ne garde pas sa connexion ouverte : elle reprend au
+  retour.
+- Si l'instantané est impossible (réseau d'entreprise, coupure longue), l'appli relit comme
+  aujourd'hui, toutes les minutes, sans message d'erreur.
+
+### Les mouvements
+
+- Ce qui arrive le fait en douceur (un fondu, un nombre qui change sans saut de mise en page) ;
+  sous « Réduire les animations », sans mouvement.
+- Le lecteur d'écran annonce une arrivée qui concerne l'écran (« 1 nouveau commentaire »), une fois,
+  sans voler le focus ; il n'annonce pas chaque réaction.
+
+### Hors de cette tranche
+
+- Les notifications poussées sur le téléphone fermé ou en veille, et les e-mails : inchangés.
+- Une messagerie entre membres.
+- La refonte visuelle du Fil, d'Explorer et de la page d'un projet (recherche et planches en cours
+  en parallèle).
+
+### Le reste ne change pas
+
+Les règles de chaque fonction (qui peut commenter, réagir, suivre, voir) ne changent pas : R21 ne
+change que le moment où l'on voit.

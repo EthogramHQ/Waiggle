@@ -66,3 +66,12 @@ export function useFloatingTopOfOthers(owner: object): number {
   for (const [token, value] of claims) if (token !== owner && value > top) top = value
   return top
 }
+
+/**
+ * R21 : de combien les autres éléments flottants (la Goutte, dans le coin) dépassent le haut de la
+ * place flottante de l'écran, en points ; 0 si rien ne dépasse. Screen le donne à ce qu'il pose
+ * dans sa place flottante : le bouton « N nouveaux commentaires », posé au-dessus de la capsule
+ * sans compter dans la hauteur réservée (sinon la Goutte montait à son arrivée), s'en sert pour
+ * passer au-dessus de la Goutte au lieu de la couvrir. Hors d'un écran : 0.
+ */
+export const FloatingClearanceContext = createContext(0)

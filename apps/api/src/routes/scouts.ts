@@ -25,6 +25,7 @@ import { isRightInviteCode } from '../auth/invite-code'
 import { requireUser } from '../auth/session'
 import { languageOfMember } from '../email/language'
 import { errorBody, languageOf } from '../errors'
+import { type Live, toAdmins, toOwnDevices } from '../live/emit'
 import { loadMe } from '../profile/me'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { activeScout, joinScouts } from '../scouts/join'
@@ -105,9 +106,11 @@ type Deps = {
   publicApiUrl: string
   /** Le code des Éclaireuses (SCOUT_INVITE_CODE) ; null : aucun code ne marche. */
   scoutCode: string | null
+  /** R21 : la base et le bus du temps réel, pour les signaux de chaque geste (live/emit.ts). */
+  live: Live
 }
 
-export const scoutRoutes = ({ db, limiter, publicApiUrl, scoutCode }: Deps) => {
+export const scoutRoutes = ({ db, limiter, publicApiUrl, scoutCode, live }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (même avant la lecture du corps). Les chemins exacts :
   // les retours (/v1/me/scout/reports) posent leur propre garde, dans leur fichier.
@@ -156,6 +159,10 @@ export const scoutRoutes = ({ db, limiter, publicApiUrl, scoutCode }: Deps) => {
     }
     const outcome = await joinScouts(db, user.id, 'settings', new Date())
     if (outcome !== 'joined') return c.json(errorBody(languageOf(c), outcome), 409)
+    // R21 : une Éclaireuse de plus dans la page de tri (les places, la liste) ; ses autres
+    // appareils : la Goutte et ses missions.
+    toAdmins(live, 'scouts')
+    toOwnDevices(live, [user.id], 'scouts')
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
     return c.json(me, 200)
@@ -174,6 +181,8 @@ export const scoutRoutes = ({ db, limiter, publicApiUrl, scoutCode }: Deps) => {
       .where(and(eq(schema.scout.memberId, user.id), isNull(schema.scout.removedAt)))
       .returning({ memberId: schema.scout.memberId })
     if (changed.length === 0) return scoutOnly(c)
+    // R21 : « Afficher la Goutte » change aussi sur ses autres appareils.
+    toOwnDevices(live, [user.id], 'scouts')
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
     return c.json(me, 200)

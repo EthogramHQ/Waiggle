@@ -102,7 +102,9 @@ export const inviteToHive = (
 
 export type AcceptOutcome =
   // `pollen` : ce que l'invité vient de gagner (R19, 15 ; 0 sinon), que la route met dans l'en-tête.
-  | { hiveId: string; pollen: number }
+  // R21 : `inviterId`, qui a invité (null si son compte est supprimé) : son Activité (« Max a
+  // rejoint Famille ») et sa récolte changent, la route le lui signale.
+  | { hiveId: string; pollen: number; inviterId: string | null }
   | 'not_found'
   | 'invitation_expired'
   | 'hives_joined_limit'
@@ -177,7 +179,7 @@ export const acceptInvitation = (
         counterpartId: inviteeId,
       })
     }
-    return { hiveId: found.hiveId, pollen }
+    return { hiveId: found.hiveId, pollen, inviterId: invitation.inviterId }
   })
 
 // ─── Refuser ──────────────────────────────────────────────────────────────────────────────────────
