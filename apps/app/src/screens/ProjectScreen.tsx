@@ -753,8 +753,10 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
     />
   ) : null
   // R21 : le bouton des nouveaux commentaires, toujours monté (sa région annonce l'arrivée), sans
-  // place à 0. Sur téléphone, il s'empile au-dessus de la capsule des réactions, dans la même place
-  // flottante ; ailleurs, la capsule est sur la galerie, le bouton flotte seul.
+  // place à 0. Sur téléphone, il flotte au-dessus de la capsule des réactions (`over`), sans compter
+  // dans la hauteur de la place flottante : la Goutte des Éclaireuses, posée au-dessus de la capsule,
+  // ne bouge pas à son arrivée, et il passe au-dessus d'elle. Ailleurs, la capsule est sur la
+  // galerie, le bouton flotte seul.
   // Sur ordinateur, la colonne des commentaires a sa région et y annonce l'arrivée : le bouton n'en
   // ajoute pas. `null` : la feuille des commentaires est ouverte, elle porte son propre bouton.
   const freshButton =
@@ -763,6 +765,7 @@ function ProjectView({ project: shown, viewerId }: ViewProps) {
         count={freshComments}
         onPress={() => commentsFresh.current?.goToFresh()}
         announce={!columns}
+        over={!large}
       />
     )
   const floating = large ? (

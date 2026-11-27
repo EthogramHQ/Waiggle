@@ -13,10 +13,12 @@
 // L'arrivée est annoncée une seule fois, poliment, par une région `LiveStatus` cachée à l'œil (le
 // bouton se voit déjà) : jamais par le focus, qui reste là où la personne lit. Un nouveau dessin
 // avec le même nombre se tait ; un nombre qui change (« 2 nouveaux commentaires ») s'annonce.
-import { useEffect, useRef } from 'react'
+import { space } from '@ruche/brand'
+import { useContext, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View, type ViewStyle } from 'react-native'
 import { Button } from './Button'
+import { FloatingClearanceContext } from './floatingSpace'
 import { LiveStatus } from './LiveStatus'
 import { holdPageTaps } from './tapGuard'
 
@@ -38,6 +40,15 @@ type Props = {
    * mal (capture du catalogue, R21).
    */
   on?: 'page' | 'sheet'
+  /**
+   * Vrai : posé au-dessus de ce qu'il surmonte dans la place flottante (la capsule des réactions,
+   * sur téléphone), hors du flux. Empilé, il grandissait la hauteur réservée de la place, et la
+   * Goutte des Éclaireuses, posée au-dessus de cette réserve, montait de 52 points à l'arrivée d'un
+   * commentaire, sans geste du membre (relecture de l'interface de R21). S'il y a une Goutte dans
+   * le coin, il passe au-dessus d'elle (`FloatingClearanceContext`, donné par Screen) au lieu de la
+   * couvrir. Faux (défaut) : il prend sa place dans le flux.
+   */
+  over?: boolean
 }
 
 /**
@@ -54,7 +65,13 @@ const focusLost = () => {
   return !page.activeElement || page.activeElement === page.body
 }
 
-export function NewCommentsButton({ count, onPress, announce = true, on = 'page' }: Props) {
+export function NewCommentsButton({
+  count,
+  onPress,
+  announce = true,
+  on = 'page',
+  over = false,
+}: Props) {
   const { t } = useTranslation()
   // Au-delà de 0, le nombre lui-même : « 1 nouveau commentaire », « 3 nouveaux commentaires ».
   const label = count > 0 ? t(($) => $.project.comments.newComments, { count }) : ''
@@ -76,7 +93,10 @@ export function NewCommentsButton({ count, onPress, announce = true, on = 'page'
     place?.focus?.({ preventScroll: true })
   }, [count])
 
-  return (
+  // `over` : ce dont les autres éléments flottants (la Goutte) dépassent le haut de la place.
+  const clearance = useContext(FloatingClearanceContext)
+
+  const place = (
     <View
       ref={slot}
       {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
@@ -106,6 +126,30 @@ export function NewCommentsButton({ count, onPress, announce = true, on = 'page'
       {/* Toujours montée, vide à 0 : un lecteur d'écran n'annonce que ce qui change dans une région
           qu'il connaît déjà (voir LiveStatus). */}
       {announce ? <LiveStatus message={label} visible={false} /> : null}
+    </View>
+  )
+  if (!over) return place
+  // Posé au-dessus de ce qu'il surmonte (`bottom: '100%'` : son bas sur le haut de la pile qui le
+  // contient), à l'écart habituel, plus ce que la Goutte dépasse. Sur toute la largeur pour se
+  // centrer, en `box-none` : un toucher à côté du bouton passe à la page dessous. La même vue à 0
+  // (vide, hors du flux) : la région annoncée et la place du focus restent montées.
+  return (
+    <View
+      pointerEvents="box-none"
+      style={
+        count > 0
+          ? {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: '100%',
+              marginBottom: space.sm + clearance,
+              alignItems: 'center',
+            }
+          : empty
+      }
+    >
+      {place}
     </View>
   )
 }

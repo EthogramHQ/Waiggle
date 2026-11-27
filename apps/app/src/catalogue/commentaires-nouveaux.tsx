@@ -12,7 +12,10 @@ import { radii, space } from '@ruche/brand'
 import type { CommentReply } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
+import { Button } from '../ui/Button'
 import { CommentCard } from '../ui/CommentCard'
+import { FloatingClearanceContext } from '../ui/floatingSpace'
+import { DROP_SIZE, HoneyDrop } from '../ui/HoneyDrop'
 import { NewCommentsButton } from '../ui/NewCommentsButton'
 import { ScreenFloating } from '../ui/Screen'
 import { SheetPanel } from '../ui/Sheet'
@@ -41,6 +44,9 @@ const fr = {
   sheetTitle: 'Commentaires',
   sheetSpoken: '6 commentaires',
   sheetField: 'Le champ « Écrire un commentaire », collé en bas.',
+  over: 'Sur la page d’un projet (téléphone) : au-dessus de la capsule des réactions (over), hors de la hauteur réservée. La Goutte des Éclaireuses ne bouge pas, et le bouton passe au-dessus d’elle.',
+  capsule: 'La capsule des réactions',
+  drop: 'Faire un retour',
 }
 
 const en: typeof fr = {
@@ -62,6 +68,9 @@ const en: typeof fr = {
   sheetTitle: 'Comments',
   sheetSpoken: '6 comments',
   sheetField: 'The “Write a comment” field, pinned at the bottom.',
+  over: 'On a project page (phone): above the reactions capsule (over), out of the reserved height. The scouts drop stays still, and the button goes above it.',
+  capsule: 'The reactions capsule',
+  drop: 'Give feedback',
 }
 
 const noop = () => {}
@@ -165,6 +174,51 @@ function SheetFrame({ l }: { l: typeof fr }) {
   )
 }
 
+/**
+ * R21 : le bas d'un téléphone de 320 points sur la page d'un projet. La capsule (ici un bouton qui
+ * en tient la place) dans la place flottante, la Goutte posée 8 points au-dessus d'elle, dans le
+ * coin, et le bouton `over` qui passe au-dessus de la Goutte (ce que `Screen` donne par
+ * `FloatingClearanceContext` : la Goutte, 56 points et son écart, dépasse de 64 la place).
+ */
+function OverCapsuleFrame({ l }: { l: typeof fr }) {
+  const { colors } = useTheme()
+  const capsule = 44
+  return (
+    <View
+      style={{
+        height: 260,
+        width: 320,
+        alignSelf: 'center',
+        overflow: 'hidden',
+        borderRadius: radii.tile,
+        backgroundColor: colors.background,
+      }}
+    >
+      <View
+        style={{ position: 'absolute', right: space.lg, bottom: space.lg + capsule + space.sm }}
+      >
+        <HoneyDrop
+          label={l.drop}
+          folded={false}
+          onPress={noop}
+          onLongPress={noop}
+          onUnfold={noop}
+          inline
+          still
+        />
+      </View>
+      <ScreenFloating lift={space.lg}>
+        <FloatingClearanceContext.Provider value={DROP_SIZE + space.sm}>
+          <Stack gap="sm" align="center">
+            <NewCommentsButton count={1} onPress={noop} over />
+            <Button label={l.capsule} variant="glass" size="compact" onPress={noop} />
+          </Stack>
+        </FloatingClearanceContext.Provider>
+      </ScreenFloating>
+    </View>
+  )
+}
+
 export function NewCommentsCatalogue() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -205,6 +259,9 @@ export function NewCommentsCatalogue() {
 
       <Text tone="secondary">{l.inSheet}</Text>
       <SheetFrame l={l} />
+
+      <Text tone="secondary">{l.over}</Text>
+      <OverCapsuleFrame l={l} />
     </Stack>
   )
 }
