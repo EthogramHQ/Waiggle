@@ -13,7 +13,8 @@
 // un vrai `useInfiniteQuery` sur la clé des commentaires, avec un faux serveur choisi par le test.
 import type { Comment, CommentPage, Project } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { AccessibilityInfo, ScrollView } from 'react-native'
+import { createRef } from 'react'
+import { AccessibilityInfo, Text as NativeText, ScrollView, View } from 'react-native'
 import { usePostComment } from '../comments/api'
 import { useMentionable } from '../mentions/api'
 import { getMe } from '../profile/api'
@@ -23,7 +24,7 @@ import { liveSignal } from '../testing/live'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { focusAndReveal } from '../ui/focus'
-import { Comments } from './ProjectComments'
+import { Comments, type CommentsFresh } from './ProjectComments'
 import { lineOf, openSheet, previewNames, sheet, sheetLayer } from './ProjectComments.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -218,7 +219,57 @@ describe('a comment that arrives out of view, while the member reads further dow
 
     // Amené en haut de la liste, là où le commentaire est arrivé (par défilement ou par le focus).
     expect(scrollTo.mock.calls.length + jest.mocked(focusAndReveal).mock.calls.length).toBe(1)
+    // Relecture de design de R21 : un appel sur rien (`null`) ne fait rien voir. S'il passe par
+    // le focus, c'est sur une vue rendue.
+    for (const [node] of jest.mocked(focusAndReveal).mock.calls) expect(node).toBeTruthy()
     expect(screen.queryByRole('button', { name: '1 nouveau commentaire' })).toBeNull()
+  })
+
+  // Relecture de design de R21 : sur la page, le bouton de l'écran s'en allait, mais la page ne
+  // défilait pas : la ligne de l'aperçu (carte `compact`) ne rendait aucune vue à `view()`, et
+  // `focusAndReveal(null)` ne fait rien.
+  it('brings the new line of the page into view when the page button is touched', async () => {
+    // Jest ne place rien à l'écran : on prête aux vues et aux textes natifs un `measureInWindow`
+    // qui met le titre de la section sous le bas de la fenêtre (Léa lit plus haut, la description).
+    const probeText = createRef<NativeText>()
+    const probeView = createRef<View>()
+    const protos = [probeText, probeView]
+    const pageFresh = jest.fn()
+    const fresh = createRef<CommentsFresh>()
+    const { queryClient } = await renderWithProviders(
+      <>
+        <NativeText ref={probeText} />
+        <View ref={probeView} />
+        <Comments project={project} onPageFresh={pageFresh} freshRef={fresh} />
+      </>,
+    )
+    await act(async () => {})
+    const patched = protos.map((probe) => {
+      const proto = Object.getPrototypeOf(probe.current) as { measureInWindow?: unknown }
+      const had = Object.hasOwn(proto, 'measureInWindow')
+      const previous = proto.measureInWindow
+      proto.measureInWindow = (done: (x: number, y: number, w: number, h: number) => void) =>
+        done(0, 5000, 390, 30)
+      return () => {
+        if (had) proto.measureInWindow = previous
+        else delete proto.measureInWindow
+      }
+    })
+    try {
+      mockServer.comments = [firstNew, maxComment, zoeComment]
+      await signalComments(queryClient)
+      // Témoin : l'écran reçoit le nombre, il montrerait le bouton.
+      expect(pageFresh).toHaveBeenLastCalledWith(1)
+      jest.mocked(focusAndReveal).mockClear()
+
+      await act(async () => fresh.current?.goToFresh())
+
+      expect(focusAndReveal).toHaveBeenCalledTimes(1)
+      expect(jest.mocked(focusAndReveal).mock.calls[0]?.[0]).toBeTruthy()
+      expect(pageFresh).toHaveBeenLastCalledWith(0)
+    } finally {
+      for (const restore of patched) restore()
+    }
   })
 
   it('announces the arrival once to the screen reader', async () => {

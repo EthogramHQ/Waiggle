@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next'
 import { Platform, View, type ViewStyle } from 'react-native'
 import { Button } from './Button'
 import { LiveStatus } from './LiveStatus'
+import { holdPageTaps } from './tapGuard'
 
 type Props = {
   /** Le nombre de commentaires arrivés hors de vue ; 0 : rien de neuf, le bouton n'est pas là. */
@@ -90,6 +91,11 @@ export function NewCommentsButton({ count, onPress, announce = true, on = 'page'
           label={label}
           onPress={() => {
             pressed.current = true
+            // Le bouton s'en va sous le doigt : sur le web, la seconde tape d'une double tape
+            // tombait sur ce qui était dessous (« Offrir du miel » à 320 px, « Suivre ce projet » à
+            // 768 px, une autre carte dans la feuille ; relecture de design de R21). La page ignore
+            // les tapes un moment, comme sous une feuille qui se ferme d'elle-même.
+            holdPageTaps()
             onPress()
           }}
           icon={on === 'sheet' ? 'caret-up' : 'caret-down'}
