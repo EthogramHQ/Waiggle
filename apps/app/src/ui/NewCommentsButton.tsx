@@ -35,7 +35,7 @@ type Props = {
   announce?: boolean
   /**
    * Sur quoi le bouton se pose. `page` (défaut) : en verre, dans la place flottante de `Screen`, sur
-   * la lumière de la page. `sheet` : blanc et plein, par-dessus le texte de la liste d'une feuille :
+   * la lumière de la page (plein avec `over`, voir plus bas). `sheet` : blanc et plein, par-dessus le texte de la liste d'une feuille :
    * le verre de nuit y laissait passer les lignes du commentaire dessous, et le libellé se lisait
    * mal (capture du catalogue, R21).
    */
@@ -103,8 +103,8 @@ export function NewCommentsButton({
       style={count > 0 ? { alignSelf: 'center', maxWidth: '100%' } : empty}
     >
       {count > 0 ? (
-        // En verre plutôt qu'en miel : l'action miel de la page (« Tester la démo ») reste la
-        // seule. La flèche montre où sont les nouveaux : sur la page, plus bas que ce qu'on lit (la
+        // En verre ou plein plutôt qu'en miel : l'action miel de la page (« Tester la démo ») reste
+        // la seule. La flèche montre où sont les nouveaux : sur la page, plus bas que ce qu'on lit (la
         // section des commentaires) ; dans la feuille, rangée du plus récent au plus ancien, plus
         // haut. Hauteur `compact`, 44 points : la zone à toucher minimale.
         <Button
@@ -119,7 +119,12 @@ export function NewCommentsButton({
             onPress()
           }}
           icon={on === 'sheet' ? 'caret-up' : 'caret-down'}
-          variant={on === 'sheet' ? 'secondary' : 'glass'}
+          // Plein (`secondary`) dès qu'il se pose sur du texte : dans la feuille, et au-dessus de la
+          // capsule sur téléphone, où il passe sur le contenu de la page qui défile dessous (à
+          // 320 px avec la Goutte, sur « Rejoindre les testeurs » : les deux libellés se lisaient
+          // l'un dans l'autre à travers le verre, sans flou sur le web). En verre seulement dans la
+          // place flottante de l'ordinateur, posée sur la lumière de la page.
+          variant={on === 'sheet' || over ? 'secondary' : 'glass'}
           size="compact"
         />
       ) : null}

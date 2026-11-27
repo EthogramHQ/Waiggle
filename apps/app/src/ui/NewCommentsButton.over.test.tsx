@@ -55,4 +55,34 @@ describe('NewCommentsButton over what it is stacked on', () => {
 
     expect(placeOf('1 nouveau commentaire')?.style.marginBottom).toBe(space.sm + 64)
   })
+
+  // Posé au-dessus de la Goutte, à 320 px, il passait sur « Rejoindre les testeurs » : en verre (sans
+  // flou sur le web), les deux libellés se lisaient l'un dans l'autre (R21, 27/11/2026). Au-dessus
+  // de la page, il prend donc le fond plein de la feuille, et non le verre de la place flottante.
+  it('is solid like on a sheet, not glass, when it floats over the page', async () => {
+    await renderWithProviders(
+      <>
+        <NewCommentsButton count={1} onPress={() => {}} announce={false} />
+        <NewCommentsButton count={2} onPress={() => {}} announce={false} on="sheet" />
+        <NewCommentsButton count={3} onPress={() => {}} announce={false} over />
+      </>,
+    )
+
+    const glass = backgroundOf('1 nouveau commentaire')
+    const solid = backgroundOf('2 nouveaux commentaires')
+    expect(solid).not.toBe(glass)
+    expect(backgroundOf('3 nouveaux commentaires')).toBe(solid)
+  })
 })
+
+/** Le fond du bouton : le premier `backgroundColor` de sa vue ou de ce qu'elle contient. */
+function backgroundOf(name: string) {
+  type Host = { props: Record<string, unknown>; children?: (Host | string)[] }
+  const queue = [screen.getByRole('button', { name }) as unknown as Host]
+  for (let node = queue.shift(); node; node = queue.shift()) {
+    const style = (StyleSheet.flatten(node.props.style as never) ?? {}) as ViewStyle
+    if (style.backgroundColor !== undefined) return style.backgroundColor
+    for (const child of node.children ?? []) if (typeof child !== 'string') queue.push(child)
+  }
+  return undefined
+}
